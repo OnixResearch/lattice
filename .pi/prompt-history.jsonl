@@ -1,0 +1,8 @@
+{"text":"add github/brittonr/subwayrat as a dependency","timestamp":1774849146561}
+{"text":"add redb and nickel lang as dependncies","timestamp":1774849161157}
+{"text":"add verus and tracey","timestamp":1774849205651}
+{"text":"update our cargo toml to use the latest","timestamp":1774849236238}
+{"text":"lets use subwayrat and write a tui for a n8n type applicaiton. we want to use nickel to configure and use redb for the backend. what q's do you have?","timestamp":1774849426001}
+{"text":"1 canvas. 2 shell to start. 3 all 4 what to you suggest? 5. both 6. all. 7. sure. 8. also use blake3 for node hashing and caching hash","timestamp":1774849588255}
+{"text":"make sure we can nix build and nix run","timestamp":1774850578994}
+{"text":"lets get connecting nodes working","timestamp":1774851362789}
