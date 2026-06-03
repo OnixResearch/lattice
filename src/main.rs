@@ -113,7 +113,17 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
         None => {
-            let app = App::new(app_config);
+            let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
+            let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
+            let mut app = App::new(app_config);
+            app.set_node_templates(template_load.templates);
+            for diagnostic in template_load.diagnostics {
+                app.output.push_line(&format!(
+                    "Template diagnostic {}: {}",
+                    diagnostic.path.display(),
+                    diagnostic.message
+                ));
+            }
             app.run_tui().await.map_err(|e| n8nclone::error::Error::Io { source: e })?;
             Ok(ExitCode::SUCCESS)
         }

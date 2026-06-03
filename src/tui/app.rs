@@ -29,6 +29,7 @@ use tracing::info;
 
 use crate::config::AppConfig;
 use crate::config::NodeTemplate;
+use crate::config::render_template_command;
 use crate::engine::executor::Executor;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
@@ -169,6 +170,15 @@ pub fn normalized_node_label(input: &str, default_label: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+pub fn template_parameter_values(template: &NodeTemplate, values: &[String]) -> HashMap<String, String> {
+    template
+        .parameters
+        .iter()
+        .zip(values.iter())
+        .map(|(parameter, value)| (parameter.name.clone(), value.clone()))
+        .collect()
 }
 
 pub fn format_run_record(record: &RunRecord) -> String {
@@ -371,6 +381,7 @@ fn run_detail_status_from_node_run_status(status: NodeRunStatus) -> RunNodeDetai
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddNodeStep {
     TemplateSelect,
+    TemplateParameter,
     Label,
     Command,
 }
@@ -382,6 +393,8 @@ pub struct AddNodeFlowState {
     pub label: String,
     pub command: String,
     pub selected_template: usize,
+    pub parameter_values: Vec<String>,
+    pub parameter_index: usize,
 }
 
 impl AddNodeFlowState {
@@ -392,6 +405,8 @@ impl AddNodeFlowState {
             label: String::new(),
             command: String::new(),
             selected_template: 0,
+            parameter_values: Vec::new(),
+            parameter_index: 0,
         }
     }
 
@@ -402,6 +417,8 @@ impl AddNodeFlowState {
             label: default_label,
             command: String::new(),
             selected_template: 0,
+            parameter_values: Vec::new(),
+            parameter_index: 0,
         }
     }
 
@@ -412,6 +429,8 @@ impl AddNodeFlowState {
             label: String::new(),
             command: String::new(),
             selected_template: 0,
+            parameter_values: Vec::new(),
+            parameter_index: 0,
         }
     }
 }
@@ -791,6 +810,11 @@ impl App {
         match self.add_node_flow.step {
             AddNodeStep::Label => self.add_node_flow.label.push(ch),
             AddNodeStep::Command => self.add_node_flow.command.push(ch),
+            AddNodeStep::TemplateParameter => {
+                if let Some(value) = self.add_node_flow.parameter_values.get_mut(self.add_node_flow.parameter_index) {
+                    value.push(ch);
+                }
+            }
             AddNodeStep::TemplateSelect => {}
         }
     }
@@ -804,6 +828,11 @@ impl App {
             AddNodeStep::Command => {
                 self.add_node_flow.command.pop();
             }
+            AddNodeStep::TemplateParameter => {
+                if let Some(value) = self.add_node_flow.parameter_values.get_mut(self.add_node_flow.parameter_index) {
+                    value.pop();
+                }
+            }
             AddNodeStep::TemplateSelect => {}
         }
     }
@@ -812,6 +841,7 @@ impl App {
     pub fn confirm_add_node_flow(&mut self) {
         match self.add_node_flow.step {
             AddNodeStep::TemplateSelect => self.confirm_template_node(),
+            AddNodeStep::TemplateParameter => self.confirm_template_parameter(),
             AddNodeStep::Label => self.add_node_flow.step = AddNodeStep::Command,
             AddNodeStep::Command => self.confirm_shell_node_from_flow(),
         }
@@ -828,6 +858,34 @@ impl App {
         let Some(template) = self.node_templates.get(self.add_node_flow.selected_template).cloned() else {
             return;
         };
+        if template.parameters.is_empty() {
+            if self.add_template_node(&template) {
+                self.cancel_add_node_flow();
+            }
+            return;
+        }
+        self.start_template_parameter_flow(&template);
+    }
+
+    fn start_template_parameter_flow(&mut self, template: &NodeTemplate) {
+        self.add_node_flow.step = AddNodeStep::TemplateParameter;
+        self.add_node_flow.parameter_index = 0;
+        self.add_node_flow.parameter_values = template
+            .parameters
+            .iter()
+            .map(|parameter| parameter.default.as_ref().map_or_else(String::new, |default| default.as_raw_string()))
+            .collect();
+    }
+
+    fn confirm_template_parameter(&mut self) {
+        let Some(template) = self.node_templates.get(self.add_node_flow.selected_template).cloned() else {
+            return;
+        };
+        let last_parameter_index = template.parameters.len().saturating_sub(1);
+        if self.add_node_flow.parameter_index < last_parameter_index {
+            self.add_node_flow.parameter_index += 1;
+            return;
+        }
         if self.add_template_node(&template) {
             self.cancel_add_node_flow();
         }
@@ -849,8 +907,16 @@ impl App {
             .iter()
             .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
             .collect::<Vec<_>>();
+        let parameter_values = template_parameter_values(template, &self.add_node_flow.parameter_values);
+        let command = match render_template_command(template, &parameter_values) {
+            Ok(command) => command,
+            Err(error) => {
+                self.output.push_line(&format!("Template parameter error: {error}"));
+                return false;
+            }
+        };
         let id = self.workflow.graph.add_node(template.name.clone(), &inputs, &outputs);
-        self.workflow.set_node_config(id, NodeConfig::shell(template.command.clone().unwrap_or_default()));
+        self.workflow.set_node_config(id, NodeConfig::shell(command));
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -1605,6 +1671,9 @@ mod tests {
 
     use super::*;
     use crate::config::PortTemplate;
+    use crate::config::TemplateParameter;
+    use crate::config::TemplateParameterDefault;
+    use crate::config::TemplateParameterType;
     use crate::engine::value::ContentHash;
 
     const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
@@ -1627,6 +1696,11 @@ mod tests {
     const SNAPSHOT_SECOND_RUN_ID: u64 = 1;
     const OLDER_STDOUT_TEXT: &str = "older output";
     const OTHER_NODE_TEXT: &str = "other node output";
+    const TEMPLATE_PARAMETER_COUNT: usize = 1;
+    const TEMPLATE_FIRST_PARAMETER_INDEX: usize = 0;
+    const TEMPLATE_NUMBER_DEFAULT: f64 = 10.0;
+    const TEMPLATE_NUMBER_MIN: f64 = 1.0;
+    const TEMPLATE_NUMBER_MAX: f64 = 10.0;
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1644,6 +1718,32 @@ mod tests {
                 DisplayLine::Omitted(_) => None,
             })
             .collect()
+    }
+
+    fn parameterized_grep_template() -> NodeTemplate {
+        NodeTemplate {
+            name: "grep".to_string(),
+            description: "Filter text".to_string(),
+            kind: "shell".to_string(),
+            command: Some("grep -E '${pattern}'".to_string()),
+            parameters: vec![TemplateParameter {
+                name: "pattern".to_string(),
+                type_tag: TemplateParameterType::String,
+                description: "Search pattern".to_string(),
+                default: None,
+                required: true,
+                min: None,
+                max: None,
+            }],
+            input_ports: vec![PortTemplate {
+                label: "stdin".to_string(),
+                type_tag: "string".to_string(),
+            }],
+            output_ports: vec![PortTemplate {
+                label: "stdout".to_string(),
+                type_tag: "string".to_string(),
+            }],
+        }
     }
 
     fn rendered_output_records(records: Vec<RunOutputLine>) -> Vec<String> {
@@ -1862,6 +1962,7 @@ mod tests {
             description: "Filter text".to_string(),
             kind: "shell".to_string(),
             command: Some("grep needle".to_string()),
+            parameters: Vec::new(),
             input_ports: vec![PortTemplate {
                 label: "stdin".to_string(),
                 type_tag: "string".to_string(),
@@ -1899,6 +2000,72 @@ mod tests {
         assert_eq!(app.workflow.graph.node_count(), 0);
         assert!(!app.is_add_node_flow_open());
         assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn add_node_flow_prompts_and_renders_template_parameters() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.set_node_templates(vec![parameterized_grep_template()]);
+
+        app.open_add_node_flow();
+        app.confirm_add_node_flow();
+
+        assert_eq!(app.add_node_flow.step, AddNodeStep::TemplateParameter);
+        assert_eq!(app.add_node_flow.parameter_values.len(), TEMPLATE_PARAMETER_COUNT);
+        assert_eq!(app.add_node_flow.parameter_index, TEMPLATE_FIRST_PARAMETER_INDEX);
+        app.add_node_flow.parameter_values[TEMPLATE_FIRST_PARAMETER_INDEX] = "needle".to_string();
+        app.confirm_add_node_flow();
+
+        let node_id = app.graph_state.focused.expect("new node focused");
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "grep -E 'needle'"),
+            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+        }
+        assert!(!app.is_add_node_flow_open());
+    }
+
+    #[test]
+    fn cancel_template_parameter_entry_preserves_workflow() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.set_node_templates(vec![parameterized_grep_template()]);
+
+        app.open_add_node_flow();
+        app.confirm_add_node_flow();
+        app.cancel_add_node_flow();
+
+        assert_eq!(app.workflow.graph.node_count(), 0);
+        assert!(!app.is_add_node_flow_open());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn invalid_template_parameter_keeps_flow_recoverable_without_node() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        let mut template = parameterized_grep_template();
+        template.command = Some("head -n ${limit}".to_string());
+        template.parameters = vec![TemplateParameter {
+            name: "limit".to_string(),
+            type_tag: TemplateParameterType::Number,
+            description: "Line limit".to_string(),
+            default: Some(TemplateParameterDefault::Number(TEMPLATE_NUMBER_DEFAULT)),
+            required: true,
+            min: Some(TEMPLATE_NUMBER_MIN),
+            max: Some(TEMPLATE_NUMBER_MAX),
+        }];
+        app.set_node_templates(vec![template]);
+
+        app.open_add_node_flow();
+        app.confirm_add_node_flow();
+        app.add_node_flow.parameter_values[TEMPLATE_FIRST_PARAMETER_INDEX] = "not-a-number".to_string();
+        app.confirm_add_node_flow();
+
+        assert_eq!(app.workflow.graph.node_count(), 0);
+        assert_eq!(app.add_node_flow.step, AddNodeStep::TemplateParameter);
+        assert!(app.is_add_node_flow_open());
+        assert!(output_text_lines(&app).iter().any(|line| line.contains("expects a number")));
     }
 
     #[test]

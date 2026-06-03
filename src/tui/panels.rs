@@ -746,6 +746,7 @@ fn render_add_node_flow(app: &App, area: Rect, buf: &mut Buffer) {
             Line::from(app.add_node_flow.label.clone()),
             Line::styled("Enter: command │ Esc: cancel", Style::default().fg(Color::DarkGray)),
         ],
+        AddNodeStep::TemplateParameter => render_add_node_parameter_lines(app),
         AddNodeStep::Command => vec![
             Line::styled("Shell command", Style::default().fg(Color::Yellow)),
             Line::from(app.add_node_flow.command.clone()),
@@ -777,6 +778,32 @@ fn render_add_node_template_lines(app: &App) -> Vec<Line<'static>> {
     }
 
     lines
+}
+
+fn render_add_node_parameter_lines(app: &App) -> Vec<Line<'static>> {
+    let Some(template) = app.node_templates.get(app.add_node_flow.selected_template) else {
+        return vec![Line::styled("Template missing", Style::default().fg(Color::Red))];
+    };
+    let Some(parameter) = template.parameters.get(app.add_node_flow.parameter_index) else {
+        return vec![Line::styled("Parameter missing", Style::default().fg(Color::Red))];
+    };
+    let value = app
+        .add_node_flow
+        .parameter_values
+        .get(app.add_node_flow.parameter_index)
+        .cloned()
+        .unwrap_or_default();
+    let required = if parameter.required { "required" } else { "optional" };
+    vec![
+        Line::styled(
+            format!("Template parameter {} / {}", app.add_node_flow.parameter_index + 1, template.parameters.len()),
+            Style::default().fg(Color::Yellow),
+        ),
+        Line::from(format!("{} ({:?}, {required})", parameter.name, parameter.type_tag)),
+        Line::from(parameter.description.clone()),
+        Line::from(value),
+        Line::styled("Enter: next/create │ Esc: cancel", Style::default().fg(Color::DarkGray)),
+    ]
 }
 
 fn render_workflow_browser(app: &App, area: Rect, buf: &mut Buffer) {
