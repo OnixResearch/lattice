@@ -1,16 +1,33 @@
 //! Panel rendering: properties sidebar, output log, status bar.
 
-use crate::engine::workflow::NodeConfig;
-use crate::tui::app::{App, FocusPanel};
-use rat_fuzzy::{FuzzyFinder, FuzzyStyle};
+use rat_fuzzy::FuzzyFinder;
+use rat_fuzzy::FuzzyStyle;
 use rat_nodegraph::model::NodeId;
-use rat_nodegraph::view::{InteractionMode, NodeGraphWidget};
+use rat_nodegraph::view::InteractionMode;
+use rat_nodegraph::view::NodeGraphWidget;
 use rat_streaming::render_streaming_lines;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, StatefulWidget, Widget};
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::StatefulWidget;
+use ratatui::widgets::Widget;
+
+use crate::engine::workflow::NodeConfig;
+use crate::tui::app::App;
+use crate::tui::app::FocusPanel;
+
+const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -18,9 +35,9 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
     let vert = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(8),       // canvas + properties
-            Constraint::Length(10),    // output log
-            Constraint::Length(1),     // status bar
+            Constraint::Min(8),     // canvas + properties
+            Constraint::Length(10), // output log
+            Constraint::Length(1),  // status bar
         ])
         .split(area);
 
@@ -53,10 +70,7 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
         Style::default().fg(Color::DarkGray)
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Canvas ")
-        .border_style(border_style);
+    let block = Block::default().borders(Borders::ALL).title(" Canvas ").border_style(border_style);
 
     let inner = block.inner(area);
     block.render(area, buf);
@@ -74,10 +88,7 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
         Style::default().fg(Color::DarkGray)
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Properties ")
-        .border_style(border_style);
+    let block = Block::default().borders(Borders::ALL).title(" Properties ").border_style(border_style);
 
     let inner = block.inner(area);
     block.render(area, buf);
@@ -90,9 +101,7 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
         } else {
             "Multiple nodes selected"
         };
-        Paragraph::new(hint)
-            .style(Style::default().fg(Color::DarkGray))
-            .render(inner, buf);
+        Paragraph::new(hint).style(Style::default().fg(Color::DarkGray)).render(inner, buf);
         return;
     }
 
@@ -105,10 +114,7 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
     let mut lines = vec![
         Line::from(vec![
             Span::styled("Node: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                node.label.clone(),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-            ),
+            Span::styled(node.label.clone(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         ]),
         Line::from(vec![
             Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
@@ -147,10 +153,7 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("Pipe stdin: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        if *pipe_stdin { "yes" } else { "no" },
-                        Style::default().fg(Color::Gray),
-                    ),
+                    Span::styled(if *pipe_stdin { "yes" } else { "no" }, Style::default().fg(Color::Gray)),
                 ]));
             }
         }
@@ -158,32 +161,20 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
 
     // Show ports.
     lines.push(Line::from(""));
-    lines.push(Line::styled(
-        "─ Inputs ─",
-        Style::default().fg(Color::DarkGray),
-    ));
+    lines.push(Line::styled("─ Inputs ─", Style::default().fg(Color::DarkGray)));
     for port in &node.input_ports {
         lines.push(Line::from(vec![
             Span::styled("● ", Style::default().fg(Color::Cyan)),
             Span::raw(port.label.clone()),
-            Span::styled(
-                format!(" ({})", port.type_tag),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(format!(" ({})", port.type_tag), Style::default().fg(Color::DarkGray)),
         ]));
     }
-    lines.push(Line::styled(
-        "─ Outputs ─",
-        Style::default().fg(Color::DarkGray),
-    ));
+    lines.push(Line::styled("─ Outputs ─", Style::default().fg(Color::DarkGray)));
     for port in &node.output_ports {
         lines.push(Line::from(vec![
             Span::styled("● ", Style::default().fg(Color::Green)),
             Span::raw(port.label.clone()),
-            Span::styled(
-                format!(" ({})", port.type_tag),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(format!(" ({})", port.type_tag), Style::default().fg(Color::DarkGray)),
         ]));
     }
 
@@ -199,21 +190,14 @@ fn render_output(app: &mut App, area: Rect, buf: &mut Buffer) {
         Style::default().fg(Color::DarkGray)
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Output ")
-        .border_style(border_style);
+    let block = Block::default().borders(Borders::ALL).title(" Output ").border_style(border_style);
 
     let inner = block.inner(area);
     block.render(area, buf);
 
     // Render streaming output lines.
     let visible_height = inner.height as usize;
-    let rendered_lines = render_streaming_lines(
-        &mut app.output,
-        visible_height,
-        Style::default().fg(Color::DarkGray),
-    );
+    let rendered_lines = render_streaming_lines(&mut app.output, visible_height, Style::default().fg(Color::DarkGray));
 
     for (i, line) in rendered_lines.iter().enumerate() {
         if i >= inner.height as usize {
@@ -236,46 +220,90 @@ fn render_output(app: &mut App, area: Rect, buf: &mut Buffer) {
 /// Render the status bar.
 fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
     let mode_span = match &app.graph_state.mode {
-        InteractionMode::Wiring { .. } => {
-            Span::styled(" WIRING ", Style::default().bg(Color::Yellow).fg(Color::Black))
-        }
+        InteractionMode::Wiring { .. } => Span::styled(" WIRING ", Style::default().bg(Color::Yellow).fg(Color::Black)),
         _ => match app.focus {
-            FocusPanel::Canvas => {
-                Span::styled(" CANVAS ", Style::default().bg(Color::Cyan).fg(Color::Black))
-            }
-            FocusPanel::Properties => {
-                Span::styled(" PROPS ", Style::default().bg(Color::Yellow).fg(Color::Black))
-            }
-            FocusPanel::Output => {
-                Span::styled(" OUTPUT ", Style::default().bg(Color::Magenta).fg(Color::Black))
-            }
+            FocusPanel::Canvas => Span::styled(" CANVAS ", Style::default().bg(Color::Cyan).fg(Color::Black)),
+            FocusPanel::Properties => Span::styled(" PROPS ", Style::default().bg(Color::Yellow).fg(Color::Black)),
+            FocusPanel::Output => Span::styled(" OUTPUT ", Style::default().bg(Color::Magenta).fg(Color::Black)),
         },
     };
 
-    let wf_name = Span::styled(
-        format!(" {} ", app.workflow.meta.name),
-        Style::default().fg(Color::White),
-    );
+    let wf_name = Span::styled(format!(" {} ", app.workflow.meta.name), Style::default().fg(Color::White));
 
     let node_count = app.graph_state.graph.node_count();
     let edge_count = app.graph_state.graph.edge_count();
-    let stats = Span::styled(
-        format!(" {node_count} nodes │ {edge_count} edges "),
-        Style::default().fg(Color::DarkGray),
-    );
+    let stats =
+        Span::styled(format!(" {node_count} nodes │ {edge_count} edges "), Style::default().fg(Color::DarkGray));
 
-    let help_text = match &app.graph_state.mode {
-        InteractionMode::Wiring { .. } => {
-            " Click target port to connect │ Esc: cancel "
-        }
-        _ => " C-P: palette │ C-R: run │ C-N: add │ C-L: layout ",
-    };
+    let help_text = contextual_help_text(FooterHelpContext {
+        focus: app.focus,
+        palette_open: app.show_palette,
+        interaction_mode: footer_interaction_mode(&app.graph_state.mode),
+        width: area.width,
+    });
     let help = Span::styled(help_text, Style::default().fg(Color::DarkGray));
 
     let line = Line::from(vec![mode_span, wf_name, stats, help]);
-    Paragraph::new(line)
-        .style(Style::default().bg(Color::Black))
-        .render(area, buf);
+    Paragraph::new(line).style(Style::default().bg(Color::Black)).render(area, buf);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FooterInteractionMode {
+    Default,
+    Wiring,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FooterHelpContext {
+    focus: FocusPanel,
+    palette_open: bool,
+    interaction_mode: FooterInteractionMode,
+    width: u16,
+}
+
+fn footer_interaction_mode(mode: &InteractionMode) -> FooterInteractionMode {
+    if matches!(mode, InteractionMode::Wiring { .. }) {
+        FooterInteractionMode::Wiring
+    } else {
+        FooterInteractionMode::Default
+    }
+}
+
+// r[impl n8nclone.tui_ux.help_footer.contextual]
+fn contextual_help_text(context: FooterHelpContext) -> &'static str {
+    if context.width < COMPACT_STATUS_HELP_WIDTH {
+        return compact_contextual_help_text(context);
+    }
+
+    if context.palette_open {
+        return " Type: filter │ ↑/↓: select │ Enter: run │ Esc: close ";
+    }
+
+    if context.interaction_mode == FooterInteractionMode::Wiring {
+        return " Click target port: connect │ Esc: cancel wiring ";
+    }
+
+    match context.focus {
+        FocusPanel::Canvas => " C-P: palette │ C-N: add │ C-R: run │ C-L: layout │ A-Tab: focus ",
+        FocusPanel::Properties => " e: edit │ C-S: save │ C-P: palette │ A-Tab: focus ",
+        FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
+    }
+}
+
+fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
+    if context.palette_open {
+        return " Enter: run │ Esc ";
+    }
+
+    if context.interaction_mode == FooterInteractionMode::Wiring {
+        return " Click target │ Esc ";
+    }
+
+    match context.focus {
+        FocusPanel::Canvas => " C-P palette │ C-N add ",
+        FocusPanel::Properties => " e edit │ A-Tab ",
+        FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
+    }
 }
 
 /// Render the fuzzy command palette overlay.
@@ -301,4 +329,69 @@ fn render_palette(app: &mut App, area: Rect, buf: &mut Buffer) {
     let style = FuzzyStyle::default();
     let widget = FuzzyFinder::new(&app.palette_data, style);
     widget.render(inner, buf, &mut app.palette_state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const WIDE_STATUS_WIDTH: u16 = COMPACT_STATUS_HELP_WIDTH;
+    const NARROW_STATUS_WIDTH: u16 = COMPACT_STATUS_HELP_WIDTH - 1;
+
+    fn context(focus: FocusPanel) -> FooterHelpContext {
+        FooterHelpContext {
+            focus,
+            palette_open: false,
+            interaction_mode: FooterInteractionMode::Default,
+            width: WIDE_STATUS_WIDTH,
+        }
+    }
+
+    #[test]
+    fn contextual_help_matches_canvas_and_wiring_modes() {
+        assert_eq!(
+            contextual_help_text(context(FocusPanel::Canvas)),
+            " C-P: palette │ C-N: add │ C-R: run │ C-L: layout │ A-Tab: focus ",
+        );
+
+        let wiring = FooterHelpContext {
+            interaction_mode: FooterInteractionMode::Wiring,
+            ..context(FocusPanel::Canvas)
+        };
+        assert_eq!(contextual_help_text(wiring), " Click target port: connect │ Esc: cancel wiring ",);
+    }
+
+    #[test]
+    fn contextual_help_matches_properties_and_output_focus() {
+        assert_eq!(
+            contextual_help_text(context(FocusPanel::Properties)),
+            " e: edit │ C-S: save │ C-P: palette │ A-Tab: focus ",
+        );
+        assert_eq!(contextual_help_text(context(FocusPanel::Output)), " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",);
+    }
+
+    #[test]
+    fn contextual_help_reports_palette_modal() {
+        let palette = FooterHelpContext {
+            palette_open: true,
+            ..context(FocusPanel::Canvas)
+        };
+
+        assert_eq!(contextual_help_text(palette), " Type: filter │ ↑/↓: select │ Enter: run │ Esc: close ",);
+    }
+
+    #[test]
+    fn contextual_help_uses_compact_copy_for_narrow_width() {
+        let narrow = FooterHelpContext {
+            width: NARROW_STATUS_WIDTH,
+            ..context(FocusPanel::Canvas)
+        };
+        assert_eq!(contextual_help_text(narrow), " C-P palette │ C-N add ");
+
+        let narrow_wiring = FooterHelpContext {
+            interaction_mode: FooterInteractionMode::Wiring,
+            ..narrow
+        };
+        assert_eq!(contextual_help_text(narrow_wiring), " Click target │ Esc ");
+    }
 }
