@@ -1,7 +1,21 @@
 //! Input handling: dispatch key/mouse events to the focused panel.
 
-use crate::tui::app::{App, AppAction, FocusPanel};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::event::Event;
+use crossterm::event::KeyCode;
+use crossterm::event::KeyEvent;
+use crossterm::event::KeyModifiers;
+use crossterm::event::MouseEvent;
+use crossterm::event::MouseEventKind;
+use rat_fuzzy::Action as FuzzyAction;
+use rat_fuzzy::handle_action as handle_fuzzy_action;
+
+use crate::tui::app::App;
+use crate::tui::app::AppAction;
+use crate::tui::app::FocusPanel;
+use crate::tui::app::palette_action;
+
+const OUTPUT_SCROLL_MARGIN_ROWS: usize = 8;
+const MOUSE_WHEEL_PAN_ROWS: i32 = 3;
 
 /// Process a terminal event and return any resulting app action.
 pub fn handle_event(app: &mut App, event: &Event) -> Option<AppAction> {
@@ -17,26 +31,32 @@ pub fn handle_event(app: &mut App, event: &Event) -> Option<AppAction> {
 }
 
 fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
-    // Global keybindings (regardless of focus).
+    // Hard quit keybindings remain global even while a modal is open.
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('c')) => return Some(AppAction::Quit),
         (KeyModifiers::CONTROL, KeyCode::Char('q')) => return Some(AppAction::Quit),
-        (KeyModifiers::CONTROL, KeyCode::Char('p')) => {
-            app.show_palette = !app.show_palette;
-            return None;
-        }
+        _ => {}
+    }
+
+    // Ctrl-P toggles the command palette.
+    if matches!((key.modifiers, key.code), (KeyModifiers::CONTROL, KeyCode::Char('p'))) {
+        toggle_palette(app);
+        return None;
+    }
+
+    // Palette input has modal priority over global workflow shortcuts.
+    if app.show_palette {
+        return handle_palette_key(app, key);
+    }
+
+    // Global keybindings (regardless of focus).
+    match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Some(AppAction::RunWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Some(AppAction::SaveWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('l')) => return Some(AppAction::AutoLayout),
         _ => {}
-    }
-
-    // Escape closes palette overlay.
-    if key.code == KeyCode::Esc && app.show_palette {
-        app.show_palette = false;
-        return None;
     }
 
     // Tab cycles focus between panels.
@@ -51,6 +71,90 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
     }
+}
+
+fn toggle_palette(app: &mut App) {
+    if app.show_palette {
+        close_palette(app);
+    } else {
+        app.show_palette = true;
+        handle_fuzzy_action(&mut app.palette_state, FuzzyAction::Open, &app.palette_data);
+    }
+}
+
+fn close_palette(app: &mut App) {
+    app.show_palette = false;
+    app.palette_state.open = false;
+    app.palette_state.query.clear();
+    app.palette_state.results.clear();
+    app.palette_state.selected = 0;
+    app.palette_state.scroll_offset = 0;
+}
+
+fn handle_palette_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match palette_key_action(key) {
+        PaletteKeyAction::Close => {
+            close_palette(app);
+            None
+        }
+        PaletteKeyAction::Backspace => {
+            handle_fuzzy_action(&mut app.palette_state, FuzzyAction::Backspace, &app.palette_data);
+            None
+        }
+        PaletteKeyAction::SelectNext => {
+            handle_fuzzy_action(&mut app.palette_state, FuzzyAction::SelectNext, &app.palette_data);
+            None
+        }
+        PaletteKeyAction::SelectPrev => {
+            handle_fuzzy_action(&mut app.palette_state, FuzzyAction::SelectPrev, &app.palette_data);
+            None
+        }
+        PaletteKeyAction::TypeChar(ch) => {
+            handle_fuzzy_action(&mut app.palette_state, FuzzyAction::TypeChar(ch), &app.palette_data);
+            None
+        }
+        PaletteKeyAction::Confirm => confirm_palette_selection(app),
+        PaletteKeyAction::Ignore => None,
+    }
+}
+
+fn confirm_palette_selection(app: &mut App) -> Option<AppAction> {
+    if app.palette_state.result_count() == 0 {
+        return None;
+    }
+
+    handle_fuzzy_action(&mut app.palette_state, FuzzyAction::Confirm, &app.palette_data);
+
+    let selected = app.palette_state.take_result().and_then(|candidate| palette_action(&candidate.id));
+    close_palette(app);
+    selected
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PaletteKeyAction {
+    Close,
+    Backspace,
+    SelectNext,
+    SelectPrev,
+    TypeChar(char),
+    Confirm,
+    Ignore,
+}
+
+fn palette_key_action(key: &KeyEvent) -> PaletteKeyAction {
+    match key.code {
+        KeyCode::Esc => PaletteKeyAction::Close,
+        KeyCode::Enter => PaletteKeyAction::Confirm,
+        KeyCode::Backspace => PaletteKeyAction::Backspace,
+        KeyCode::Down => PaletteKeyAction::SelectNext,
+        KeyCode::Up => PaletteKeyAction::SelectPrev,
+        KeyCode::Char(ch) if accepts_palette_text(key.modifiers) => PaletteKeyAction::TypeChar(ch),
+        _ => PaletteKeyAction::Ignore,
+    }
+}
+
+fn accepts_palette_text(modifiers: KeyModifiers) -> bool {
+    modifiers.is_empty() || modifiers == KeyModifiers::SHIFT
 }
 
 fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
@@ -95,7 +199,7 @@ fn handle_output_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
             app.output.scroll_up(1);
         }
         KeyCode::Down => {
-            app.output.scroll_down(1, 8);
+            app.output.scroll_down(1, OUTPUT_SCROLL_MARGIN_ROWS);
         }
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             return Some(AppAction::Quit);
@@ -170,12 +274,101 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
             }
         }
         MouseEventKind::ScrollUp => {
-            app.graph_state.viewport.pan(0, -3);
+            app.graph_state.viewport.pan(0, -MOUSE_WHEEL_PAN_ROWS);
         }
         MouseEventKind::ScrollDown => {
-            app.graph_state.viewport.pan(0, 3);
+            app.graph_state.viewport.pan(0, MOUSE_WHEEL_PAN_ROWS);
         }
         _ => {}
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use crossterm::event::Event;
+    use crossterm::event::KeyCode;
+    use crossterm::event::KeyEvent;
+    use crossterm::event::KeyModifiers;
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::config::AppConfig;
+
+    fn test_app() -> (TempDir, App) {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let config = AppConfig {
+            data_dir: temp_dir.path().join("data"),
+            ..AppConfig::default()
+        };
+        (temp_dir, App::new(config))
+    }
+
+    fn key_event(modifiers: KeyModifiers, code: KeyCode) -> Event {
+        Event::Key(KeyEvent::new(code, modifiers))
+    }
+
+    #[test]
+    fn palette_executes_filtered_action_and_closes() {
+        let (_temp_dir, mut app) = test_app();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('p')),), None,);
+        assert!(app.show_palette);
+
+        for ch in ['r', 'u', 'n'] {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)),
+            Some(AppAction::RunWorkflow),
+        );
+        assert!(!app.show_palette);
+    }
+
+    #[test]
+    fn palette_navigation_executes_selected_action() {
+        let (_temp_dir, mut app) = test_app();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('p')),), None,);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Down)), None,);
+
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)),
+            Some(AppAction::RunWorkflow),
+        );
+        assert!(!app.show_palette);
+    }
+
+    #[test]
+    fn palette_escape_closes_without_changing_workflow() {
+        let (_temp_dir, mut app) = test_app();
+        let node_count = app.workflow.graph.node_count();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('p')),), None,);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('a'))), None,);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
+
+        assert!(!app.show_palette);
+        assert!(app.palette_state.query.is_empty());
+        assert_eq!(app.workflow.graph.node_count(), node_count);
+    }
+
+    #[test]
+    fn palette_enter_with_no_match_keeps_recoverable_state() {
+        let (_temp_dir, mut app) = test_app();
+        let node_count = app.workflow.graph.node_count();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('p')),), None,);
+        for ch in ['z', 'z'] {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(app.palette_state.result_count(), 0);
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
+        assert!(app.show_palette);
+        assert_eq!(app.palette_state.query, "zz");
+        assert_eq!(app.workflow.graph.node_count(), node_count);
+    }
 }
