@@ -6,10 +6,13 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
 use crossterm::event::MouseEvent;
 use crossterm::event::MouseEventKind;
+use rat_canvas::Position;
 use rat_fuzzy::Action as FuzzyAction;
 use rat_fuzzy::handle_action as handle_fuzzy_action;
+use rat_nodegraph::model::Graph;
 use rat_nodegraph::view::GraphAction;
 use rat_nodegraph::view::InteractionMode;
+use rat_nodegraph::view::node_bounds;
 
 use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
@@ -20,6 +23,12 @@ use crate::tui::app::palette_action;
 
 const OUTPUT_SCROLL_MARGIN_ROWS: usize = 8;
 const MOUSE_WHEEL_PAN_ROWS: i32 = 3;
+const PORT_SNAP_RADIUS_CELLS: i32 = 1;
+const INPUT_PORT_MARKER_X_FROM_NODE_LEFT: i32 = 1;
+const OUTPUT_PORT_MARKER_RIGHT_INSET: i32 = 2;
+const OUTPUT_PORT_HIT_RIGHT_INSET: i32 = 1;
+const PORT_HIT_ROW_FROM_NODE_TOP: i32 = 2;
+const PORT_MARKER_ROW_FROM_NODE_TOP: i32 = 3;
 
 /// Process a terminal event and return any resulting app action.
 pub fn handle_event(app: &mut App, event: &Event) -> Option<AppAction> {
@@ -423,6 +432,82 @@ fn graph_counts_changed(before: GraphCounts, after: GraphCounts) -> bool {
     before != after
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CanvasPosition {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MouseCoordinates {
+    column: u16,
+    row: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PortSnapTarget {
+    marker: CanvasPosition,
+    hit: CanvasPosition,
+}
+
+fn port_snap_target(graph: &Graph, cursor: CanvasPosition) -> Option<PortSnapTarget> {
+    let mut nearest: Option<(i32, PortSnapTarget)> = None;
+
+    for node in graph.nodes() {
+        let Some(bounds) = node_bounds(graph, node.id) else {
+            continue;
+        };
+
+        for (index, _) in node.input_ports.iter().enumerate() {
+            let port_index = i32::try_from(index).expect("port index fits in canvas coordinates");
+            let marker = CanvasPosition {
+                x: bounds.x + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
+                y: bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
+            };
+            let hit = CanvasPosition {
+                x: bounds.x,
+                y: bounds.y + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
+            };
+            nearest = nearest_port_snap_target(nearest, cursor, marker, hit);
+        }
+
+        for (index, _) in node.output_ports.iter().enumerate() {
+            let port_index = i32::try_from(index).expect("port index fits in canvas coordinates");
+            let marker = CanvasPosition {
+                x: bounds.x + i32::from(bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
+                y: bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
+            };
+            let hit = CanvasPosition {
+                x: bounds.x + i32::from(bounds.width) - OUTPUT_PORT_HIT_RIGHT_INSET,
+                y: bounds.y + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
+            };
+            nearest = nearest_port_snap_target(nearest, cursor, marker, hit);
+        }
+    }
+
+    nearest.map(|(_, target)| target)
+}
+
+fn nearest_port_snap_target(
+    current: Option<(i32, PortSnapTarget)>,
+    cursor: CanvasPosition,
+    marker: CanvasPosition,
+    hit: CanvasPosition,
+) -> Option<(i32, PortSnapTarget)> {
+    let dx = (cursor.x - marker.x).abs();
+    let dy = (cursor.y - marker.y).abs();
+    if dx > PORT_SNAP_RADIUS_CELLS || dy > PORT_SNAP_RADIUS_CELLS {
+        return current;
+    }
+
+    let distance = dx + dy;
+    let target = PortSnapTarget { marker, hit };
+    match current {
+        Some((best_distance, best_target)) if best_distance <= distance => Some((best_distance, best_target)),
+        _ => Some((distance, target)),
+    }
+}
+
 fn apply_graph_actions(app: &mut App, actions: &[GraphAction]) {
     app.graph_state.apply_actions(actions);
     app.workflow.graph = app.graph_state.graph.clone();
@@ -435,16 +520,47 @@ fn apply_graph_actions_and_mark_count_changes(app: &mut App, before: GraphCounts
     }
 }
 
-fn mouse_canvas_position(app: &App, mouse: &MouseEvent) -> (i32, i32) {
+fn mouse_canvas_position(app: &App, mouse: &MouseEvent) -> CanvasPosition {
     let canvas_pos = app.graph_state.viewport.screen_to_canvas(
         mouse.column.saturating_sub(app.graph_state.area.x),
         mouse.row.saturating_sub(app.graph_state.area.y),
     );
-    (canvas_pos.x, canvas_pos.y)
+    CanvasPosition {
+        x: canvas_pos.x,
+        y: canvas_pos.y,
+    }
 }
 
-fn is_drag_release(start: Option<(i32, i32)>, end: (i32, i32)) -> bool {
-    matches!(start, Some(start) if start != end)
+fn snapped_wiring_canvas_position(app: &App, mouse: &MouseEvent) -> CanvasPosition {
+    let cursor = mouse_canvas_position(app, mouse);
+    port_snap_target(&app.graph_state.graph, cursor).map_or(cursor, |target| target.marker)
+}
+
+fn graph_click_coordinates(app: &App, mouse: &MouseEvent) -> MouseCoordinates {
+    let cursor = mouse_canvas_position(app, mouse);
+    let hit = port_snap_target(&app.graph_state.graph, cursor).map_or(cursor, |target| target.hit);
+    canvas_to_mouse_coordinates(app, hit).unwrap_or(MouseCoordinates {
+        column: mouse.column,
+        row: mouse.row,
+    })
+}
+
+fn canvas_to_mouse_coordinates(app: &App, canvas: CanvasPosition) -> Option<MouseCoordinates> {
+    app.graph_state
+        .viewport
+        .canvas_to_screen(Position::new(canvas.x, canvas.y))
+        .map(|(column, row)| MouseCoordinates {
+            column: column.saturating_add(app.graph_state.area.x),
+            row: row.saturating_add(app.graph_state.area.y),
+        })
+}
+
+fn canvas_position_tuple(position: CanvasPosition) -> (i32, i32) {
+    (position.x, position.y)
+}
+
+fn is_drag_release(start: Option<(i32, i32)>, end: CanvasPosition) -> bool {
+    matches!(start, Some(start) if start != canvas_position_tuple(end))
 }
 
 fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
@@ -452,25 +568,32 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
         MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
             let before = graph_counts(app);
             let shift = mouse.modifiers.contains(KeyModifiers::SHIFT);
-            let actions = app.graph_state.handle_mouse_click(mouse.column, mouse.row, shift);
+            let click = graph_click_coordinates(app, mouse);
+            let actions = app.graph_state.handle_mouse_click(click.column, click.row, shift);
             apply_graph_actions_and_mark_count_changes(app, before, &actions);
 
             // Record drag start position.
-            app.last_drag_canvas = Some(mouse_canvas_position(app, mouse));
+            let drag_start = if matches!(app.graph_state.mode, InteractionMode::Wiring { .. }) {
+                snapped_wiring_canvas_position(app, mouse)
+            } else {
+                mouse_canvas_position(app, mouse)
+            };
+            app.last_drag_canvas = Some(canvas_position_tuple(drag_start));
         }
         MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
             let canvas_pos = mouse_canvas_position(app, mouse);
 
             // During wiring, update the preview cursor instead of dragging nodes.
             if matches!(app.graph_state.mode, InteractionMode::Wiring { .. }) {
+                let snapped_pos = snapped_wiring_canvas_position(app, mouse);
                 if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                    *cursor_x = canvas_pos.0;
-                    *cursor_y = canvas_pos.1;
+                    *cursor_x = snapped_pos.x;
+                    *cursor_y = snapped_pos.y;
                 }
             } else {
                 // Compute drag delta from last canvas position.
                 let (dx, dy) = if let Some((prev_x, prev_y)) = app.last_drag_canvas {
-                    (canvas_pos.0 - prev_x, canvas_pos.1 - prev_y)
+                    (canvas_pos.x - prev_x, canvas_pos.y - prev_y)
                 } else {
                     (0, 0)
                 };
@@ -484,19 +607,19 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
                     }
                 }
 
-                app.last_drag_canvas = Some(canvas_pos);
+                app.last_drag_canvas = Some(canvas_position_tuple(canvas_pos));
             }
         }
         MouseEventKind::Moved => {
             // Update wiring preview cursor on mouse movement.
-            let canvas_pos = mouse_canvas_position(app, mouse);
+            let canvas_pos = snapped_wiring_canvas_position(app, mouse);
             if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                *cursor_x = canvas_pos.0;
-                *cursor_y = canvas_pos.1;
+                *cursor_x = canvas_pos.x;
+                *cursor_y = canvas_pos.y;
             }
         }
         MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
-            let canvas_pos = mouse_canvas_position(app, mouse);
+            let canvas_pos = snapped_wiring_canvas_position(app, mouse);
             let should_complete_drag_wiring = matches!(app.graph_state.mode, InteractionMode::Wiring { .. })
                 && is_drag_release(app.last_drag_canvas, canvas_pos);
             app.last_drag_canvas = None;
@@ -504,7 +627,8 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
             if should_complete_drag_wiring {
                 let before = graph_counts(app);
                 let shift = mouse.modifiers.contains(KeyModifiers::SHIFT);
-                let actions = app.graph_state.handle_mouse_click(mouse.column, mouse.row, shift);
+                let click = graph_click_coordinates(app, mouse);
+                let actions = app.graph_state.handle_mouse_click(click.column, click.row, shift);
                 apply_graph_actions_and_mark_count_changes(app, before, &actions);
             } else if matches!(app.graph_state.mode, InteractionMode::BoxSelect { .. }) {
                 // Finalize box selection on mouse up.
@@ -547,7 +671,6 @@ mod tests {
         (temp_dir, App::new(config))
     }
 
-    const FIRST_PORT_ROW_FROM_NODE_TOP: i32 = 2;
     const NODE_BODY_INSET: i32 = 1;
 
     fn key_event(modifiers: KeyModifiers, code: KeyCode) -> Event {
@@ -574,6 +697,17 @@ mod tests {
         )
     }
 
+    fn screen_to_canvas(app: &App, column: u16, row: u16) -> CanvasPosition {
+        let canvas_pos = app.graph_state.viewport.screen_to_canvas(
+            column.saturating_sub(app.graph_state.area.x),
+            row.saturating_sub(app.graph_state.area.y),
+        );
+        CanvasPosition {
+            x: canvas_pos.x,
+            y: canvas_pos.y,
+        }
+    }
+
     fn shell_port_positions(app: &App) -> ((u16, u16), (u16, u16), (u16, u16)) {
         let node_ids = app.graph_state.graph.node_ids();
         let source_id = node_ids.first().copied().expect("source node exists");
@@ -582,10 +716,14 @@ mod tests {
         let target_bounds = node_bounds(&app.graph_state.graph, target_id).expect("target bounds");
         let source_output = canvas_to_screen(
             app,
-            source_bounds.x + i32::from(source_bounds.width) - NODE_BODY_INSET,
-            source_bounds.y + FIRST_PORT_ROW_FROM_NODE_TOP,
+            source_bounds.x + i32::from(source_bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
+            source_bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP,
         );
-        let target_input = canvas_to_screen(app, target_bounds.x, target_bounds.y + FIRST_PORT_ROW_FROM_NODE_TOP);
+        let target_input = canvas_to_screen(
+            app,
+            target_bounds.x + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
+            target_bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP,
+        );
         let target_body = canvas_to_screen(app, target_bounds.x + NODE_BODY_INSET, target_bounds.y + NODE_BODY_INSET);
         (source_output, target_input, target_body)
     }
@@ -731,6 +869,43 @@ mod tests {
 
         assert_eq!(
             handle_event(&mut app, &mouse_event(MouseEventKind::Up(MouseButton::Left), target_input.0, target_input.1),),
+            None,
+        );
+
+        assert_eq!(app.workflow.graph.edge_count(), 1);
+        assert!(matches!(app.graph_state.mode, InteractionMode::Normal));
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn mouse_drag_release_near_visible_input_snaps_to_edge() {
+        let (_temp_dir, mut app) = app_with_two_shell_nodes();
+        let (source_output, target_input, _) = shell_port_positions(&app);
+        let snap_offset = u16::try_from(PORT_SNAP_RADIUS_CELLS).expect("snap radius fits in terminal coordinates");
+        let near_target = (target_input.0.saturating_add(snap_offset), target_input.1);
+
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Down(MouseButton::Left), source_output.0, source_output.1),
+            ),
+            None,
+        );
+        assert_eq!(
+            handle_event(&mut app, &mouse_event(MouseEventKind::Drag(MouseButton::Left), near_target.0, near_target.1),),
+            None,
+        );
+        let target_canvas = screen_to_canvas(&app, target_input.0, target_input.1);
+        assert!(
+            matches!(
+                &app.graph_state.mode,
+                InteractionMode::Wiring { cursor_x, cursor_y, .. }
+                    if *cursor_x == target_canvas.x && *cursor_y == target_canvas.y
+            ),
+            "wiring preview should snap to the visible input dot",
+        );
+        assert_eq!(
+            handle_event(&mut app, &mouse_event(MouseEventKind::Up(MouseButton::Left), near_target.0, near_target.1),),
             None,
         );
 
