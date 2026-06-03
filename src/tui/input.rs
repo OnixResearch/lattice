@@ -55,6 +55,11 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         _ => {}
     }
 
+    if app.property_edit.is_some() {
+        handle_property_edit_key(app, key);
+        return None;
+    }
+
     if app.is_run_history_open() {
         return handle_run_history_key(app, key);
     }
@@ -87,6 +92,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('l')) => return Some(AppAction::AutoLayout),
+        (KeyModifiers::CONTROL, KeyCode::Char('e')) => return Some(AppAction::EditNodeCommand),
         _ => {}
     }
 
@@ -323,6 +329,11 @@ fn accepts_palette_text(modifiers: KeyModifiers) -> bool {
 }
 
 fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    if let Some(field) = property_edit_shortcut(key) {
+        app.start_property_edit(field);
+        return None;
+    }
+
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
     let key_name = match key.code {
@@ -361,24 +372,19 @@ fn canvas_key_may_mutate(key: &KeyEvent, has_selection: bool) -> bool {
 }
 
 fn handle_properties_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
-    if app.property_edit.is_some() {
-        handle_property_edit_key(app, key);
-        return None;
-    }
-
-    match key.code {
-        KeyCode::Char('l') if accepts_palette_text(key.modifiers) => {
-            app.start_property_edit(PropertyEditField::Label);
-        }
-        KeyCode::Char('e') if accepts_palette_text(key.modifiers) => {
-            app.start_property_edit(PropertyEditField::Command);
-        }
-        KeyCode::Char('t') if accepts_palette_text(key.modifiers) => {
-            app.start_property_edit(PropertyEditField::TimeoutSecs);
-        }
-        _ => {}
+    if let Some(field) = property_edit_shortcut(key) {
+        app.start_property_edit(field);
     }
     None
+}
+
+fn property_edit_shortcut(key: &KeyEvent) -> Option<PropertyEditField> {
+    match key.code {
+        KeyCode::Char('l') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::Label),
+        KeyCode::Char('e') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::Command),
+        KeyCode::Char('t') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::TimeoutSecs),
+        _ => None,
+    }
 }
 
 fn handle_property_edit_key(app: &mut App, key: &KeyEvent) {
@@ -660,6 +666,7 @@ mod tests {
     use super::*;
     use crate::config::AppConfig;
     use crate::engine::workflow::NodeConfig;
+    use crate::tui::app::PropertyEditState;
     use crate::tui::app::WorkflowBrowserState;
 
     fn test_app() -> (TempDir, App) {
@@ -763,7 +770,23 @@ mod tests {
 
         assert_eq!(
             handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)),
-            Some(AppAction::RunWorkflow),
+            Some(AppAction::EditNodeCommand),
+        );
+        assert!(!app.show_palette);
+    }
+
+    #[test]
+    fn palette_filters_to_edit_command_action() {
+        let (_temp_dir, mut app) = test_app();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('p')),), None,);
+        for ch in "command".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)),
+            Some(AppAction::EditNodeCommand),
         );
         assert!(!app.show_palette);
     }
@@ -975,6 +998,76 @@ mod tests {
 
         assert_eq!(app.workflow.graph.edge_count(), 0);
         assert!(matches!(app.graph_state.mode, InteractionMode::Normal));
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn canvas_key_edits_shell_command_without_focus_change() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("Example", "");
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Canvas;
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('e'))), None,);
+        assert!(matches!(
+            app.property_edit,
+            Some(PropertyEditState {
+                field: PropertyEditField::Command,
+                ..
+            })
+        ));
+        for ch in ['e', 'c', 'h', 'o'] {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "echo"),
+        }
+        assert!(app.property_edit.is_none());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn canvas_key_cancels_property_edit_without_mutating_command() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("Example", "echo old");
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Canvas;
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('e'))), None,);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('x'))), None,);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
+
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "echo old"),
+        }
+        assert!(app.property_edit.is_none());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn ctrl_e_requests_selected_command_edit_action() {
+        let (_temp_dir, mut app) = test_app();
+        app.focus = FocusPanel::Output;
+
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::CONTROL, KeyCode::Char('e'))),
+            Some(AppAction::EditNodeCommand),
+        );
+    }
+
+    #[test]
+    fn edit_shortcut_without_selection_does_not_mutate_workflow() {
+        let (_temp_dir, mut app) = test_app();
+        app.clear_workflow_dirty();
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('e'))), None,);
+
+        assert!(app.property_edit.is_none());
+        assert_eq!(app.workflow.graph.node_count(), 0);
         assert!(!app.has_unsaved_changes());
     }
 

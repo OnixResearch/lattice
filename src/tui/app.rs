@@ -65,6 +65,9 @@ pub enum AppAction {
     AddNode,
     OpenWorkflow,
     AutoLayout,
+    EditNodeLabel,
+    EditNodeCommand,
+    EditNodeTimeout,
 }
 
 /// Command palette data.
@@ -276,6 +279,24 @@ impl PaletteData {
                 icon: Some('+'),
             },
             FuzzyCandidate {
+                id: "edit_command".into(),
+                text: "Edit Selected Node Command (e)".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "edit_label".into(),
+                text: "Rename Selected Node (l)".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "edit_timeout".into(),
+                text: "Edit Selected Node Timeout (t)".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
                 id: "run".into(),
                 text: "Run Workflow (Ctrl-R)".into(),
                 context: None,
@@ -338,6 +359,9 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
         "layout" => Some(AppAction::AutoLayout),
+        "edit_label" => Some(AppAction::EditNodeLabel),
+        "edit_command" => Some(AppAction::EditNodeCommand),
+        "edit_timeout" => Some(AppAction::EditNodeTimeout),
         "quit" => Some(AppAction::Quit),
         _ => None,
     }
@@ -1144,6 +1168,15 @@ impl App {
                         }
                         AppAction::AutoLayout => {
                             self.auto_layout();
+                        }
+                        AppAction::EditNodeLabel => {
+                            self.start_property_edit(PropertyEditField::Label);
+                        }
+                        AppAction::EditNodeCommand => {
+                            self.start_property_edit(PropertyEditField::Command);
+                        }
+                        AppAction::EditNodeTimeout => {
+                            self.start_property_edit(PropertyEditField::TimeoutSecs);
                         }
                     }
                 }

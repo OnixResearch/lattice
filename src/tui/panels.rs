@@ -446,8 +446,8 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " C-P: palette │ C-N: add │ C-R: run │ C-X: cancel │ C-L: layout ",
-        FocusPanel::Properties => " e: edit │ C-S: save │ C-P: palette │ A-Tab: focus ",
+        FocusPanel::Canvas => " e: cmd │ l: label │ t: timeout │ C-N: add │ C-R: run │ C-P: palette ",
+        FocusPanel::Properties => " e: cmd │ l: label │ t: timeout │ C-S: save │ A-Tab: focus ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
 }
@@ -474,8 +474,8 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " C-P palette │ C-N add ",
-        FocusPanel::Properties => " e edit │ A-Tab ",
+        FocusPanel::Canvas => " e cmd │ l label ",
+        FocusPanel::Properties => " e cmd │ l label ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
 }
@@ -712,7 +712,7 @@ mod tests {
     fn contextual_help_matches_canvas_and_wiring_modes() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Canvas)),
-            " C-P: palette │ C-N: add │ C-R: run │ C-X: cancel │ C-L: layout ",
+            " e: cmd │ l: label │ t: timeout │ C-N: add │ C-R: run │ C-P: palette ",
         );
 
         let wiring = FooterHelpContext {
@@ -726,7 +726,7 @@ mod tests {
     fn contextual_help_matches_properties_and_output_focus() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Properties)),
-            " e: edit │ C-S: save │ C-P: palette │ A-Tab: focus ",
+            " e: cmd │ l: label │ t: timeout │ C-S: save │ A-Tab: focus ",
         );
         assert_eq!(contextual_help_text(context(FocusPanel::Output)), " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",);
     }
@@ -757,7 +757,7 @@ mod tests {
             width: NARROW_STATUS_WIDTH,
             ..context(FocusPanel::Canvas)
         };
-        assert_eq!(contextual_help_text(narrow), " C-P palette │ C-N add ");
+        assert_eq!(contextual_help_text(narrow), " e cmd │ l label ");
 
         let narrow_wiring = FooterHelpContext {
             interaction_mode: FooterInteractionMode::Wiring,
