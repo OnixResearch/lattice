@@ -7,6 +7,7 @@ use rat_nodegraph::view::InteractionMode;
 use rat_nodegraph::view::NodeGraphWidget;
 use rat_streaming::render_streaming_lines;
 use ratatui::buffer::Buffer;
+use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
 use ratatui::layout::Direction;
 use ratatui::layout::Layout;
@@ -28,6 +29,8 @@ use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
+const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
+const FULL_EMPTY_STATE_MIN_HEIGHT: u16 = 7;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -75,8 +78,57 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
     let inner = block.inner(area);
     block.render(area, buf);
 
+    if should_show_empty_state(app.graph_state.graph.node_count(), app.show_palette) {
+        render_empty_canvas_state(inner, buf);
+        return;
+    }
+
     let widget = NodeGraphWidget::default();
     widget.render(inner, buf, &mut app.graph_state);
+}
+
+fn render_empty_canvas_state(area: Rect, buf: &mut Buffer) {
+    let copy = empty_state_copy(area.width, area.height);
+    let mut lines = vec![Line::styled(
+        copy.title,
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )];
+
+    for hint in copy.hints {
+        lines.push(Line::from(Span::styled(*hint, Style::default().fg(Color::DarkGray))));
+    }
+
+    Paragraph::new(lines).alignment(Alignment::Center).render(area, buf);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EmptyStateCopy {
+    title: &'static str,
+    hints: &'static [&'static str],
+}
+
+// r[impl n8nclone.tui_ux.empty_state.show] r[impl n8nclone.tui_ux.empty_state.compact]
+fn empty_state_copy(width: u16, height: u16) -> EmptyStateCopy {
+    if width < FULL_EMPTY_STATE_MIN_WIDTH || height < FULL_EMPTY_STATE_MIN_HEIGHT {
+        return EmptyStateCopy {
+            title: "Empty workflow",
+            hints: &["Ctrl-N add node │ Ctrl-P palette"],
+        };
+    }
+
+    EmptyStateCopy {
+        title: "Start your workflow",
+        hints: &[
+            "Ctrl-N: add your first node",
+            "Ctrl-P: open the command palette",
+            "Drag nodes and connect ports to build a flow",
+        ],
+    }
+}
+
+// r[impl n8nclone.tui_ux.empty_state.hide]
+fn should_show_empty_state(node_count: usize, modal_open: bool) -> bool {
+    node_count == 0 && !modal_open
 }
 
 /// Render the properties panel for the selected node.
@@ -393,5 +445,29 @@ mod tests {
             ..narrow
         };
         assert_eq!(contextual_help_text(narrow_wiring), " Click target │ Esc ");
+    }
+
+    #[test]
+    fn empty_state_visibility_requires_empty_workflow_without_modal() {
+        assert!(should_show_empty_state(0, false));
+        assert!(!should_show_empty_state(1, false));
+        assert!(!should_show_empty_state(0, true));
+    }
+
+    #[test]
+    fn empty_state_copy_lists_next_actions_for_full_canvas() {
+        let copy = empty_state_copy(FULL_EMPTY_STATE_MIN_WIDTH, FULL_EMPTY_STATE_MIN_HEIGHT);
+
+        assert_eq!(copy.title, "Start your workflow");
+        assert!(copy.hints.contains(&"Ctrl-N: add your first node"));
+        assert!(copy.hints.contains(&"Ctrl-P: open the command palette"));
+    }
+
+    #[test]
+    fn empty_state_copy_uses_compact_hint_for_small_canvas() {
+        let copy = empty_state_copy(FULL_EMPTY_STATE_MIN_WIDTH - 1, FULL_EMPTY_STATE_MIN_HEIGHT);
+
+        assert_eq!(copy.title, "Empty workflow");
+        assert_eq!(copy.hints, &["Ctrl-N add node │ Ctrl-P palette"]);
     }
 }
