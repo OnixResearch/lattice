@@ -23,12 +23,14 @@ use crate::engine::ContentHash;
 use crate::engine::RunId;
 use crate::engine::Value;
 use crate::engine::Workflow;
+use crate::scheduler::ScheduleDefinition;
 
 const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows");
 const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
 const CACHE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cache");
 const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
 const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_details");
+const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
 const INITIAL_RUN_ID_VALUE: u64 = 0;
 const NEXT_RUN_ID_INCREMENT: u64 = 1;
 
@@ -94,6 +96,7 @@ impl Store {
             let _ = txn.open_table(CACHE).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -157,6 +160,62 @@ impl Store {
         {
             let mut table = txn.open_table(WORKFLOWS).map_err(|e| StoreError::Table(e.to_string()))?;
             table.remove(name).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    // -- schedules -----------------------------------------------------------
+
+    /// Save or replace a schedule definition.
+    pub fn save_schedule(&self, schedule: &ScheduleDefinition) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(schedule).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.insert(schedule.id.as_str(), data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Load a schedule definition by id.
+    pub fn load_schedule(&self, schedule_id: &str) -> Result<Option<ScheduleDefinition>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
+        match table.get(schedule_id).map_err(|e| StoreError::Db(e.to_string()))? {
+            Some(data) => {
+                let bytes: &[u8] = data.value();
+                let schedule: ScheduleDefinition =
+                    serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                Ok(Some(schedule))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all schedule definitions.
+    pub fn list_schedules(&self) -> Result<Vec<ScheduleDefinition>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
+        let mut schedules = Vec::new();
+        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
+        for entry in iter {
+            let (_key, data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
+            let bytes: &[u8] = data.value();
+            let schedule: ScheduleDefinition =
+                serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+            schedules.push(schedule);
+        }
+        Ok(schedules)
+    }
+
+    /// Delete a schedule definition by id.
+    pub fn delete_schedule(&self, schedule_id: &str) -> Result<(), StoreError> {
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.remove(schedule_id).map_err(|e| StoreError::Db(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())

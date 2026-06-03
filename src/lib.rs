@@ -6,6 +6,7 @@ pub mod expressions;
 pub mod file_node;
 pub mod headless;
 pub mod http;
+pub mod scheduler;
 pub mod store;
 pub mod tui;
 pub mod workflow_format;

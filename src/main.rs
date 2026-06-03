@@ -7,6 +7,9 @@ use clap::ValueEnum;
 use n8nclone::config;
 use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
+use n8nclone::scheduler;
+use n8nclone::scheduler::ScheduleDaemonOutcome;
+use n8nclone::scheduler::ScheduleSkipReason;
 use n8nclone::store::Store;
 use n8nclone::tui::App;
 use n8nclone::workflow_format;
@@ -44,6 +47,8 @@ enum CliCommand {
     Export(ExportWorkflowArgs),
     /// Import a typed Nickel workflow file into the store
     Import(ImportWorkflowArgs),
+    /// Run one scheduler daemon evaluation without starting the TUI
+    SchedulerDaemon(SchedulerDaemonArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -69,6 +74,13 @@ struct ExportWorkflowArgs {
 struct ImportWorkflowArgs {
     /// Nickel workflow file to import
     path: PathBuf,
+}
+
+#[derive(clap::Args, Debug)]
+struct SchedulerDaemonArgs {
+    /// Explicit current time for deterministic daemon evaluation
+    #[arg(long)]
+    now_epoch_ms: Option<i64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
@@ -112,6 +124,9 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
+        Some(CliCommand::SchedulerDaemon(scheduler_args)) => {
+            run_scheduler_daemon_once(&app_config, &scheduler_args).await
+        }
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -187,6 +202,81 @@ fn print_headless_run_error(error: &headless::HeadlessRunError) {
         for diagnostic in diagnostics {
             eprintln!("  {}", workflow_validation::format_diagnostic(diagnostic));
         }
+    }
+}
+
+// r[impl n8nclone.scheduling.daemon.run_due]
+async fn run_scheduler_daemon_once(
+    app_config: &config::AppConfig,
+    args: &SchedulerDaemonArgs,
+) -> Result<ExitCode, n8nclone::error::Error> {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Scheduler failed: {error}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
+    let schedules = match store.list_schedules() {
+        Ok(schedules) => schedules,
+        Err(error) => {
+            eprintln!("Scheduler failed: {error}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
+    let now_epoch_ms = args.now_epoch_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+    let evaluation = scheduler::evaluate_due_runs(&schedules, now_epoch_ms, &std::collections::HashSet::new());
+
+    for skipped in evaluation.skipped_runs {
+        if skipped.reason == ScheduleSkipReason::MissedRunSkipped {
+            update_schedule_next_run(&store, &skipped.schedule_id, skipped.next_run_epoch_ms);
+        }
+        let outcome = ScheduleDaemonOutcome::Skipped(skipped);
+        println!("{}", scheduler::render_daemon_outcome(&outcome));
+    }
+
+    for plan in evaluation.due_runs {
+        let run_id = match store.next_run_id() {
+            Ok(run_id) => run_id,
+            Err(error) => {
+                let outcome = ScheduleDaemonOutcome::Error {
+                    schedule_id: plan.schedule_id.clone(),
+                    workflow_name: plan.workflow_name.clone(),
+                    message: error.to_string(),
+                    next_run_epoch_ms: plan.next_run_epoch_ms,
+                };
+                println!("{}", scheduler::render_daemon_outcome(&outcome));
+                continue;
+            }
+        };
+        let outcome = match headless::run_saved_workflow(&store, &plan.workflow_name, run_id).await {
+            Ok(summary) => ScheduleDaemonOutcome::Started {
+                schedule_id: plan.schedule_id.clone(),
+                workflow_name: plan.workflow_name.clone(),
+                summary: Box::new(summary),
+                next_run_epoch_ms: plan.next_run_epoch_ms,
+            },
+            Err(error) => ScheduleDaemonOutcome::Error {
+                schedule_id: plan.schedule_id.clone(),
+                workflow_name: plan.workflow_name.clone(),
+                message: error.to_string(),
+                next_run_epoch_ms: plan.next_run_epoch_ms,
+            },
+        };
+        update_schedule_next_run(&store, &plan.schedule_id, plan.next_run_epoch_ms);
+        println!("{}", scheduler::render_daemon_outcome(&outcome));
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn update_schedule_next_run(store: &Store, schedule_id: &str, next_run_epoch_ms: i64) {
+    let Ok(Some(mut schedule)) = store.load_schedule(schedule_id) else {
+        return;
+    };
+    schedule.next_run_epoch_ms = next_run_epoch_ms;
+    if let Err(error) = store.save_schedule(&schedule) {
+        eprintln!("Scheduler failed to update schedule {schedule_id}: {error}");
     }
 }
 
