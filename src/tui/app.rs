@@ -34,6 +34,7 @@ use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::store::RunRecord;
 use crate::store::Store;
 use crate::tui::input;
 use crate::tui::panels;
@@ -41,6 +42,7 @@ use crate::tui::panels;
 const INITIAL_VIEWPORT_WIDTH: u16 = 80;
 const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
 const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
+const RUN_HISTORY_LIMIT: usize = 20;
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +60,7 @@ pub enum AppAction {
     CancelQuit,
     RunWorkflow,
     CancelRun,
+    OpenRunHistory,
     SaveWorkflow,
     AddNode,
     OpenWorkflow,
@@ -90,6 +93,7 @@ impl AppRunState {
 }
 
 struct ActiveRun {
+    run_id: RunId,
     receiver: mpsc::UnboundedReceiver<RunEvent>,
     handle: JoinHandle<()>,
 }
@@ -147,6 +151,13 @@ pub fn normalized_node_label(input: &str, default_label: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+pub fn format_run_record(record: &RunRecord) -> String {
+    format!(
+        "{} │ {} nodes │ {} failures │ {} cache hits",
+        record.run_id, record.node_count, record.failures, record.cache_hits,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,6 +235,37 @@ impl WorkflowBrowserState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct RunHistoryState {
+    pub open: bool,
+    pub records: Vec<RunRecord>,
+    pub selected: usize,
+    pub detail: Option<String>,
+    pub message: Option<String>,
+}
+
+impl RunHistoryState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            records: Vec::new(),
+            selected: 0,
+            detail: None,
+            message: None,
+        }
+    }
+
+    fn open(records: Vec<RunRecord>, message: Option<String>) -> Self {
+        Self {
+            open: true,
+            records,
+            selected: 0,
+            detail: None,
+            message,
+        }
+    }
+}
+
 impl PaletteData {
     fn new() -> Self {
         let items = vec![
@@ -244,6 +286,12 @@ impl PaletteData {
                 text: "Cancel Run (Ctrl-X)".into(),
                 context: None,
                 icon: Some('■'),
+            },
+            FuzzyCandidate {
+                id: "history".into(),
+                text: "Run History (Ctrl-H)".into(),
+                context: None,
+                icon: Some('◷'),
             },
             FuzzyCandidate {
                 id: "save".into(),
@@ -286,6 +334,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "add_node" => Some(AppAction::AddNode),
         "run" => Some(AppAction::RunWorkflow),
         "cancel_run" => Some(AppAction::CancelRun),
+        "history" => Some(AppAction::OpenRunHistory),
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
         "layout" => Some(AppAction::AutoLayout),
@@ -308,13 +357,14 @@ pub struct App {
     pub add_node_flow: AddNodeFlowState,
     pub node_templates: Vec<NodeTemplate>,
     pub run_state: AppRunState,
+    pub run_history: RunHistoryState,
     pub store: Option<Store>,
     active_run: Option<ActiveRun>,
+    next_tui_run_id: u64,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
     dirty: bool,
     confirm_quit: bool,
-    executor: Executor,
 }
 
 impl App {
@@ -347,13 +397,14 @@ impl App {
             add_node_flow: AddNodeFlowState::closed(),
             node_templates: Vec::new(),
             run_state: AppRunState::idle(),
+            run_history: RunHistoryState::closed(),
             store,
             active_run: None,
+            next_tui_run_id: 0,
             config,
             last_drag_canvas: None,
             dirty: false,
             confirm_quit: false,
-            executor: Executor::new(),
         }
     }
 
@@ -516,6 +567,68 @@ impl App {
 
     fn next_shell_node_label(&self) -> String {
         format!("Shell {}", self.workflow.graph.node_count() + 1)
+    }
+
+    /// Return whether the run-history modal is open.
+    pub fn is_run_history_open(&self) -> bool {
+        self.run_history.open
+    }
+
+    /// Open recent run history.
+    pub fn open_run_history(&mut self) {
+        self.show_palette = false;
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.add_node_flow = AddNodeFlowState::closed();
+        let Some(store) = &self.store else {
+            let message = "No database available".to_string();
+            self.output.push_line(&message);
+            self.run_history = RunHistoryState::open(Vec::new(), Some(message));
+            return;
+        };
+
+        match store.list_runs(RUN_HISTORY_LIMIT) {
+            Ok(records) => {
+                let message = if records.is_empty() {
+                    Some("No run history available".to_string())
+                } else {
+                    None
+                };
+                if let Some(message) = &message {
+                    self.output.push_line(message);
+                }
+                self.run_history = RunHistoryState::open(records, message);
+            }
+            Err(e) => {
+                let message = format!("Run history failed: {e}");
+                self.output.push_line(&message);
+                self.run_history = RunHistoryState::open(Vec::new(), Some(message));
+            }
+        }
+    }
+
+    pub fn close_run_history(&mut self) {
+        self.run_history = RunHistoryState::closed();
+    }
+
+    pub fn select_next_run_history(&mut self) {
+        if self.run_history.records.is_empty() {
+            return;
+        }
+        let last_index = self.run_history.records.len() - 1;
+        self.run_history.selected = (self.run_history.selected + 1).min(last_index);
+        self.run_history.detail = None;
+    }
+
+    pub fn select_previous_run_history(&mut self) {
+        self.run_history.selected = self.run_history.selected.saturating_sub(1);
+        self.run_history.detail = None;
+    }
+
+    pub fn inspect_selected_run_history(&mut self) {
+        let Some(record) = self.run_history.records.get(self.run_history.selected) else {
+            return;
+        };
+        self.run_history.detail = Some(format_run_record(record));
     }
 
     /// Return whether the workflow browser modal is open.
@@ -821,6 +934,8 @@ impl App {
         }
 
         let workflow = self.workflow.clone();
+        let run_id = RunId(self.next_tui_run_id);
+        self.next_tui_run_id += 1;
         let (sender, receiver) = mpsc::unbounded_channel();
         let node_statuses =
             workflow.graph.nodes().map(|node| (node.id.0, NodeRunStatus::Pending)).collect::<HashMap<_, _>>();
@@ -834,10 +949,14 @@ impl App {
         let handle = tokio::spawn(async move {
             let mut executor = Executor::new();
             let cache = HashMap::new();
-            let (run_id, results) = executor.run(&workflow, &cache).await;
+            let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
             let _ = sender.send(RunEvent::Completed { run_id, results });
         });
-        self.active_run = Some(ActiveRun { receiver, handle });
+        self.active_run = Some(ActiveRun {
+            run_id,
+            receiver,
+            handle,
+        });
         true
     }
 
@@ -855,6 +974,7 @@ impl App {
             }
         }
         self.run_state.active = false;
+        self.save_run_record(active_run.run_id, 0, 0, self.run_state.node_statuses.len());
         self.output.push_line("Workflow run canceled");
         true
     }
@@ -914,7 +1034,32 @@ impl App {
         }
 
         self.run_state.active = false;
+        let failures = results.iter().filter(|step| matches!(step.status, NodeStatus::Failed { .. })).count();
+        let cache_hits = results
+            .iter()
+            .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
+            .count();
+        self.save_run_record(run_id, cache_hits, failures, results.len());
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
+    }
+
+    fn save_run_record(&mut self, run_id: RunId, cache_hits: usize, failures: usize, node_count: usize) {
+        let Some(store) = &self.store else {
+            return;
+        };
+        let now = chrono::Utc::now().timestamp_millis();
+        let record = RunRecord {
+            run_id,
+            workflow_name: self.workflow.meta.name.clone(),
+            started_epoch_ms: now,
+            finished_epoch_ms: Some(now),
+            node_count,
+            cache_hits,
+            failures,
+        };
+        if let Err(e) = store.save_run(&record) {
+            self.output.push_line(&format!("Run history save failed: {e}"));
+        }
     }
 
     /// Save the current workflow to the store.
@@ -984,6 +1129,9 @@ impl App {
                         }
                         AppAction::CancelRun => {
                             self.cancel_active_run();
+                        }
+                        AppAction::OpenRunHistory => {
+                            self.open_run_history();
                         }
                         AppAction::SaveWorkflow => {
                             self.save_workflow();
@@ -1339,5 +1487,64 @@ mod tests {
 
         assert!(!app.run_state.active);
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
+    }
+
+    #[tokio::test]
+    async fn completed_background_run_is_persisted_to_history() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Ok", "echo ok");
+
+        assert!(app.start_workflow_run());
+        for _ in 0..RUN_EVENT_POLL_LIMIT {
+            app.poll_run_events();
+            if !app.run_state.active {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(RUN_EVENT_POLL_DELAY_MS)).await;
+        }
+        app.open_run_history();
+
+        assert!(app.is_run_history_open());
+        assert_eq!(app.run_history.records.len(), 1);
+        assert_eq!(app.run_history.records[0].node_count, 1);
+        assert_eq!(app.run_history.records[0].failures, 0);
+    }
+
+    #[tokio::test]
+    async fn canceled_background_run_is_persisted_to_history() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Long", "sleep 1");
+
+        assert!(app.start_workflow_run());
+        assert!(app.cancel_active_run());
+        app.open_run_history();
+
+        assert_eq!(app.run_history.records.len(), 1);
+        assert_eq!(app.run_history.records[0].node_count, 1);
+    }
+
+    #[test]
+    fn run_history_empty_and_inspect_states_are_visible() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_run_history();
+        assert_eq!(app.run_history.message.as_deref(), Some("No run history available"),);
+
+        let record = RunRecord {
+            run_id: RunId(7),
+            workflow_name: "wf".to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(0),
+            node_count: 2,
+            cache_hits: 1,
+            failures: 0,
+        };
+        app.run_history = RunHistoryState::open(vec![record], None);
+        app.inspect_selected_run_history();
+
+        assert_eq!(app.run_history.detail.as_deref(), Some("run:7 │ 2 nodes │ 0 failures │ 1 cache hits"),);
     }
 }

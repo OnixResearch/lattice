@@ -44,6 +44,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         _ => {}
     }
 
+    if app.is_run_history_open() {
+        return handle_run_history_key(app, key);
+    }
+
     if app.is_workflow_browser_open() {
         return handle_workflow_browser_key(app, key);
     }
@@ -67,6 +71,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Some(AppAction::RunWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => return Some(AppAction::CancelRun),
+        (KeyModifiers::CONTROL, KeyCode::Char('h')) => return Some(AppAction::OpenRunHistory),
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Some(AppAction::SaveWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
@@ -85,6 +90,36 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Canvas => handle_canvas_key(app, key),
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
+    }
+}
+
+fn handle_run_history_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match run_history_key_action(key) {
+        RunHistoryKeyAction::Close => app.close_run_history(),
+        RunHistoryKeyAction::SelectNext => app.select_next_run_history(),
+        RunHistoryKeyAction::SelectPrevious => app.select_previous_run_history(),
+        RunHistoryKeyAction::Inspect => app.inspect_selected_run_history(),
+        RunHistoryKeyAction::Ignore => {}
+    }
+    None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunHistoryKeyAction {
+    Close,
+    SelectNext,
+    SelectPrevious,
+    Inspect,
+    Ignore,
+}
+
+fn run_history_key_action(key: &KeyEvent) -> RunHistoryKeyAction {
+    match key.code {
+        KeyCode::Esc => RunHistoryKeyAction::Close,
+        KeyCode::Down => RunHistoryKeyAction::SelectNext,
+        KeyCode::Up => RunHistoryKeyAction::SelectPrevious,
+        KeyCode::Enter => RunHistoryKeyAction::Inspect,
+        _ => RunHistoryKeyAction::Ignore,
     }
 }
 

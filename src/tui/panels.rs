@@ -43,6 +43,9 @@ const WORKFLOW_BROWSER_TOP_OFFSET: u16 = 2;
 const ADD_NODE_WIDTH: u16 = 66;
 const ADD_NODE_HEIGHT: u16 = 14;
 const ADD_NODE_TOP_OFFSET: u16 = 2;
+const RUN_HISTORY_WIDTH: u16 = 72;
+const RUN_HISTORY_HEIGHT: u16 = 16;
+const RUN_HISTORY_TOP_OFFSET: u16 = 2;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -73,6 +76,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
     // Overlay: fuzzy palette.
     if app.show_palette {
         render_palette(app, area, buf);
+    }
+
+    if app.is_run_history_open() {
+        render_run_history(app, area, buf);
     }
 
     if app.is_workflow_browser_open() {
@@ -373,6 +380,7 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
         palette_open: app.show_palette,
         workflow_browser_open: app.is_workflow_browser_open(),
         add_node_open: app.is_add_node_flow_open(),
+        run_history_open: app.is_run_history_open(),
         interaction_mode: footer_interaction_mode(&app.graph_state.mode),
         width: area.width,
     });
@@ -398,6 +406,7 @@ struct FooterHelpContext {
     palette_open: bool,
     workflow_browser_open: bool,
     add_node_open: bool,
+    run_history_open: bool,
     interaction_mode: FooterInteractionMode,
     width: u16,
 }
@@ -428,6 +437,10 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Type: edit field │ Enter: next/create │ Esc: cancel ";
     }
 
+    if context.run_history_open {
+        return " ↑/↓: choose run │ Enter: inspect │ Esc: close ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target port: connect │ Esc: cancel wiring ";
     }
@@ -452,6 +465,10 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Enter next │ Esc ";
     }
 
+    if context.run_history_open {
+        return " Enter inspect │ Esc ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target │ Esc ";
     }
@@ -461,6 +478,60 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         FocusPanel::Properties => " e edit │ A-Tab ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
+}
+
+fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
+    let width = area.width.min(RUN_HISTORY_WIDTH);
+    let height = area.height.min(RUN_HISTORY_HEIGHT);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = RUN_HISTORY_TOP_OFFSET.min(area.height.saturating_sub(height));
+    let history_area = Rect::new(x, y, width, height);
+
+    Clear.render(history_area, buf);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Run History ")
+        .border_style(Style::default().fg(Color::Magenta));
+    let inner = block.inner(history_area);
+    block.render(history_area, buf);
+
+    if let Some(detail) = &app.run_history.detail {
+        Paragraph::new(detail.as_str())
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::White))
+            .render(inner, buf);
+        return;
+    }
+
+    if app.run_history.records.is_empty() {
+        let message = app.run_history.message.as_deref().unwrap_or("No run history available");
+        Paragraph::new(message)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::DarkGray))
+            .render(inner, buf);
+        return;
+    }
+
+    let visible_rows = inner.height as usize;
+    let lines = app
+        .run_history
+        .records
+        .iter()
+        .take(visible_rows)
+        .enumerate()
+        .map(|(index, record)| {
+            let selected = index == app.run_history.selected;
+            let style = if selected {
+                Style::default().fg(Color::Black).bg(Color::Magenta)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let prefix = if selected { "› " } else { "  " };
+            Line::styled(format!("{prefix}{}", crate::tui::app::format_run_record(record)), style)
+        })
+        .collect::<Vec<_>>();
+
+    Paragraph::new(lines).render(inner, buf);
 }
 
 fn render_add_node_flow(app: &App, area: Rect, buf: &mut Buffer) {
@@ -625,6 +696,7 @@ mod tests {
             palette_open: false,
             workflow_browser_open: false,
             add_node_open: false,
+            run_history_open: false,
             interaction_mode: FooterInteractionMode::Default,
             width: WIDE_STATUS_WIDTH,
         }
