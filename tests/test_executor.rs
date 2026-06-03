@@ -194,6 +194,37 @@ async fn run_two_node_pipeline() {
 }
 
 #[tokio::test]
+async fn regression_connected_stdout_reaches_downstream_stdin() {
+    let (wf, echo_node, grep_node) = common::two_node_pipeline();
+    let echo_stdout_port = common::stdout_port_id(&wf, echo_node);
+    let grep_stdout_port = common::stdout_port_id(&wf, grep_node);
+    let grep_exit_port = common::exit_port_id(&wf, grep_node);
+    let mut executor = Executor::new();
+    let cache = HashMap::new();
+
+    let (_, results) = executor.run(&wf, &cache).await;
+
+    assert_eq!(results.len(), 2, "echo and grep nodes should both run");
+    match &results[0].status {
+        NodeStatus::Completed { outputs, .. } => {
+            let upstream_stdout =
+                outputs.get(&echo_stdout_port).expect("upstream stdout must use the real graph port id");
+            assert_eq!(upstream_stdout.as_display_string().trim(), "hello world");
+        }
+        other => panic!("source node: expected Completed, got {:?}", other),
+    }
+    match &results[1].status {
+        NodeStatus::Completed { outputs, .. } => {
+            let downstream_stdout = outputs.get(&grep_stdout_port).expect("downstream stdout missing");
+            let downstream_exit = outputs.get(&grep_exit_port).expect("downstream exit missing");
+            assert_eq!(downstream_stdout.as_display_string().trim(), "hello world");
+            assert_eq!(downstream_exit.as_display_string(), "exit code: 0");
+        }
+        other => panic!("grep node: expected Completed, got {:?}", other),
+    }
+}
+
+#[tokio::test]
 async fn run_increments_run_id() {
     let (wf, _) = common::standalone_node("echo", "true");
     let mut executor = Executor::new();
