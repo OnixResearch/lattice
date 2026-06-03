@@ -28,6 +28,7 @@ use crate::engine::workflow::NodeConfig;
 use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
+use crate::tui::app::NodeRunStatus;
 use crate::tui::app::PropertyEditField;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
@@ -198,6 +199,14 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
         Line::from(""),
     ];
 
+    if let Some(status) = app.run_state.node_statuses.get(&node_id.0).copied() {
+        lines.push(Line::from(vec![
+            Span::styled("Run: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(run_status_label(status), run_status_style(status)),
+        ]));
+        lines.push(Line::from(""));
+    }
+
     if let Some(edit) = &app.property_edit {
         if edit.node_id == node_id {
             lines.push(Line::from(vec![
@@ -272,6 +281,26 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
     }
 
     Paragraph::new(lines).render(inner, buf);
+}
+
+fn run_status_label(status: NodeRunStatus) -> &'static str {
+    match status {
+        NodeRunStatus::Pending => "pending",
+        NodeRunStatus::Running => "running",
+        NodeRunStatus::Completed => "completed",
+        NodeRunStatus::Failed => "failed",
+        NodeRunStatus::Skipped => "skipped",
+    }
+}
+
+fn run_status_style(status: NodeRunStatus) -> Style {
+    match status {
+        NodeRunStatus::Pending => Style::default().fg(Color::DarkGray),
+        NodeRunStatus::Running => Style::default().fg(Color::Yellow),
+        NodeRunStatus::Completed => Style::default().fg(Color::Green),
+        NodeRunStatus::Failed => Style::default().fg(Color::Red),
+        NodeRunStatus::Skipped => Style::default().fg(Color::Gray),
+    }
 }
 
 fn property_field_title(field: PropertyEditField) -> &'static str {
@@ -404,7 +433,7 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " C-P: palette │ C-N: add │ C-R: run │ C-L: layout │ A-Tab: focus ",
+        FocusPanel::Canvas => " C-P: palette │ C-N: add │ C-R: run │ C-X: cancel │ C-L: layout ",
         FocusPanel::Properties => " e: edit │ C-S: save │ C-P: palette │ A-Tab: focus ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
@@ -611,7 +640,7 @@ mod tests {
     fn contextual_help_matches_canvas_and_wiring_modes() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Canvas)),
-            " C-P: palette │ C-N: add │ C-R: run │ C-L: layout │ A-Tab: focus ",
+            " C-P: palette │ C-N: add │ C-R: run │ C-X: cancel │ C-L: layout ",
         );
 
         let wiring = FooterHelpContext {

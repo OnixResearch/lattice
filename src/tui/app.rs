@@ -21,12 +21,17 @@ use rat_nodegraph::view::node_bounds;
 use rat_streaming::StreamingOutput;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::error;
 use tracing::info;
 
 use crate::config::AppConfig;
 use crate::config::NodeTemplate;
 use crate::engine::executor::Executor;
+use crate::engine::executor::NodeStatus;
+use crate::engine::executor::RunId;
+use crate::engine::executor::StepResult;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::store::Store;
@@ -52,6 +57,7 @@ pub enum AppAction {
     ConfirmQuit,
     CancelQuit,
     RunWorkflow,
+    CancelRun,
     SaveWorkflow,
     AddNode,
     OpenWorkflow,
@@ -59,6 +65,40 @@ pub enum AppAction {
 }
 
 /// Command palette data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeRunStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppRunState {
+    pub active: bool,
+    pub node_statuses: HashMap<u64, NodeRunStatus>,
+}
+
+impl AppRunState {
+    fn idle() -> Self {
+        Self {
+            active: false,
+            node_statuses: HashMap::new(),
+        }
+    }
+}
+
+struct ActiveRun {
+    receiver: mpsc::UnboundedReceiver<RunEvent>,
+    handle: JoinHandle<()>,
+}
+
+#[derive(Debug)]
+enum RunEvent {
+    Completed { run_id: RunId, results: Vec<StepResult> },
+}
+
 pub struct PaletteData {
     pub items: Vec<FuzzyCandidate>,
 }
@@ -200,6 +240,12 @@ impl PaletteData {
                 icon: Some('▶'),
             },
             FuzzyCandidate {
+                id: "cancel_run".into(),
+                text: "Cancel Run (Ctrl-X)".into(),
+                context: None,
+                icon: Some('■'),
+            },
+            FuzzyCandidate {
                 id: "save".into(),
                 text: "Save Workflow (Ctrl-S)".into(),
                 context: None,
@@ -239,6 +285,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
     match id {
         "add_node" => Some(AppAction::AddNode),
         "run" => Some(AppAction::RunWorkflow),
+        "cancel_run" => Some(AppAction::CancelRun),
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
         "layout" => Some(AppAction::AutoLayout),
@@ -260,7 +307,9 @@ pub struct App {
     pub property_edit: Option<PropertyEditState>,
     pub add_node_flow: AddNodeFlowState,
     pub node_templates: Vec<NodeTemplate>,
+    pub run_state: AppRunState,
     pub store: Option<Store>,
+    active_run: Option<ActiveRun>,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
     dirty: bool,
@@ -297,7 +346,9 @@ impl App {
             property_edit: None,
             add_node_flow: AddNodeFlowState::closed(),
             node_templates: Vec::new(),
+            run_state: AppRunState::idle(),
             store,
+            active_run: None,
             config,
             last_drag_canvas: None,
             dirty: false,
@@ -762,22 +813,80 @@ impl App {
         self.output.push_line("Auto-layout applied");
     }
 
-    /// Run the current workflow.
-    pub async fn run_workflow(&mut self) {
+    /// Start the current workflow in the background.
+    pub fn start_workflow_run(&mut self) -> bool {
+        if self.run_state.active {
+            self.output.push_line("Workflow already running");
+            return false;
+        }
+
+        let workflow = self.workflow.clone();
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let node_statuses =
+            workflow.graph.nodes().map(|node| (node.id.0, NodeRunStatus::Pending)).collect::<HashMap<_, _>>();
+
+        self.run_state = AppRunState {
+            active: true,
+            node_statuses,
+        };
         self.output.push_line("▶ Running workflow…");
 
-        let cache = HashMap::new();
-        let (run_id, results) = self.executor.run(&self.workflow, &cache).await;
+        let handle = tokio::spawn(async move {
+            let mut executor = Executor::new();
+            let cache = HashMap::new();
+            let (run_id, results) = executor.run(&workflow, &cache).await;
+            let _ = sender.send(RunEvent::Completed { run_id, results });
+        });
+        self.active_run = Some(ActiveRun { receiver, handle });
+        true
+    }
 
+    /// Cancel the active background run, if any.
+    pub fn cancel_active_run(&mut self) -> bool {
+        let Some(active_run) = self.active_run.take() else {
+            self.output.push_line("No active workflow run");
+            return false;
+        };
+
+        active_run.handle.abort();
+        for status in self.run_state.node_statuses.values_mut() {
+            if matches!(*status, NodeRunStatus::Pending | NodeRunStatus::Running) {
+                *status = NodeRunStatus::Skipped;
+            }
+        }
+        self.run_state.active = false;
+        self.output.push_line("Workflow run canceled");
+        true
+    }
+
+    /// Poll background run events and apply completed results.
+    pub fn poll_run_events(&mut self) {
+        let mut completed = Vec::new();
+        if let Some(active_run) = &mut self.active_run {
+            while let Ok(event) = active_run.receiver.try_recv() {
+                completed.push(event);
+            }
+        }
+
+        for event in completed {
+            match event {
+                RunEvent::Completed { run_id, results } => {
+                    self.finish_workflow_run(run_id, results);
+                    self.active_run = None;
+                }
+            }
+        }
+    }
+
+    fn finish_workflow_run(&mut self, run_id: RunId, results: Vec<StepResult>) {
         for step in &results {
             let node_label = self.workflow.graph.node(step.node_id).map(|n| n.label.as_str()).unwrap_or("?");
-
             match &step.status {
-                crate::engine::executor::NodeStatus::Completed { outputs, cached, .. } => {
+                NodeStatus::Completed { outputs, cached, .. } => {
+                    self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Completed);
                     let cache_tag = if *cached { " (cached)" } else { "" };
                     self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
 
-                    // Show stdout if present.
                     for val in outputs.values() {
                         let display = val.as_display_string();
                         if !display.is_empty() {
@@ -787,18 +896,24 @@ impl App {
                         }
                     }
 
-                    // Cache the result.
                     if let Some(ref store) = self.store {
                         let _ = store.put_cache(&step.input_hash, outputs);
                     }
                 }
-                crate::engine::executor::NodeStatus::Failed { error } => {
+                NodeStatus::Failed { error } => {
+                    self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Failed);
                     self.output.push_line(&format!("✗ {node_label}: {error}"));
                 }
-                _ => {}
+                NodeStatus::Skipped => {
+                    self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Skipped);
+                }
+                NodeStatus::Pending | NodeStatus::Running => {
+                    self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Running);
+                }
             }
         }
 
+        self.run_state.active = false;
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
@@ -843,6 +958,8 @@ impl App {
         info!("TUI started");
 
         loop {
+            self.poll_run_events();
+
             // Render.
             terminal.draw(|frame| {
                 panels::render(&mut self, frame.area(), frame.buffer_mut());
@@ -863,7 +980,10 @@ impl App {
                             self.cancel_quit_confirmation();
                         }
                         AppAction::RunWorkflow => {
-                            self.run_workflow().await;
+                            self.start_workflow_run();
+                        }
+                        AppAction::CancelRun => {
+                            self.cancel_active_run();
                         }
                         AppAction::SaveWorkflow => {
                             self.save_workflow();
@@ -900,6 +1020,8 @@ mod tests {
     use crate::config::PortTemplate;
 
     const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
+    const RUN_EVENT_POLL_LIMIT: usize = 50;
+    const RUN_EVENT_POLL_DELAY_MS: u64 = 10;
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1161,5 +1283,61 @@ mod tests {
     fn empty_add_node_label_uses_default() {
         assert_eq!(normalized_node_label("", "Shell 1"), "Shell 1");
         assert_eq!(normalized_node_label("  Custom  ", "Shell 1"), "Custom");
+    }
+
+    #[tokio::test]
+    async fn background_run_starts_without_blocking() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Long", "sleep 1");
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert!(app.start_workflow_run());
+
+        assert!(app.run_state.active);
+        assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Pending),);
+        assert!(app.cancel_active_run());
+    }
+
+    #[tokio::test]
+    async fn cancel_active_run_marks_pending_nodes_skipped() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Long", "sleep 1");
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert!(app.start_workflow_run());
+        assert!(app.cancel_active_run());
+
+        assert!(!app.run_state.active);
+        assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Skipped),);
+    }
+
+    #[tokio::test]
+    async fn failed_background_run_marks_node_failed() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        let node_id = app.workflow.add_shell_node("Bad cwd", "echo no");
+        app.workflow.set_node_config(node_id, NodeConfig::Shell {
+            command: "echo no".to_string(),
+            cwd: Some(temp_dir.path().join("missing").display().to_string()),
+            env: HashMap::new(),
+            timeout_secs: DEFAULT_SHELL_TIMEOUT_SECS,
+            pipe_stdin: true,
+        });
+        app.sync_graph_state();
+        app.select_node(node_id);
+
+        assert!(app.start_workflow_run());
+        for _ in 0..RUN_EVENT_POLL_LIMIT {
+            app.poll_run_events();
+            if !app.run_state.active {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(RUN_EVENT_POLL_DELAY_MS)).await;
+        }
+
+        assert!(!app.run_state.active);
+        assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
     }
 }

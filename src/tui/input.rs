@@ -66,6 +66,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
     // Global keybindings (regardless of focus).
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Some(AppAction::RunWorkflow),
+        (KeyModifiers::CONTROL, KeyCode::Char('x')) => return Some(AppAction::CancelRun),
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Some(AppAction::SaveWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
