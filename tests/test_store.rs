@@ -13,6 +13,15 @@ use n8nclone::store::Store;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::PortId;
 
+const INITIAL_NEXT_RUN_ID: u64 = 0;
+const FIRST_SAVED_RUN_ID: u64 = 3;
+const SECOND_SAVED_RUN_ID: u64 = 9;
+const EXPECTED_NEXT_RUN_ID: u64 = 10;
+const RUN_RECORD_NODE_COUNT: usize = 1;
+const RUN_RECORD_CACHE_HITS: usize = 0;
+const RUN_RECORD_FAILURES: usize = 0;
+const STARTED_EPOCH_MS: i64 = 1000;
+
 // ---------------------------------------------------------------------------
 // Store creation
 // ---------------------------------------------------------------------------
@@ -288,6 +297,37 @@ fn list_runs_empty() {
     let (store, _dir) = common::temp_store();
     let runs = store.list_runs(10).unwrap();
     assert!(runs.is_empty());
+}
+
+#[test]
+fn next_run_id_starts_at_initial_value() {
+    let (store, _dir) = common::temp_store();
+
+    let next_run_id = store.next_run_id().unwrap();
+
+    assert_eq!(next_run_id, RunId(INITIAL_NEXT_RUN_ID));
+}
+
+#[test]
+fn next_run_id_follows_highest_saved_run() {
+    let (store, _dir) = common::temp_store();
+    for run_id in [FIRST_SAVED_RUN_ID, SECOND_SAVED_RUN_ID] {
+        store
+            .save_run(&RunRecord {
+                run_id: RunId(run_id),
+                workflow_name: format!("wf-{run_id}"),
+                started_epoch_ms: STARTED_EPOCH_MS,
+                finished_epoch_ms: None,
+                node_count: RUN_RECORD_NODE_COUNT,
+                cache_hits: RUN_RECORD_CACHE_HITS,
+                failures: RUN_RECORD_FAILURES,
+            })
+            .unwrap();
+    }
+
+    let next_run_id = store.next_run_id().unwrap();
+
+    assert_eq!(next_run_id, RunId(EXPECTED_NEXT_RUN_ID));
 }
 
 // ---------------------------------------------------------------------------

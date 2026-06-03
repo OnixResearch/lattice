@@ -45,6 +45,7 @@ const INITIAL_VIEWPORT_WIDTH: u16 = 80;
 const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
 const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
 const RUN_HISTORY_LIMIT: usize = 20;
+const INITIAL_TUI_RUN_ID: u64 = 0;
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -505,6 +506,11 @@ impl App {
             }
         };
 
+        let next_tui_run_id = store
+            .as_ref()
+            .and_then(|store| store.next_run_id().ok())
+            .map(|run_id| run_id.0)
+            .unwrap_or(INITIAL_TUI_RUN_ID);
         let palette_state = FuzzyState::new();
         let palette_data = PaletteData::new();
 
@@ -525,7 +531,7 @@ impl App {
             run_history: RunHistoryState::closed(),
             store,
             active_run: None,
-            next_tui_run_id: 0,
+            next_tui_run_id,
             config,
             last_drag_canvas: None,
             dirty: false,

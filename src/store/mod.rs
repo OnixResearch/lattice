@@ -26,6 +26,8 @@ const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows"
 const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
 const CACHE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cache");
 const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
+const INITIAL_RUN_ID_VALUE: u64 = 0;
+const NEXT_RUN_ID_INCREMENT: u64 = 1;
 
 /// Serializable run record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -210,6 +212,20 @@ impl Store {
         records.reverse();
         records.truncate(limit);
         Ok(records)
+    }
+
+    /// Return the next run id after currently persisted run records.
+    pub fn next_run_id(&self) -> Result<RunId, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+        let mut next_id = INITIAL_RUN_ID_VALUE;
+        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
+        for entry in iter {
+            let (key, _data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
+            let candidate = key.value().saturating_add(NEXT_RUN_ID_INCREMENT);
+            next_id = next_id.max(candidate);
+        }
+        Ok(RunId(next_id))
     }
 }
 
