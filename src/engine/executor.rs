@@ -24,6 +24,8 @@ use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::expressions;
+use crate::expressions::ExpressionContext;
 use crate::file_node::FileOperationKind;
 use crate::file_node::FileOperationPlan;
 use crate::file_node::FileOperationResult;
@@ -90,6 +92,12 @@ struct ShellOutputValues {
     stdout: String,
     stderr: String,
     exit_code: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolvedString {
+    value: String,
+    sensitive_fragments: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -226,6 +234,55 @@ fn file_operation_label(operation: FileOperationKind) -> &'static str {
         FileOperationKind::Write => "write",
         FileOperationKind::Append => "append",
     }
+}
+
+fn resolve_config_string(input: &str, context: &ExpressionContext) -> Result<ResolvedString, String> {
+    expressions::resolve_expression_string(input, context)
+        .map(|value| ResolvedString {
+            value: value.text,
+            sensitive_fragments: value.sensitive_fragments,
+        })
+        .map_err(|error| error.to_string())
+}
+
+fn resolve_optional_config_string(
+    input: &Option<String>,
+    context: &ExpressionContext,
+) -> Result<Option<ResolvedString>, String> {
+    input.as_ref().map(|value| resolve_config_string(value, context)).transpose()
+}
+
+fn resolve_config_map(
+    input: &HashMap<String, String>,
+    context: &ExpressionContext,
+) -> Result<(HashMap<String, String>, Vec<String>), String> {
+    let mut resolved = HashMap::new();
+    let mut sensitive_fragments = Vec::new();
+    for (key, value) in input {
+        let resolved_value = resolve_config_string(value, context)?;
+        sensitive_fragments.extend(resolved_value.sensitive_fragments);
+        resolved.insert(key.clone(), resolved_value.value);
+    }
+    Ok((resolved, sensitive_fragments))
+}
+
+fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<String> {
+    inputs.values().flat_map(|value| value.sensitive_fragments.clone()).collect()
+}
+
+fn expression_context_from_workflow_outputs(
+    workflow: &Workflow,
+    port_values: &HashMap<PortId, Value>,
+) -> ExpressionContext {
+    let mut context = ExpressionContext::default();
+    for node in workflow.graph.nodes() {
+        for port in &node.output_ports {
+            if let Some(value) = port_values.get(&port.id) {
+                context.insert(node.id.0, port.id.0, value.clone());
+            }
+        }
+    }
+    context
 }
 
 fn update_secret_refs_hash(hasher: &mut blake3::Hasher, credentials: Option<&NodeCredentialRefs>) {
@@ -557,6 +614,17 @@ impl Executor {
         node_id: NodeId,
         inputs: &HashMap<PortId, Value>,
     ) -> StepResult {
+        self.execute_node_with_expression_context(workflow, node_id, inputs, &ExpressionContext::default())
+            .await
+    }
+
+    async fn execute_node_with_expression_context(
+        &self,
+        workflow: &Workflow,
+        node_id: NodeId,
+        inputs: &HashMap<PortId, Value>,
+        expression_context: &ExpressionContext,
+    ) -> StepResult {
         let node = match workflow.graph.node(node_id) {
             Some(n) => n,
             None => {
@@ -622,9 +690,55 @@ impl Executor {
                         };
                     }
                 };
-                let merged_env = merged_shell_env(env, &secret_env.env);
+                let resolved_command = match resolve_config_string(command, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_cwd = match resolve_optional_config_string(cwd, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let (resolved_env, env_sensitive_fragments) = match resolve_config_map(env, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let mut sensitive_fragments = secret_env.secret_values.clone();
+                sensitive_fragments.extend(resolved_command.sensitive_fragments.clone());
+                sensitive_fragments.extend(env_sensitive_fragments);
+                sensitive_fragments.extend(collect_input_sensitive_fragments(inputs));
+                let resolved_cwd_value = resolved_cwd.map(|value| {
+                    sensitive_fragments.extend(value.sensitive_fragments);
+                    value.value
+                });
+                let merged_env = merged_shell_env(&resolved_env, &secret_env.env);
                 let stdin_value = shell_stdin_value(node, inputs);
-                let result = execute_shell(command, cwd, &merged_env, *timeout_secs, *pipe_stdin, stdin_value).await;
+                let result = execute_shell(
+                    &resolved_command.value,
+                    &resolved_cwd_value,
+                    &merged_env,
+                    *timeout_secs,
+                    *pipe_stdin,
+                    stdin_value,
+                )
+                .await;
 
                 match result {
                     Ok(shell_outputs) => StepResult {
@@ -632,7 +746,7 @@ impl Executor {
                         status: NodeStatus::Completed {
                             outputs: shell_outputs_by_real_port(
                                 output_ports,
-                                redact_shell_outputs(shell_outputs, &secret_env.secret_values),
+                                redact_shell_outputs(shell_outputs, &sensitive_fragments),
                             ),
                             cached: false,
                         },
@@ -662,7 +776,55 @@ impl Executor {
                         };
                     }
                 };
-                let request = http_request_plan(node, method, url, headers, body, *timeout_secs, inputs);
+                let resolved_method = match resolve_config_string(method, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_url = match resolve_config_string(url, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let (resolved_headers, _) = match resolve_config_map(headers, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_body = match resolve_optional_config_string(body, expression_context) {
+                    Ok(value) => value.map(|value| value.value),
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let request = http_request_plan(
+                    node,
+                    &resolved_method.value,
+                    &resolved_url.value,
+                    &resolved_headers,
+                    &resolved_body,
+                    *timeout_secs,
+                    inputs,
+                );
                 match self.http_client.execute(&request) {
                     Ok(response) => StepResult {
                         node_id,
@@ -698,12 +860,53 @@ impl Executor {
                         };
                     }
                 };
-                let plan = file_operation_plan(node, *operation, path, content, *overwrite, allowed_roots, inputs);
+                let resolved_path = match resolve_config_string(path, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_content = match resolve_optional_config_string(content, expression_context) {
+                    Ok(value) => value.map(|value| value.value),
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let mut resolved_roots = Vec::new();
+                for root in allowed_roots {
+                    match resolve_config_string(root, expression_context) {
+                        Ok(value) => resolved_roots.push(value.value),
+                        Err(error) => {
+                            return StepResult {
+                                node_id,
+                                status: NodeStatus::Failed { error },
+                                input_hash,
+                            };
+                        }
+                    }
+                }
+                let plan = file_operation_plan(
+                    node,
+                    *operation,
+                    &resolved_path.value,
+                    &resolved_content,
+                    *overwrite,
+                    &resolved_roots,
+                    inputs,
+                );
                 match self.file_system.execute(&plan) {
                     Ok(result) => StepResult {
                         node_id,
                         status: NodeStatus::Completed {
-                            outputs: file_outputs_by_real_port(output_ports, path, result),
+                            outputs: file_outputs_by_real_port(output_ports, &resolved_path.value, result),
                             cached: false,
                         },
                         input_hash,
@@ -773,7 +976,8 @@ impl Executor {
                 continue;
             }
 
-            let step = self.execute_node(workflow, node_id, &inputs).await;
+            let expression_context = expression_context_from_workflow_outputs(workflow, &port_values);
+            let step = self.execute_node_with_expression_context(workflow, node_id, &inputs, &expression_context).await;
 
             // Store outputs for downstream nodes.
             if let NodeStatus::Completed { ref outputs, .. } = step.status {

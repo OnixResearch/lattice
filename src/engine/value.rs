@@ -104,6 +104,8 @@ impl fmt::Display for TypeTag {
 pub struct Value {
     pub data: ValueData,
     pub hash: ContentHash,
+    #[serde(default)]
+    pub sensitive_fragments: Vec<String>,
 }
 
 /// The actual data payload.
@@ -122,6 +124,7 @@ impl Value {
         Self {
             data: ValueData::String(s),
             hash,
+            sensitive_fragments: Vec::new(),
         }
     }
 
@@ -130,6 +133,7 @@ impl Value {
         Self {
             data: ValueData::Bytes(b),
             hash,
+            sensitive_fragments: Vec::new(),
         }
     }
 
@@ -139,6 +143,7 @@ impl Value {
         Self {
             data: ValueData::Json(v),
             hash,
+            sensitive_fragments: Vec::new(),
         }
     }
 
@@ -147,6 +152,7 @@ impl Value {
         Self {
             data: ValueData::ExitCode(code),
             hash,
+            sensitive_fragments: Vec::new(),
         }
     }
 
@@ -159,7 +165,19 @@ impl Value {
         Self {
             data: ValueData::Error { message, stderr },
             hash,
+            sensitive_fragments: Vec::new(),
         }
+    }
+
+    pub fn from_sensitive_string(s: String) -> Self {
+        let mut value = Self::from_string(s.clone());
+        value.sensitive_fragments.push(s);
+        value
+    }
+
+    pub fn with_sensitive_fragments(mut self, fragments: Vec<String>) -> Self {
+        self.sensitive_fragments = fragments;
+        self
     }
 
     pub fn type_tag(&self) -> TypeTag {

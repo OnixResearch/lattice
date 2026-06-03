@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::credentials;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::expressions;
 use crate::file_node;
 use crate::http;
 
@@ -35,6 +36,7 @@ pub enum WorkflowDiagnosticCode {
     InvalidHttpMethod,
     InvalidHttpUrl,
     UnsafeFilePath,
+    InvalidExpressionSyntax,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +98,9 @@ pub fn format_diagnostic(diagnostic: &WorkflowDiagnostic) -> String {
 
 fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
     for node in workflow.graph.nodes() {
+        if let Some(config) = workflow.node_config(node.id) {
+            validate_config_expressions(node.id, config, diagnostics);
+        }
         match workflow.node_config(node.id) {
             Some(NodeConfig::Shell { command, .. }) if command.trim().is_empty() => {
                 diagnostics.push(fatal(
@@ -155,6 +160,66 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 "node config references a missing graph node".to_string(),
             ));
         }
+    }
+}
+
+fn validate_config_expressions(node_id: NodeId, config: &NodeConfig, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    match config {
+        NodeConfig::Shell { command, cwd, env, .. } => {
+            validate_expression_field(node_id, "command", command, diagnostics);
+            if let Some(cwd) = cwd {
+                validate_expression_field(node_id, "cwd", cwd, diagnostics);
+            }
+            for (name, value) in env {
+                validate_expression_field(node_id, &format!("env.{name}"), value, diagnostics);
+            }
+        }
+        NodeConfig::Http {
+            method,
+            url,
+            headers,
+            body,
+            ..
+        } => {
+            validate_expression_field(node_id, "method", method, diagnostics);
+            validate_expression_field(node_id, "url", url, diagnostics);
+            for (name, value) in headers {
+                validate_expression_field(node_id, &format!("header.{name}"), value, diagnostics);
+            }
+            if let Some(body) = body {
+                validate_expression_field(node_id, "body", body, diagnostics);
+            }
+        }
+        NodeConfig::File {
+            path,
+            content,
+            allowed_roots,
+            ..
+        } => {
+            validate_expression_field(node_id, "path", path, diagnostics);
+            if let Some(content) = content {
+                validate_expression_field(node_id, "content", content, diagnostics);
+            }
+            for root in allowed_roots {
+                validate_expression_field(node_id, "allowed_root", root, diagnostics);
+            }
+        }
+    }
+}
+
+fn validate_expression_field(
+    node_id: NodeId,
+    field_name: &str,
+    value: &str,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    for error in expressions::expression_error_fragments(value) {
+        diagnostics.push(fatal(
+            WorkflowDiagnosticCode::InvalidExpressionSyntax,
+            Some(node_id),
+            None,
+            format!("invalid expression in {field_name}: {error}"),
+        ));
     }
 }
 
