@@ -27,8 +27,8 @@ async fn execute_echo_produces_stdout() {
     match &result.status {
         NodeStatus::Completed { outputs, cached } => {
             assert!(!cached);
-            // stdout sentinel port.
-            let stdout = outputs.get(&PortId(u64::MAX - 2)).expect("stdout missing");
+            let stdout_port = common::stdout_port_id(&wf, node_id);
+            let stdout = outputs.get(&stdout_port).expect("stdout missing");
             assert_eq!(stdout.as_display_string().trim(), "hello");
         }
         other => panic!("expected Completed, got {:?}", other),
@@ -45,7 +45,8 @@ async fn execute_failing_command() {
 
     match &result.status {
         NodeStatus::Completed { outputs, .. } => {
-            let exit_val = outputs.get(&PortId(u64::MAX)).expect("exit missing");
+            let exit_port = common::exit_port_id(&wf, node_id);
+            let exit_val = outputs.get(&exit_port).expect("exit missing");
             assert_eq!(exit_val.as_display_string(), "exit code: 1");
         }
         other => panic!("expected Completed (with non-zero exit), got {:?}", other),
@@ -96,7 +97,8 @@ async fn execute_with_stdin_piped() {
 
     match &result.status {
         NodeStatus::Completed { outputs, .. } => {
-            let stdout = outputs.get(&PortId(u64::MAX - 2)).expect("stdout missing");
+            let stdout_port = common::stdout_port_id(&wf, node_id);
+            let stdout = outputs.get(&stdout_port).expect("stdout missing");
             assert_eq!(stdout.as_display_string().trim(), "piped input");
         }
         other => panic!("expected Completed, got {:?}", other),
@@ -111,7 +113,8 @@ async fn execute_captures_stderr() {
 
     match &result.status {
         NodeStatus::Completed { outputs, .. } => {
-            let stderr = outputs.get(&PortId(u64::MAX - 1)).expect("stderr missing");
+            let stderr_port = common::stderr_port_id(&wf, node_id);
+            let stderr = outputs.get(&stderr_port).expect("stderr missing");
             assert_eq!(stderr.as_display_string().trim(), "oops");
         }
         other => panic!("expected Completed, got {:?}", other),
@@ -163,7 +166,7 @@ async fn run_single_node_workflow() {
 
 #[tokio::test]
 async fn run_two_node_pipeline() {
-    let (wf, _, _) = common::two_node_pipeline();
+    let (wf, _, grep_node) = common::two_node_pipeline();
     let mut executor = Executor::new();
     let cache = HashMap::new();
 
@@ -174,6 +177,19 @@ async fn run_two_node_pipeline() {
     match &results[0].status {
         NodeStatus::Completed { .. } => {}
         other => panic!("first node: expected Completed, got {:?}", other),
+    }
+
+    // Second node should receive upstream stdout on stdin and grep should match.
+    match &results[1].status {
+        NodeStatus::Completed { outputs, .. } => {
+            let stdout_port = common::stdout_port_id(&wf, grep_node);
+            let exit_port = common::exit_port_id(&wf, grep_node);
+            let stdout = outputs.get(&stdout_port).expect("grep stdout missing");
+            let exit = outputs.get(&exit_port).expect("grep exit missing");
+            assert_eq!(stdout.as_display_string().trim(), "hello world");
+            assert_eq!(exit.as_display_string(), "exit code: 0");
+        }
+        other => panic!("second node: expected Completed, got {:?}", other),
     }
 }
 
@@ -226,7 +242,7 @@ async fn run_uses_cache_when_hash_matches() {
     let first_input_hash = results[0].input_hash;
 
     // Build a cache map with the same input hash.
-    let (_, cached_outputs) = common::fake_cache_entry(first_input_hash, "from cache");
+    let (_, cached_outputs) = common::fake_cache_entry(&wf, node_id, first_input_hash, "from cache");
     let mut cache = HashMap::new();
     cache.insert(first_input_hash, cached_outputs);
 
@@ -278,7 +294,8 @@ async fn execute_with_env_vars() {
 
     match &result.status {
         NodeStatus::Completed { outputs, .. } => {
-            let stdout = outputs.get(&PortId(u64::MAX - 2)).unwrap();
+            let stdout_port = common::stdout_port_id(&wf, id);
+            let stdout = outputs.get(&stdout_port).unwrap();
             assert_eq!(stdout.as_display_string().trim(), "injected");
         }
         other => panic!("expected Completed, got {:?}", other),
@@ -306,7 +323,8 @@ async fn execute_with_cwd() {
 
     match &result.status {
         NodeStatus::Completed { outputs, .. } => {
-            let stdout = outputs.get(&PortId(u64::MAX - 2)).unwrap();
+            let stdout_port = common::stdout_port_id(&wf, id);
+            let stdout = outputs.get(&stdout_port).unwrap();
             // /tmp might resolve to a private tmp on some systems, just check it ran.
             assert!(!stdout.as_display_string().trim().is_empty());
         }

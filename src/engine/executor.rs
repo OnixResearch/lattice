@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use rat_nodegraph::model::Node;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use serde::Deserialize;
@@ -19,6 +20,52 @@ use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+
+const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
+const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
+const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ShellOutputPortIds {
+    stdout: PortId,
+    stderr: PortId,
+    exit: PortId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ShellOutputValues {
+    stdout: String,
+    stderr: String,
+    exit_code: i32,
+}
+
+fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
+    let stdout = node
+        .output_ports
+        .get(SHELL_STDOUT_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing stdout output port", node.label))?;
+    let stderr = node
+        .output_ports
+        .get(SHELL_STDERR_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing stderr output port", node.label))?;
+    let exit = node
+        .output_ports
+        .get(SHELL_EXIT_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing exit output port", node.label))?;
+
+    Ok(ShellOutputPortIds { stdout, stderr, exit })
+}
+
+fn shell_outputs_by_real_port(ports: ShellOutputPortIds, outputs: ShellOutputValues) -> HashMap<PortId, Value> {
+    let mut mapped = HashMap::new();
+    mapped.insert(ports.stdout, Value::from_string(outputs.stdout));
+    mapped.insert(ports.stderr, Value::from_string(outputs.stderr));
+    mapped.insert(ports.exit, Value::from_exit_code(outputs.exit_code));
+    mapped
+}
 
 /// Unique identifier for an execution run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -120,12 +167,25 @@ impl Executor {
                 timeout_secs,
                 pipe_stdin,
             } => {
+                let output_ports = match shell_output_port_ids(node) {
+                    Ok(ports) => ports,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
                 let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, inputs).await;
 
                 match result {
-                    Ok(outputs) => StepResult {
+                    Ok(shell_outputs) => StepResult {
                         node_id,
-                        status: NodeStatus::Completed { outputs, cached: false },
+                        status: NodeStatus::Completed {
+                            outputs: shell_outputs_by_real_port(output_ports, shell_outputs),
+                            cached: false,
+                        },
                         input_hash,
                     },
                     Err(e) => StepResult {
@@ -216,7 +276,7 @@ async fn execute_shell(
     timeout_secs: u64,
     pipe_stdin: bool,
     inputs: &HashMap<PortId, Value>,
-) -> Result<HashMap<PortId, Value>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<ShellOutputValues, Box<dyn std::error::Error + Send + Sync>> {
     let mut cmd = Command::new("sh");
     cmd.arg("-c").arg(command);
 
@@ -263,20 +323,11 @@ async fn execute_shell(
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     let exit_code = output.status.code().unwrap_or(-1);
 
-    // Build output map. Port IDs are assigned by the graph — we use
-    // positional convention: output[0]=stdout, output[1]=stderr, output[2]=exit.
-    // The caller maps these to actual PortIds from the node.
-    //
-    // For now, we return a synthetic map. The executor resolves port IDs.
-    let mut outputs = HashMap::new();
-
-    // We use sentinel PortIds here — the executor maps them to real
-    // port IDs when integrating with the workflow graph.
-    outputs.insert(PortId(u64::MAX - 2), Value::from_string(stdout));
-    outputs.insert(PortId(u64::MAX - 1), Value::from_string(stderr));
-    outputs.insert(PortId(u64::MAX), Value::from_exit_code(exit_code));
-
-    Ok(outputs)
+    Ok(ShellOutputValues {
+        stdout,
+        stderr,
+        exit_code,
+    })
 }
 
 /// Gather input values for a node from upstream edge outputs.

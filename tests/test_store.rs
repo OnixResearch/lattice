@@ -314,7 +314,8 @@ async fn executor_output_round_trips_through_store() {
 
             // Read back from cache.
             let cached = store.get_cache(&result.input_hash).unwrap().unwrap();
-            let stdout = cached.get(&PortId(u64::MAX - 2)).unwrap();
+            let stdout_port = common::stdout_port_id(&wf, node_id);
+            let stdout = cached.get(&stdout_port).unwrap();
             assert_eq!(stdout.as_display_string().trim(), "stored");
 
             // Read back individual values.

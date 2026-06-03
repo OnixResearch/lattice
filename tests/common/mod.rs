@@ -6,8 +6,13 @@ use n8nclone::engine::value::ContentHash;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::store::Store;
+use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use tempfile::TempDir;
+
+const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
+const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
+const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 
 /// Build a simple linear two-node workflow: echo → grep.
 /// Returns (workflow, node_a_id, node_b_id).
@@ -17,7 +22,7 @@ pub fn two_node_pipeline() -> (Workflow, rat_nodegraph::model::NodeId, rat_nodeg
     let b = wf.add_shell_node("grep-hello", "grep hello");
 
     // Wire a's stdout (output port 0) → b's stdin (input port 0).
-    let a_stdout = wf.graph.node(a).unwrap().output_ports[0].id;
+    let a_stdout = stdout_port_id(&wf, a);
     let b_stdin = wf.graph.node(b).unwrap().input_ports[0].id;
     wf.graph.add_edge(a_stdout, b_stdin).unwrap();
 
@@ -45,18 +50,18 @@ pub fn diamond_workflow() -> (
     let d = wf.add_shell_node("sink", "cat");
 
     // A → B
-    let a_out = wf.graph.node(a).unwrap().output_ports[0].id;
+    let a_out = stdout_port_id(&wf, a);
     let b_in = wf.graph.node(b).unwrap().input_ports[0].id;
     wf.graph.add_edge(a_out, b_in).unwrap();
 
     // A → C  (use stderr port from A since stdout is taken; or add another node)
     // Actually, we need separate edges. Let's use A's stderr → C.
-    let a_stderr = wf.graph.node(a).unwrap().output_ports[1].id;
+    let a_stderr = stderr_port_id(&wf, a);
     let c_in = wf.graph.node(c).unwrap().input_ports[0].id;
     wf.graph.add_edge(a_stderr, c_in).unwrap();
 
     // B → D
-    let b_out = wf.graph.node(b).unwrap().output_ports[0].id;
+    let b_out = stdout_port_id(&wf, b);
     let d_in = wf.graph.node(d).unwrap().input_ports[0].id;
     wf.graph.add_edge(b_out, d_in).unwrap();
 
@@ -79,11 +84,28 @@ pub fn temp_store() -> (Store, TempDir) {
     (store, dir)
 }
 
-/// Build a fake cache entry: maps an input hash to a set of port→value outputs.
-pub fn fake_cache_entry(input_hash: ContentHash, stdout_val: &str) -> (ContentHash, HashMap<PortId, Value>) {
+pub fn stdout_port_id(workflow: &Workflow, node_id: NodeId) -> PortId {
+    workflow.graph.node(node_id).expect("node exists").output_ports[SHELL_STDOUT_OUTPUT_INDEX].id
+}
+
+pub fn stderr_port_id(workflow: &Workflow, node_id: NodeId) -> PortId {
+    workflow.graph.node(node_id).expect("node exists").output_ports[SHELL_STDERR_OUTPUT_INDEX].id
+}
+
+pub fn exit_port_id(workflow: &Workflow, node_id: NodeId) -> PortId {
+    workflow.graph.node(node_id).expect("node exists").output_ports[SHELL_EXIT_OUTPUT_INDEX].id
+}
+
+/// Build a fake cache entry: maps an input hash to a set of real port→value outputs.
+pub fn fake_cache_entry(
+    workflow: &Workflow,
+    node_id: NodeId,
+    input_hash: ContentHash,
+    stdout_val: &str,
+) -> (ContentHash, HashMap<PortId, Value>) {
     let mut outputs = HashMap::new();
-    outputs.insert(PortId(u64::MAX - 2), Value::from_string(stdout_val.into()));
-    outputs.insert(PortId(u64::MAX - 1), Value::from_string(String::new()));
-    outputs.insert(PortId(u64::MAX), Value::from_exit_code(0));
+    outputs.insert(stdout_port_id(workflow, node_id), Value::from_string(stdout_val.into()));
+    outputs.insert(stderr_port_id(workflow, node_id), Value::from_string(String::new()));
+    outputs.insert(exit_port_id(workflow, node_id), Value::from_exit_code(0));
     (input_hash, outputs)
 }
