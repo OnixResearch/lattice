@@ -4,13 +4,21 @@
 //!  - **Run**: async parallel execution of independent branches via tokio.
 //!  - **Debug**: step-through, one node at a time, with pause after each.
 
-use crate::engine::value::{ContentHash, Value};
-use crate::engine::workflow::{NodeConfig, Workflow};
-use rat_nodegraph::model::{NodeId, PortId};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use rat_nodegraph::model::NodeId;
+use rat_nodegraph::model::PortId;
+use serde::Deserialize;
+use serde::Serialize;
 use tokio::process::Command;
-use tracing::{debug, error, info};
+use tracing::debug;
+use tracing::error;
+use tracing::info;
+
+use crate::engine::value::ContentHash;
+use crate::engine::value::Value;
+use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::Workflow;
 
 /// Unique identifier for an execution run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -112,23 +120,17 @@ impl Executor {
                 timeout_secs,
                 pipe_stdin,
             } => {
-                let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, inputs)
-                    .await;
+                let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, inputs).await;
 
                 match result {
                     Ok(outputs) => StepResult {
                         node_id,
-                        status: NodeStatus::Completed {
-                            outputs,
-                            cached: false,
-                        },
+                        status: NodeStatus::Completed { outputs, cached: false },
                         input_hash,
                     },
                     Err(e) => StepResult {
                         node_id,
-                        status: NodeStatus::Failed {
-                            error: e.to_string(),
-                        },
+                        status: NodeStatus::Failed { error: e.to_string() },
                         input_hash,
                     },
                 }
@@ -250,14 +252,9 @@ async fn execute_shell(
     }
 
     let output = if timeout_secs > 0 {
-        tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_secs),
-            child.wait_with_output(),
-        )
-        .await
-        .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> {
-            "command timed out".into()
-        })??
+        tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), child.wait_with_output())
+            .await
+            .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> { "command timed out".into() })??
     } else {
         child.wait_with_output().await?
     };
@@ -283,11 +280,7 @@ async fn execute_shell(
 }
 
 /// Gather input values for a node from upstream edge outputs.
-fn gather_inputs(
-    workflow: &Workflow,
-    node_id: NodeId,
-    port_values: &HashMap<PortId, Value>,
-) -> HashMap<PortId, Value> {
+fn gather_inputs(workflow: &Workflow, node_id: NodeId, port_values: &HashMap<PortId, Value>) -> HashMap<PortId, Value> {
     let mut inputs = HashMap::new();
 
     let node = match workflow.graph.node(node_id) {
@@ -329,11 +322,7 @@ fn topological_sort(workflow: &Workflow) -> Option<Vec<NodeId>> {
         }
     }
 
-    let mut queue: Vec<NodeId> = in_degree
-        .iter()
-        .filter(|(_, deg)| **deg == 0)
-        .map(|(&id, _)| id)
-        .collect();
+    let mut queue: Vec<NodeId> = in_degree.iter().filter(|(_, deg)| **deg == 0).map(|(&id, _)| id).collect();
     queue.sort(); // deterministic order
 
     let mut order = Vec::new();

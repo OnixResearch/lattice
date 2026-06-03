@@ -1,0 +1,344 @@
+//! Tests for store — redb persistence: workflows, values, cache, run records.
+
+mod common;
+
+use std::collections::HashMap;
+
+use n8nclone::engine::executor::RunId;
+use n8nclone::engine::value::ContentHash;
+use n8nclone::engine::value::Value;
+use n8nclone::engine::workflow::Workflow;
+use n8nclone::store::RunRecord;
+use n8nclone::store::Store;
+use pretty_assertions::assert_eq;
+use rat_nodegraph::model::PortId;
+
+// ---------------------------------------------------------------------------
+// Store creation
+// ---------------------------------------------------------------------------
+
+#[test]
+fn store_opens_successfully() {
+    let (_store, _dir) = common::temp_store();
+}
+
+#[test]
+fn store_open_is_idempotent() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("test.redb");
+    // Open twice — should not panic or corrupt.
+    Store::open(&path).unwrap();
+    Store::open(&path).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Workflow CRUD
+// ---------------------------------------------------------------------------
+
+#[test]
+fn save_and_load_workflow() {
+    let (store, _dir) = common::temp_store();
+    let (wf, _, _) = common::two_node_pipeline();
+
+    store.save_workflow(&wf).unwrap();
+    let loaded = store.load_workflow("test-pipeline").unwrap();
+
+    assert!(loaded.is_some());
+    let loaded = loaded.unwrap();
+    assert_eq!(loaded.meta.name, "test-pipeline");
+    assert_eq!(loaded.graph.node_count(), 2);
+    assert_eq!(loaded.graph.edge_count(), 1);
+}
+
+#[test]
+fn load_nonexistent_workflow_returns_none() {
+    let (store, _dir) = common::temp_store();
+    let result = store.load_workflow("does-not-exist").unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn list_workflows_empty() {
+    let (store, _dir) = common::temp_store();
+    let names = store.list_workflows().unwrap();
+    assert!(names.is_empty());
+}
+
+#[test]
+fn list_workflows_returns_all() {
+    let (store, _dir) = common::temp_store();
+
+    let wf1 = Workflow::new("alpha");
+    let wf2 = Workflow::new("beta");
+    store.save_workflow(&wf1).unwrap();
+    store.save_workflow(&wf2).unwrap();
+
+    let mut names = store.list_workflows().unwrap();
+    names.sort();
+    assert_eq!(names, vec!["alpha", "beta"]);
+}
+
+#[test]
+fn save_workflow_overwrites() {
+    let (store, _dir) = common::temp_store();
+
+    let mut wf = Workflow::new("overwrite-test");
+    store.save_workflow(&wf).unwrap();
+
+    // Modify and re-save.
+    wf.add_shell_node("new-node", "true");
+    store.save_workflow(&wf).unwrap();
+
+    let loaded = store.load_workflow("overwrite-test").unwrap().unwrap();
+    assert_eq!(loaded.graph.node_count(), 1, "overwritten version should have 1 node");
+}
+
+#[test]
+fn delete_workflow() {
+    let (store, _dir) = common::temp_store();
+    let wf = Workflow::new("doomed");
+    store.save_workflow(&wf).unwrap();
+
+    store.delete_workflow("doomed").unwrap();
+    assert!(store.load_workflow("doomed").unwrap().is_none());
+}
+
+#[test]
+fn delete_nonexistent_workflow_is_ok() {
+    let (store, _dir) = common::temp_store();
+    // Should not error.
+    store.delete_workflow("ghost").unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Value store (content-addressed)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn put_and_get_value() {
+    let (store, _dir) = common::temp_store();
+    let val = Value::from_string("hello store".into());
+
+    store.put_value(&val).unwrap();
+    let loaded = store.get_value(&val.hash).unwrap();
+
+    assert!(loaded.is_some());
+    let loaded = loaded.unwrap();
+    assert_eq!(loaded.hash, val.hash);
+    assert_eq!(loaded.as_display_string(), "hello store");
+}
+
+#[test]
+fn get_missing_value_returns_none() {
+    let (store, _dir) = common::temp_store();
+    let fake_hash = ContentHash::from_bytes(b"not stored");
+    assert!(store.get_value(&fake_hash).unwrap().is_none());
+}
+
+#[test]
+fn put_value_deduplicates() {
+    let (store, _dir) = common::temp_store();
+    let val = Value::from_string("dedup".into());
+
+    // Store same value twice — should be a no-op on the second write.
+    store.put_value(&val).unwrap();
+    store.put_value(&val).unwrap();
+
+    let loaded = store.get_value(&val.hash).unwrap().unwrap();
+    assert_eq!(loaded.hash, val.hash);
+}
+
+#[test]
+fn store_different_value_types() {
+    let (store, _dir) = common::temp_store();
+
+    let s = Value::from_string("text".into());
+    let b = Value::from_bytes(vec![1, 2, 3]);
+    let j = Value::from_json(serde_json::json!({"k": "v"}));
+    let e = Value::from_exit_code(0);
+    let err = Value::error("fail".into(), "trace".into());
+
+    for val in [&s, &b, &j, &e, &err] {
+        store.put_value(val).unwrap();
+        let loaded = store.get_value(&val.hash).unwrap().unwrap();
+        assert_eq!(loaded.hash, val.hash);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Execution cache
+// ---------------------------------------------------------------------------
+
+#[test]
+fn put_and_get_cache() {
+    let (store, _dir) = common::temp_store();
+
+    let input_hash = ContentHash::from_bytes(b"cache key");
+    let mut outputs = HashMap::new();
+    outputs.insert(PortId(100), Value::from_string("cached output".into()));
+
+    store.put_cache(&input_hash, &outputs).unwrap();
+
+    let loaded = store.get_cache(&input_hash).unwrap();
+    assert!(loaded.is_some());
+    let loaded = loaded.unwrap();
+    assert!(loaded.contains_key(&PortId(100)));
+    assert_eq!(loaded.get(&PortId(100)).unwrap().as_display_string(), "cached output");
+}
+
+#[test]
+fn get_missing_cache_returns_none() {
+    let (store, _dir) = common::temp_store();
+    let hash = ContentHash::from_bytes(b"no cache");
+    assert!(store.get_cache(&hash).unwrap().is_none());
+}
+
+#[test]
+fn cache_overwrites_on_same_key() {
+    let (store, _dir) = common::temp_store();
+    let hash = ContentHash::from_bytes(b"overwrite cache");
+
+    let mut v1 = HashMap::new();
+    v1.insert(PortId(1), Value::from_string("first".into()));
+    store.put_cache(&hash, &v1).unwrap();
+
+    let mut v2 = HashMap::new();
+    v2.insert(PortId(1), Value::from_string("second".into()));
+    store.put_cache(&hash, &v2).unwrap();
+
+    let loaded = store.get_cache(&hash).unwrap().unwrap();
+    assert_eq!(loaded.get(&PortId(1)).unwrap().as_display_string(), "second");
+}
+
+// ---------------------------------------------------------------------------
+// Run records
+// ---------------------------------------------------------------------------
+
+#[test]
+fn save_and_list_runs() {
+    let (store, _dir) = common::temp_store();
+
+    let record = RunRecord {
+        run_id: RunId(0),
+        workflow_name: "test-wf".into(),
+        started_epoch_ms: 1000,
+        finished_epoch_ms: Some(2000),
+        node_count: 3,
+        cache_hits: 1,
+        failures: 0,
+    };
+    store.save_run(&record).unwrap();
+
+    let runs = store.list_runs(10).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].workflow_name, "test-wf");
+    assert_eq!(runs[0].node_count, 3);
+    assert_eq!(runs[0].cache_hits, 1);
+}
+
+#[test]
+fn list_runs_respects_limit() {
+    let (store, _dir) = common::temp_store();
+
+    for i in 0..5 {
+        store
+            .save_run(&RunRecord {
+                run_id: RunId(i),
+                workflow_name: format!("wf-{i}"),
+                started_epoch_ms: i as i64 * 1000,
+                finished_epoch_ms: None,
+                node_count: 1,
+                cache_hits: 0,
+                failures: 0,
+            })
+            .unwrap();
+    }
+
+    let runs = store.list_runs(3).unwrap();
+    assert_eq!(runs.len(), 3);
+}
+
+#[test]
+fn list_runs_newest_first() {
+    let (store, _dir) = common::temp_store();
+
+    for i in 0..3 {
+        store
+            .save_run(&RunRecord {
+                run_id: RunId(i),
+                workflow_name: format!("wf-{i}"),
+                started_epoch_ms: i as i64 * 1000,
+                finished_epoch_ms: None,
+                node_count: 1,
+                cache_hits: 0,
+                failures: 0,
+            })
+            .unwrap();
+    }
+
+    let runs = store.list_runs(10).unwrap();
+    // Newest (highest run_id) should come first.
+    assert_eq!(runs[0].run_id.0, 2);
+    assert_eq!(runs[1].run_id.0, 1);
+    assert_eq!(runs[2].run_id.0, 0);
+}
+
+#[test]
+fn list_runs_empty() {
+    let (store, _dir) = common::temp_store();
+    let runs = store.list_runs(10).unwrap();
+    assert!(runs.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Cross-module: store + executor integration
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn executor_output_round_trips_through_store() {
+    let (store, _dir) = common::temp_store();
+    let (wf, node_id) = common::standalone_node("echo", "echo stored");
+
+    let executor = n8nclone::engine::executor::Executor::new();
+    let result = executor.execute_node(&wf, node_id, &HashMap::new()).await;
+
+    match &result.status {
+        n8nclone::engine::executor::NodeStatus::Completed { outputs, .. } => {
+            // Store each output value.
+            for val in outputs.values() {
+                store.put_value(val).unwrap();
+            }
+
+            // Store in cache.
+            store.put_cache(&result.input_hash, outputs).unwrap();
+
+            // Read back from cache.
+            let cached = store.get_cache(&result.input_hash).unwrap().unwrap();
+            let stdout = cached.get(&PortId(u64::MAX - 2)).unwrap();
+            assert_eq!(stdout.as_display_string().trim(), "stored");
+
+            // Read back individual values.
+            for val in outputs.values() {
+                let loaded = store.get_value(&val.hash).unwrap().unwrap();
+                assert_eq!(loaded.hash, val.hash);
+            }
+        }
+        other => panic!("expected Completed, got {:?}", other),
+    }
+}
+
+#[test]
+fn workflow_survives_store_round_trip_with_configs() {
+    let (store, _dir) = common::temp_store();
+    let (wf, _, _, _, _) = common::diamond_workflow();
+
+    store.save_workflow(&wf).unwrap();
+    let loaded = store.load_workflow("diamond").unwrap().unwrap();
+
+    // All configs survived.
+    assert_eq!(loaded.configs.len(), 4);
+    for (key, cfg) in &wf.configs {
+        let loaded_cfg = loaded.configs.get(key).expect("config missing after round-trip");
+        assert_eq!(cfg.kind_label(), loaded_cfg.kind_label());
+    }
+}

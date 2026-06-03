@@ -1,8 +1,8 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use n8nclone::config;
 use n8nclone::tui::App;
-
-use std::path::PathBuf;
 use tracing::info;
 
 #[derive(Parser, Debug)]
@@ -30,15 +30,11 @@ async fn main() -> Result<(), n8nclone::error::Error> {
     let log_file = std::fs::File::create("/tmp/n8nclone.log").ok();
     if let Some(file) = log_file {
         tracing_subscriber::fmt()
-            .with_env_filter(
-                tracing_subscriber::EnvFilter::from_default_env().add_directive(
-                    if args.verbose {
-                        tracing::Level::DEBUG.into()
-                    } else {
-                        tracing::Level::INFO.into()
-                    },
-                ),
-            )
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(if args.verbose {
+                tracing::Level::DEBUG.into()
+            } else {
+                tracing::Level::INFO.into()
+            }))
             .with_writer(file)
             .init();
     }
@@ -82,21 +78,13 @@ fn init_config(config_path: &PathBuf) -> Result<(), n8nclone::error::Error> {
     }
 
     // Write default config.ncl.
-    std::fs::write(config_path, config::default_config_ncl())
-        .map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    std::fs::write(config_path, config::default_config_ncl()).map_err(|e| n8nclone::error::Error::Io { source: e })?;
 
     // Create templates dir with an example.
-    let templates_dir = config_path
-        .parent()
-        .unwrap_or(&PathBuf::from("."))
-        .join("templates");
-    std::fs::create_dir_all(&templates_dir)
+    let templates_dir = config_path.parent().unwrap_or(&PathBuf::from(".")).join("templates");
+    std::fs::create_dir_all(&templates_dir).map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    std::fs::write(templates_dir.join("grep.ncl"), config::example_template_ncl())
         .map_err(|e| n8nclone::error::Error::Io { source: e })?;
-    std::fs::write(
-        templates_dir.join("grep.ncl"),
-        config::example_template_ncl(),
-    )
-    .map_err(|e| n8nclone::error::Error::Io { source: e })?;
 
     Ok(())
 }

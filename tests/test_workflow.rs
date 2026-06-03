@@ -1,0 +1,215 @@
+//! Tests for engine::workflow — graph construction, node configs, edges.
+
+mod common;
+
+use n8nclone::engine::workflow::NodeConfig;
+use n8nclone::engine::workflow::Workflow;
+use n8nclone::engine::workflow::WorkflowMeta;
+use pretty_assertions::assert_eq;
+
+// ---------------------------------------------------------------------------
+// WorkflowMeta
+// ---------------------------------------------------------------------------
+
+#[test]
+fn meta_new_sets_name() {
+    let m = WorkflowMeta::new("my workflow");
+    assert_eq!(m.name, "my workflow");
+    assert!(m.description.is_empty());
+}
+
+#[test]
+fn meta_timestamps_are_recent() {
+    let before = chrono::Utc::now();
+    let m = WorkflowMeta::new("ts test");
+    let after = chrono::Utc::now();
+    assert!(m.created >= before && m.created <= after);
+    assert_eq!(m.created, m.modified);
+}
+
+// ---------------------------------------------------------------------------
+// NodeConfig
+// ---------------------------------------------------------------------------
+
+#[test]
+fn shell_config_defaults() {
+    let cfg = NodeConfig::shell("ls -la");
+    match &cfg {
+        NodeConfig::Shell {
+            command,
+            cwd,
+            env,
+            timeout_secs,
+            pipe_stdin,
+        } => {
+            assert_eq!(command, "ls -la");
+            assert!(cwd.is_none());
+            assert!(env.is_empty());
+            assert_eq!(*timeout_secs, 60);
+            assert!(*pipe_stdin);
+        }
+    }
+}
+
+#[test]
+fn shell_config_kind_label() {
+    let cfg = NodeConfig::shell("true");
+    assert_eq!(cfg.kind_label(), "Shell");
+}
+
+#[test]
+fn node_config_serde_round_trip() {
+    let cfg = NodeConfig::Shell {
+        command: "wc -l".into(),
+        cwd: Some("/tmp".into()),
+        env: [("FOO".into(), "bar".into())].into(),
+        timeout_secs: 30,
+        pipe_stdin: false,
+    };
+    let json = serde_json::to_string(&cfg).unwrap();
+    let back: NodeConfig = serde_json::from_str(&json).unwrap();
+    match back {
+        NodeConfig::Shell {
+            command,
+            cwd,
+            env,
+            timeout_secs,
+            pipe_stdin,
+        } => {
+            assert_eq!(command, "wc -l");
+            assert_eq!(cwd.as_deref(), Some("/tmp"));
+            assert_eq!(env.get("FOO").map(|s| s.as_str()), Some("bar"));
+            assert_eq!(timeout_secs, 30);
+            assert!(!pipe_stdin);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workflow construction
+// ---------------------------------------------------------------------------
+
+#[test]
+fn new_workflow_starts_empty() {
+    let wf = Workflow::new("empty");
+    assert_eq!(wf.meta.name, "empty");
+    assert_eq!(wf.graph.node_count(), 0);
+    assert_eq!(wf.graph.edge_count(), 0);
+    assert!(wf.configs.is_empty());
+}
+
+#[test]
+fn add_shell_node_registers_config() {
+    let mut wf = Workflow::new("test");
+    let id = wf.add_shell_node("echo", "echo hi");
+    assert_eq!(wf.graph.node_count(), 1);
+    let cfg = wf.node_config(id).expect("config should exist");
+    assert_eq!(cfg.kind_label(), "Shell");
+}
+
+#[test]
+fn add_shell_node_has_correct_ports() {
+    let mut wf = Workflow::new("test");
+    let id = wf.add_shell_node("node", "true");
+    let node = wf.graph.node(id).unwrap();
+    assert_eq!(node.input_ports.len(), 1, "one input: stdin");
+    assert_eq!(node.output_ports.len(), 3, "three outputs: stdout, stderr, exit");
+    assert_eq!(node.input_ports[0].label, "stdin");
+    assert_eq!(node.output_ports[0].label, "stdout");
+    assert_eq!(node.output_ports[1].label, "stderr");
+    assert_eq!(node.output_ports[2].label, "exit");
+}
+
+#[test]
+fn add_multiple_nodes() {
+    let mut wf = Workflow::new("multi");
+    let a = wf.add_shell_node("a", "echo a");
+    let b = wf.add_shell_node("b", "echo b");
+    let c = wf.add_shell_node("c", "echo c");
+    assert_eq!(wf.graph.node_count(), 3);
+    assert_ne!(a, b);
+    assert_ne!(b, c);
+    assert_eq!(wf.configs.len(), 3);
+}
+
+#[test]
+fn connect_nodes_creates_edge() {
+    let (wf, _a, _b) = common::two_node_pipeline();
+    assert_eq!(wf.graph.edge_count(), 1);
+}
+
+#[test]
+fn dag_mode_prevents_cycles() {
+    let mut wf = Workflow::new("cycle");
+    let a = wf.add_shell_node("a", "true");
+    let b = wf.add_shell_node("b", "true");
+
+    let a_out = wf.graph.node(a).unwrap().output_ports[0].id;
+    let b_in = wf.graph.node(b).unwrap().input_ports[0].id;
+    wf.graph.add_edge(a_out, b_in).unwrap();
+
+    // Try to create b → a (would form a cycle).
+    let b_out = wf.graph.node(b).unwrap().output_ports[0].id;
+    let a_in = wf.graph.node(a).unwrap().input_ports[0].id;
+    let result = wf.graph.add_edge(b_out, a_in);
+    assert!(result.is_err(), "cycle should be rejected in DAG mode");
+}
+
+#[test]
+fn self_loop_rejected() {
+    let mut wf = Workflow::new("selfloop");
+    let a = wf.add_shell_node("a", "true");
+    let a_out = wf.graph.node(a).unwrap().output_ports[0].id;
+    let a_in = wf.graph.node(a).unwrap().input_ports[0].id;
+    let result = wf.graph.add_edge(a_out, a_in);
+    assert!(result.is_err(), "self-loop should be rejected");
+}
+
+#[test]
+fn set_node_config_replaces_existing() {
+    let mut wf = Workflow::new("replace");
+    let id = wf.add_shell_node("node", "old-command");
+    wf.set_node_config(id, NodeConfig::shell("new-command"));
+    match wf.node_config(id).unwrap() {
+        NodeConfig::Shell { command, .. } => assert_eq!(command, "new-command"),
+    }
+}
+
+#[test]
+fn touch_updates_modified() {
+    let mut wf = Workflow::new("touch");
+    let before = wf.meta.modified;
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    wf.touch();
+    assert!(wf.meta.modified > before);
+}
+
+#[test]
+fn workflow_serde_round_trip() {
+    let (wf, _, _) = common::two_node_pipeline();
+    let json = serde_json::to_string(&wf).unwrap();
+    let back: Workflow = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.meta.name, wf.meta.name);
+    assert_eq!(back.graph.node_count(), wf.graph.node_count());
+    assert_eq!(back.graph.edge_count(), wf.graph.edge_count());
+    assert_eq!(back.configs.len(), wf.configs.len());
+}
+
+// ---------------------------------------------------------------------------
+// Diamond workflow structural checks
+// ---------------------------------------------------------------------------
+
+#[test]
+fn diamond_has_four_nodes_three_edges() {
+    let (wf, _, _, _, _) = common::diamond_workflow();
+    assert_eq!(wf.graph.node_count(), 4);
+    assert_eq!(wf.graph.edge_count(), 3);
+}
+
+#[test]
+fn diamond_node_configs_all_present() {
+    let (wf, a, b, c, d) = common::diamond_workflow();
+    for id in [a, b, c, d] {
+        assert!(wf.node_config(id).is_some(), "config missing for {:?}", id);
+    }
+}

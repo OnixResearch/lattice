@@ -38,16 +38,16 @@ nickel-lang-core = "0.17.0"
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
-rat-nodegraph = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-widgets = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-keymap = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-fuzzy = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-streaming = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-layers = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-canvas = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-tree = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-table = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
-rat-editor = { git = "https://github.com/brittonr/subwayrat", version = "0.1.0" }
+rat-nodegraph = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-widgets = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-keymap = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-fuzzy = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-streaming = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-layers = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-canvas = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-tree = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-table = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+rat-editor = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
 home = "0.5.12"
 dirs-next = "2.0.0"
 

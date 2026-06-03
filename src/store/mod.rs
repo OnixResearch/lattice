@@ -6,12 +6,21 @@
 //!  - runs: RunId → execution log
 //!  - cache: input_hash → output values (skip re-execution)
 
-use crate::engine::{ContentHash, RunId, Value, Workflow};
-use rat_nodegraph::model::PortId;
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+
+use rat_nodegraph::model::PortId;
+use redb::Database;
+use redb::ReadableDatabase;
+use redb::ReadableTable;
+use redb::TableDefinition;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::engine::ContentHash;
+use crate::engine::RunId;
+use crate::engine::Value;
+use crate::engine::Workflow;
 
 const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows");
 const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
@@ -84,8 +93,7 @@ impl Store {
         match table.get(name).map_err(|e| StoreError::Db(e.to_string()))? {
             Some(data) => {
                 let bytes: &[u8] = data.value();
-                let wf: Workflow = serde_json::from_slice(bytes)
-                    .map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                let wf: Workflow = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
                 Ok(Some(wf))
             }
             None => Ok(None),
@@ -124,9 +132,7 @@ impl Store {
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
             let mut table = txn.open_table(VALUES).map_err(|e| StoreError::Table(e.to_string()))?;
-            table
-                .insert(value.hash.0.as_slice(), data.as_slice())
-                .map_err(|e| StoreError::Db(e.to_string()))?;
+            table.insert(value.hash.0.as_slice(), data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
@@ -139,8 +145,7 @@ impl Store {
         match table.get(hash.0.as_slice()).map_err(|e| StoreError::Db(e.to_string()))? {
             Some(data) => {
                 let bytes: &[u8] = data.value();
-                let val: Value = serde_json::from_slice(bytes)
-                    .map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                let val: Value = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
                 Ok(Some(val))
             }
             None => Ok(None),
@@ -150,36 +155,26 @@ impl Store {
     // -- execution cache ----------------------------------------------------
 
     /// Store cached outputs for an input hash.
-    pub fn put_cache(
-        &self,
-        input_hash: &ContentHash,
-        outputs: &HashMap<PortId, Value>,
-    ) -> Result<(), StoreError> {
-        let data =
-            serde_json::to_vec(outputs).map_err(|e| StoreError::Serialize(e.to_string()))?;
+    pub fn put_cache(&self, input_hash: &ContentHash, outputs: &HashMap<PortId, Value>) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(outputs).map_err(|e| StoreError::Serialize(e.to_string()))?;
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
             let mut table = txn.open_table(CACHE).map_err(|e| StoreError::Table(e.to_string()))?;
-            table
-                .insert(input_hash.0.as_slice(), data.as_slice())
-                .map_err(|e| StoreError::Db(e.to_string()))?;
+            table.insert(input_hash.0.as_slice(), data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
     }
 
     /// Retrieve cached outputs for an input hash.
-    pub fn get_cache(
-        &self,
-        input_hash: &ContentHash,
-    ) -> Result<Option<HashMap<PortId, Value>>, StoreError> {
+    pub fn get_cache(&self, input_hash: &ContentHash) -> Result<Option<HashMap<PortId, Value>>, StoreError> {
         let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
         let table = txn.open_table(CACHE).map_err(|e| StoreError::Table(e.to_string()))?;
         match table.get(input_hash.0.as_slice()).map_err(|e| StoreError::Db(e.to_string()))? {
             Some(data) => {
                 let bytes: &[u8] = data.value();
-                let map: HashMap<PortId, Value> = serde_json::from_slice(bytes)
-                    .map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                let map: HashMap<PortId, Value> =
+                    serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
                 Ok(Some(map))
             }
             None => Ok(None),
@@ -190,14 +185,11 @@ impl Store {
 
     /// Store a run record.
     pub fn save_run(&self, record: &RunRecord) -> Result<(), StoreError> {
-        let data =
-            serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
             let mut table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
-            table
-                .insert(record.run_id.0, data.as_slice())
-                .map_err(|e| StoreError::Db(e.to_string()))?;
+            table.insert(record.run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
@@ -212,8 +204,7 @@ impl Store {
         for entry in iter {
             let (_key, data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
             let bytes: &[u8] = data.value();
-            let rec: RunRecord = serde_json::from_slice(bytes)
-                .map_err(|e| StoreError::Deserialize(e.to_string()))?;
+            let rec: RunRecord = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
             records.push(rec);
         }
         records.reverse();

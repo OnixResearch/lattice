@@ -3,10 +3,15 @@
 //! A Workflow wraps a rat-nodegraph Graph and attaches execution config
 //! (shell commands, environment, etc.) to each node.
 
-use crate::engine::value::TypeTag;
-use rat_nodegraph::model::{Graph, NodeId, PortSpec};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use rat_nodegraph::model::Graph;
+use rat_nodegraph::model::NodeId;
+use rat_nodegraph::model::PortSpec;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::engine::value::TypeTag;
 
 /// Metadata about a workflow (stored alongside the graph).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,9 +81,7 @@ impl Workflow {
         let mut graph = Graph::new();
         graph.dag_mode = true;
         // Accept "any" type on either side of an edge.
-        graph.set_compatibility(Box::new(|src, tgt| {
-            src == tgt || src == "any" || tgt == "any"
-        }));
+        graph.set_compatibility(Box::new(|src, tgt| src == tgt || src == "any" || tgt == "any"));
 
         Self {
             meta: WorkflowMeta::new(name),
@@ -89,20 +92,12 @@ impl Workflow {
 
     /// Add a shell node with the given label and command.
     /// Returns the NodeId.
-    pub fn add_shell_node(
-        &mut self,
-        label: impl Into<String>,
-        command: impl Into<String>,
-    ) -> NodeId {
-        let id = self.graph.add_node(
-            label,
-            &[PortSpec::new("stdin", TypeTag::String.as_str())],
-            &[
-                PortSpec::new("stdout", TypeTag::String.as_str()),
-                PortSpec::new("stderr", TypeTag::String.as_str()),
-                PortSpec::new("exit", TypeTag::ExitCode.as_str()),
-            ],
-        );
+    pub fn add_shell_node(&mut self, label: impl Into<String>, command: impl Into<String>) -> NodeId {
+        let id = self.graph.add_node(label, &[PortSpec::new("stdin", TypeTag::String.as_str())], &[
+            PortSpec::new("stdout", TypeTag::String.as_str()),
+            PortSpec::new("stderr", TypeTag::String.as_str()),
+            PortSpec::new("exit", TypeTag::ExitCode.as_str()),
+        ]);
         self.configs.insert(id.0, NodeConfig::shell(command));
         id
     }

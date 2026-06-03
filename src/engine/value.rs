@@ -4,9 +4,11 @@
 //! redb stores values keyed by hash for dedup. Re-runs skip nodes
 //! whose input hash tree hasn't changed.
 
-use blake3::Hash;
-use serde::{Deserialize, Serialize};
 use std::fmt;
+
+use blake3::Hash;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Blake3 content hash of a value.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
