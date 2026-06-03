@@ -15,6 +15,7 @@ use rat_fuzzy::FuzzyState;
 use rat_nodegraph::layout::LayoutConfig;
 use rat_nodegraph::layout::auto_layout;
 use rat_nodegraph::model::NodeId;
+use rat_nodegraph::model::PortSpec;
 use rat_nodegraph::view::NodeGraphState;
 use rat_nodegraph::view::node_bounds;
 use rat_streaming::StreamingOutput;
@@ -24,6 +25,7 @@ use tracing::error;
 use tracing::info;
 
 use crate::config::AppConfig;
+use crate::config::NodeTemplate;
 use crate::engine::executor::Executor;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
@@ -96,6 +98,63 @@ pub enum PropertyEditError {
 
 pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
     input.trim().parse::<u64>().map_err(|_| PropertyEditError::InvalidTimeout)
+}
+
+pub fn normalized_node_label(input: &str, default_label: &str) -> String {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        default_label.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddNodeStep {
+    TemplateSelect,
+    Label,
+    Command,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddNodeFlowState {
+    pub open: bool,
+    pub step: AddNodeStep,
+    pub label: String,
+    pub command: String,
+    pub selected_template: usize,
+}
+
+impl AddNodeFlowState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            step: AddNodeStep::Label,
+            label: String::new(),
+            command: String::new(),
+            selected_template: 0,
+        }
+    }
+
+    fn shell(default_label: String) -> Self {
+        Self {
+            open: true,
+            step: AddNodeStep::Label,
+            label: default_label,
+            command: String::new(),
+            selected_template: 0,
+        }
+    }
+
+    fn templates() -> Self {
+        Self {
+            open: true,
+            step: AddNodeStep::TemplateSelect,
+            label: String::new(),
+            command: String::new(),
+            selected_template: 0,
+        }
+    }
 }
 
 pub struct WorkflowBrowserState {
@@ -199,6 +258,8 @@ pub struct App {
     pub output: StreamingOutput,
     pub workflow_browser: WorkflowBrowserState,
     pub property_edit: Option<PropertyEditState>,
+    pub add_node_flow: AddNodeFlowState,
+    pub node_templates: Vec<NodeTemplate>,
     pub store: Option<Store>,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
@@ -234,6 +295,8 @@ impl App {
             output: StreamingOutput::new(),
             workflow_browser: WorkflowBrowserState::closed(),
             property_edit: None,
+            add_node_flow: AddNodeFlowState::closed(),
+            node_templates: Vec::new(),
             store,
             config,
             last_drag_canvas: None,
@@ -280,6 +343,128 @@ impl App {
     pub fn cancel_quit_confirmation(&mut self) {
         self.confirm_quit = false;
         self.output.push_line("Quit canceled");
+    }
+
+    /// Return whether the add-node flow is open.
+    pub fn is_add_node_flow_open(&self) -> bool {
+        self.add_node_flow.open
+    }
+
+    /// Replace the configured node templates.
+    pub fn set_node_templates(&mut self, templates: Vec<NodeTemplate>) {
+        self.node_templates = templates;
+    }
+
+    /// Start the guided add-node flow.
+    pub fn open_add_node_flow(&mut self) {
+        self.show_palette = false;
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.property_edit = None;
+        self.add_node_flow = if self.node_templates.is_empty() {
+            AddNodeFlowState::shell(self.next_shell_node_label())
+        } else {
+            AddNodeFlowState::templates()
+        };
+    }
+
+    /// Cancel guided add-node state without mutating the workflow.
+    pub fn cancel_add_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::closed();
+    }
+
+    /// Switch from template selection to manual shell-node entry.
+    pub fn start_manual_shell_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::shell(self.next_shell_node_label());
+    }
+
+    /// Move add-node template selection down.
+    pub fn select_next_node_template(&mut self) {
+        if self.node_templates.is_empty() {
+            return;
+        }
+        let last_index = self.node_templates.len() - 1;
+        self.add_node_flow.selected_template = (self.add_node_flow.selected_template + 1).min(last_index);
+    }
+
+    /// Move add-node template selection up.
+    pub fn select_previous_node_template(&mut self) {
+        self.add_node_flow.selected_template = self.add_node_flow.selected_template.saturating_sub(1);
+    }
+
+    /// Append one character to the active add-node draft field.
+    pub fn push_add_node_char(&mut self, ch: char) {
+        match self.add_node_flow.step {
+            AddNodeStep::Label => self.add_node_flow.label.push(ch),
+            AddNodeStep::Command => self.add_node_flow.command.push(ch),
+            AddNodeStep::TemplateSelect => {}
+        }
+    }
+
+    /// Remove one character from the active add-node draft field.
+    pub fn pop_add_node_char(&mut self) {
+        match self.add_node_flow.step {
+            AddNodeStep::Label => {
+                self.add_node_flow.label.pop();
+            }
+            AddNodeStep::Command => {
+                self.add_node_flow.command.pop();
+            }
+            AddNodeStep::TemplateSelect => {}
+        }
+    }
+
+    /// Advance or finish the guided add-node flow.
+    pub fn confirm_add_node_flow(&mut self) {
+        match self.add_node_flow.step {
+            AddNodeStep::TemplateSelect => self.confirm_template_node(),
+            AddNodeStep::Label => self.add_node_flow.step = AddNodeStep::Command,
+            AddNodeStep::Command => self.confirm_shell_node_from_flow(),
+        }
+    }
+
+    fn confirm_shell_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_shell_node_label());
+        let command = self.add_node_flow.command.clone();
+        self.add_shell_node(&label, &command);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_template_node(&mut self) {
+        let Some(template) = self.node_templates.get(self.add_node_flow.selected_template).cloned() else {
+            return;
+        };
+        if self.add_template_node(&template) {
+            self.cancel_add_node_flow();
+        }
+    }
+
+    fn add_template_node(&mut self, template: &NodeTemplate) -> bool {
+        if template.kind != "shell" {
+            self.output.push_line(&format!("Unsupported template kind: {}", template.kind));
+            return false;
+        }
+
+        let inputs = template
+            .input_ports
+            .iter()
+            .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+            .collect::<Vec<_>>();
+        let outputs = template
+            .output_ports
+            .iter()
+            .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+            .collect::<Vec<_>>();
+        let id = self.workflow.graph.add_node(template.name.clone(), &inputs, &outputs);
+        self.workflow.set_node_config(id, NodeConfig::shell(template.command.clone().unwrap_or_default()));
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+        true
+    }
+
+    fn next_shell_node_label(&self) -> String {
+        format!("Shell {}", self.workflow.graph.node_count() + 1)
     }
 
     /// Return whether the workflow browser modal is open.
@@ -531,7 +716,13 @@ impl App {
     /// Add a new shell node to the workflow.
     pub fn add_shell_node(&mut self, label: &str, command: &str) {
         let id = self.workflow.add_shell_node(label, command);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
 
+    fn place_new_node(&mut self, id: NodeId) {
         // Position the new node so it doesn't overlap existing ones.
         // Find the rightmost edge of all existing nodes, then place after a gap.
         let mut max_right: i32 = 0;
@@ -555,14 +746,12 @@ impl App {
                 node.y = stack_y;
             }
         }
+    }
 
-        self.sync_graph_state();
-
-        // Select the new node.
+    fn select_node(&mut self, id: NodeId) {
         self.graph_state.selected.clear();
         self.graph_state.selected.insert(id);
         self.graph_state.focused = Some(id);
-        self.mark_workflow_dirty();
     }
 
     /// Run auto-layout on the graph.
@@ -680,8 +869,7 @@ impl App {
                             self.save_workflow();
                         }
                         AppAction::AddNode => {
-                            let n = self.workflow.graph.node_count();
-                            self.add_shell_node(&format!("Shell {}", n + 1), "echo 'hello'");
+                            self.open_add_node_flow();
                         }
                         AppAction::OpenWorkflow => {
                             self.open_workflow_browser();
@@ -709,6 +897,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::config::PortTemplate;
 
     const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
 
@@ -898,5 +1087,79 @@ mod tests {
     fn timeout_validation_accepts_whole_seconds_only() {
         assert_eq!(validate_timeout_secs("42"), Ok(42));
         assert_eq!(validate_timeout_secs("nope"), Err(PropertyEditError::InvalidTimeout));
+    }
+
+    #[test]
+    fn add_node_flow_creates_shell_node_from_entered_fields() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_add_node_flow();
+        app.add_node_flow.label = "Custom".to_string();
+        app.confirm_add_node_flow();
+        app.add_node_flow.command = "echo custom".to_string();
+        app.confirm_add_node_flow();
+
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        let node_id = app.graph_state.focused.expect("new node focused");
+        assert_eq!(app.workflow.graph.node(node_id).expect("node").label, "Custom");
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "echo custom"),
+        }
+        assert!(!app.is_add_node_flow_open());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn add_node_flow_creates_node_from_template() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.set_node_templates(vec![NodeTemplate {
+            name: "grep".to_string(),
+            description: "Filter text".to_string(),
+            kind: "shell".to_string(),
+            command: Some("grep needle".to_string()),
+            input_ports: vec![PortTemplate {
+                label: "stdin".to_string(),
+                type_tag: "string".to_string(),
+            }],
+            output_ports: vec![PortTemplate {
+                label: "stdout".to_string(),
+                type_tag: "string".to_string(),
+            }],
+        }]);
+
+        app.open_add_node_flow();
+        app.confirm_add_node_flow();
+
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        let node_id = app.graph_state.focused.expect("new node focused");
+        let node = app.workflow.graph.node(node_id).expect("node");
+        assert_eq!(node.label, "grep");
+        assert_eq!(node.input_ports.len(), 1);
+        assert_eq!(node.output_ports.len(), 1);
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "grep needle"),
+        }
+    }
+
+    #[test]
+    fn add_node_flow_cancel_preserves_workflow() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_add_node_flow();
+        app.add_node_flow.label = "Should not exist".to_string();
+        app.cancel_add_node_flow();
+
+        assert_eq!(app.workflow.graph.node_count(), 0);
+        assert!(!app.is_add_node_flow_open());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn empty_add_node_label_uses_default() {
+        assert_eq!(normalized_node_label("", "Shell 1"), "Shell 1");
+        assert_eq!(normalized_node_label("  Custom  ", "Shell 1"), "Custom");
     }
 }

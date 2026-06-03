@@ -9,6 +9,7 @@ use crossterm::event::MouseEventKind;
 use rat_fuzzy::Action as FuzzyAction;
 use rat_fuzzy::handle_action as handle_fuzzy_action;
 
+use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
 use crate::tui::app::AppAction;
 use crate::tui::app::FocusPanel;
@@ -47,6 +48,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         return handle_workflow_browser_key(app, key);
     }
 
+    if app.is_add_node_flow_open() {
+        return handle_add_node_key(app, key);
+    }
+
     // Ctrl-P toggles the command palette.
     if matches!((key.modifiers, key.code), (KeyModifiers::CONTROL, KeyCode::Char('p'))) {
         toggle_palette(app);
@@ -79,6 +84,51 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Canvas => handle_canvas_key(app, key),
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
+    }
+}
+
+fn handle_add_node_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match add_node_key_action(key, app.add_node_flow.step) {
+        AddNodeKeyAction::Close => app.cancel_add_node_flow(),
+        AddNodeKeyAction::Confirm => app.confirm_add_node_flow(),
+        AddNodeKeyAction::Backspace => app.pop_add_node_char(),
+        AddNodeKeyAction::TypeChar(ch) => app.push_add_node_char(ch),
+        AddNodeKeyAction::SelectNextTemplate => app.select_next_node_template(),
+        AddNodeKeyAction::SelectPreviousTemplate => app.select_previous_node_template(),
+        AddNodeKeyAction::ManualShell => app.start_manual_shell_node_flow(),
+        AddNodeKeyAction::Ignore => {}
+    }
+    None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AddNodeKeyAction {
+    Close,
+    Confirm,
+    Backspace,
+    TypeChar(char),
+    SelectNextTemplate,
+    SelectPreviousTemplate,
+    ManualShell,
+    Ignore,
+}
+
+fn add_node_key_action(key: &KeyEvent, step: AddNodeStep) -> AddNodeKeyAction {
+    match key.code {
+        KeyCode::Esc => AddNodeKeyAction::Close,
+        KeyCode::Enter => AddNodeKeyAction::Confirm,
+        KeyCode::Backspace => AddNodeKeyAction::Backspace,
+        KeyCode::Down if step == AddNodeStep::TemplateSelect => AddNodeKeyAction::SelectNextTemplate,
+        KeyCode::Up if step == AddNodeStep::TemplateSelect => AddNodeKeyAction::SelectPreviousTemplate,
+        KeyCode::Char('s') | KeyCode::Char('S')
+            if step == AddNodeStep::TemplateSelect && accepts_palette_text(key.modifiers) =>
+        {
+            AddNodeKeyAction::ManualShell
+        }
+        KeyCode::Char(ch) if accepts_palette_text(key.modifiers) && step != AddNodeStep::TemplateSelect => {
+            AddNodeKeyAction::TypeChar(ch)
+        }
+        _ => AddNodeKeyAction::Ignore,
     }
 }
 
@@ -570,5 +620,31 @@ mod tests {
         }
         assert!(app.property_edit.is_none());
         assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn add_node_keys_create_shell_node_and_cancel_flow() {
+        let (_temp_dir, mut app) = test_app();
+
+        app.open_add_node_flow();
+        for _ in 0.."Shell 1".chars().count() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Backspace)), None,);
+        }
+        for ch in "One".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+        for ch in "echo one".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        assert!(!app.is_add_node_flow_open());
+
+        app.open_add_node_flow();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        assert!(!app.is_add_node_flow_open());
     }
 }

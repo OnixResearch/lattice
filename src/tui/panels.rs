@@ -25,6 +25,7 @@ use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 
 use crate::engine::workflow::NodeConfig;
+use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
 use crate::tui::app::PropertyEditField;
@@ -38,6 +39,9 @@ const QUIT_CONFIRM_TOP_OFFSET: u16 = 3;
 const WORKFLOW_BROWSER_WIDTH: u16 = 64;
 const WORKFLOW_BROWSER_HEIGHT: u16 = 16;
 const WORKFLOW_BROWSER_TOP_OFFSET: u16 = 2;
+const ADD_NODE_WIDTH: u16 = 66;
+const ADD_NODE_HEIGHT: u16 = 14;
+const ADD_NODE_TOP_OFFSET: u16 = 2;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -72,6 +76,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
 
     if app.is_workflow_browser_open() {
         render_workflow_browser(app, area, buf);
+    }
+
+    if app.is_add_node_flow_open() {
+        render_add_node_flow(app, area, buf);
     }
 
     if app.is_confirming_quit() {
@@ -335,6 +343,7 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
         focus: app.focus,
         palette_open: app.show_palette,
         workflow_browser_open: app.is_workflow_browser_open(),
+        add_node_open: app.is_add_node_flow_open(),
         interaction_mode: footer_interaction_mode(&app.graph_state.mode),
         width: area.width,
     });
@@ -359,6 +368,7 @@ struct FooterHelpContext {
     focus: FocusPanel,
     palette_open: bool,
     workflow_browser_open: bool,
+    add_node_open: bool,
     interaction_mode: FooterInteractionMode,
     width: u16,
 }
@@ -385,6 +395,10 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " ↑/↓: choose workflow │ Enter: open │ Esc: close ";
     }
 
+    if context.add_node_open {
+        return " Type: edit field │ Enter: next/create │ Esc: cancel ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target port: connect │ Esc: cancel wiring ";
     }
@@ -405,6 +419,10 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Enter open │ Esc ";
     }
 
+    if context.add_node_open {
+        return " Enter next │ Esc ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target │ Esc ";
     }
@@ -414,6 +432,61 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         FocusPanel::Properties => " e edit │ A-Tab ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
+}
+
+fn render_add_node_flow(app: &App, area: Rect, buf: &mut Buffer) {
+    let width = area.width.min(ADD_NODE_WIDTH);
+    let height = area.height.min(ADD_NODE_HEIGHT);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = ADD_NODE_TOP_OFFSET.min(area.height.saturating_sub(height));
+    let flow_area = Rect::new(x, y, width, height);
+
+    Clear.render(flow_area, buf);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Add Node ")
+        .border_style(Style::default().fg(Color::Green));
+    let inner = block.inner(flow_area);
+    block.render(flow_area, buf);
+
+    let lines = match app.add_node_flow.step {
+        AddNodeStep::TemplateSelect => render_add_node_template_lines(app),
+        AddNodeStep::Label => vec![
+            Line::styled("Shell node label", Style::default().fg(Color::Yellow)),
+            Line::from(app.add_node_flow.label.clone()),
+            Line::styled("Enter: command │ Esc: cancel", Style::default().fg(Color::DarkGray)),
+        ],
+        AddNodeStep::Command => vec![
+            Line::styled("Shell command", Style::default().fg(Color::Yellow)),
+            Line::from(app.add_node_flow.command.clone()),
+            Line::styled("Enter: create │ Esc: cancel", Style::default().fg(Color::DarkGray)),
+        ],
+    };
+
+    Paragraph::new(lines).render(inner, buf);
+}
+
+fn render_add_node_template_lines(app: &App) -> Vec<Line<'static>> {
+    let mut lines = vec![
+        Line::styled("Choose a template", Style::default().fg(Color::Yellow)),
+        Line::styled(
+            "↑/↓: select │ Enter: create │ s: manual shell │ Esc: cancel",
+            Style::default().fg(Color::DarkGray),
+        ),
+    ];
+
+    for (index, template) in app.node_templates.iter().enumerate() {
+        let selected = index == app.add_node_flow.selected_template;
+        let style = if selected {
+            Style::default().fg(Color::Black).bg(Color::Green)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let prefix = if selected { "› " } else { "  " };
+        lines.push(Line::styled(format!("{prefix}{}", template.name), style));
+    }
+
+    lines
 }
 
 fn render_workflow_browser(app: &App, area: Rect, buf: &mut Buffer) {
@@ -522,6 +595,7 @@ mod tests {
             focus,
             palette_open: false,
             workflow_browser_open: false,
+            add_node_open: false,
             interaction_mode: FooterInteractionMode::Default,
             width: WIDE_STATUS_WIDTH,
         }
