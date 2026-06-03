@@ -31,6 +31,10 @@ pub fn handle_event(app: &mut App, event: &Event) -> Option<AppAction> {
 }
 
 fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    if app.is_confirming_quit() {
+        return handle_quit_confirmation_key(key);
+    }
+
     // Hard quit keybindings remain global even while a modal is open.
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('c')) => return Some(AppAction::Quit),
@@ -70,6 +74,35 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Canvas => handle_canvas_key(app, key),
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
+    }
+}
+
+fn handle_quit_confirmation_key(key: &KeyEvent) -> Option<AppAction> {
+    match quit_confirmation_key_action(key) {
+        QuitConfirmationKeyAction::Confirm => Some(AppAction::ConfirmQuit),
+        QuitConfirmationKeyAction::Cancel => Some(AppAction::CancelQuit),
+        QuitConfirmationKeyAction::Ignore => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuitConfirmationKeyAction {
+    Confirm,
+    Cancel,
+    Ignore,
+}
+
+fn quit_confirmation_key_action(key: &KeyEvent) -> QuitConfirmationKeyAction {
+    match key.code {
+        KeyCode::Enter => QuitConfirmationKeyAction::Confirm,
+        KeyCode::Char('y') | KeyCode::Char('Y') if accepts_palette_text(key.modifiers) => {
+            QuitConfirmationKeyAction::Confirm
+        }
+        KeyCode::Esc => QuitConfirmationKeyAction::Cancel,
+        KeyCode::Char('n') | KeyCode::Char('N') if accepts_palette_text(key.modifiers) => {
+            QuitConfirmationKeyAction::Cancel
+        }
+        _ => QuitConfirmationKeyAction::Ignore,
     }
 }
 
@@ -173,13 +206,26 @@ fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         _ => return None,
     };
 
+    let may_mutate = canvas_key_may_mutate(key, !app.graph_state.selected.is_empty());
     let actions = app.graph_state.handle_key(key_name, shift);
+    let did_mutate = may_mutate && !actions.is_empty();
     app.graph_state.apply_actions(&actions);
 
     // Sync graph changes back to workflow.
     app.workflow.graph = app.graph_state.graph.clone();
+    if did_mutate {
+        app.mark_workflow_dirty();
+    }
 
     None
+}
+
+fn canvas_key_may_mutate(key: &KeyEvent, has_selection: bool) -> bool {
+    match key.code {
+        KeyCode::Delete | KeyCode::Backspace => true,
+        KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right => has_selection,
+        _ => false,
+    }
 }
 
 fn handle_properties_key(_app: &mut App, key: &KeyEvent) -> Option<AppAction> {
@@ -209,15 +255,36 @@ fn handle_output_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
     None
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GraphCounts {
+    nodes: usize,
+    edges: usize,
+}
+
+fn graph_counts(app: &App) -> GraphCounts {
+    GraphCounts {
+        nodes: app.graph_state.graph.node_count(),
+        edges: app.graph_state.graph.edge_count(),
+    }
+}
+
+fn graph_counts_changed(before: GraphCounts, after: GraphCounts) -> bool {
+    before != after
+}
+
 fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
     use rat_nodegraph::view::InteractionMode;
 
     match mouse.kind {
         MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+            let before = graph_counts(app);
             let shift = mouse.modifiers.contains(KeyModifiers::SHIFT);
             let actions = app.graph_state.handle_mouse_click(mouse.column, mouse.row, shift);
             app.graph_state.apply_actions(&actions);
             app.workflow.graph = app.graph_state.graph.clone();
+            if graph_counts_changed(before, graph_counts(app)) {
+                app.mark_workflow_dirty();
+            }
 
             // Record drag start position.
             let canvas_pos = app.graph_state.viewport.screen_to_canvas(
@@ -248,8 +315,12 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
 
                 if dx != 0 || dy != 0 {
                     let actions = app.graph_state.handle_mouse_drag(mouse.column, mouse.row, dx, dy);
+                    let did_mutate = !actions.is_empty();
                     app.graph_state.apply_actions(&actions);
                     app.workflow.graph = app.graph_state.graph.clone();
+                    if did_mutate {
+                        app.mark_workflow_dirty();
+                    }
                 }
             }
             app.last_drag_canvas = Some((canvas_pos.x, canvas_pos.y));
@@ -370,5 +441,33 @@ mod tests {
         assert!(app.show_palette);
         assert_eq!(app.palette_state.query, "zz");
         assert_eq!(app.workflow.graph.node_count(), node_count);
+    }
+
+    #[test]
+    fn quit_confirmation_keys_confirm_or_cancel() {
+        let (_temp_dir, mut app) = test_app();
+        app.mark_workflow_dirty();
+        assert!(!app.request_quit());
+
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)),
+            Some(AppAction::ConfirmQuit),
+        );
+
+        assert!(!app.request_quit());
+        assert_eq!(
+            handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)),
+            Some(AppAction::CancelQuit),
+        );
+    }
+
+    #[test]
+    fn quit_confirmation_ignores_unrelated_keys() {
+        let (_temp_dir, mut app) = test_app();
+        app.mark_workflow_dirty();
+        assert!(!app.request_quit());
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('x'))), None,);
+        assert!(app.is_confirming_quit());
     }
 }

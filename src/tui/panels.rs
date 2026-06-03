@@ -31,6 +31,9 @@ use crate::tui::app::FocusPanel;
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
 const FULL_EMPTY_STATE_MIN_HEIGHT: u16 = 7;
+const QUIT_CONFIRM_WIDTH: u16 = 62;
+const QUIT_CONFIRM_HEIGHT: u16 = 5;
+const QUIT_CONFIRM_TOP_OFFSET: u16 = 3;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -61,6 +64,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
     // Overlay: fuzzy palette.
     if app.show_palette {
         render_palette(app, area, buf);
+    }
+
+    if app.is_confirming_quit() {
+        render_quit_confirmation(area, buf);
     }
 }
 
@@ -280,7 +287,10 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
         },
     };
 
-    let wf_name = Span::styled(format!(" {} ", app.workflow.meta.name), Style::default().fg(Color::White));
+    let wf_name = Span::styled(
+        format!(" {}{} ", app.workflow.meta.name, unsaved_indicator(app.has_unsaved_changes()),),
+        Style::default().fg(Color::White),
+    );
 
     let node_count = app.graph_state.graph.node_count();
     let edge_count = app.graph_state.graph.edge_count();
@@ -297,6 +307,10 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
 
     let line = Line::from(vec![mode_span, wf_name, stats, help]);
     Paragraph::new(line).style(Style::default().bg(Color::Black)).render(area, buf);
+}
+
+fn unsaved_indicator(has_unsaved_changes: bool) -> &'static str {
+    if has_unsaved_changes { "*" } else { "" }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -358,6 +372,29 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 }
 
+fn render_quit_confirmation(area: Rect, buf: &mut Buffer) {
+    let width = area.width.min(QUIT_CONFIRM_WIDTH);
+    let height = area.height.min(QUIT_CONFIRM_HEIGHT);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = area.height.saturating_sub(height).min(QUIT_CONFIRM_TOP_OFFSET);
+    let confirm_area = Rect::new(x, y, width, height);
+
+    Clear.render(confirm_area, buf);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Unsaved changes ")
+        .border_style(Style::default().fg(Color::Red));
+    let inner = block.inner(confirm_area);
+    block.render(confirm_area, buf);
+
+    Paragraph::new(vec![
+        Line::styled("Quit without saving?", Style::default().fg(Color::White)),
+        Line::styled("y/Enter: quit │ n/Esc: stay", Style::default().fg(Color::DarkGray)),
+    ])
+    .alignment(Alignment::Center)
+    .render(inner, buf);
+}
+
 /// Render the fuzzy command palette overlay.
 fn render_palette(app: &mut App, area: Rect, buf: &mut Buffer) {
     let width = area.width.min(60);
@@ -397,6 +434,12 @@ mod tests {
             interaction_mode: FooterInteractionMode::Default,
             width: WIDE_STATUS_WIDTH,
         }
+    }
+
+    #[test]
+    fn unsaved_indicator_marks_dirty_workflows() {
+        assert_eq!(unsaved_indicator(false), "");
+        assert_eq!(unsaved_indicator(true), "*");
     }
 
     #[test]

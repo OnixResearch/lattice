@@ -1,23 +1,37 @@
 //! Core application state and event loop.
 
+use std::collections::HashMap;
+use std::io;
+
+use crossterm::cursor;
+use crossterm::event;
+use crossterm::execute;
+use crossterm::terminal::EnterAlternateScreen;
+use crossterm::terminal::LeaveAlternateScreen;
+use crossterm::terminal::{self};
+use rat_fuzzy::FuzzyCandidate;
+use rat_fuzzy::FuzzySource;
+use rat_fuzzy::FuzzyState;
+use rat_nodegraph::layout::LayoutConfig;
+use rat_nodegraph::layout::auto_layout;
+use rat_nodegraph::view::NodeGraphState;
+use rat_nodegraph::view::node_bounds;
+use rat_streaming::StreamingOutput;
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use tracing::error;
+use tracing::info;
+
 use crate::config::AppConfig;
 use crate::engine::executor::Executor;
 use crate::engine::workflow::Workflow;
 use crate::store::Store;
 use crate::tui::input;
 use crate::tui::panels;
-use crossterm::event;
-use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
-use crossterm::{cursor, execute};
-use rat_fuzzy::{FuzzyCandidate, FuzzySource, FuzzyState};
-use rat_nodegraph::layout::{auto_layout, LayoutConfig};
-use rat_nodegraph::view::{node_bounds, NodeGraphState};
-use rat_streaming::StreamingOutput;
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
-use std::collections::HashMap;
-use std::io;
-use tracing::{error, info};
+
+const INITIAL_VIEWPORT_WIDTH: u16 = 80;
+const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
+const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +45,8 @@ pub enum FocusPanel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppAction {
     Quit,
+    ConfirmQuit,
+    CancelQuit,
     RunWorkflow,
     SaveWorkflow,
     AddNode,
@@ -118,6 +134,8 @@ pub struct App {
     pub store: Option<Store>,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
+    dirty: bool,
+    confirm_quit: bool,
     executor: Executor,
 }
 
@@ -125,7 +143,7 @@ impl App {
     /// Create a new app with an empty workflow.
     pub fn new(config: AppConfig) -> Self {
         let workflow = Workflow::new("untitled");
-        let graph_state = NodeGraphState::new(workflow.graph.clone(), 80, 24);
+        let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
 
         let store = match Store::new(&config.data_dir.join("n8nclone.redb")) {
             Ok(s) => Some(s),
@@ -149,8 +167,49 @@ impl App {
             store,
             config,
             last_drag_canvas: None,
+            dirty: false,
+            confirm_quit: false,
             executor: Executor::new(),
         }
+    }
+
+    /// Return whether the workflow has unsaved changes.
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.dirty
+    }
+
+    /// Return whether quit confirmation is currently active.
+    pub fn is_confirming_quit(&self) -> bool {
+        self.confirm_quit
+    }
+
+    /// Mark the current workflow as dirty after a user-visible mutation.
+    pub fn mark_workflow_dirty(&mut self) {
+        self.workflow.touch();
+        self.dirty = true;
+    }
+
+    /// Clear dirty state after a successful save or clean workflow load.
+    pub fn clear_workflow_dirty(&mut self) {
+        self.dirty = false;
+        self.confirm_quit = false;
+    }
+
+    /// Request quit. Returns true when the event loop may exit immediately.
+    pub fn request_quit(&mut self) -> bool {
+        if self.has_unsaved_changes() {
+            self.confirm_quit = true;
+            self.output.push_line("Unsaved changes. Press y/Enter to quit or n/Esc to stay.");
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Cancel a pending quit confirmation.
+    pub fn cancel_quit_confirmation(&mut self) {
+        self.confirm_quit = false;
+        self.output.push_line("Quit canceled");
     }
 
     /// Cycle focus to the next panel.
@@ -185,7 +244,7 @@ impl App {
         let has_others = self.workflow.graph.node_count() > 1;
         if let Some(node) = self.workflow.graph.node_mut(id) {
             if has_others {
-                node.x = max_right + 4;
+                node.x = max_right + NEW_NODE_HORIZONTAL_GAP;
                 node.y = stack_y;
             }
         }
@@ -196,12 +255,14 @@ impl App {
         self.graph_state.selected.clear();
         self.graph_state.selected.insert(id);
         self.graph_state.focused = Some(id);
+        self.mark_workflow_dirty();
     }
 
     /// Run auto-layout on the graph.
     pub fn auto_layout(&mut self) {
         auto_layout(&mut self.workflow.graph, &LayoutConfig::default());
         self.sync_graph_state();
+        self.mark_workflow_dirty();
         self.output.push_line("Auto-layout applied");
     }
 
@@ -213,21 +274,12 @@ impl App {
         let (run_id, results) = self.executor.run(&self.workflow, &cache).await;
 
         for step in &results {
-            let node_label = self
-                .workflow
-                .graph
-                .node(step.node_id)
-                .map(|n| n.label.as_str())
-                .unwrap_or("?");
+            let node_label = self.workflow.graph.node(step.node_id).map(|n| n.label.as_str()).unwrap_or("?");
 
             match &step.status {
-                crate::engine::executor::NodeStatus::Completed {
-                    outputs, cached, ..
-                } => {
+                crate::engine::executor::NodeStatus::Completed { outputs, cached, .. } => {
                     let cache_tag = if *cached { " (cached)" } else { "" };
-                    self.output.push_line(
-                        &format!("✓ {node_label}{cache_tag} [{}]", step.input_hash),
-                    );
+                    self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
 
                     // Show stdout if present.
                     for val in outputs.values() {
@@ -245,17 +297,13 @@ impl App {
                     }
                 }
                 crate::engine::executor::NodeStatus::Failed { error } => {
-                    self.output.push_line(
-                        &format!("✗ {node_label}: {error}"),
-                    );
+                    self.output.push_line(&format!("✗ {node_label}: {error}"));
                 }
                 _ => {}
             }
         }
 
-        self.output.push_line(
-            &format!("── run {} complete ({} steps) ──", run_id, results.len()),
-        );
+        self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
     /// Save the current workflow to the store.
@@ -263,12 +311,11 @@ impl App {
         if let Some(ref store) = self.store {
             match store.save_workflow(&self.workflow) {
                 Ok(()) => {
-                    self.output
-                        .push_line(&format!("Saved '{}'", self.workflow.meta.name));
+                    self.clear_workflow_dirty();
+                    self.output.push_line(&format!("Saved '{}'", self.workflow.meta.name));
                 }
                 Err(e) => {
-                    self.output
-                        .push_line(&format!("Save failed: {e}"));
+                    self.output.push_line(&format!("Save failed: {e}"));
                 }
             }
         } else {
@@ -281,14 +328,8 @@ impl App {
         let old_viewport = self.graph_state.viewport.clone();
         let mut graph = self.workflow.graph.clone();
         // Re-apply the "any" type compatibility function (lost on clone).
-        graph.set_compatibility(Box::new(|src, tgt| {
-            src == tgt || src == "any" || tgt == "any"
-        }));
-        self.graph_state = NodeGraphState::new(
-            graph,
-            old_viewport.width,
-            old_viewport.height,
-        );
+        graph.set_compatibility(Box::new(|src, tgt| src == tgt || src == "any" || tgt == "any"));
+        self.graph_state = NodeGraphState::new(graph, old_viewport.width, old_viewport.height);
         self.graph_state.viewport = old_viewport;
     }
 
@@ -316,7 +357,15 @@ impl App {
                 let ev = event::read()?;
                 if let Some(action) = input::handle_event(&mut self, &ev) {
                     match action {
-                        AppAction::Quit => break,
+                        AppAction::Quit => {
+                            if self.request_quit() {
+                                break;
+                            }
+                        }
+                        AppAction::ConfirmQuit => break,
+                        AppAction::CancelQuit => {
+                            self.cancel_quit_confirmation();
+                        }
                         AppAction::RunWorkflow => {
                             self.run_workflow().await;
                         }
@@ -325,10 +374,7 @@ impl App {
                         }
                         AppAction::AddNode => {
                             let n = self.workflow.graph.node_count();
-                            self.add_shell_node(
-                                &format!("Shell {}", n + 1),
-                                "echo 'hello'",
-                            );
+                            self.add_shell_node(&format!("Shell {}", n + 1), "echo 'hello'");
                         }
                         AppAction::OpenWorkflow => {
                             self.output.push_line("Workflow browser not yet implemented");
@@ -342,14 +388,85 @@ impl App {
         }
 
         // Cleanup.
-        crossterm::execute!(
-            terminal.backend_mut(),
-            event::DisableMouseCapture
-        )?;
+        crossterm::execute!(terminal.backend_mut(), event::DisableMouseCapture)?;
         execute!(terminal.backend_mut(), LeaveAlternateScreen, cursor::Show)?;
         terminal::disable_raw_mode()?;
 
         info!("TUI exited");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn test_config(temp_dir: &TempDir) -> AppConfig {
+        let data_dir = temp_dir.path().join("data");
+        std::fs::create_dir_all(&data_dir).expect("create app data directory");
+        AppConfig {
+            data_dir,
+            ..AppConfig::default()
+        }
+    }
+
+    #[test]
+    fn mutation_marks_workflow_dirty() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        assert!(!app.has_unsaved_changes());
+        app.add_shell_node("Example", "echo example");
+
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn successful_save_clears_dirty_state() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Example", "echo example");
+
+        assert!(app.has_unsaved_changes());
+        app.save_workflow();
+
+        assert!(!app.has_unsaved_changes());
+        assert!(!app.is_confirming_quit());
+    }
+
+    #[test]
+    fn failed_save_keeps_dirty_state() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Example", "echo example");
+        app.store = None;
+
+        app.save_workflow();
+
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn dirty_quit_requests_confirmation() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Example", "echo example");
+
+        assert!(!app.request_quit());
+        assert!(app.is_confirming_quit());
+
+        app.cancel_quit_confirmation();
+        assert!(!app.is_confirming_quit());
+    }
+
+    #[test]
+    fn clean_quit_exits_without_confirmation() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        assert!(app.request_quit());
+        assert!(!app.is_confirming_quit());
     }
 }
