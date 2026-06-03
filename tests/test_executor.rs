@@ -32,6 +32,14 @@ const CACHE_CWD_OLD: &str = "/tmp";
 const CACHE_ENV_KEY: &str = "CACHE_VALUE";
 const CACHE_ENV_OLD: &str = "old";
 const CACHE_ENV_NEW: &str = "new";
+const CACHE_ENV_FIRST_KEY: &str = "CACHE_A";
+const CACHE_ENV_FIRST_VALUE: &str = "one";
+const CACHE_ENV_SECOND_KEY: &str = "CACHE_B";
+const CACHE_ENV_SECOND_VALUE: &str = "two";
+const CACHE_STABLE_COMMAND: &str = "printf stable";
+const CACHE_ENV_ORDER_COMMAND: &str = "printf env-order";
+const CACHE_HIT_OUTPUT: &str = "cache hit";
+const FIRST_RESULT_INDEX: usize = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ShellConfigMutation {
@@ -434,6 +442,85 @@ async fn run_diamond_executes_all_nodes() {
 // ---------------------------------------------------------------------------
 // Cache hits
 // ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn cache_key_is_stable_for_identical_shell_config() {
+    let config = shell_config(
+        CACHE_STABLE_COMMAND,
+        None,
+        &[(CACHE_ENV_FIRST_KEY, CACHE_ENV_FIRST_VALUE)],
+        CACHE_BASE_TIMEOUT_SECS,
+        true,
+    );
+    let (first_workflow, first_node_id) = workflow_with_config(config.clone());
+    let (second_workflow, second_node_id) = workflow_with_config(config);
+    let mut executor = Executor::new();
+    let (_, first_results) = executor.run(&first_workflow, &HashMap::new()).await;
+    let first_input_hash = first_results[FIRST_RESULT_INDEX].input_hash;
+    let (_, cached_outputs) =
+        common::fake_cache_entry(&first_workflow, first_node_id, first_input_hash, CACHE_HIT_OUTPUT);
+    let mut cache = HashMap::new();
+    cache.insert(first_input_hash, cached_outputs);
+
+    let (_, second_results) = executor.run(&second_workflow, &cache).await;
+
+    assert_eq!(second_results[FIRST_RESULT_INDEX].input_hash, first_input_hash);
+    match &second_results[FIRST_RESULT_INDEX].status {
+        NodeStatus::Completed { outputs, cached } => {
+            assert!(*cached, "identical config and inputs should reuse cached outputs");
+            let stdout_port = common::stdout_port_id(&second_workflow, second_node_id);
+            let stdout = outputs.get(&stdout_port).expect("stdout missing");
+            assert_eq!(stdout.as_display_string(), CACHE_HIT_OUTPUT);
+        }
+        other => panic!("expected Completed, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn cache_key_is_stable_across_env_insertion_order() {
+    let first_config = shell_config(
+        CACHE_ENV_ORDER_COMMAND,
+        None,
+        &[
+            (CACHE_ENV_FIRST_KEY, CACHE_ENV_FIRST_VALUE),
+            (CACHE_ENV_SECOND_KEY, CACHE_ENV_SECOND_VALUE),
+        ],
+        CACHE_BASE_TIMEOUT_SECS,
+        true,
+    );
+    let second_config = shell_config(
+        CACHE_ENV_ORDER_COMMAND,
+        None,
+        &[
+            (CACHE_ENV_SECOND_KEY, CACHE_ENV_SECOND_VALUE),
+            (CACHE_ENV_FIRST_KEY, CACHE_ENV_FIRST_VALUE),
+        ],
+        CACHE_BASE_TIMEOUT_SECS,
+        true,
+    );
+    let (first_workflow, first_node_id) = workflow_with_config(first_config);
+    let (second_workflow, second_node_id) = workflow_with_config(second_config);
+    let mut executor = Executor::new();
+    let (_, first_results) = executor.run(&first_workflow, &HashMap::new()).await;
+    let first_input_hash = first_results[FIRST_RESULT_INDEX].input_hash;
+    let (_, cached_outputs) =
+        common::fake_cache_entry(&first_workflow, first_node_id, first_input_hash, CACHE_HIT_OUTPUT);
+    let mut cache = HashMap::new();
+    cache.insert(first_input_hash, cached_outputs);
+
+    let (_, second_results) = executor.run(&second_workflow, &cache).await;
+
+    assert_eq!(second_results[FIRST_RESULT_INDEX].input_hash, first_input_hash);
+    match &second_results[FIRST_RESULT_INDEX].status {
+        NodeStatus::Completed { outputs, cached } => {
+            assert!(*cached, "env insertion order must not change the cache key");
+            let stdout_port = common::stdout_port_id(&second_workflow, second_node_id);
+            let stdout = outputs.get(&stdout_port).expect("stdout missing");
+            assert_eq!(stdout.as_display_string(), CACHE_HIT_OUTPUT);
+        }
+        other => panic!("expected Completed, got {:?}", other),
+    }
+}
 
 // r[verify n8nclone.workflow_execution.cache_key.shell_config.command_edit]
 #[tokio::test]
