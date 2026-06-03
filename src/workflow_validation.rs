@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::credentials;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::http;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +31,8 @@ pub enum WorkflowDiagnosticCode {
     EdgeIncompatibleType,
     MalformedSecretRef,
     CredentialRefWithoutNode,
+    InvalidHttpMethod,
+    InvalidHttpUrl,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +104,24 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 ));
             }
             Some(NodeConfig::Shell { .. }) => {}
+            Some(NodeConfig::Http { method, url, .. }) => {
+                if !http::validate_http_method(method) {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::InvalidHttpMethod,
+                        Some(node.id),
+                        None,
+                        format!("HTTP node '{}' has an invalid method", node.label),
+                    ));
+                }
+                if !http::validate_http_url(url) {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::InvalidHttpUrl,
+                        Some(node.id),
+                        None,
+                        format!("HTTP node '{}' has an invalid URL", node.label),
+                    ));
+                }
+            }
             None => diagnostics.push(fatal(
                 WorkflowDiagnosticCode::MissingNodeConfig,
                 Some(node.id),

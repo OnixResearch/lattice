@@ -3,6 +3,7 @@ pub mod credentials;
 pub mod engine;
 pub mod error;
 pub mod headless;
+pub mod http;
 pub mod store;
 pub mod tui;
 pub mod workflow_format;

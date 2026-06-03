@@ -1041,6 +1041,7 @@ mod tests {
 
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(app.property_edit.is_none());
         assert!(app.has_unsaved_changes());
@@ -1060,6 +1061,7 @@ mod tests {
 
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo old"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(app.property_edit.is_none());
         assert!(!app.has_unsaved_changes());
@@ -1104,6 +1106,7 @@ mod tests {
 
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(app.property_edit.is_none());
         assert!(app.has_unsaved_changes());

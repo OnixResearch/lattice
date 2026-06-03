@@ -48,6 +48,7 @@ fn shell_config_defaults() {
             assert_eq!(*timeout_secs, 60);
             assert!(*pipe_stdin);
         }
+        NodeConfig::Http { .. } => panic!("expected shell config"),
     }
 }
 
@@ -82,6 +83,28 @@ fn node_config_serde_round_trip() {
             assert_eq!(timeout_secs, 30);
             assert!(!pipe_stdin);
         }
+        NodeConfig::Http { .. } => panic!("expected shell config"),
+    }
+}
+
+#[test]
+fn http_config_defaults() {
+    let cfg = NodeConfig::http("get", "https://example.test");
+    match cfg {
+        NodeConfig::Http {
+            method,
+            url,
+            headers,
+            body,
+            timeout_secs,
+        } => {
+            assert_eq!(method, "get");
+            assert_eq!(url, "https://example.test");
+            assert!(headers.is_empty());
+            assert!(body.is_none());
+            assert_eq!(timeout_secs, 60);
+        }
+        NodeConfig::Shell { .. } => panic!("expected HTTP config"),
     }
 }
 
@@ -172,6 +195,7 @@ fn set_node_config_replaces_existing() {
     wf.set_node_config(id, NodeConfig::shell("new-command"));
     match wf.node_config(id).unwrap() {
         NodeConfig::Shell { command, .. } => assert_eq!(command, "new-command"),
+        NodeConfig::Http { .. } => panic!("expected shell config"),
     }
 }
 

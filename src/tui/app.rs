@@ -1150,9 +1150,12 @@ impl App {
             PropertyEditField::Label => self.workflow.graph.node(node_id).map(|node| node.label.clone()),
             PropertyEditField::Command => match self.workflow.node_config(node_id)? {
                 NodeConfig::Shell { command, .. } => Some(command.clone()),
+                NodeConfig::Http { .. } => None,
             },
             PropertyEditField::TimeoutSecs => match self.workflow.node_config(node_id)? {
-                NodeConfig::Shell { timeout_secs, .. } => Some(timeout_secs.to_string()),
+                NodeConfig::Shell { timeout_secs, .. } | NodeConfig::Http { timeout_secs, .. } => {
+                    Some(timeout_secs.to_string())
+                }
             },
         }
     }
@@ -1190,6 +1193,7 @@ impl App {
                         });
                         Ok(())
                     }
+                    NodeConfig::Http { .. } => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::TimeoutSecs => {
@@ -1211,6 +1215,22 @@ impl App {
                             env,
                             timeout_secs,
                             pipe_stdin,
+                        });
+                        Ok(())
+                    }
+                    NodeConfig::Http {
+                        method,
+                        url,
+                        headers,
+                        body,
+                        ..
+                    } => {
+                        self.workflow.set_node_config(edit.node_id, NodeConfig::Http {
+                            method,
+                            url,
+                            headers,
+                            body,
+                            timeout_secs,
                         });
                         Ok(())
                     }
@@ -1758,6 +1778,7 @@ mod tests {
 
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo new"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(app.has_unsaved_changes());
     }
@@ -1778,6 +1799,7 @@ mod tests {
             NodeConfig::Shell { timeout_secs, .. } => {
                 assert_eq!(*timeout_secs, DEFAULT_SHELL_TIMEOUT_SECS)
             }
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(app.property_edit.is_some());
         assert!(!app.has_unsaved_changes());
@@ -1823,6 +1845,7 @@ mod tests {
         assert_eq!(app.workflow.graph.node(node_id).expect("node").label, "Custom");
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo custom"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
         assert!(!app.is_add_node_flow_open());
         assert!(app.has_unsaved_changes());
@@ -1858,6 +1881,7 @@ mod tests {
         assert_eq!(node.output_ports.len(), 1);
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "grep needle"),
+            NodeConfig::Http { .. } => panic!("expected shell config"),
         }
     }
 

@@ -24,15 +24,28 @@ use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::http;
+use crate::http::HttpClient;
+use crate::http::HttpRequestPlan;
+use crate::http::NoopHttpClient;
 
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 const SHELL_STDIN_INPUT_LABEL: &str = "stdin";
+const HTTP_BODY_INPUT_LABEL: &str = "body";
+const HTTP_STATUS_OUTPUT_INDEX: usize = 0;
+const HTTP_HEADERS_OUTPUT_INDEX: usize = 1;
+const HTTP_BODY_OUTPUT_INDEX: usize = 2;
 const HASH_TAG_NODE_EXECUTION: &[u8] = b"node-execution:v1";
 const HASH_TAG_NODE_ID: &[u8] = b"node-id";
 const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
+const HASH_TAG_HTTP_CONFIG: &[u8] = b"http-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
+const HASH_TAG_HTTP_METHOD: &[u8] = b"http-method";
+const HASH_TAG_HTTP_URL: &[u8] = b"http-url";
+const HASH_TAG_HTTP_HEADERS: &[u8] = b"http-headers";
+const HASH_TAG_HTTP_BODY: &[u8] = b"http-body";
 const HASH_TAG_CWD: &[u8] = b"cwd";
 const HASH_TAG_ENV: &[u8] = b"env";
 const HASH_TAG_SECRET_ENV: &[u8] = b"secret-env";
@@ -62,6 +75,13 @@ struct ShellOutputValues {
     stdout: String,
     stderr: String,
     exit_code: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HttpOutputPortIds {
+    status: PortId,
+    headers: PortId,
+    body: PortId,
 }
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
@@ -107,6 +127,20 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
             update_u64(hasher, HASH_TAG_TIMEOUT, *timeout_secs);
             update_bool(hasher, HASH_TAG_PIPE_STDIN, *pipe_stdin);
         }
+        NodeConfig::Http {
+            method,
+            url,
+            headers,
+            body,
+            timeout_secs,
+        } => {
+            hasher.update(HASH_TAG_HTTP_CONFIG);
+            update_str(hasher, HASH_TAG_HTTP_METHOD, &http::normalized_method(method));
+            update_str(hasher, HASH_TAG_HTTP_URL, url);
+            update_env_with_tag(hasher, HASH_TAG_HTTP_HEADERS, headers);
+            update_optional_str(hasher, HASH_TAG_HTTP_BODY, body.as_deref());
+            update_u64(hasher, HASH_TAG_TIMEOUT, *timeout_secs);
+        }
     }
 }
 
@@ -125,14 +159,18 @@ fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Valu
 }
 
 fn update_env(hasher: &mut blake3::Hasher, env: &HashMap<String, String>) {
+    update_env_with_tag(hasher, HASH_TAG_ENV, env);
+}
+
+fn update_env_with_tag(hasher: &mut blake3::Hasher, tag: &[u8], env: &HashMap<String, String>) {
     let mut env_pairs = env.iter().collect::<Vec<_>>();
     env_pairs.sort_by_key(|(key, _)| *key);
 
-    hasher.update(HASH_TAG_ENV);
+    hasher.update(tag);
     update_len(hasher, env_pairs.len());
     for (key, value) in env_pairs {
-        update_str(hasher, HASH_TAG_ENV, key);
-        update_str(hasher, HASH_TAG_ENV, value);
+        update_str(hasher, tag, key);
+        update_str(hasher, tag, value);
     }
 }
 
@@ -195,6 +233,38 @@ fn shell_stdin_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Opt
     node.input_ports.iter().find_map(|port| inputs.get(&port.id))
 }
 
+fn http_body_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+    let labeled_body = node
+        .input_ports
+        .iter()
+        .find(|port| port.label == HTTP_BODY_INPUT_LABEL)
+        .and_then(|port| inputs.get(&port.id));
+    if labeled_body.is_some() {
+        return labeled_body;
+    }
+
+    node.input_ports.iter().find_map(|port| inputs.get(&port.id))
+}
+
+fn http_request_plan(
+    node: &Node,
+    method: &str,
+    url: &str,
+    headers: &HashMap<String, String>,
+    body: &Option<String>,
+    timeout_secs: u64,
+    inputs: &HashMap<PortId, Value>,
+) -> HttpRequestPlan {
+    let resolved_body = body.clone().or_else(|| http_body_value(node, inputs).map(Value::as_display_string));
+    HttpRequestPlan {
+        method: http::normalized_method(method),
+        url: url.to_string(),
+        headers: headers.clone(),
+        body: resolved_body,
+        timeout_secs,
+    }
+}
+
 fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
     let stdout = node
         .output_ports
@@ -220,6 +290,33 @@ fn shell_outputs_by_real_port(ports: ShellOutputPortIds, outputs: ShellOutputVal
     mapped.insert(ports.stdout, Value::from_string(outputs.stdout));
     mapped.insert(ports.stderr, Value::from_string(outputs.stderr));
     mapped.insert(ports.exit, Value::from_exit_code(outputs.exit_code));
+    mapped
+}
+
+fn http_output_port_ids(node: &Node) -> Result<HttpOutputPortIds, String> {
+    let status = node
+        .output_ports
+        .get(HTTP_STATUS_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing HTTP status output port", node.label))?;
+    let headers = node
+        .output_ports
+        .get(HTTP_HEADERS_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing HTTP headers output port", node.label))?;
+    let body = node
+        .output_ports
+        .get(HTTP_BODY_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing HTTP body output port", node.label))?;
+    Ok(HttpOutputPortIds { status, headers, body })
+}
+
+fn http_outputs_by_real_port(ports: HttpOutputPortIds, response: http::HttpResponse) -> HashMap<PortId, Value> {
+    let mut mapped = HashMap::new();
+    mapped.insert(ports.status, Value::from_string(response.status.to_string()));
+    mapped.insert(ports.headers, Value::from_json(serde_json::json!(response.headers)));
+    mapped.insert(ports.body, Value::from_string(response.body));
     mapped
 }
 
@@ -269,6 +366,7 @@ pub struct StepResult {
 pub struct Executor {
     next_run_id: u64,
     credential_provider: Box<dyn CredentialProvider>,
+    http_client: Box<dyn HttpClient>,
 }
 
 impl Executor {
@@ -276,6 +374,7 @@ impl Executor {
         Self {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client: Box::<NoopHttpClient>::default(),
         }
     }
 
@@ -283,6 +382,26 @@ impl Executor {
         Self {
             next_run_id: 0,
             credential_provider,
+            http_client: Box::<NoopHttpClient>::default(),
+        }
+    }
+
+    pub fn new_with_http_client(http_client: Box<dyn HttpClient>) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client,
+        }
+    }
+
+    pub fn new_with_clients(
+        credential_provider: Box<dyn CredentialProvider>,
+        http_client: Box<dyn HttpClient>,
+    ) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider,
+            http_client,
         }
     }
 
@@ -377,6 +496,42 @@ impl Executor {
                     Err(e) => StepResult {
                         node_id,
                         status: NodeStatus::Failed { error: e.to_string() },
+                        input_hash,
+                    },
+                }
+            }
+            NodeConfig::Http {
+                method,
+                url,
+                headers,
+                body,
+                timeout_secs,
+            } => {
+                let output_ports = match http_output_port_ids(node) {
+                    Ok(ports) => ports,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let request = http_request_plan(node, method, url, headers, body, *timeout_secs, inputs);
+                match self.http_client.execute(&request) {
+                    Ok(response) => StepResult {
+                        node_id,
+                        status: NodeStatus::Completed {
+                            outputs: http_outputs_by_real_port(output_ports, response),
+                            cached: false,
+                        },
+                        input_hash,
+                    },
+                    Err(error) => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
                         input_hash,
                     },
                 }

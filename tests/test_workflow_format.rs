@@ -64,6 +64,7 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
     let target_node = imported.graph.nodes().find(|node| node.label == "grep-hello").expect("target node imported");
     match imported.node_config(target_node.id).expect("target config imported") {
         NodeConfig::Shell { command, .. } => assert_eq!(command, "grep hello"),
+        NodeConfig::Http { .. } => panic!("expected shell config"),
     }
     assert!(workflow.graph.node(target).is_some());
 }

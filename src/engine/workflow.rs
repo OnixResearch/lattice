@@ -49,6 +49,13 @@ pub enum NodeConfig {
         /// If true, pipe previous node's stdout into this command's stdin.
         pipe_stdin: bool,
     },
+    Http {
+        method: String,
+        url: String,
+        headers: HashMap<String, String>,
+        body: Option<String>,
+        timeout_secs: u64,
+    },
 }
 
 impl NodeConfig {
@@ -62,9 +69,20 @@ impl NodeConfig {
         }
     }
 
+    pub fn http(method: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::Http {
+            method: method.into(),
+            url: url.into(),
+            headers: HashMap::new(),
+            body: None,
+            timeout_secs: 60,
+        }
+    }
+
     pub fn kind_label(&self) -> &'static str {
         match self {
             Self::Shell { .. } => "Shell",
+            Self::Http { .. } => "HTTP",
         }
     }
 }
@@ -103,6 +121,23 @@ impl Workflow {
             PortSpec::new("exit", TypeTag::ExitCode.as_str()),
         ]);
         self.configs.insert(id.0, NodeConfig::shell(command));
+        id
+    }
+
+    /// Add an HTTP request node with default status, headers, and body outputs.
+    /// Returns the NodeId.
+    pub fn add_http_node(
+        &mut self,
+        label: impl Into<String>,
+        method: impl Into<String>,
+        url: impl Into<String>,
+    ) -> NodeId {
+        let id = self.graph.add_node(label, &[PortSpec::new("body", TypeTag::String.as_str())], &[
+            PortSpec::new("status", TypeTag::String.as_str()),
+            PortSpec::new("headers", TypeTag::Json.as_str()),
+            PortSpec::new("body", TypeTag::String.as_str()),
+        ]);
+        self.configs.insert(id.0, NodeConfig::http(method, url));
         id
     }
 

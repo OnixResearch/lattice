@@ -278,6 +278,29 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
                     Span::styled(if *pipe_stdin { "yes" } else { "no" }, Style::default().fg(Color::Gray)),
                 ]));
             }
+            NodeConfig::Http {
+                method,
+                url,
+                timeout_secs,
+                ..
+            } => {
+                lines.push(Line::from(vec![
+                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("HTTP", Style::default().fg(Color::Green)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Method: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(method.clone(), Style::default().fg(Color::Cyan)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("URL: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(url.clone(), Style::default().fg(Color::Cyan)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Timeout: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!("{timeout_secs}s"), Style::default().fg(Color::Gray)),
+                ]));
+            }
         }
     }
 
