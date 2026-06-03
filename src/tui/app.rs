@@ -169,36 +169,67 @@ pub fn format_run_record(record: &RunRecord) -> String {
     )
 }
 
-fn completed_output_lines(workflow: &Workflow, node_id: NodeId, outputs: &HashMap<PortId, Value>) -> Vec<String> {
-    let mut lines = Vec::new();
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunOutputLine {
+    pub run_id: RunId,
+    pub node_id: NodeId,
+    pub port_id: PortId,
+    pub port_label: String,
+    pub text: String,
+}
+
+impl RunOutputLine {
+    fn rendered(&self) -> String {
+        format!("  │ {}: {}", self.port_label, self.text)
+    }
+}
+
+fn completed_output_records(
+    run_id: RunId,
+    workflow: &Workflow,
+    node_id: NodeId,
+    outputs: &HashMap<PortId, Value>,
+) -> Vec<RunOutputLine> {
+    let mut records = Vec::new();
 
     if let Some(node) = workflow.graph.node(node_id) {
         for port in &node.output_ports {
             if let Some(value) = outputs.get(&port.id) {
-                append_output_value_lines(&mut lines, &port.label, value);
+                append_output_value_records(&mut records, run_id, node_id, port.id, &port.label, value);
             }
         }
-        return lines;
+        return records;
     }
 
     let mut fallback_outputs = outputs.iter().collect::<Vec<_>>();
     fallback_outputs.sort_by_key(|(port_id, _)| port_id.0);
     for (port_id, value) in fallback_outputs {
-        append_output_value_lines(&mut lines, &format!("port {}", port_id.0), value);
+        append_output_value_records(&mut records, run_id, node_id, *port_id, &format!("port {}", port_id.0), value);
     }
 
-    lines
+    records
 }
 
-fn append_output_value_lines(lines: &mut Vec<String>, port_label: &str, value: &Value) {
+fn append_output_value_records(
+    records: &mut Vec<RunOutputLine>,
+    run_id: RunId,
+    node_id: NodeId,
+    port_id: PortId,
+    port_label: &str,
+    value: &Value,
+) {
     let display = value.as_display_string();
     if display.is_empty() {
         return;
     }
 
-    for line in display.lines() {
-        lines.push(format!("  │ {port_label}: {line}"));
-    }
+    records.extend(display.lines().map(|line| RunOutputLine {
+        run_id,
+        node_id,
+        port_id,
+        port_label: port_label.to_string(),
+        text: line.to_string(),
+    }));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -414,6 +445,7 @@ pub struct App {
     pub palette_state: FuzzyState,
     pub palette_data: PaletteData,
     pub output: StreamingOutput,
+    pub run_output_lines: Vec<RunOutputLine>,
     pub workflow_browser: WorkflowBrowserState,
     pub property_edit: Option<PropertyEditState>,
     pub add_node_flow: AddNodeFlowState,
@@ -454,6 +486,7 @@ impl App {
             palette_state,
             palette_data,
             output: StreamingOutput::new(),
+            run_output_lines: Vec::new(),
             workflow_browser: WorkflowBrowserState::closed(),
             property_edit: None,
             add_node_flow: AddNodeFlowState::closed(),
@@ -1078,8 +1111,9 @@ impl App {
                     let cache_tag = if *cached { " (cached)" } else { "" };
                     self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
 
-                    for line in completed_output_lines(run_workflow, step.node_id, outputs) {
-                        self.output.push_line(&line);
+                    for record in completed_output_records(run_id, run_workflow, step.node_id, outputs) {
+                        self.output.push_line(&record.rendered());
+                        self.run_output_lines.push(record);
                     }
 
                     if let Some(ref store) = self.store {
@@ -1264,8 +1298,10 @@ mod tests {
     const SNAPSHOT_NODE_LABEL: &str = "Snapshot label";
     const MUTATED_NODE_LABEL: &str = "Mutated label";
     const SNAPSHOT_COMMAND: &str = "echo snapshot";
+    const SNAPSHOT_STDOUT_TEXT: &str = "snapshot output";
     const SNAPSHOT_STDOUT: &str = "snapshot output\n";
     const SNAPSHOT_INPUT_HASH_BYTES: &[u8] = b"snapshot-log";
+    const SNAPSHOT_OUTPUT_RECORD_COUNT: usize = 2;
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1283,6 +1319,10 @@ mod tests {
                 DisplayLine::Omitted(_) => None,
             })
             .collect()
+    }
+
+    fn rendered_output_records(records: Vec<RunOutputLine>) -> Vec<String> {
+        records.into_iter().map(|record| record.rendered()).collect()
     }
 
     #[test]
@@ -1549,10 +1589,34 @@ mod tests {
         outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_SUCCESS));
         outputs.insert(stdout_port, Value::from_string("hello world\n".to_string()));
 
-        assert_eq!(completed_output_lines(&workflow, node_id, &outputs), vec![
-            "  │ stdout: hello world".to_string(),
-            "  │ exit: exit code: 0".to_string()
-        ],);
+        assert_eq!(
+            rendered_output_records(completed_output_records(RunId(SNAPSHOT_RUN_ID), &workflow, node_id, &outputs)),
+            vec![
+                "  │ stdout: hello world".to_string(),
+                "  │ exit: exit code: 0".to_string()
+            ],
+        );
+    }
+
+    #[test]
+    fn completed_output_records_preserve_run_node_and_port_metadata() {
+        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let node_id = workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
+        let node = workflow.graph.node(node_id).expect("node exists");
+        let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let exit_port = node.output_ports[SHELL_EXIT_OUTPUT_INDEX].id;
+        let mut outputs = HashMap::new();
+        outputs.insert(stdout_port, Value::from_string(SNAPSHOT_STDOUT.to_string()));
+        outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_SUCCESS));
+
+        let records = completed_output_records(RunId(SNAPSHOT_RUN_ID), &workflow, node_id, &outputs);
+
+        assert_eq!(records.len(), SNAPSHOT_OUTPUT_RECORD_COUNT);
+        let stdout_record = records.iter().find(|record| record.port_id == stdout_port).expect("stdout record");
+        assert_eq!(stdout_record.run_id, RunId(SNAPSHOT_RUN_ID));
+        assert_eq!(stdout_record.node_id, node_id);
+        assert_eq!(stdout_record.port_label, "stdout");
+        assert_eq!(stdout_record.text, SNAPSHOT_STDOUT_TEXT);
     }
 
     #[test]
@@ -1568,7 +1632,10 @@ mod tests {
         outputs.insert(stderr_port, Value::from_string(String::new()));
         outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_GREP_NO_MATCH));
 
-        assert_eq!(completed_output_lines(&workflow, node_id, &outputs), vec!["  │ exit: exit code: 1".to_string()],);
+        assert_eq!(
+            rendered_output_records(completed_output_records(RunId(SNAPSHOT_RUN_ID), &workflow, node_id, &outputs)),
+            vec!["  │ exit: exit code: 1".to_string()],
+        );
     }
 
     #[test]
@@ -1597,6 +1664,14 @@ mod tests {
         assert!(lines.iter().any(|line| line.contains(SNAPSHOT_NODE_LABEL)), "lines: {lines:?}");
         assert!(!lines.iter().any(|line| line.contains(MUTATED_NODE_LABEL)), "lines: {lines:?}");
         assert!(lines.iter().any(|line| line == "  │ stdout: snapshot output"), "lines: {lines:?}");
+        assert_eq!(app.run_output_lines.len(), SNAPSHOT_OUTPUT_RECORD_COUNT);
+        assert!(
+            app.run_output_lines.iter().any(|record| record.run_id == RunId(SNAPSHOT_RUN_ID)
+                && record.node_id == node_id
+                && record.text == SNAPSHOT_STDOUT_TEXT),
+            "records: {:?}",
+            app.run_output_lines
+        );
     }
 
     #[tokio::test]
