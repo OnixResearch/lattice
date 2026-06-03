@@ -122,7 +122,7 @@ pub fn load_node_templates(dir: &Path) -> Vec<NodeTemplate> {
 }
 
 /// Evaluate a Nickel file and return the result as serde_json::Value.
-fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, String> {
+pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, String> {
     let mut program = Program::<CacheImpl>::new_from_file(path, std::io::sink(), NullReporter {})
         .map_err(|e| format!("failed to load {}: {e:?}", path.display()))?;
 

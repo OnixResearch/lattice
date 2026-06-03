@@ -9,6 +9,7 @@ use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::store::Store;
 use n8nclone::tui::App;
+use n8nclone::workflow_format;
 use tracing::info;
 
 const DEFAULT_CONFIG_PATH: &str = "~/.n8nclone/config.ncl";
@@ -38,6 +39,10 @@ struct Args {
 enum CliCommand {
     /// Run a saved workflow without starting the TUI
     Run(RunCommandArgs),
+    /// Export a saved workflow to a typed Nickel file
+    Export(ExportWorkflowArgs),
+    /// Import a typed Nickel workflow file into the store
+    Import(ImportWorkflowArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -48,6 +53,21 @@ struct RunCommandArgs {
     /// Output format for the run summary
     #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
     output: RunOutputFormat,
+}
+
+#[derive(clap::Args, Debug)]
+struct ExportWorkflowArgs {
+    /// Saved workflow name to export
+    workflow: String,
+
+    /// Nickel file to write
+    output: PathBuf,
+}
+
+#[derive(clap::Args, Debug)]
+struct ImportWorkflowArgs {
+    /// Nickel workflow file to import
+    path: PathBuf,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
@@ -89,6 +109,8 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
 
     match args.command {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
+        Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
+        Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
         None => {
             let app = App::new(app_config);
             app.run_tui().await.map_err(|e| n8nclone::error::Error::Io { source: e })?;
@@ -112,8 +134,7 @@ fn setup_logging(verbose: bool) {
 }
 
 async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandArgs) -> ExitCode {
-    let store_path = app_config.data_dir.join(STORE_FILE_NAME);
-    let store = match Store::new(&store_path) {
+    let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => {
             eprintln!("Run failed: {error}");
@@ -147,6 +168,82 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
             ExitCode::FAILURE
         }
     }
+}
+
+// r[impl n8nclone.workflow_format.nickel.export]
+fn export_workflow_command(app_config: &config::AppConfig, args: &ExportWorkflowArgs) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Export failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let workflow = match store.load_workflow(&args.workflow) {
+        Ok(Some(workflow)) => workflow,
+        Ok(None) => {
+            eprintln!("Export failed: workflow not found: {}", args.workflow);
+            return ExitCode::FAILURE;
+        }
+        Err(error) => {
+            eprintln!("Export failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty())
+        && let Err(error) = std::fs::create_dir_all(parent)
+    {
+        eprintln!("Export failed: {error}");
+        return ExitCode::FAILURE;
+    }
+
+    let nickel = workflow_format::workflow_to_nickel(&workflow);
+    match std::fs::write(&args.output, nickel) {
+        Ok(()) => {
+            println!("Exported '{}' to {}", workflow.meta.name, args.output.display());
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("Export failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+// r[impl n8nclone.workflow_format.nickel.import]
+fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflowArgs) -> ExitCode {
+    let workflow = match workflow_format::load_workflow_nickel_file(&args.path) {
+        Ok(workflow) => workflow,
+        Err(error) => {
+            eprintln!("Import failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Import failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match store.save_workflow(&workflow) {
+        Ok(()) => {
+            println!("Imported '{}'", workflow.meta.name);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("Import failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn open_store(app_config: &config::AppConfig) -> Result<Store, String> {
+    Store::new(app_config.data_dir.join(STORE_FILE_NAME)).map_err(|error| error.to_string())
 }
 
 fn process_result_to_exit_code(result: HeadlessProcessResult) -> ExitCode {
