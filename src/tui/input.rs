@@ -42,6 +42,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         _ => {}
     }
 
+    if app.is_workflow_browser_open() {
+        return handle_workflow_browser_key(app, key);
+    }
+
     // Ctrl-P toggles the command palette.
     if matches!((key.modifiers, key.code), (KeyModifiers::CONTROL, KeyCode::Char('p'))) {
         toggle_palette(app);
@@ -74,6 +78,36 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Canvas => handle_canvas_key(app, key),
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
+    }
+}
+
+fn handle_workflow_browser_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match workflow_browser_key_action(key) {
+        WorkflowBrowserKeyAction::Close => app.close_workflow_browser(),
+        WorkflowBrowserKeyAction::SelectNext => app.select_next_workflow(),
+        WorkflowBrowserKeyAction::SelectPrevious => app.select_previous_workflow(),
+        WorkflowBrowserKeyAction::Confirm => app.confirm_workflow_browser_selection(),
+        WorkflowBrowserKeyAction::Ignore => {}
+    }
+    None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkflowBrowserKeyAction {
+    Close,
+    SelectNext,
+    SelectPrevious,
+    Confirm,
+    Ignore,
+}
+
+fn workflow_browser_key_action(key: &KeyEvent) -> WorkflowBrowserKeyAction {
+    match key.code {
+        KeyCode::Esc => WorkflowBrowserKeyAction::Close,
+        KeyCode::Down => WorkflowBrowserKeyAction::SelectNext,
+        KeyCode::Up => WorkflowBrowserKeyAction::SelectPrevious,
+        KeyCode::Enter => WorkflowBrowserKeyAction::Confirm,
+        _ => WorkflowBrowserKeyAction::Ignore,
     }
 }
 
@@ -365,6 +399,7 @@ mod tests {
 
     use super::*;
     use crate::config::AppConfig;
+    use crate::tui::app::WorkflowBrowserState;
 
     fn test_app() -> (TempDir, App) {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -469,5 +504,20 @@ mod tests {
 
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('x'))), None,);
         assert!(app.is_confirming_quit());
+    }
+
+    #[test]
+    fn workflow_browser_keys_navigate_and_close_modal() {
+        let (_temp_dir, mut app) = test_app();
+        app.workflow_browser = WorkflowBrowserState::open(vec!["first".to_string(), "second".to_string()], None);
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Down)), None,);
+        assert_eq!(app.workflow_browser.selected, 1);
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Up)), None,);
+        assert_eq!(app.workflow_browser.selected, 0);
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
+        assert!(!app.is_workflow_browser_open());
     }
 }

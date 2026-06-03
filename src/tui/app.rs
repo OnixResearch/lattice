@@ -59,6 +59,34 @@ pub struct PaletteData {
     pub items: Vec<FuzzyCandidate>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowBrowserState {
+    pub open: bool,
+    pub names: Vec<String>,
+    pub selected: usize,
+    pub message: Option<String>,
+}
+
+impl WorkflowBrowserState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            names: Vec::new(),
+            selected: 0,
+            message: None,
+        }
+    }
+
+    pub fn open(names: Vec<String>, message: Option<String>) -> Self {
+        Self {
+            open: true,
+            names,
+            selected: 0,
+            message,
+        }
+    }
+}
+
 impl PaletteData {
     fn new() -> Self {
         let items = vec![
@@ -131,6 +159,7 @@ pub struct App {
     pub palette_state: FuzzyState,
     pub palette_data: PaletteData,
     pub output: StreamingOutput,
+    pub workflow_browser: WorkflowBrowserState,
     pub store: Option<Store>,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
@@ -164,6 +193,7 @@ impl App {
             palette_state,
             palette_data,
             output: StreamingOutput::new(),
+            workflow_browser: WorkflowBrowserState::closed(),
             store,
             config,
             last_drag_canvas: None,
@@ -210,6 +240,98 @@ impl App {
     pub fn cancel_quit_confirmation(&mut self) {
         self.confirm_quit = false;
         self.output.push_line("Quit canceled");
+    }
+
+    /// Return whether the workflow browser modal is open.
+    pub fn is_workflow_browser_open(&self) -> bool {
+        self.workflow_browser.open
+    }
+
+    /// Open the saved-workflow browser.
+    pub fn open_workflow_browser(&mut self) {
+        self.show_palette = false;
+        let Some(store) = &self.store else {
+            let message = "No database available".to_string();
+            self.output.push_line(&message);
+            self.workflow_browser = WorkflowBrowserState::open(Vec::new(), Some(message));
+            return;
+        };
+
+        match store.list_workflows() {
+            Ok(mut names) => {
+                names.sort();
+                let message = if names.is_empty() {
+                    Some("No saved workflows available".to_string())
+                } else {
+                    None
+                };
+                if let Some(message) = &message {
+                    self.output.push_line(message);
+                }
+                self.workflow_browser = WorkflowBrowserState::open(names, message);
+            }
+            Err(e) => {
+                let message = format!("Workflow browser failed: {e}");
+                self.output.push_line(&message);
+                self.workflow_browser = WorkflowBrowserState::open(Vec::new(), Some(message));
+            }
+        }
+    }
+
+    /// Close the saved-workflow browser.
+    pub fn close_workflow_browser(&mut self) {
+        self.workflow_browser = WorkflowBrowserState::closed();
+    }
+
+    /// Move browser selection to the next saved workflow.
+    pub fn select_next_workflow(&mut self) {
+        if self.workflow_browser.names.is_empty() {
+            return;
+        }
+        let last_index = self.workflow_browser.names.len() - 1;
+        self.workflow_browser.selected = (self.workflow_browser.selected + 1).min(last_index);
+    }
+
+    /// Move browser selection to the previous saved workflow.
+    pub fn select_previous_workflow(&mut self) {
+        self.workflow_browser.selected = self.workflow_browser.selected.saturating_sub(1);
+    }
+
+    /// Confirm the selected workflow in the browser.
+    pub fn confirm_workflow_browser_selection(&mut self) {
+        let Some(name) = self.workflow_browser.names.get(self.workflow_browser.selected).cloned() else {
+            return;
+        };
+
+        if self.load_workflow_by_name(&name) {
+            self.close_workflow_browser();
+        }
+    }
+
+    /// Load a saved workflow by name, preserving the current workflow on failure.
+    pub fn load_workflow_by_name(&mut self, name: &str) -> bool {
+        let Some(store) = &self.store else {
+            self.output.push_line("No database available");
+            return false;
+        };
+
+        match store.load_workflow(name) {
+            Ok(Some(workflow)) => {
+                self.workflow = workflow;
+                self.sync_graph_state();
+                self.clear_workflow_dirty();
+                self.output.push_line(&format!("Opened workflow '{name}'"));
+                true
+            }
+            Ok(None) => {
+                self.output.push_line(&format!("Workflow not found: {name}"));
+                false
+            }
+            Err(e) => {
+                self.output.push_line(&format!("Open failed: {e}"));
+                false
+            }
+        }
     }
 
     /// Cycle focus to the next panel.
@@ -377,7 +499,7 @@ impl App {
                             self.add_shell_node(&format!("Shell {}", n + 1), "echo 'hello'");
                         }
                         AppAction::OpenWorkflow => {
-                            self.output.push_line("Workflow browser not yet implemented");
+                            self.open_workflow_browser();
                         }
                         AppAction::AutoLayout => {
                             self.auto_layout();
@@ -468,5 +590,63 @@ mod tests {
 
         assert!(app.request_quit());
         assert!(!app.is_confirming_quit());
+    }
+
+    #[test]
+    fn workflow_browser_lists_saved_workflows() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.workflow.meta.name = "saved".to_string();
+        app.save_workflow();
+
+        app.open_workflow_browser();
+
+        assert!(app.is_workflow_browser_open());
+        assert_eq!(app.workflow_browser.names, vec!["saved".to_string()]);
+        assert_eq!(app.workflow_browser.selected, 0);
+    }
+
+    #[test]
+    fn workflow_browser_reports_empty_store() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_workflow_browser();
+
+        assert!(app.is_workflow_browser_open());
+        assert!(app.workflow_browser.names.is_empty());
+        assert_eq!(app.workflow_browser.message.as_deref(), Some("No saved workflows available"),);
+    }
+
+    #[test]
+    fn workflow_browser_loads_selected_workflow() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.workflow.meta.name = "saved".to_string();
+        app.add_shell_node("Saved", "echo saved");
+        app.save_workflow();
+        app.workflow = Workflow::new("current");
+        app.sync_graph_state();
+
+        app.open_workflow_browser();
+        app.confirm_workflow_browser_selection();
+
+        assert_eq!(app.workflow.meta.name, "saved");
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        assert!(!app.is_workflow_browser_open());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn workflow_browser_load_failure_preserves_current_workflow() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.workflow = Workflow::new("current");
+        app.sync_graph_state();
+
+        assert!(!app.load_workflow_by_name("missing"));
+
+        assert_eq!(app.workflow.meta.name, "current");
+        assert_eq!(app.workflow.graph.node_count(), 0);
     }
 }

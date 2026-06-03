@@ -34,6 +34,9 @@ const FULL_EMPTY_STATE_MIN_HEIGHT: u16 = 7;
 const QUIT_CONFIRM_WIDTH: u16 = 62;
 const QUIT_CONFIRM_HEIGHT: u16 = 5;
 const QUIT_CONFIRM_TOP_OFFSET: u16 = 3;
+const WORKFLOW_BROWSER_WIDTH: u16 = 64;
+const WORKFLOW_BROWSER_HEIGHT: u16 = 16;
+const WORKFLOW_BROWSER_TOP_OFFSET: u16 = 2;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -64,6 +67,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
     // Overlay: fuzzy palette.
     if app.show_palette {
         render_palette(app, area, buf);
+    }
+
+    if app.is_workflow_browser_open() {
+        render_workflow_browser(app, area, buf);
     }
 
     if app.is_confirming_quit() {
@@ -300,6 +307,7 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
     let help_text = contextual_help_text(FooterHelpContext {
         focus: app.focus,
         palette_open: app.show_palette,
+        workflow_browser_open: app.is_workflow_browser_open(),
         interaction_mode: footer_interaction_mode(&app.graph_state.mode),
         width: area.width,
     });
@@ -323,6 +331,7 @@ enum FooterInteractionMode {
 struct FooterHelpContext {
     focus: FocusPanel,
     palette_open: bool,
+    workflow_browser_open: bool,
     interaction_mode: FooterInteractionMode,
     width: u16,
 }
@@ -345,6 +354,10 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Type: filter │ ↑/↓: select │ Enter: run │ Esc: close ";
     }
 
+    if context.workflow_browser_open {
+        return " ↑/↓: choose workflow │ Enter: open │ Esc: close ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target port: connect │ Esc: cancel wiring ";
     }
@@ -361,6 +374,10 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Enter: run │ Esc ";
     }
 
+    if context.workflow_browser_open {
+        return " Enter open │ Esc ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target │ Esc ";
     }
@@ -370,6 +387,52 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         FocusPanel::Properties => " e edit │ A-Tab ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
+}
+
+fn render_workflow_browser(app: &App, area: Rect, buf: &mut Buffer) {
+    let width = area.width.min(WORKFLOW_BROWSER_WIDTH);
+    let height = area.height.min(WORKFLOW_BROWSER_HEIGHT);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = WORKFLOW_BROWSER_TOP_OFFSET.min(area.height.saturating_sub(height));
+    let browser_area = Rect::new(x, y, width, height);
+
+    Clear.render(browser_area, buf);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Open Workflow ")
+        .border_style(Style::default().fg(Color::Blue));
+    let inner = block.inner(browser_area);
+    block.render(browser_area, buf);
+
+    if app.workflow_browser.names.is_empty() {
+        let message = app.workflow_browser.message.as_deref().unwrap_or("No saved workflows available");
+        Paragraph::new(message)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::DarkGray))
+            .render(inner, buf);
+        return;
+    }
+
+    let visible_rows = inner.height as usize;
+    let lines = app
+        .workflow_browser
+        .names
+        .iter()
+        .take(visible_rows)
+        .enumerate()
+        .map(|(index, name)| {
+            let selected = index == app.workflow_browser.selected;
+            let style = if selected {
+                Style::default().fg(Color::Black).bg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let prefix = if selected { "› " } else { "  " };
+            Line::styled(format!("{prefix}{name}"), style)
+        })
+        .collect::<Vec<_>>();
+
+    Paragraph::new(lines).render(inner, buf);
 }
 
 fn render_quit_confirmation(area: Rect, buf: &mut Buffer) {
@@ -431,6 +494,7 @@ mod tests {
         FooterHelpContext {
             focus,
             palette_open: false,
+            workflow_browser_open: false,
             interaction_mode: FooterInteractionMode::Default,
             width: WIDE_STATUS_WIDTH,
         }
@@ -473,6 +537,16 @@ mod tests {
         };
 
         assert_eq!(contextual_help_text(palette), " Type: filter │ ↑/↓: select │ Enter: run │ Esc: close ",);
+    }
+
+    #[test]
+    fn contextual_help_reports_workflow_browser_modal() {
+        let browser = FooterHelpContext {
+            workflow_browser_open: true,
+            ..context(FocusPanel::Canvas)
+        };
+
+        assert_eq!(contextual_help_text(browser), " ↑/↓: choose workflow │ Enter: open │ Esc: close ",);
     }
 
     #[test]
