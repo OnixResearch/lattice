@@ -8,6 +8,8 @@ use crossterm::event::MouseEvent;
 use crossterm::event::MouseEventKind;
 use rat_fuzzy::Action as FuzzyAction;
 use rat_fuzzy::handle_action as handle_fuzzy_action;
+use rat_nodegraph::view::GraphAction;
+use rat_nodegraph::view::InteractionMode;
 
 use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
@@ -421,43 +423,54 @@ fn graph_counts_changed(before: GraphCounts, after: GraphCounts) -> bool {
     before != after
 }
 
-fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
-    use rat_nodegraph::view::InteractionMode;
+fn apply_graph_actions(app: &mut App, actions: &[GraphAction]) {
+    app.graph_state.apply_actions(actions);
+    app.workflow.graph = app.graph_state.graph.clone();
+}
 
+fn apply_graph_actions_and_mark_count_changes(app: &mut App, before: GraphCounts, actions: &[GraphAction]) {
+    apply_graph_actions(app, actions);
+    if graph_counts_changed(before, graph_counts(app)) {
+        app.mark_workflow_dirty();
+    }
+}
+
+fn mouse_canvas_position(app: &App, mouse: &MouseEvent) -> (i32, i32) {
+    let canvas_pos = app.graph_state.viewport.screen_to_canvas(
+        mouse.column.saturating_sub(app.graph_state.area.x),
+        mouse.row.saturating_sub(app.graph_state.area.y),
+    );
+    (canvas_pos.x, canvas_pos.y)
+}
+
+fn is_drag_release(start: Option<(i32, i32)>, end: (i32, i32)) -> bool {
+    matches!(start, Some(start) if start != end)
+}
+
+fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
     match mouse.kind {
         MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
             let before = graph_counts(app);
             let shift = mouse.modifiers.contains(KeyModifiers::SHIFT);
             let actions = app.graph_state.handle_mouse_click(mouse.column, mouse.row, shift);
-            app.graph_state.apply_actions(&actions);
-            app.workflow.graph = app.graph_state.graph.clone();
-            if graph_counts_changed(before, graph_counts(app)) {
-                app.mark_workflow_dirty();
-            }
+            apply_graph_actions_and_mark_count_changes(app, before, &actions);
 
             // Record drag start position.
-            let canvas_pos = app.graph_state.viewport.screen_to_canvas(
-                mouse.column.saturating_sub(app.graph_state.area.x),
-                mouse.row.saturating_sub(app.graph_state.area.y),
-            );
-            app.last_drag_canvas = Some((canvas_pos.x, canvas_pos.y));
+            app.last_drag_canvas = Some(mouse_canvas_position(app, mouse));
         }
         MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
-            let canvas_pos = app.graph_state.viewport.screen_to_canvas(
-                mouse.column.saturating_sub(app.graph_state.area.x),
-                mouse.row.saturating_sub(app.graph_state.area.y),
-            );
+            let canvas_pos = mouse_canvas_position(app, mouse);
 
             // During wiring, update the preview cursor instead of dragging nodes.
             if matches!(app.graph_state.mode, InteractionMode::Wiring { .. }) {
                 if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                    *cursor_x = canvas_pos.x;
-                    *cursor_y = canvas_pos.y;
+                    *cursor_x = canvas_pos.0;
+                    *cursor_y = canvas_pos.1;
                 }
             } else {
                 // Compute drag delta from last canvas position.
                 let (dx, dy) = if let Some((prev_x, prev_y)) = app.last_drag_canvas {
-                    (canvas_pos.x - prev_x, canvas_pos.y - prev_y)
+                    (canvas_pos.0 - prev_x, canvas_pos.1 - prev_y)
                 } else {
                     (0, 0)
                 };
@@ -465,32 +478,38 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
                 if dx != 0 || dy != 0 {
                     let actions = app.graph_state.handle_mouse_drag(mouse.column, mouse.row, dx, dy);
                     let did_mutate = !actions.is_empty();
-                    app.graph_state.apply_actions(&actions);
-                    app.workflow.graph = app.graph_state.graph.clone();
+                    apply_graph_actions(app, &actions);
                     if did_mutate {
                         app.mark_workflow_dirty();
                     }
                 }
+
+                app.last_drag_canvas = Some(canvas_pos);
             }
-            app.last_drag_canvas = Some((canvas_pos.x, canvas_pos.y));
         }
         MouseEventKind::Moved => {
             // Update wiring preview cursor on mouse movement.
+            let canvas_pos = mouse_canvas_position(app, mouse);
             if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                let canvas_pos = app.graph_state.viewport.screen_to_canvas(
-                    mouse.column.saturating_sub(app.graph_state.area.x),
-                    mouse.row.saturating_sub(app.graph_state.area.y),
-                );
-                *cursor_x = canvas_pos.x;
-                *cursor_y = canvas_pos.y;
+                *cursor_x = canvas_pos.0;
+                *cursor_y = canvas_pos.1;
             }
         }
         MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
+            let canvas_pos = mouse_canvas_position(app, mouse);
+            let should_complete_drag_wiring = matches!(app.graph_state.mode, InteractionMode::Wiring { .. })
+                && is_drag_release(app.last_drag_canvas, canvas_pos);
             app.last_drag_canvas = None;
-            // Finalize box selection on mouse up.
-            if matches!(app.graph_state.mode, InteractionMode::BoxSelect { .. }) {
+
+            if should_complete_drag_wiring {
+                let before = graph_counts(app);
+                let shift = mouse.modifiers.contains(KeyModifiers::SHIFT);
+                let actions = app.graph_state.handle_mouse_click(mouse.column, mouse.row, shift);
+                apply_graph_actions_and_mark_count_changes(app, before, &actions);
+            } else if matches!(app.graph_state.mode, InteractionMode::BoxSelect { .. }) {
+                // Finalize box selection on mouse up.
                 let actions = app.graph_state.finish_box_select();
-                app.graph_state.apply_actions(&actions);
+                apply_graph_actions(app, &actions);
             }
         }
         MouseEventKind::ScrollUp => {
@@ -510,6 +529,8 @@ mod tests {
     use crossterm::event::KeyCode;
     use crossterm::event::KeyEvent;
     use crossterm::event::KeyModifiers;
+    use crossterm::event::MouseButton;
+    use rat_nodegraph::view::node_bounds;
     use tempfile::TempDir;
 
     use super::*;
@@ -526,8 +547,55 @@ mod tests {
         (temp_dir, App::new(config))
     }
 
+    const FIRST_PORT_ROW_FROM_NODE_TOP: i32 = 2;
+    const NODE_BODY_INSET: i32 = 1;
+
     fn key_event(modifiers: KeyModifiers, code: KeyCode) -> Event {
         Event::Key(KeyEvent::new(code, modifiers))
+    }
+
+    fn mouse_event(kind: MouseEventKind, column: u16, row: u16) -> Event {
+        Event::Mouse(MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: KeyModifiers::empty(),
+        })
+    }
+
+    fn canvas_to_screen(app: &App, canvas_x: i32, canvas_y: i32) -> (u16, u16) {
+        let viewport = &app.graph_state.viewport;
+        let graph_area = app.graph_state.area;
+        let screen_x = canvas_x - viewport.offset_x + i32::from(graph_area.x);
+        let screen_y = canvas_y - viewport.offset_y + i32::from(graph_area.y);
+        (
+            u16::try_from(screen_x).expect("canvas x is visible in test viewport"),
+            u16::try_from(screen_y).expect("canvas y is visible in test viewport"),
+        )
+    }
+
+    fn shell_port_positions(app: &App) -> ((u16, u16), (u16, u16), (u16, u16)) {
+        let node_ids = app.graph_state.graph.node_ids();
+        let source_id = node_ids.first().copied().expect("source node exists");
+        let target_id = node_ids.get(1).copied().expect("target node exists");
+        let source_bounds = node_bounds(&app.graph_state.graph, source_id).expect("source bounds");
+        let target_bounds = node_bounds(&app.graph_state.graph, target_id).expect("target bounds");
+        let source_output = canvas_to_screen(
+            app,
+            source_bounds.x + i32::from(source_bounds.width) - NODE_BODY_INSET,
+            source_bounds.y + FIRST_PORT_ROW_FROM_NODE_TOP,
+        );
+        let target_input = canvas_to_screen(app, target_bounds.x, target_bounds.y + FIRST_PORT_ROW_FROM_NODE_TOP);
+        let target_body = canvas_to_screen(app, target_bounds.x + NODE_BODY_INSET, target_bounds.y + NODE_BODY_INSET);
+        (source_output, target_input, target_body)
+    }
+
+    fn app_with_two_shell_nodes() -> (TempDir, App) {
+        let (temp_dir, mut app) = test_app();
+        app.add_shell_node("Source", "printf source");
+        app.add_shell_node("Target", "cat");
+        app.clear_workflow_dirty();
+        (temp_dir, app)
     }
 
     #[test]
@@ -635,6 +703,104 @@ mod tests {
 
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
         assert!(!app.is_workflow_browser_open());
+    }
+
+    #[test]
+    fn mouse_drag_release_creates_compatible_edge() {
+        let (_temp_dir, mut app) = app_with_two_shell_nodes();
+        let (source_output, target_input, _) = shell_port_positions(&app);
+
+        assert_eq!(app.workflow.graph.edge_count(), 0);
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Down(MouseButton::Left), source_output.0, source_output.1),
+            ),
+            None,
+        );
+        assert!(matches!(app.graph_state.mode, InteractionMode::Wiring { .. }));
+
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Drag(MouseButton::Left), target_input.0, target_input.1),
+            ),
+            None,
+        );
+        assert_eq!(app.workflow.graph.edge_count(), 0);
+
+        assert_eq!(
+            handle_event(&mut app, &mouse_event(MouseEventKind::Up(MouseButton::Left), target_input.0, target_input.1),),
+            None,
+        );
+
+        assert_eq!(app.workflow.graph.edge_count(), 1);
+        assert!(matches!(app.graph_state.mode, InteractionMode::Normal));
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn mouse_click_release_keeps_click_to_click_wiring_available() {
+        let (_temp_dir, mut app) = app_with_two_shell_nodes();
+        let (source_output, target_input, _) = shell_port_positions(&app);
+
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Down(MouseButton::Left), source_output.0, source_output.1),
+            ),
+            None,
+        );
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Up(MouseButton::Left), source_output.0, source_output.1),
+            ),
+            None,
+        );
+        assert!(matches!(app.graph_state.mode, InteractionMode::Wiring { .. }));
+        assert_eq!(app.workflow.graph.edge_count(), 0);
+        assert!(!app.has_unsaved_changes());
+
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Down(MouseButton::Left), target_input.0, target_input.1),
+            ),
+            None,
+        );
+
+        assert_eq!(app.workflow.graph.edge_count(), 1);
+        assert!(matches!(app.graph_state.mode, InteractionMode::Normal));
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn mouse_drag_release_on_non_port_cancels_wiring_without_edge() {
+        let (_temp_dir, mut app) = app_with_two_shell_nodes();
+        let (source_output, _, target_body) = shell_port_positions(&app);
+
+        assert_eq!(
+            handle_event(
+                &mut app,
+                &mouse_event(MouseEventKind::Down(MouseButton::Left), source_output.0, source_output.1),
+            ),
+            None,
+        );
+        assert!(matches!(app.graph_state.mode, InteractionMode::Wiring { .. }));
+
+        assert_eq!(
+            handle_event(&mut app, &mouse_event(MouseEventKind::Drag(MouseButton::Left), target_body.0, target_body.1),),
+            None,
+        );
+        assert_eq!(
+            handle_event(&mut app, &mouse_event(MouseEventKind::Up(MouseButton::Left), target_body.0, target_body.1),),
+            None,
+        );
+
+        assert_eq!(app.workflow.graph.edge_count(), 0);
+        assert!(matches!(app.graph_state.mode, InteractionMode::Normal));
+        assert!(!app.has_unsaved_changes());
     }
 
     #[test]
