@@ -14,6 +14,7 @@ use rat_fuzzy::FuzzySource;
 use rat_fuzzy::FuzzyState;
 use rat_nodegraph::layout::LayoutConfig;
 use rat_nodegraph::layout::auto_layout;
+use rat_nodegraph::model::NodeId;
 use rat_nodegraph::view::NodeGraphState;
 use rat_nodegraph::view::node_bounds;
 use rat_streaming::StreamingOutput;
@@ -24,6 +25,7 @@ use tracing::info;
 
 use crate::config::AppConfig;
 use crate::engine::executor::Executor;
+use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::store::Store;
 use crate::tui::input;
@@ -59,7 +61,43 @@ pub struct PaletteData {
     pub items: Vec<FuzzyCandidate>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropertyEditField {
+    Label,
+    Command,
+    TimeoutSecs,
+}
+
+impl PropertyEditField {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Label => "label",
+            Self::Command => "command",
+            Self::TimeoutSecs => "timeout",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PropertyEditState {
+    pub node_id: NodeId,
+    pub field: PropertyEditField,
+    pub original: String,
+    pub draft: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PropertyEditError {
+    MissingSelection,
+    NodeNotFound,
+    MissingConfig,
+    InvalidTimeout,
+}
+
+pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
+    input.trim().parse::<u64>().map_err(|_| PropertyEditError::InvalidTimeout)
+}
+
 pub struct WorkflowBrowserState {
     pub open: bool,
     pub names: Vec<String>,
@@ -160,6 +198,7 @@ pub struct App {
     pub palette_data: PaletteData,
     pub output: StreamingOutput,
     pub workflow_browser: WorkflowBrowserState,
+    pub property_edit: Option<PropertyEditState>,
     pub store: Option<Store>,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
@@ -194,6 +233,7 @@ impl App {
             palette_data,
             output: StreamingOutput::new(),
             workflow_browser: WorkflowBrowserState::closed(),
+            property_edit: None,
             store,
             config,
             last_drag_canvas: None,
@@ -330,6 +370,151 @@ impl App {
             Err(e) => {
                 self.output.push_line(&format!("Open failed: {e}"));
                 false
+            }
+        }
+    }
+
+    /// Start editing a selected shell-node property.
+    pub fn start_property_edit(&mut self, field: PropertyEditField) -> bool {
+        let Some(node_id) = self.selected_node_id() else {
+            self.output.push_line("Select one node to edit properties");
+            return false;
+        };
+
+        let Some(draft) = self.property_value(node_id, field) else {
+            self.output.push_line("Selected node property is unavailable");
+            return false;
+        };
+
+        self.property_edit = Some(PropertyEditState {
+            node_id,
+            field,
+            original: draft.clone(),
+            draft,
+        });
+        true
+    }
+
+    /// Append one character to the active property draft.
+    pub fn push_property_edit_char(&mut self, ch: char) {
+        if let Some(edit) = &mut self.property_edit {
+            edit.draft.push(ch);
+        }
+    }
+
+    /// Remove one character from the active property draft.
+    pub fn pop_property_edit_char(&mut self) {
+        if let Some(edit) = &mut self.property_edit {
+            edit.draft.pop();
+        }
+    }
+
+    /// Cancel active property editing without mutating workflow state.
+    pub fn cancel_property_edit(&mut self) {
+        self.property_edit = None;
+    }
+
+    /// Save active property editing, preserving previous state on validation failure.
+    pub fn save_property_edit(&mut self) -> bool {
+        let Some(edit) = self.property_edit.clone() else {
+            return false;
+        };
+
+        match self.apply_property_edit(&edit) {
+            Ok(()) => {
+                self.property_edit = None;
+                self.mark_workflow_dirty();
+                self.output.push_line(&format!("Updated node {}", edit.field.label()));
+                true
+            }
+            Err(PropertyEditError::InvalidTimeout) => {
+                self.output.push_line("Invalid timeout; enter whole seconds");
+                false
+            }
+            Err(_) => {
+                self.output.push_line("Property edit failed");
+                false
+            }
+        }
+    }
+
+    fn selected_node_id(&self) -> Option<NodeId> {
+        if self.graph_state.selected.len() != 1 {
+            return None;
+        }
+        self.graph_state.selected.iter().next().copied()
+    }
+
+    fn property_value(&self, node_id: NodeId, field: PropertyEditField) -> Option<String> {
+        match field {
+            PropertyEditField::Label => self.workflow.graph.node(node_id).map(|node| node.label.clone()),
+            PropertyEditField::Command => match self.workflow.node_config(node_id)? {
+                NodeConfig::Shell { command, .. } => Some(command.clone()),
+            },
+            PropertyEditField::TimeoutSecs => match self.workflow.node_config(node_id)? {
+                NodeConfig::Shell { timeout_secs, .. } => Some(timeout_secs.to_string()),
+            },
+        }
+    }
+
+    fn apply_property_edit(&mut self, edit: &PropertyEditState) -> Result<(), PropertyEditError> {
+        match edit.field {
+            PropertyEditField::Label => {
+                let Some(node) = self.workflow.graph.node_mut(edit.node_id) else {
+                    return Err(PropertyEditError::NodeNotFound);
+                };
+                node.label = edit.draft.clone();
+                self.sync_graph_state();
+                self.graph_state.selected.insert(edit.node_id);
+                self.graph_state.focused = Some(edit.node_id);
+                Ok(())
+            }
+            PropertyEditField::Command => {
+                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                match config {
+                    NodeConfig::Shell {
+                        cwd,
+                        env,
+                        timeout_secs,
+                        pipe_stdin,
+                        ..
+                    } => {
+                        self.workflow.set_node_config(edit.node_id, NodeConfig::Shell {
+                            command: edit.draft.clone(),
+                            cwd,
+                            env,
+                            timeout_secs,
+                            pipe_stdin,
+                        });
+                        Ok(())
+                    }
+                }
+            }
+            PropertyEditField::TimeoutSecs => {
+                let timeout_secs = validate_timeout_secs(&edit.draft)?;
+                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                match config {
+                    NodeConfig::Shell {
+                        command,
+                        cwd,
+                        env,
+                        pipe_stdin,
+                        ..
+                    } => {
+                        self.workflow.set_node_config(edit.node_id, NodeConfig::Shell {
+                            command,
+                            cwd,
+                            env,
+                            timeout_secs,
+                            pipe_stdin,
+                        });
+                        Ok(())
+                    }
+                }
             }
         }
     }
@@ -525,6 +710,8 @@ mod tests {
 
     use super::*;
 
+    const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
+
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
         std::fs::create_dir_all(&data_dir).expect("create app data directory");
@@ -648,5 +835,68 @@ mod tests {
 
         assert_eq!(app.workflow.meta.name, "current");
         assert_eq!(app.workflow.graph.node_count(), 0);
+    }
+
+    #[test]
+    fn property_edit_updates_shell_command() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Example", "echo old");
+        app.clear_workflow_dirty();
+        let node_id = app.selected_node_id().expect("selected shell node");
+
+        assert!(app.start_property_edit(PropertyEditField::Command));
+        app.property_edit.as_mut().expect("property edit").draft = "echo new".to_string();
+        assert!(app.save_property_edit());
+
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "echo new"),
+        }
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn property_edit_rejects_invalid_timeout_without_mutating() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Example", "echo example");
+        app.clear_workflow_dirty();
+        let node_id = app.selected_node_id().expect("selected shell node");
+
+        assert!(app.start_property_edit(PropertyEditField::TimeoutSecs));
+        app.property_edit.as_mut().expect("property edit").draft = "not seconds".to_string();
+        assert!(!app.save_property_edit());
+
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { timeout_secs, .. } => {
+                assert_eq!(*timeout_secs, DEFAULT_SHELL_TIMEOUT_SECS)
+            }
+        }
+        assert!(app.property_edit.is_some());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn property_edit_cancel_preserves_original_value() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_shell_node("Original", "echo example");
+        app.clear_workflow_dirty();
+        let node_id = app.selected_node_id().expect("selected shell node");
+
+        assert!(app.start_property_edit(PropertyEditField::Label));
+        app.property_edit.as_mut().expect("property edit").draft = "Changed".to_string();
+        app.cancel_property_edit();
+
+        let label = app.workflow.graph.node(node_id).expect("node").label.as_str();
+        assert_eq!(label, "Original");
+        assert!(app.property_edit.is_none());
+        assert!(!app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn timeout_validation_accepts_whole_seconds_only() {
+        assert_eq!(validate_timeout_secs("42"), Ok(42));
+        assert_eq!(validate_timeout_secs("nope"), Err(PropertyEditError::InvalidTimeout));
     }
 }

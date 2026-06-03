@@ -27,6 +27,7 @@ use ratatui::widgets::Widget;
 use crate::engine::workflow::NodeConfig;
 use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
+use crate::tui::app::PropertyEditField;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
@@ -189,6 +190,24 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
         Line::from(""),
     ];
 
+    if let Some(edit) = &app.property_edit {
+        if edit.node_id == node_id {
+            lines.push(Line::from(vec![
+                Span::styled("Editing: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    property_field_title(edit.field),
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("Draft: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(edit.draft.clone(), Style::default().fg(Color::White)),
+            ]));
+            lines.push(Line::styled("Enter: save │ Esc: cancel", Style::default().fg(Color::DarkGray)));
+            lines.push(Line::from(""));
+        }
+    }
+
     // Show config details.
     if let Some(config) = app.workflow.node_config(node_id) {
         match config {
@@ -245,6 +264,14 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
     }
 
     Paragraph::new(lines).render(inner, buf);
+}
+
+fn property_field_title(field: PropertyEditField) -> &'static str {
+    match field {
+        PropertyEditField::Label => "Label",
+        PropertyEditField::Command => "Command",
+        PropertyEditField::TimeoutSecs => "Timeout",
+    }
 }
 
 /// Render the output/execution log panel.

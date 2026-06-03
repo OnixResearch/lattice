@@ -12,6 +12,7 @@ use rat_fuzzy::handle_action as handle_fuzzy_action;
 use crate::tui::app::App;
 use crate::tui::app::AppAction;
 use crate::tui::app::FocusPanel;
+use crate::tui::app::PropertyEditField;
 use crate::tui::app::palette_action;
 
 const OUTPUT_SCROLL_MARGIN_ROWS: usize = 8;
@@ -262,15 +263,43 @@ fn canvas_key_may_mutate(key: &KeyEvent, has_selection: bool) -> bool {
     }
 }
 
-fn handle_properties_key(_app: &mut App, key: &KeyEvent) -> Option<AppAction> {
-    // TODO: property editing (text inputs, dropdowns, etc.)
+fn handle_properties_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    if app.property_edit.is_some() {
+        handle_property_edit_key(app, key);
+        return None;
+    }
+
     match key.code {
-        KeyCode::Char('e') => {
-            // Could open an editor for the command.
+        KeyCode::Char('l') if accepts_palette_text(key.modifiers) => {
+            app.start_property_edit(PropertyEditField::Label);
+        }
+        KeyCode::Char('e') if accepts_palette_text(key.modifiers) => {
+            app.start_property_edit(PropertyEditField::Command);
+        }
+        KeyCode::Char('t') if accepts_palette_text(key.modifiers) => {
+            app.start_property_edit(PropertyEditField::TimeoutSecs);
         }
         _ => {}
     }
     None
+}
+
+fn handle_property_edit_key(app: &mut App, key: &KeyEvent) {
+    match key.code {
+        KeyCode::Enter => {
+            app.save_property_edit();
+        }
+        KeyCode::Esc => {
+            app.cancel_property_edit();
+        }
+        KeyCode::Backspace => {
+            app.pop_property_edit_char();
+        }
+        KeyCode::Char(ch) if accepts_palette_text(key.modifiers) => {
+            app.push_property_edit_char(ch);
+        }
+        _ => {}
+    }
 }
 
 fn handle_output_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
@@ -399,6 +428,7 @@ mod tests {
 
     use super::*;
     use crate::config::AppConfig;
+    use crate::engine::workflow::NodeConfig;
     use crate::tui::app::WorkflowBrowserState;
 
     fn test_app() -> (TempDir, App) {
@@ -519,5 +549,26 @@ mod tests {
 
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
         assert!(!app.is_workflow_browser_open());
+    }
+
+    #[test]
+    fn property_keys_edit_shell_command() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("Example", "");
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Properties;
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('e'))), None,);
+        for ch in ['e', 'c', 'h', 'o'] {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::Shell { command, .. } => assert_eq!(command, "echo"),
+        }
+        assert!(app.property_edit.is_none());
+        assert!(app.has_unsaved_changes());
     }
 }
