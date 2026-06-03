@@ -30,6 +30,7 @@ use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
 use crate::tui::app::NodeRunStatus;
 use crate::tui::app::PropertyEditField;
+use crate::tui::app::rendered_latest_node_output_lines;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
@@ -285,6 +286,15 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
             Span::raw(port.label.clone()),
             Span::styled(format!(" ({})", port.type_tag), Style::default().fg(Color::DarkGray)),
         ]));
+    }
+
+    let latest_output_lines = rendered_latest_node_output_lines(&app.run_output_lines, &app.workflow, node_id);
+    if !latest_output_lines.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::styled("─ Latest output ─", Style::default().fg(Color::DarkGray)));
+        for line in latest_output_lines {
+            lines.push(Line::styled(line, Style::default().fg(Color::Gray)));
+        }
     }
 
     Paragraph::new(lines).render(inner, buf);

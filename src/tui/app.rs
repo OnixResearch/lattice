@@ -184,6 +184,36 @@ impl RunOutputLine {
     }
 }
 
+pub fn latest_node_output_records(
+    records: &[RunOutputLine],
+    workflow: &Workflow,
+    node_id: NodeId,
+) -> Vec<RunOutputLine> {
+    let mut latest_by_port = HashMap::new();
+    for record in records.iter().filter(|record| record.node_id == node_id) {
+        latest_by_port.insert(record.port_id, record.clone());
+    }
+
+    if let Some(node) = workflow.graph.node(node_id) {
+        return node.output_ports.iter().filter_map(|port| latest_by_port.remove(&port.id)).collect();
+    }
+
+    let mut latest_records = latest_by_port.into_values().collect::<Vec<_>>();
+    latest_records.sort_by_key(|record| record.port_id.0);
+    latest_records
+}
+
+pub fn rendered_latest_node_output_lines(
+    records: &[RunOutputLine],
+    workflow: &Workflow,
+    node_id: NodeId,
+) -> Vec<String> {
+    latest_node_output_records(records, workflow, node_id)
+        .into_iter()
+        .map(|record| record.rendered())
+        .collect()
+}
+
 fn completed_output_records(
     run_id: RunId,
     workflow: &Workflow,
@@ -1302,6 +1332,9 @@ mod tests {
     const SNAPSHOT_STDOUT: &str = "snapshot output\n";
     const SNAPSHOT_INPUT_HASH_BYTES: &[u8] = b"snapshot-log";
     const SNAPSHOT_OUTPUT_RECORD_COUNT: usize = 2;
+    const SNAPSHOT_SECOND_RUN_ID: u64 = 1;
+    const OLDER_STDOUT_TEXT: &str = "older output";
+    const OTHER_NODE_TEXT: &str = "other node output";
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1617,6 +1650,55 @@ mod tests {
         assert_eq!(stdout_record.node_id, node_id);
         assert_eq!(stdout_record.port_label, "stdout");
         assert_eq!(stdout_record.text, SNAPSHOT_STDOUT_TEXT);
+    }
+
+    #[test]
+    fn latest_node_output_records_return_latest_lines_in_port_order() {
+        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let node_id = workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
+        let other_node_id = workflow.add_shell_node(MUTATED_NODE_LABEL, SNAPSHOT_COMMAND);
+        let node = workflow.graph.node(node_id).expect("node exists");
+        let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let exit_port = node.output_ports[SHELL_EXIT_OUTPUT_INDEX].id;
+        let other_stdout_port =
+            workflow.graph.node(other_node_id).expect("other node exists").output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let records = vec![
+            RunOutputLine {
+                run_id: RunId(SNAPSHOT_RUN_ID),
+                node_id,
+                port_id: stdout_port,
+                port_label: "stdout".to_string(),
+                text: OLDER_STDOUT_TEXT.to_string(),
+            },
+            RunOutputLine {
+                run_id: RunId(SNAPSHOT_RUN_ID),
+                node_id,
+                port_id: exit_port,
+                port_label: "exit".to_string(),
+                text: "exit code: 0".to_string(),
+            },
+            RunOutputLine {
+                run_id: RunId(SNAPSHOT_SECOND_RUN_ID),
+                node_id,
+                port_id: stdout_port,
+                port_label: "stdout".to_string(),
+                text: SNAPSHOT_STDOUT_TEXT.to_string(),
+            },
+            RunOutputLine {
+                run_id: RunId(SNAPSHOT_SECOND_RUN_ID),
+                node_id: other_node_id,
+                port_id: other_stdout_port,
+                port_label: "stdout".to_string(),
+                text: OTHER_NODE_TEXT.to_string(),
+            },
+        ];
+
+        let rendered = rendered_latest_node_output_lines(&records, &workflow, node_id);
+
+        assert_eq!(rendered, vec![
+            "  │ stdout: snapshot output".to_string(),
+            "  │ exit: exit code: 0".to_string()
+        ],);
     }
 
     #[test]
