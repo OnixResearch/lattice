@@ -4,8 +4,8 @@
 
 ```bash
 nix develop          # enter devshell
-cargo check          # verify compilation
-cargo nextest run    # run tests
+scripts/check.rs     # run fmt, tests, and clippy with repo-local target artifacts
+cargo check          # quick compile check
 nix flake check      # full CI (build + test + clippy + fmt)
 ```
 

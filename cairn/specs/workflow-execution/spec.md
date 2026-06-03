@@ -32,3 +32,12 @@ r[n8nclone.workflow_execution.pipeline_stdin.cache_real_ports.routable]
 - GIVEN a cached shell output is used during a workflow run
 - WHEN a downstream edge reads the cached upstream output
 - THEN the downstream input lookup uses the same real output port ID as non-cached execution
+
+### Requirement: Shell cache keys include executable configuration
+r[n8nclone.workflow_execution.cache_key.shell_config] The system MUST include shell node executable configuration in the cache key used to reuse completed shell outputs.
+
+#### Scenario: Command edits do not reuse stale output
+r[n8nclone.workflow_execution.cache_key.shell_config.command_edit]
+- GIVEN a shell node previously cached output for one command
+- WHEN the same node inputs are run with a different command
+- THEN the executor runs the new command instead of reusing the previous command's cached output

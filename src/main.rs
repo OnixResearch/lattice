@@ -64,10 +64,10 @@ async fn main() -> Result<(), n8nclone::error::Error> {
 }
 
 fn shellexpand(path: &str) -> PathBuf {
-    if path.starts_with("~/") {
-        if let Some(home) = home::home_dir() {
-            return home.join(&path[2..]);
-        }
+    if let Some(stripped_path) = path.strip_prefix("~/")
+        && let Some(home) = home::home_dir()
+    {
+        return home.join(stripped_path);
     }
     PathBuf::from(path)
 }

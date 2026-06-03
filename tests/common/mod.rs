@@ -1,4 +1,5 @@
 //! Shared test helpers — workflow builders, temp stores, assertion utilities.
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 

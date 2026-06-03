@@ -214,22 +214,22 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
         lines.push(Line::from(""));
     }
 
-    if let Some(edit) = &app.property_edit {
-        if edit.node_id == node_id {
-            lines.push(Line::from(vec![
-                Span::styled("Editing: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(
-                    property_field_title(edit.field),
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("Draft: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(edit.draft.clone(), Style::default().fg(Color::White)),
-            ]));
-            lines.push(Line::styled("Enter: save │ Esc: cancel", Style::default().fg(Color::DarkGray)));
-            lines.push(Line::from(""));
-        }
+    if let Some(edit) = &app.property_edit
+        && edit.node_id == node_id
+    {
+        lines.push(Line::from(vec![
+            Span::styled("Editing: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                property_field_title(edit.field),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("Draft: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(edit.draft.clone(), Style::default().fg(Color::White)),
+        ]));
+        lines.push(Line::styled("Enter: save │ Esc: cancel", Style::default().fg(Color::DarkGray)));
+        lines.push(Line::from(""));
     }
 
     // Show config details.

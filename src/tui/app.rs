@@ -15,6 +15,7 @@ use rat_fuzzy::FuzzyState;
 use rat_nodegraph::layout::LayoutConfig;
 use rat_nodegraph::layout::auto_layout;
 use rat_nodegraph::model::NodeId;
+use rat_nodegraph::model::PortId;
 use rat_nodegraph::model::PortSpec;
 use rat_nodegraph::view::NodeGraphState;
 use rat_nodegraph::view::node_bounds;
@@ -32,6 +33,7 @@ use crate::engine::executor::Executor;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
+use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::store::RunRecord;
@@ -103,7 +105,11 @@ struct ActiveRun {
 
 #[derive(Debug)]
 enum RunEvent {
-    Completed { run_id: RunId, results: Vec<StepResult> },
+    Completed {
+        run_id: RunId,
+        workflow: Workflow,
+        results: Vec<StepResult>,
+    },
 }
 
 pub struct PaletteData {
@@ -161,6 +167,38 @@ pub fn format_run_record(record: &RunRecord) -> String {
         "{} │ {} nodes │ {} failures │ {} cache hits",
         record.run_id, record.node_count, record.failures, record.cache_hits,
     )
+}
+
+fn completed_output_lines(workflow: &Workflow, node_id: NodeId, outputs: &HashMap<PortId, Value>) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    if let Some(node) = workflow.graph.node(node_id) {
+        for port in &node.output_ports {
+            if let Some(value) = outputs.get(&port.id) {
+                append_output_value_lines(&mut lines, &port.label, value);
+            }
+        }
+        return lines;
+    }
+
+    let mut fallback_outputs = outputs.iter().collect::<Vec<_>>();
+    fallback_outputs.sort_by_key(|(port_id, _)| port_id.0);
+    for (port_id, value) in fallback_outputs {
+        append_output_value_lines(&mut lines, &format!("port {}", port_id.0), value);
+    }
+
+    lines
+}
+
+fn append_output_value_lines(lines: &mut Vec<String>, port_label: &str, value: &Value) {
+    let display = value.as_display_string();
+    if display.is_empty() {
+        return;
+    }
+
+    for line in display.lines() {
+        lines.push(format!("  │ {port_label}: {line}"));
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -397,7 +435,7 @@ impl App {
         let workflow = Workflow::new("untitled");
         let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
 
-        let store = match Store::new(&config.data_dir.join("n8nclone.redb")) {
+        let store = match Store::new(config.data_dir.join("n8nclone.redb")) {
             Ok(s) => Some(s),
             Err(e) => {
                 error!(error = %e, "failed to open database, running without persistence");
@@ -928,11 +966,11 @@ impl App {
             }
         }
         let has_others = self.workflow.graph.node_count() > 1;
-        if let Some(node) = self.workflow.graph.node_mut(id) {
-            if has_others {
-                node.x = max_right + NEW_NODE_HORIZONTAL_GAP;
-                node.y = stack_y;
-            }
+        if let Some(node) = self.workflow.graph.node_mut(id)
+            && has_others
+        {
+            node.x = max_right + NEW_NODE_HORIZONTAL_GAP;
+            node.y = stack_y;
         }
     }
 
@@ -974,7 +1012,11 @@ impl App {
             let mut executor = Executor::new();
             let cache = HashMap::new();
             let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
-            let _ = sender.send(RunEvent::Completed { run_id, results });
+            let _ = sender.send(RunEvent::Completed {
+                run_id,
+                workflow,
+                results,
+            });
         });
         self.active_run = Some(ActiveRun {
             run_id,
@@ -998,7 +1040,8 @@ impl App {
             }
         }
         self.run_state.active = false;
-        self.save_run_record(active_run.run_id, 0, 0, self.run_state.node_statuses.len());
+        let workflow_name = self.workflow.meta.name.clone();
+        self.save_run_record(active_run.run_id, &workflow_name, 0, 0, self.run_state.node_statuses.len());
         self.output.push_line("Workflow run canceled");
         true
     }
@@ -1014,30 +1057,29 @@ impl App {
 
         for event in completed {
             match event {
-                RunEvent::Completed { run_id, results } => {
-                    self.finish_workflow_run(run_id, results);
+                RunEvent::Completed {
+                    run_id,
+                    workflow,
+                    results,
+                } => {
+                    self.finish_workflow_run(run_id, &workflow, results);
                     self.active_run = None;
                 }
             }
         }
     }
 
-    fn finish_workflow_run(&mut self, run_id: RunId, results: Vec<StepResult>) {
+    fn finish_workflow_run(&mut self, run_id: RunId, run_workflow: &Workflow, results: Vec<StepResult>) {
         for step in &results {
-            let node_label = self.workflow.graph.node(step.node_id).map(|n| n.label.as_str()).unwrap_or("?");
+            let node_label = run_workflow.graph.node(step.node_id).map(|n| n.label.as_str()).unwrap_or("?");
             match &step.status {
                 NodeStatus::Completed { outputs, cached, .. } => {
                     self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Completed);
                     let cache_tag = if *cached { " (cached)" } else { "" };
                     self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
 
-                    for val in outputs.values() {
-                        let display = val.as_display_string();
-                        if !display.is_empty() {
-                            for line in display.lines() {
-                                self.output.push_line(&format!("  │ {line}"));
-                            }
-                        }
+                    for line in completed_output_lines(run_workflow, step.node_id, outputs) {
+                        self.output.push_line(&line);
                     }
 
                     if let Some(ref store) = self.store {
@@ -1063,18 +1105,25 @@ impl App {
             .iter()
             .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
             .count();
-        self.save_run_record(run_id, cache_hits, failures, results.len());
+        self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
-    fn save_run_record(&mut self, run_id: RunId, cache_hits: usize, failures: usize, node_count: usize) {
+    fn save_run_record(
+        &mut self,
+        run_id: RunId,
+        workflow_name: &str,
+        cache_hits: usize,
+        failures: usize,
+        node_count: usize,
+    ) {
         let Some(store) = &self.store else {
             return;
         };
         let now = chrono::Utc::now().timestamp_millis();
         let record = RunRecord {
             run_id,
-            workflow_name: self.workflow.meta.name.clone(),
+            workflow_name: workflow_name.to_string(),
             started_epoch_ms: now,
             finished_epoch_ms: Some(now),
             node_count,
@@ -1195,14 +1244,28 @@ impl App {
 
 #[cfg(test)]
 mod tests {
+    use rat_streaming::streaming_output::DisplayLine;
     use tempfile::TempDir;
 
     use super::*;
     use crate::config::PortTemplate;
+    use crate::engine::value::ContentHash;
 
     const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
     const RUN_EVENT_POLL_LIMIT: usize = 50;
     const RUN_EVENT_POLL_DELAY_MS: u64 = 10;
+    const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
+    const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
+    const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
+    const EXIT_CODE_SUCCESS: i32 = 0;
+    const EXIT_CODE_GREP_NO_MATCH: i32 = 1;
+    const SNAPSHOT_RUN_ID: u64 = 0;
+    const SNAPSHOT_WORKFLOW_NAME: &str = "snapshot";
+    const SNAPSHOT_NODE_LABEL: &str = "Snapshot label";
+    const MUTATED_NODE_LABEL: &str = "Mutated label";
+    const SNAPSHOT_COMMAND: &str = "echo snapshot";
+    const SNAPSHOT_STDOUT: &str = "snapshot output\n";
+    const SNAPSHOT_INPUT_HASH_BYTES: &[u8] = b"snapshot-log";
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1211,6 +1274,15 @@ mod tests {
             data_dir,
             ..AppConfig::default()
         }
+    }
+
+    fn output_text_lines(app: &App) -> Vec<String> {
+        (0..app.output.display_line_count())
+            .filter_map(|line_index| match app.output.get_display_line(line_index) {
+                DisplayLine::Text(line) => Some(line),
+                DisplayLine::Omitted(_) => None,
+            })
+            .collect()
     }
 
     #[test]
@@ -1464,6 +1536,67 @@ mod tests {
     fn empty_add_node_label_uses_default() {
         assert_eq!(normalized_node_label("", "Shell 1"), "Shell 1");
         assert_eq!(normalized_node_label("  Custom  ", "Shell 1"), "Custom");
+    }
+
+    #[test]
+    fn completed_output_lines_are_port_labeled_and_ordered() {
+        let mut workflow = Workflow::new("display");
+        let node_id = workflow.add_shell_node("grep", "grep world");
+        let node = workflow.graph.node(node_id).expect("node exists");
+        let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let exit_port = node.output_ports[SHELL_EXIT_OUTPUT_INDEX].id;
+        let mut outputs = HashMap::new();
+        outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_SUCCESS));
+        outputs.insert(stdout_port, Value::from_string("hello world\n".to_string()));
+
+        assert_eq!(completed_output_lines(&workflow, node_id, &outputs), vec![
+            "  │ stdout: hello world".to_string(),
+            "  │ exit: exit code: 0".to_string()
+        ],);
+    }
+
+    #[test]
+    fn completed_output_lines_omit_empty_streams_for_no_match() {
+        let mut workflow = Workflow::new("display");
+        let node_id = workflow.add_shell_node("grep", "grep world");
+        let node = workflow.graph.node(node_id).expect("node exists");
+        let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let stderr_port = node.output_ports[SHELL_STDERR_OUTPUT_INDEX].id;
+        let exit_port = node.output_ports[SHELL_EXIT_OUTPUT_INDEX].id;
+        let mut outputs = HashMap::new();
+        outputs.insert(stdout_port, Value::from_string(String::new()));
+        outputs.insert(stderr_port, Value::from_string(String::new()));
+        outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_GREP_NO_MATCH));
+
+        assert_eq!(completed_output_lines(&workflow, node_id, &outputs), vec!["  │ exit: exit code: 1".to_string()],);
+    }
+
+    #[test]
+    fn finish_workflow_run_logs_executed_workflow_snapshot() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        let mut run_workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let node_id = run_workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
+        let node = run_workflow.graph.node(node_id).expect("node exists");
+        let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
+        let exit_port = node.output_ports[SHELL_EXIT_OUTPUT_INDEX].id;
+        let mut outputs = HashMap::new();
+        outputs.insert(stdout_port, Value::from_string(SNAPSHOT_STDOUT.to_string()));
+        outputs.insert(exit_port, Value::from_exit_code(EXIT_CODE_SUCCESS));
+        let step = StepResult {
+            node_id,
+            status: NodeStatus::Completed { outputs, cached: false },
+            input_hash: ContentHash::from_bytes(SNAPSHOT_INPUT_HASH_BYTES),
+        };
+
+        app.workflow = run_workflow.clone();
+        app.workflow.graph.node_mut(node_id).expect("current node exists").label = MUTATED_NODE_LABEL.to_string();
+        app.finish_workflow_run(RunId(SNAPSHOT_RUN_ID), &run_workflow, vec![step]);
+
+        let lines = output_text_lines(&app);
+        assert!(lines.iter().any(|line| line.contains(SNAPSHOT_NODE_LABEL)), "lines: {lines:?}");
+        assert!(!lines.iter().any(|line| line.contains(MUTATED_NODE_LABEL)), "lines: {lines:?}");
+        assert!(lines.iter().any(|line| line == "  │ stdout: snapshot output"), "lines: {lines:?}");
     }
 
     #[tokio::test]

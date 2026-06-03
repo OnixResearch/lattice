@@ -6,11 +6,139 @@ use std::collections::HashMap;
 
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::value::ContentHash;
 use n8nclone::engine::value::Value;
+use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
+use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
+
+const EXIT_CODE_SUCCESS_DISPLAY: &str = "exit code: 0";
+const EXIT_CODE_FAILURE_DISPLAY: &str = "exit code: 1";
+const MATCHING_SOURCE_COMMAND: &str = "echo hello world";
+const NON_MATCHING_SOURCE_COMMAND: &str = "echo hi";
+const GREP_WORLD_COMMAND: &str = "grep world";
+const SHELL_STDIN_INPUT_INDEX: usize = 0;
+const CACHE_BASE_COMMAND: &str = "printf base";
+const CACHE_CHANGED_COMMAND: &str = "printf command";
+const CACHE_CWD_COMMAND: &str = "printf cwd";
+const CACHE_ENV_COMMAND: &str = "printf env";
+const CACHE_TIMEOUT_COMMAND: &str = "printf timeout";
+const CACHE_PIPE_STDIN_COMMAND: &str = "printf pipe";
+const CACHE_OLD_OUTPUT: &str = "old cache";
+const CACHE_BASE_TIMEOUT_SECS: u64 = 10;
+const CACHE_CHANGED_TIMEOUT_SECS: u64 = 11;
+const CACHE_CWD_OLD: &str = "/tmp";
+const CACHE_ENV_KEY: &str = "CACHE_VALUE";
+const CACHE_ENV_OLD: &str = "old";
+const CACHE_ENV_NEW: &str = "new";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellConfigMutation {
+    Command,
+    Cwd,
+    Env,
+    Timeout,
+    PipeStdin,
+}
+
+const SHELL_CONFIG_MUTATIONS: &[ShellConfigMutation] = &[
+    ShellConfigMutation::Command,
+    ShellConfigMutation::Cwd,
+    ShellConfigMutation::Env,
+    ShellConfigMutation::Timeout,
+    ShellConfigMutation::PipeStdin,
+];
+
+struct CacheConfigCase {
+    mutation: ShellConfigMutation,
+    old_config: NodeConfig,
+    new_config: NodeConfig,
+    expected_stdout: &'static str,
+}
+
+fn shell_pipeline(source_command: &str, target_command: &str) -> (Workflow, NodeId, NodeId) {
+    let mut workflow = Workflow::new("test-pipeline");
+    let source = workflow.add_shell_node("source", source_command);
+    let target = workflow.add_shell_node("target", target_command);
+    let source_stdout = common::stdout_port_id(&workflow, source);
+    let target_stdin = workflow.graph.node(target).expect("target node exists").input_ports[SHELL_STDIN_INPUT_INDEX].id;
+    workflow.graph.add_edge(source_stdout, target_stdin).expect("pipeline edge is valid");
+    (workflow, source, target)
+}
+
+fn shell_config(
+    command: &str,
+    cwd: Option<&str>,
+    env: &[(&str, &str)],
+    timeout_secs: u64,
+    pipe_stdin: bool,
+) -> NodeConfig {
+    NodeConfig::Shell {
+        command: command.to_string(),
+        cwd: cwd.map(str::to_string),
+        env: env.iter().map(|(key, value)| ((*key).to_string(), (*value).to_string())).collect(),
+        timeout_secs,
+        pipe_stdin,
+    }
+}
+
+fn cache_config_case(mutation: ShellConfigMutation) -> CacheConfigCase {
+    match mutation {
+        ShellConfigMutation::Command => CacheConfigCase {
+            mutation,
+            old_config: shell_config(CACHE_BASE_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true),
+            new_config: shell_config(CACHE_CHANGED_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true),
+            expected_stdout: "command",
+        },
+        ShellConfigMutation::Cwd => CacheConfigCase {
+            mutation,
+            old_config: shell_config(CACHE_CWD_COMMAND, Some(CACHE_CWD_OLD), &[], CACHE_BASE_TIMEOUT_SECS, true),
+            new_config: shell_config(CACHE_CWD_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true),
+            expected_stdout: "cwd",
+        },
+        ShellConfigMutation::Env => CacheConfigCase {
+            mutation,
+            old_config: shell_config(
+                CACHE_ENV_COMMAND,
+                None,
+                &[(CACHE_ENV_KEY, CACHE_ENV_OLD)],
+                CACHE_BASE_TIMEOUT_SECS,
+                true,
+            ),
+            new_config: shell_config(
+                CACHE_ENV_COMMAND,
+                None,
+                &[(CACHE_ENV_KEY, CACHE_ENV_NEW)],
+                CACHE_BASE_TIMEOUT_SECS,
+                true,
+            ),
+            expected_stdout: "env",
+        },
+        ShellConfigMutation::Timeout => CacheConfigCase {
+            mutation,
+            old_config: shell_config(CACHE_TIMEOUT_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true),
+            new_config: shell_config(CACHE_TIMEOUT_COMMAND, None, &[], CACHE_CHANGED_TIMEOUT_SECS, true),
+            expected_stdout: "timeout",
+        },
+        ShellConfigMutation::PipeStdin => CacheConfigCase {
+            mutation,
+            old_config: shell_config(CACHE_PIPE_STDIN_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true),
+            new_config: shell_config(CACHE_PIPE_STDIN_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, false),
+            expected_stdout: "pipe",
+        },
+    }
+}
+
+fn workflow_with_config(config: NodeConfig) -> (Workflow, NodeId) {
+    let command = match &config {
+        NodeConfig::Shell { command, .. } => command.clone(),
+    };
+    let mut workflow = Workflow::new("cache-key");
+    let node_id = workflow.add_shell_node("cache", command);
+    workflow.set_node_config(node_id, config);
+    (workflow, node_id)
+}
 
 // ---------------------------------------------------------------------------
 // Single-node execution
@@ -194,6 +322,50 @@ async fn run_two_node_pipeline() {
 }
 
 #[tokio::test]
+async fn run_two_node_pipeline_without_match_has_empty_stdout_and_exit_one() {
+    let (workflow, _, grep_node) = shell_pipeline(NON_MATCHING_SOURCE_COMMAND, GREP_WORLD_COMMAND);
+    let mut executor = Executor::new();
+    let cache = HashMap::new();
+
+    let (_, results) = executor.run(&workflow, &cache).await;
+
+    assert_eq!(results.len(), 2, "source and grep nodes should both run");
+    match &results[1].status {
+        NodeStatus::Completed { outputs, .. } => {
+            let stdout_port = common::stdout_port_id(&workflow, grep_node);
+            let exit_port = common::exit_port_id(&workflow, grep_node);
+            let stdout = outputs.get(&stdout_port).expect("grep stdout missing");
+            let exit = outputs.get(&exit_port).expect("grep exit missing");
+            assert_eq!(stdout.as_display_string(), "");
+            assert_eq!(exit.as_display_string(), EXIT_CODE_FAILURE_DISPLAY);
+        }
+        other => panic!("grep node: expected Completed, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn run_two_node_pipeline_with_match_outputs_matching_line() {
+    let (workflow, _, grep_node) = shell_pipeline(MATCHING_SOURCE_COMMAND, GREP_WORLD_COMMAND);
+    let mut executor = Executor::new();
+    let cache = HashMap::new();
+
+    let (_, results) = executor.run(&workflow, &cache).await;
+
+    assert_eq!(results.len(), 2, "source and grep nodes should both run");
+    match &results[1].status {
+        NodeStatus::Completed { outputs, .. } => {
+            let stdout_port = common::stdout_port_id(&workflow, grep_node);
+            let exit_port = common::exit_port_id(&workflow, grep_node);
+            let stdout = outputs.get(&stdout_port).expect("grep stdout missing");
+            let exit = outputs.get(&exit_port).expect("grep exit missing");
+            assert_eq!(stdout.as_display_string().trim(), "hello world");
+            assert_eq!(exit.as_display_string(), EXIT_CODE_SUCCESS_DISPLAY);
+        }
+        other => panic!("grep node: expected Completed, got {:?}", other),
+    }
+}
+
+#[tokio::test]
 async fn regression_connected_stdout_reaches_downstream_stdin() {
     let (wf, echo_node, grep_node) = common::two_node_pipeline();
     let echo_stdout_port = common::stdout_port_id(&wf, echo_node);
@@ -262,6 +434,35 @@ async fn run_diamond_executes_all_nodes() {
 // ---------------------------------------------------------------------------
 // Cache hits
 // ---------------------------------------------------------------------------
+
+// r[verify n8nclone.workflow_execution.cache_key.shell_config.command_edit]
+#[tokio::test]
+async fn cache_key_includes_shell_executable_config() {
+    for mutation in SHELL_CONFIG_MUTATIONS {
+        let case = cache_config_case(*mutation);
+        let (old_workflow, old_node_id) = workflow_with_config(case.old_config);
+        let mut executor = Executor::new();
+        let (_, old_results) = executor.run(&old_workflow, &HashMap::new()).await;
+        let old_input_hash = old_results[0].input_hash;
+        let (_, old_cached_outputs) =
+            common::fake_cache_entry(&old_workflow, old_node_id, old_input_hash, CACHE_OLD_OUTPUT);
+        let mut cache = HashMap::new();
+        cache.insert(old_input_hash, old_cached_outputs);
+
+        let (new_workflow, new_node_id) = workflow_with_config(case.new_config);
+        let (_, new_results) = executor.run(&new_workflow, &cache).await;
+
+        match &new_results[0].status {
+            NodeStatus::Completed { outputs, cached } => {
+                assert!(!cached, "{mutation:?} config change must not reuse the old cache entry");
+                let stdout_port = common::stdout_port_id(&new_workflow, new_node_id);
+                let stdout = outputs.get(&stdout_port).expect("stdout missing");
+                assert_eq!(stdout.as_display_string().trim(), case.expected_stdout, "mutation: {:?}", case.mutation);
+            }
+            other => panic!("{mutation:?}: expected Completed, got {:?}", other),
+        }
+    }
+}
 
 #[tokio::test]
 async fn run_uses_cache_when_hash_matches() {

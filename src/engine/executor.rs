@@ -24,6 +24,22 @@ use crate::engine::workflow::Workflow;
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
+const HASH_TAG_NODE_EXECUTION: &[u8] = b"node-execution:v1";
+const HASH_TAG_NODE_ID: &[u8] = b"node-id";
+const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
+const HASH_TAG_COMMAND: &[u8] = b"command";
+const HASH_TAG_CWD: &[u8] = b"cwd";
+const HASH_TAG_ENV: &[u8] = b"env";
+const HASH_TAG_TIMEOUT: &[u8] = b"timeout-secs";
+const HASH_TAG_PIPE_STDIN: &[u8] = b"pipe-stdin";
+const HASH_TAG_INPUTS: &[u8] = b"inputs";
+const HASH_TAG_INPUT_PORT: &[u8] = b"input-port";
+const HASH_TAG_INPUT_TYPE: &[u8] = b"input-type";
+const HASH_TAG_INPUT_VALUE: &[u8] = b"input-value";
+const HASH_TAG_SOME: &[u8] = b"some";
+const HASH_TAG_NONE: &[u8] = b"none";
+const HASH_TAG_TRUE: &[u8] = b"true";
+const HASH_TAG_FALSE: &[u8] = b"false";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ShellOutputPortIds {
@@ -37,6 +53,98 @@ struct ShellOutputValues {
     stdout: String,
     stderr: String,
     exit_code: i32,
+}
+
+// r[impl n8nclone.workflow_execution.cache_key.shell_config]
+fn node_execution_hash(node_id: NodeId, config: &NodeConfig, inputs: &HashMap<PortId, Value>) -> ContentHash {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(HASH_TAG_NODE_EXECUTION);
+    update_u64(&mut hasher, HASH_TAG_NODE_ID, node_id.0);
+    update_node_config_hash(&mut hasher, config);
+    update_inputs_hash(&mut hasher, inputs);
+    ContentHash(*hasher.finalize().as_bytes())
+}
+
+fn input_values_hash(inputs: &HashMap<PortId, Value>) -> ContentHash {
+    let mut hasher = blake3::Hasher::new();
+    update_inputs_hash(&mut hasher, inputs);
+    ContentHash(*hasher.finalize().as_bytes())
+}
+
+fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
+    match config {
+        NodeConfig::Shell {
+            command,
+            cwd,
+            env,
+            timeout_secs,
+            pipe_stdin,
+        } => {
+            hasher.update(HASH_TAG_SHELL_CONFIG);
+            update_str(hasher, HASH_TAG_COMMAND, command);
+            update_optional_str(hasher, HASH_TAG_CWD, cwd.as_deref());
+            update_env(hasher, env);
+            update_u64(hasher, HASH_TAG_TIMEOUT, *timeout_secs);
+            update_bool(hasher, HASH_TAG_PIPE_STDIN, *pipe_stdin);
+        }
+    }
+}
+
+fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Value>) {
+    let mut input_pairs = inputs.iter().collect::<Vec<_>>();
+    input_pairs.sort_by_key(|(port_id, _)| port_id.0);
+
+    hasher.update(HASH_TAG_INPUTS);
+    update_len(hasher, input_pairs.len());
+    for (port_id, value) in input_pairs {
+        update_u64(hasher, HASH_TAG_INPUT_PORT, port_id.0);
+        update_str(hasher, HASH_TAG_INPUT_TYPE, value.type_tag().as_str());
+        hasher.update(HASH_TAG_INPUT_VALUE);
+        hasher.update(&value.hash.0);
+    }
+}
+
+fn update_env(hasher: &mut blake3::Hasher, env: &HashMap<String, String>) {
+    let mut env_pairs = env.iter().collect::<Vec<_>>();
+    env_pairs.sort_by_key(|(key, _)| *key);
+
+    hasher.update(HASH_TAG_ENV);
+    update_len(hasher, env_pairs.len());
+    for (key, value) in env_pairs {
+        update_str(hasher, HASH_TAG_ENV, key);
+        update_str(hasher, HASH_TAG_ENV, value);
+    }
+}
+
+fn update_optional_str(hasher: &mut blake3::Hasher, tag: &[u8], value: Option<&str>) {
+    hasher.update(tag);
+    match value {
+        Some(value) => update_str(hasher, HASH_TAG_SOME, value),
+        None => {
+            hasher.update(HASH_TAG_NONE);
+        }
+    }
+}
+
+fn update_str(hasher: &mut blake3::Hasher, tag: &[u8], value: &str) {
+    hasher.update(tag);
+    update_len(hasher, value.len());
+    hasher.update(value.as_bytes());
+}
+
+fn update_bool(hasher: &mut blake3::Hasher, tag: &[u8], value: bool) {
+    hasher.update(tag);
+    hasher.update(if value { HASH_TAG_TRUE } else { HASH_TAG_FALSE });
+}
+
+fn update_u64(hasher: &mut blake3::Hasher, tag: &[u8], value: u64) {
+    hasher.update(tag);
+    hasher.update(&value.to_le_bytes());
+}
+
+fn update_len(hasher: &mut blake3::Hasher, value: usize) {
+    let encoded_len = u64::try_from(value).expect("hash input length fits in u64");
+    hasher.update(&encoded_len.to_le_bytes());
 }
 
 fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
@@ -139,10 +247,7 @@ impl Executor {
             }
         };
 
-        // Compute input hash from all input values.
-        let mut input_hashes: Vec<ContentHash> = inputs.values().map(|v| v.hash).collect();
-        input_hashes.sort();
-        let input_hash = ContentHash::combine(&input_hashes);
+        let fallback_input_hash = input_values_hash(inputs);
 
         let config = match workflow.node_config(node_id) {
             Some(c) => c,
@@ -152,10 +257,11 @@ impl Executor {
                     status: NodeStatus::Failed {
                         error: format!("no config for node {:?} '{}'", node_id, node.label),
                     },
-                    input_hash,
+                    input_hash: fallback_input_hash,
                 };
             }
         };
+        let input_hash = node_execution_hash(node_id, config, inputs);
 
         info!(node = %node.label, "executing node");
 
@@ -225,9 +331,10 @@ impl Executor {
             let inputs = gather_inputs(workflow, node_id, &port_values);
 
             // Check cache.
-            let mut input_hashes: Vec<ContentHash> = inputs.values().map(|v| v.hash).collect();
-            input_hashes.sort();
-            let input_hash = ContentHash::combine(&input_hashes);
+            let input_hash = match workflow.node_config(node_id) {
+                Some(config) => node_execution_hash(node_id, config, &inputs),
+                None => input_values_hash(&inputs),
+            };
 
             if let Some(cached_outputs) = cache.get(&input_hash) {
                 debug!(node = ?node_id, "cache hit, skipping execution");
@@ -299,16 +406,15 @@ async fn execute_shell(
     let mut child = cmd.spawn()?;
 
     // Pipe stdin from first input value.
-    if pipe_stdin {
-        if let Some(stdin_val) = inputs.values().next() {
-            if let Some(ref mut stdin) = child.stdin {
-                use tokio::io::AsyncWriteExt;
-                let data = stdin_val.as_display_string();
-                let _ = stdin.write_all(data.as_bytes()).await;
-                // Drop stdin to close the pipe.
-                drop(child.stdin.take());
-            }
-        }
+    if pipe_stdin
+        && let Some(stdin_val) = inputs.values().next()
+        && let Some(ref mut stdin) = child.stdin
+    {
+        use tokio::io::AsyncWriteExt;
+        let data = stdin_val.as_display_string();
+        let _ = stdin.write_all(data.as_bytes()).await;
+        // Drop stdin to close the pipe.
+        drop(child.stdin.take());
     }
 
     let output = if timeout_secs > 0 {
@@ -342,10 +448,10 @@ fn gather_inputs(workflow: &Workflow, node_id: NodeId, port_values: &HashMap<Por
     for input_port in &node.input_ports {
         // Find the edge targeting this input port.
         for edge in workflow.graph.edges() {
-            if edge.target == input_port.id {
-                if let Some(value) = port_values.get(&edge.source) {
-                    inputs.insert(input_port.id, value.clone());
-                }
+            if edge.target == input_port.id
+                && let Some(value) = port_values.get(&edge.source)
+            {
+                inputs.insert(input_port.id, value.clone());
             }
         }
     }
