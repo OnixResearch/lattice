@@ -24,6 +24,7 @@ use crate::engine::workflow::Workflow;
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
+const SHELL_STDIN_INPUT_LABEL: &str = "stdin";
 const HASH_TAG_NODE_EXECUTION: &[u8] = b"node-execution:v1";
 const HASH_TAG_NODE_ID: &[u8] = b"node-id";
 const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
@@ -56,7 +57,7 @@ struct ShellOutputValues {
 }
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
-fn node_execution_hash(node_id: NodeId, config: &NodeConfig, inputs: &HashMap<PortId, Value>) -> ContentHash {
+pub fn node_execution_cache_key(node_id: NodeId, config: &NodeConfig, inputs: &HashMap<PortId, Value>) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     hasher.update(HASH_TAG_NODE_EXECUTION);
     update_u64(&mut hasher, HASH_TAG_NODE_ID, node_id.0);
@@ -145,6 +146,19 @@ fn update_u64(hasher: &mut blake3::Hasher, tag: &[u8], value: u64) {
 fn update_len(hasher: &mut blake3::Hasher, value: usize) {
     let encoded_len = u64::try_from(value).expect("hash input length fits in u64");
     hasher.update(&encoded_len.to_le_bytes());
+}
+
+fn shell_stdin_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+    let labeled_stdin = node
+        .input_ports
+        .iter()
+        .find(|port| port.label == SHELL_STDIN_INPUT_LABEL)
+        .and_then(|port| inputs.get(&port.id));
+    if labeled_stdin.is_some() {
+        return labeled_stdin;
+    }
+
+    node.input_ports.iter().find_map(|port| inputs.get(&port.id))
 }
 
 fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
@@ -261,7 +275,7 @@ impl Executor {
                 };
             }
         };
-        let input_hash = node_execution_hash(node_id, config, inputs);
+        let input_hash = node_execution_cache_key(node_id, config, inputs);
 
         info!(node = %node.label, "executing node");
 
@@ -283,7 +297,8 @@ impl Executor {
                         };
                     }
                 };
-                let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, inputs).await;
+                let stdin_value = shell_stdin_value(node, inputs);
+                let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, stdin_value).await;
 
                 match result {
                     Ok(shell_outputs) => StepResult {
@@ -332,7 +347,7 @@ impl Executor {
 
             // Check cache.
             let input_hash = match workflow.node_config(node_id) {
-                Some(config) => node_execution_hash(node_id, config, &inputs),
+                Some(config) => node_execution_cache_key(node_id, config, &inputs),
                 None => input_values_hash(&inputs),
             };
 
@@ -382,7 +397,7 @@ async fn execute_shell(
     env: &HashMap<String, String>,
     timeout_secs: u64,
     pipe_stdin: bool,
-    inputs: &HashMap<PortId, Value>,
+    stdin_value: Option<&Value>,
 ) -> Result<ShellOutputValues, Box<dyn std::error::Error + Send + Sync>> {
     let mut cmd = Command::new("sh");
     cmd.arg("-c").arg(command);
@@ -405,9 +420,9 @@ async fn execute_shell(
 
     let mut child = cmd.spawn()?;
 
-    // Pipe stdin from first input value.
+    // Pipe stdin from the node's selected stdin input value.
     if pipe_stdin
-        && let Some(stdin_val) = inputs.values().next()
+        && let Some(stdin_val) = stdin_value
         && let Some(ref mut stdin) = child.stdin
     {
         use tokio::io::AsyncWriteExt;

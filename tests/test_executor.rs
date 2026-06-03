@@ -6,12 +6,14 @@ use std::collections::HashMap;
 
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
+use n8nclone::engine::executor::node_execution_cache_key;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
+use rat_nodegraph::model::PortSpec;
 
 const EXIT_CODE_SUCCESS_DISPLAY: &str = "exit code: 0";
 const EXIT_CODE_FAILURE_DISPLAY: &str = "exit code: 1";
@@ -40,6 +42,26 @@ const CACHE_STABLE_COMMAND: &str = "printf stable";
 const CACHE_ENV_ORDER_COMMAND: &str = "printf env-order";
 const CACHE_HIT_OUTPUT: &str = "cache hit";
 const FIRST_RESULT_INDEX: usize = 0;
+const AUX_INPUT_INDEX: usize = 0;
+const LABELED_STDIN_INPUT_INDEX: usize = 1;
+const SINGLE_STDIN_INPUT_INDEX: usize = 0;
+const CUSTOM_AUX_INPUT_LABEL: &str = "aux";
+const CUSTOM_STDIN_INPUT_LABEL: &str = "stdin";
+const CUSTOM_STDOUT_OUTPUT_LABEL: &str = "stdout";
+const CUSTOM_STDERR_OUTPUT_LABEL: &str = "stderr";
+const CUSTOM_EXIT_OUTPUT_LABEL: &str = "exit";
+const TYPE_TAG_STRING: &str = "string";
+const TYPE_TAG_EXIT_CODE: &str = "exitcode";
+const AUX_SOURCE_COMMAND: &str = "printf aux";
+const SELECTED_STDIN_SOURCE_COMMAND: &str = "printf selected";
+const CAT_COMMAND: &str = "cat";
+const STDERR_SOURCE_COMMAND: &str = "printf stderr-value >&2";
+const PIPE_DISABLED_SOURCE_COMMAND: &str = "printf ignored";
+const CACHE_KEY_DIRECT_COMMAND: &str = "printf direct";
+const CACHE_KEY_DIRECT_INPUT: &str = "direct input";
+const CACHE_KEY_NODE_ID_VALUE: u64 = 4242;
+const CACHE_KEY_INPUT_PORT_VALUE: u64 = 9001;
+const CACHE_KEY_OTHER_INPUT_PORT_VALUE: u64 = 9002;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ShellConfigMutation {
@@ -146,6 +168,37 @@ fn workflow_with_config(config: NodeConfig) -> (Workflow, NodeId) {
     let node_id = workflow.add_shell_node("cache", command);
     workflow.set_node_config(node_id, config);
     (workflow, node_id)
+}
+
+fn add_custom_multi_input_shell_node(workflow: &mut Workflow, label: &str, command: &str) -> NodeId {
+    let node_id = workflow.graph.add_node(
+        label,
+        &[
+            PortSpec::new(CUSTOM_AUX_INPUT_LABEL, TYPE_TAG_STRING),
+            PortSpec::new(CUSTOM_STDIN_INPUT_LABEL, TYPE_TAG_STRING),
+        ],
+        &[
+            PortSpec::new(CUSTOM_STDOUT_OUTPUT_LABEL, TYPE_TAG_STRING),
+            PortSpec::new(CUSTOM_STDERR_OUTPUT_LABEL, TYPE_TAG_STRING),
+            PortSpec::new(CUSTOM_EXIT_OUTPUT_LABEL, TYPE_TAG_EXIT_CODE),
+        ],
+    );
+    workflow.set_node_config(node_id, NodeConfig::shell(command));
+    node_id
+}
+
+fn step_status(results: &[n8nclone::engine::executor::StepResult], node_id: NodeId) -> &NodeStatus {
+    &results.iter().find(|step| step.node_id == node_id).expect("step result missing").status
+}
+
+fn completed_stdout<'a>(workflow: &Workflow, node_id: NodeId, status: &'a NodeStatus) -> &'a Value {
+    match status {
+        NodeStatus::Completed { outputs, .. } => {
+            let stdout_port = common::stdout_port_id(workflow, node_id);
+            outputs.get(&stdout_port).expect("stdout missing")
+        }
+        other => panic!("expected Completed, got {:?}", other),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -374,6 +427,69 @@ async fn run_two_node_pipeline_with_match_outputs_matching_line() {
 }
 
 #[tokio::test]
+async fn run_multi_input_shell_uses_labeled_stdin_port() {
+    let mut workflow = Workflow::new("multi-input");
+    let aux_source = workflow.add_shell_node("aux", AUX_SOURCE_COMMAND);
+    let stdin_source = workflow.add_shell_node("stdin", SELECTED_STDIN_SOURCE_COMMAND);
+    let target = add_custom_multi_input_shell_node(&mut workflow, "target", CAT_COMMAND);
+    let aux_stdout = common::stdout_port_id(&workflow, aux_source);
+    let stdin_stdout = common::stdout_port_id(&workflow, stdin_source);
+    let target_node = workflow.graph.node(target).expect("target exists");
+    let target_aux = target_node.input_ports[AUX_INPUT_INDEX].id;
+    let target_stdin = target_node.input_ports[LABELED_STDIN_INPUT_INDEX].id;
+    workflow.graph.add_edge(aux_stdout, target_aux).expect("aux edge");
+    workflow.graph.add_edge(stdin_stdout, target_stdin).expect("stdin edge");
+    let mut executor = Executor::new();
+
+    let (_, results) = executor.run(&workflow, &HashMap::new()).await;
+
+    let stdout = completed_stdout(&workflow, target, step_status(&results, target));
+    assert_eq!(stdout.as_display_string(), "selected");
+}
+
+#[tokio::test]
+async fn run_stderr_output_can_feed_downstream_stdin() {
+    let mut workflow = Workflow::new("stderr-pipeline");
+    let source = workflow.add_shell_node("stderr-source", STDERR_SOURCE_COMMAND);
+    let target = workflow.add_shell_node("cat", CAT_COMMAND);
+    let source_stderr = common::stderr_port_id(&workflow, source);
+    let target_stdin = workflow.graph.node(target).expect("target exists").input_ports[SINGLE_STDIN_INPUT_INDEX].id;
+    workflow.graph.add_edge(source_stderr, target_stdin).expect("stderr edge");
+    let mut executor = Executor::new();
+
+    let (_, results) = executor.run(&workflow, &HashMap::new()).await;
+
+    let stdout = completed_stdout(&workflow, target, step_status(&results, target));
+    assert_eq!(stdout.as_display_string(), "stderr-value");
+}
+
+#[tokio::test]
+async fn run_pipe_stdin_false_ignores_connected_input() {
+    let mut workflow = Workflow::new("pipe-disabled");
+    let source = workflow.add_shell_node("source", PIPE_DISABLED_SOURCE_COMMAND);
+    let target = workflow.add_shell_node("cat", CAT_COMMAND);
+    workflow.set_node_config(target, shell_config(CAT_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, false));
+    let source_stdout = common::stdout_port_id(&workflow, source);
+    let target_stdin = workflow.graph.node(target).expect("target exists").input_ports[SINGLE_STDIN_INPUT_INDEX].id;
+    workflow.graph.add_edge(source_stdout, target_stdin).expect("stdout edge");
+    let mut executor = Executor::new();
+
+    let (_, results) = executor.run(&workflow, &HashMap::new()).await;
+
+    let stdout = completed_stdout(&workflow, target, step_status(&results, target));
+    assert_eq!(stdout.as_display_string(), "");
+}
+
+#[test]
+fn exit_code_output_cannot_wire_to_string_stdin() {
+    let (mut workflow, source, target) = shell_pipeline(MATCHING_SOURCE_COMMAND, GREP_WORLD_COMMAND);
+    let source_exit = common::exit_port_id(&workflow, source);
+    let target_stdin = workflow.graph.node(target).expect("target exists").input_ports[SINGLE_STDIN_INPUT_INDEX].id;
+
+    assert!(workflow.graph.add_edge(source_exit, target_stdin).is_err());
+}
+
+#[tokio::test]
 async fn regression_connected_stdout_reaches_downstream_stdin() {
     let (wf, echo_node, grep_node) = common::two_node_pipeline();
     let echo_stdout_port = common::stdout_port_id(&wf, echo_node);
@@ -442,6 +558,35 @@ async fn run_diamond_executes_all_nodes() {
 // ---------------------------------------------------------------------------
 // Cache hits
 // ---------------------------------------------------------------------------
+
+#[test]
+fn direct_cache_key_is_stable_for_identical_config_and_inputs() {
+    let config = shell_config(CACHE_KEY_DIRECT_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true);
+    let node_id = NodeId(CACHE_KEY_NODE_ID_VALUE);
+    let mut inputs = HashMap::new();
+    inputs.insert(PortId(CACHE_KEY_INPUT_PORT_VALUE), Value::from_string(CACHE_KEY_DIRECT_INPUT.to_string()));
+
+    let first = node_execution_cache_key(node_id, &config, &inputs);
+    let second = node_execution_cache_key(node_id, &config, &inputs);
+
+    assert_eq!(first, second);
+}
+
+#[test]
+fn direct_cache_key_changes_when_input_port_identity_changes() {
+    let config = shell_config(CACHE_KEY_DIRECT_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, true);
+    let node_id = NodeId(CACHE_KEY_NODE_ID_VALUE);
+    let input_value = Value::from_string(CACHE_KEY_DIRECT_INPUT.to_string());
+    let mut first_inputs = HashMap::new();
+    first_inputs.insert(PortId(CACHE_KEY_INPUT_PORT_VALUE), input_value.clone());
+    let mut second_inputs = HashMap::new();
+    second_inputs.insert(PortId(CACHE_KEY_OTHER_INPUT_PORT_VALUE), input_value);
+
+    let first = node_execution_cache_key(node_id, &config, &first_inputs);
+    let second = node_execution_cache_key(node_id, &config, &second_inputs);
+
+    assert_ne!(first, second);
+}
 
 #[tokio::test]
 async fn cache_key_is_stable_for_identical_shell_config() {
