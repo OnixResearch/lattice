@@ -6,6 +6,7 @@ use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::credentials;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 
@@ -27,6 +28,8 @@ pub enum WorkflowDiagnosticCode {
     EdgeWrongDirection,
     EdgeSelfLoop,
     EdgeIncompatibleType,
+    MalformedSecretRef,
+    CredentialRefWithoutNode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,6 +56,7 @@ pub fn validate_workflow(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     }
 
     validate_node_configs(workflow, &mut diagnostics);
+    validate_credentials(workflow, &mut diagnostics);
     validate_edges(workflow, &mut diagnostics);
 
     diagnostics
@@ -115,6 +119,40 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 None,
                 "node config references a missing graph node".to_string(),
             ));
+        }
+    }
+}
+
+fn validate_credentials(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    for (node_id, refs) in &workflow.credentials {
+        let node_id = NodeId(*node_id);
+        if workflow.graph.node(node_id).is_none() {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::CredentialRefWithoutNode,
+                Some(node_id),
+                None,
+                "credential reference belongs to a missing graph node".to_string(),
+            ));
+            continue;
+        }
+
+        for (env_name, secret_ref) in &refs.env {
+            if env_name.trim().is_empty() {
+                diagnostics.push(fatal(
+                    WorkflowDiagnosticCode::MalformedSecretRef,
+                    Some(node_id),
+                    None,
+                    "credential environment variable name is empty".to_string(),
+                ));
+            }
+            if let Err(error) = credentials::validate_secret_ref(secret_ref) {
+                diagnostics.push(fatal(
+                    WorkflowDiagnosticCode::MalformedSecretRef,
+                    Some(node_id),
+                    None,
+                    error.to_string(),
+                ));
+            }
         }
     }
 }

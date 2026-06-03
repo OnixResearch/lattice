@@ -11,6 +11,7 @@ use rat_nodegraph::model::PortSpec;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::TypeTag;
 
 /// Metadata about a workflow (stored alongside the graph).
@@ -74,6 +75,8 @@ pub struct Workflow {
     pub meta: WorkflowMeta,
     pub graph: Graph,
     pub configs: HashMap<u64, NodeConfig>,
+    #[serde(default)]
+    pub credentials: HashMap<u64, NodeCredentialRefs>,
 }
 
 impl Workflow {
@@ -87,6 +90,7 @@ impl Workflow {
             meta: WorkflowMeta::new(name),
             graph,
             configs: HashMap::new(),
+            credentials: HashMap::new(),
         }
     }
 
@@ -110,6 +114,20 @@ impl Workflow {
     /// Set or replace the config for a node.
     pub fn set_node_config(&mut self, id: NodeId, config: NodeConfig) {
         self.configs.insert(id.0, config);
+    }
+
+    /// Get credential references for a node.
+    pub fn node_credentials(&self, id: NodeId) -> Option<&NodeCredentialRefs> {
+        self.credentials.get(&id.0)
+    }
+
+    /// Set or replace credential references for a node.
+    pub fn set_node_credentials(&mut self, id: NodeId, refs: NodeCredentialRefs) {
+        if refs.is_empty() {
+            self.credentials.remove(&id.0);
+        } else {
+            self.credentials.insert(id.0, refs);
+        }
     }
 
     /// Touch the modified timestamp.

@@ -16,6 +16,10 @@ use tracing::debug;
 use tracing::error;
 use tracing::info;
 
+use crate::credentials;
+use crate::credentials::CredentialProvider;
+use crate::credentials::EmptyCredentialProvider;
+use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
@@ -31,6 +35,10 @@ const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
 const HASH_TAG_CWD: &[u8] = b"cwd";
 const HASH_TAG_ENV: &[u8] = b"env";
+const HASH_TAG_SECRET_ENV: &[u8] = b"secret-env";
+const HASH_TAG_SECRET_PROVIDER: &[u8] = b"secret-provider";
+const HASH_TAG_SECRET_KEY: &[u8] = b"secret-key";
+const HASH_TAG_SECRET_FIELD: &[u8] = b"secret-field";
 const HASH_TAG_TIMEOUT: &[u8] = b"timeout-secs";
 const HASH_TAG_PIPE_STDIN: &[u8] = b"pipe-stdin";
 const HASH_TAG_INPUTS: &[u8] = b"inputs";
@@ -58,10 +66,21 @@ struct ShellOutputValues {
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
 pub fn node_execution_cache_key(node_id: NodeId, config: &NodeConfig, inputs: &HashMap<PortId, Value>) -> ContentHash {
+    node_execution_cache_key_with_credentials(node_id, config, None, inputs)
+}
+
+// r[impl n8nclone.credentials.cache_identity]
+pub fn node_execution_cache_key_with_credentials(
+    node_id: NodeId,
+    config: &NodeConfig,
+    credentials: Option<&NodeCredentialRefs>,
+    inputs: &HashMap<PortId, Value>,
+) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     hasher.update(HASH_TAG_NODE_EXECUTION);
     update_u64(&mut hasher, HASH_TAG_NODE_ID, node_id.0);
     update_node_config_hash(&mut hasher, config);
+    update_secret_refs_hash(&mut hasher, credentials);
     update_inputs_hash(&mut hasher, inputs);
     ContentHash(*hasher.finalize().as_bytes())
 }
@@ -114,6 +133,21 @@ fn update_env(hasher: &mut blake3::Hasher, env: &HashMap<String, String>) {
     for (key, value) in env_pairs {
         update_str(hasher, HASH_TAG_ENV, key);
         update_str(hasher, HASH_TAG_ENV, value);
+    }
+}
+
+fn update_secret_refs_hash(hasher: &mut blake3::Hasher, credentials: Option<&NodeCredentialRefs>) {
+    let mut secret_pairs =
+        credentials.map(|credentials| credentials.env.iter().collect::<Vec<_>>()).unwrap_or_default();
+    secret_pairs.sort_by_key(|(env_name, _)| *env_name);
+
+    hasher.update(HASH_TAG_SECRET_ENV);
+    update_len(hasher, secret_pairs.len());
+    for (env_name, secret_ref) in secret_pairs {
+        update_str(hasher, HASH_TAG_SECRET_ENV, env_name);
+        update_str(hasher, HASH_TAG_SECRET_PROVIDER, &secret_ref.provider);
+        update_str(hasher, HASH_TAG_SECRET_KEY, &secret_ref.key);
+        update_optional_str(hasher, HASH_TAG_SECRET_FIELD, secret_ref.field.as_deref());
     }
 }
 
@@ -234,11 +268,22 @@ pub struct StepResult {
 /// The executor.
 pub struct Executor {
     next_run_id: u64,
+    credential_provider: Box<dyn CredentialProvider>,
 }
 
 impl Executor {
     pub fn new() -> Self {
-        Self { next_run_id: 0 }
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+        }
+    }
+
+    pub fn new_with_credential_provider(credential_provider: Box<dyn CredentialProvider>) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider,
+        }
     }
 
     /// Execute a single node given its input values.
@@ -275,7 +320,8 @@ impl Executor {
                 };
             }
         };
-        let input_hash = node_execution_cache_key(node_id, config, inputs);
+        let node_credentials = workflow.node_credentials(node_id);
+        let input_hash = node_execution_cache_key_with_credentials(node_id, config, node_credentials, inputs);
 
         info!(node = %node.label, "executing node");
 
@@ -297,14 +343,33 @@ impl Executor {
                         };
                     }
                 };
+                let secret_env = match credentials::resolve_secret_env(
+                    node_credentials.unwrap_or(&NodeCredentialRefs::default()),
+                    self.credential_provider.as_ref(),
+                ) {
+                    Ok(secret_env) => secret_env,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        };
+                    }
+                };
+                let merged_env = merged_shell_env(env, &secret_env.env);
                 let stdin_value = shell_stdin_value(node, inputs);
-                let result = execute_shell(command, cwd, env, *timeout_secs, *pipe_stdin, stdin_value).await;
+                let result = execute_shell(command, cwd, &merged_env, *timeout_secs, *pipe_stdin, stdin_value).await;
 
                 match result {
                     Ok(shell_outputs) => StepResult {
                         node_id,
                         status: NodeStatus::Completed {
-                            outputs: shell_outputs_by_real_port(output_ports, shell_outputs),
+                            outputs: shell_outputs_by_real_port(
+                                output_ports,
+                                redact_shell_outputs(shell_outputs, &secret_env.secret_values),
+                            ),
                             cached: false,
                         },
                         input_hash,
@@ -347,7 +412,12 @@ impl Executor {
 
             // Check cache.
             let input_hash = match workflow.node_config(node_id) {
-                Some(config) => node_execution_cache_key(node_id, config, &inputs),
+                Some(config) => node_execution_cache_key_with_credentials(
+                    node_id,
+                    config,
+                    workflow.node_credentials(node_id),
+                    &inputs,
+                ),
                 None => input_values_hash(&inputs),
             };
 
@@ -387,6 +457,22 @@ impl Executor {
 impl Default for Executor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn merged_shell_env(base: &HashMap<String, String>, secret_env: &HashMap<String, String>) -> HashMap<String, String> {
+    let mut merged = base.clone();
+    for (key, value) in secret_env {
+        merged.insert(key.clone(), value.clone());
+    }
+    merged
+}
+
+fn redact_shell_outputs(outputs: ShellOutputValues, secret_values: &[String]) -> ShellOutputValues {
+    ShellOutputValues {
+        stdout: credentials::redact_text(&outputs.stdout, secret_values),
+        stderr: credentials::redact_text(&outputs.stderr, secret_values),
+        exit_code: outputs.exit_code,
     }
 }
 
