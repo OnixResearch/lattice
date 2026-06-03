@@ -13,6 +13,7 @@ use serde::Serialize;
 
 use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::TypeTag;
+use crate::file_node::FileOperationKind;
 
 /// Metadata about a workflow (stored alongside the graph).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +57,13 @@ pub enum NodeConfig {
         body: Option<String>,
         timeout_secs: u64,
     },
+    File {
+        operation: FileOperationKind,
+        path: String,
+        content: Option<String>,
+        overwrite: bool,
+        allowed_roots: Vec<String>,
+    },
 }
 
 impl NodeConfig {
@@ -79,10 +87,21 @@ impl NodeConfig {
         }
     }
 
+    pub fn file(operation: FileOperationKind, path: impl Into<String>) -> Self {
+        Self::File {
+            operation,
+            path: path.into(),
+            content: None,
+            overwrite: false,
+            allowed_roots: Vec::new(),
+        }
+    }
+
     pub fn kind_label(&self) -> &'static str {
         match self {
             Self::Shell { .. } => "Shell",
             Self::Http { .. } => "HTTP",
+            Self::File { .. } => "File",
         }
     }
 }
@@ -138,6 +157,23 @@ impl Workflow {
             PortSpec::new("body", TypeTag::String.as_str()),
         ]);
         self.configs.insert(id.0, NodeConfig::http(method, url));
+        id
+    }
+
+    /// Add a file operation node with content, metadata, and bytes-written outputs.
+    /// Returns the NodeId.
+    pub fn add_file_node(
+        &mut self,
+        label: impl Into<String>,
+        operation: FileOperationKind,
+        path: impl Into<String>,
+    ) -> NodeId {
+        let id = self.graph.add_node(label, &[PortSpec::new("content", TypeTag::String.as_str())], &[
+            PortSpec::new("content", TypeTag::String.as_str()),
+            PortSpec::new("metadata", TypeTag::Json.as_str()),
+            PortSpec::new("bytes_written", TypeTag::String.as_str()),
+        ]);
+        self.configs.insert(id.0, NodeConfig::file(operation, path));
         id
     }
 

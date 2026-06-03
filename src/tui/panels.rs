@@ -301,6 +301,20 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
                     Span::styled(format!("{timeout_secs}s"), Style::default().fg(Color::Gray)),
                 ]));
             }
+            NodeConfig::File { operation, path, .. } => {
+                lines.push(Line::from(vec![
+                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("File", Style::default().fg(Color::Green)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Op: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!("{operation:?}"), Style::default().fg(Color::Cyan)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(path.clone(), Style::default().fg(Color::Cyan)),
+                ]));
+            }
         }
     }
 

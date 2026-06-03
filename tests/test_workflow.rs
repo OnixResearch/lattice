@@ -48,7 +48,7 @@ fn shell_config_defaults() {
             assert_eq!(*timeout_secs, 60);
             assert!(*pipe_stdin);
         }
-        NodeConfig::Http { .. } => panic!("expected shell config"),
+        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
     }
 }
 
@@ -83,7 +83,7 @@ fn node_config_serde_round_trip() {
             assert_eq!(timeout_secs, 30);
             assert!(!pipe_stdin);
         }
-        NodeConfig::Http { .. } => panic!("expected shell config"),
+        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
     }
 }
 
@@ -104,7 +104,28 @@ fn http_config_defaults() {
             assert!(body.is_none());
             assert_eq!(timeout_secs, 60);
         }
-        NodeConfig::Shell { .. } => panic!("expected HTTP config"),
+        NodeConfig::Shell { .. } | NodeConfig::File { .. } => panic!("expected HTTP config"),
+    }
+}
+
+#[test]
+fn file_config_defaults() {
+    let cfg = NodeConfig::file(n8nclone::file_node::FileOperationKind::Read, "/tmp/example");
+    match cfg {
+        NodeConfig::File {
+            operation,
+            path,
+            content,
+            overwrite,
+            allowed_roots,
+        } => {
+            assert_eq!(operation, n8nclone::file_node::FileOperationKind::Read);
+            assert_eq!(path, "/tmp/example");
+            assert!(content.is_none());
+            assert!(!overwrite);
+            assert!(allowed_roots.is_empty());
+        }
+        NodeConfig::Shell { .. } | NodeConfig::Http { .. } => panic!("expected file config"),
     }
 }
 
@@ -195,7 +216,7 @@ fn set_node_config_replaces_existing() {
     wf.set_node_config(id, NodeConfig::shell("new-command"));
     match wf.node_config(id).unwrap() {
         NodeConfig::Shell { command, .. } => assert_eq!(command, "new-command"),
-        NodeConfig::Http { .. } => panic!("expected shell config"),
+        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
     }
 }
 

@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::credentials;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::file_node;
 use crate::http;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ pub enum WorkflowDiagnosticCode {
     CredentialRefWithoutNode,
     InvalidHttpMethod,
     InvalidHttpUrl,
+    UnsafeFilePath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,6 +121,18 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                         Some(node.id),
                         None,
                         format!("HTTP node '{}' has an invalid URL", node.label),
+                    ));
+                }
+            }
+            Some(NodeConfig::File {
+                path, allowed_roots, ..
+            }) => {
+                if let Err(error) = file_node::validate_path_allowed(path, allowed_roots) {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::UnsafeFilePath,
+                        Some(node.id),
+                        None,
+                        error.to_string(),
                     ));
                 }
             }

@@ -16,6 +16,7 @@ use crate::credentials::NodeCredentialRefs;
 use crate::credentials::SecretRef;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::file_node::FileOperationKind;
 
 const MAX_OPTIONAL_CWD_VALUES: usize = 1;
 const MAX_OPTIONAL_BODY_VALUES: usize = 1;
@@ -83,6 +84,16 @@ pub struct PortableNodeConfig {
     pub headers: Vec<PortableEnvVar>,
     #[serde(default)]
     pub body: Vec<String>,
+    #[serde(default)]
+    pub file_operation: String,
+    #[serde(default)]
+    pub file_path: String,
+    #[serde(default)]
+    pub file_content: Vec<String>,
+    #[serde(default)]
+    pub overwrite: bool,
+    #[serde(default)]
+    pub allowed_roots: Vec<String>,
     pub timeout_secs: u64,
     pub pipe_stdin: bool,
 }
@@ -121,6 +132,8 @@ pub enum WorkflowFormatError {
     DuplicateSecretEnvName { node_id: u64, name: String },
     InvalidSecretField { node_id: u64, count: usize },
     InvalidHttpBody { node_id: u64, count: usize },
+    InvalidFileContent { node_id: u64, count: usize },
+    InvalidFileOperation { node_id: u64, operation: String },
     InvalidGraph(String),
 }
 
@@ -149,6 +162,12 @@ impl std::fmt::Display for WorkflowFormatError {
             }
             Self::InvalidHttpBody { node_id, count } => {
                 write!(f, "node {node_id} has {count} HTTP body values; expected zero or one")
+            }
+            Self::InvalidFileContent { node_id, count } => {
+                write!(f, "node {node_id} has {count} file content values; expected zero or one")
+            }
+            Self::InvalidFileOperation { node_id, operation } => {
+                write!(f, "node {node_id} has invalid file operation: {operation}")
             }
             Self::InvalidGraph(message) => write!(f, "invalid graph: {message}"),
         }
@@ -261,6 +280,11 @@ fn node_config_to_portable(
                 url: String::new(),
                 headers: Vec::new(),
                 body: Vec::new(),
+                file_operation: String::new(),
+                file_path: String::new(),
+                file_content: Vec::new(),
+                overwrite: false,
+                allowed_roots: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: *pipe_stdin,
             }
@@ -292,10 +316,40 @@ fn node_config_to_portable(
                 url: url.clone(),
                 headers,
                 body: body.iter().cloned().collect(),
+                file_operation: String::new(),
+                file_path: String::new(),
+                file_content: Vec::new(),
+                overwrite: false,
+                allowed_roots: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: false,
             }
         }
+        NodeConfig::File {
+            operation,
+            path,
+            content,
+            overwrite,
+            allowed_roots,
+        } => PortableNodeConfig {
+            node_id,
+            kind: "file".to_string(),
+            command: String::new(),
+            cwd: Vec::new(),
+            env: Vec::new(),
+            secret_env: Vec::new(),
+            http_method: String::new(),
+            url: String::new(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            file_operation: file_operation_label(*operation).to_string(),
+            file_path: path.clone(),
+            file_content: content.iter().cloned().collect(),
+            overwrite: *overwrite,
+            allowed_roots: allowed_roots.clone(),
+            timeout_secs: 0,
+            pipe_stdin: false,
+        },
     }
 }
 
@@ -392,6 +446,7 @@ fn portable_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeCon
     match config.kind.as_str() {
         "shell" => portable_shell_config_to_node_config(config),
         "http" => portable_http_config_to_node_config(config),
+        "file" => portable_file_config_to_node_config(config),
         _ => Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone())),
     }
 }
@@ -450,6 +505,42 @@ fn portable_http_config_to_node_config(config: &PortableNodeConfig) -> Result<No
     })
 }
 
+fn portable_file_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    if config.file_content.len() > MAX_OPTIONAL_BODY_VALUES {
+        return Err(WorkflowFormatError::InvalidFileContent {
+            node_id: config.node_id,
+            count: config.file_content.len(),
+        });
+    }
+    Ok(NodeConfig::File {
+        operation: parse_file_operation(config.node_id, &config.file_operation)?,
+        path: config.file_path.clone(),
+        content: config.file_content.first().cloned(),
+        overwrite: config.overwrite,
+        allowed_roots: config.allowed_roots.clone(),
+    })
+}
+
+fn parse_file_operation(node_id: u64, operation: &str) -> Result<FileOperationKind, WorkflowFormatError> {
+    match operation {
+        "read" => Ok(FileOperationKind::Read),
+        "write" => Ok(FileOperationKind::Write),
+        "append" => Ok(FileOperationKind::Append),
+        _ => Err(WorkflowFormatError::InvalidFileOperation {
+            node_id,
+            operation: operation.to_string(),
+        }),
+    }
+}
+
+fn file_operation_label(operation: FileOperationKind) -> &'static str {
+    match operation {
+        FileOperationKind::Read => "read",
+        FileOperationKind::Write => "write",
+        FileOperationKind::Append => "append",
+    }
+}
+
 fn portable_config_to_node_credentials(config: &PortableNodeConfig) -> Result<NodeCredentialRefs, WorkflowFormatError> {
     let mut env = HashMap::new();
     for secret_env in &config.secret_env {
@@ -498,7 +589,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
@@ -594,6 +685,19 @@ fn render_config(output: &mut String, config: &PortableNodeConfig) {
     output.push_str("      body = [");
     for body in &config.body {
         output.push_str(&format!("{}, ", quoted(body)));
+    }
+    output.push_str("],\n");
+    output.push_str(&format!("      file_operation = {},\n", quoted(&config.file_operation)));
+    output.push_str(&format!("      file_path = {},\n", quoted(&config.file_path)));
+    output.push_str("      file_content = [");
+    for content in &config.file_content {
+        output.push_str(&format!("{}, ", quoted(content)));
+    }
+    output.push_str("],\n");
+    output.push_str(&format!("      overwrite = {},\n", config.overwrite));
+    output.push_str("      allowed_roots = [");
+    for root in &config.allowed_roots {
+        output.push_str(&format!("{}, ", quoted(root)));
     }
     output.push_str("],\n");
     output.push_str(&format!("      timeout_secs = {},\n", config.timeout_secs));

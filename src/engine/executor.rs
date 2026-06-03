@@ -24,6 +24,11 @@ use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::file_node::FileOperationKind;
+use crate::file_node::FileOperationPlan;
+use crate::file_node::FileOperationResult;
+use crate::file_node::FileSystem;
+use crate::file_node::NoopFileSystem;
 use crate::http;
 use crate::http::HttpClient;
 use crate::http::HttpRequestPlan;
@@ -34,6 +39,10 @@ const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 const SHELL_STDIN_INPUT_LABEL: &str = "stdin";
 const HTTP_BODY_INPUT_LABEL: &str = "body";
+const FILE_CONTENT_INPUT_LABEL: &str = "content";
+const FILE_CONTENT_OUTPUT_INDEX: usize = 0;
+const FILE_METADATA_OUTPUT_INDEX: usize = 1;
+const FILE_BYTES_OUTPUT_INDEX: usize = 2;
 const HTTP_STATUS_OUTPUT_INDEX: usize = 0;
 const HTTP_HEADERS_OUTPUT_INDEX: usize = 1;
 const HTTP_BODY_OUTPUT_INDEX: usize = 2;
@@ -41,11 +50,17 @@ const HASH_TAG_NODE_EXECUTION: &[u8] = b"node-execution:v1";
 const HASH_TAG_NODE_ID: &[u8] = b"node-id";
 const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
 const HASH_TAG_HTTP_CONFIG: &[u8] = b"http-config";
+const HASH_TAG_FILE_CONFIG: &[u8] = b"file-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
 const HASH_TAG_HTTP_METHOD: &[u8] = b"http-method";
 const HASH_TAG_HTTP_URL: &[u8] = b"http-url";
 const HASH_TAG_HTTP_HEADERS: &[u8] = b"http-headers";
 const HASH_TAG_HTTP_BODY: &[u8] = b"http-body";
+const HASH_TAG_FILE_OPERATION: &[u8] = b"file-operation";
+const HASH_TAG_FILE_PATH: &[u8] = b"file-path";
+const HASH_TAG_FILE_CONTENT: &[u8] = b"file-content";
+const HASH_TAG_FILE_OVERWRITE: &[u8] = b"file-overwrite";
+const HASH_TAG_FILE_ROOTS: &[u8] = b"file-roots";
 const HASH_TAG_CWD: &[u8] = b"cwd";
 const HASH_TAG_ENV: &[u8] = b"env";
 const HASH_TAG_SECRET_ENV: &[u8] = b"secret-env";
@@ -82,6 +97,13 @@ struct HttpOutputPortIds {
     status: PortId,
     headers: PortId,
     body: PortId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileOutputPortIds {
+    content: PortId,
+    metadata: PortId,
+    bytes_written: PortId,
 }
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
@@ -141,6 +163,20 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
             update_optional_str(hasher, HASH_TAG_HTTP_BODY, body.as_deref());
             update_u64(hasher, HASH_TAG_TIMEOUT, *timeout_secs);
         }
+        NodeConfig::File {
+            operation,
+            path,
+            content,
+            overwrite,
+            allowed_roots,
+        } => {
+            hasher.update(HASH_TAG_FILE_CONFIG);
+            update_str(hasher, HASH_TAG_FILE_OPERATION, file_operation_label(*operation));
+            update_str(hasher, HASH_TAG_FILE_PATH, path);
+            update_optional_str(hasher, HASH_TAG_FILE_CONTENT, content.as_deref());
+            update_bool(hasher, HASH_TAG_FILE_OVERWRITE, *overwrite);
+            update_string_list_hash(hasher, HASH_TAG_FILE_ROOTS, allowed_roots);
+        }
     }
 }
 
@@ -171,6 +207,24 @@ fn update_env_with_tag(hasher: &mut blake3::Hasher, tag: &[u8], env: &HashMap<St
     for (key, value) in env_pairs {
         update_str(hasher, tag, key);
         update_str(hasher, tag, value);
+    }
+}
+
+fn update_string_list_hash(hasher: &mut blake3::Hasher, tag: &[u8], values: &[String]) {
+    let mut sorted_values = values.iter().collect::<Vec<_>>();
+    sorted_values.sort();
+    hasher.update(tag);
+    update_len(hasher, sorted_values.len());
+    for value in sorted_values {
+        update_str(hasher, tag, value);
+    }
+}
+
+fn file_operation_label(operation: FileOperationKind) -> &'static str {
+    match operation {
+        FileOperationKind::Read => "read",
+        FileOperationKind::Write => "write",
+        FileOperationKind::Append => "append",
     }
 }
 
@@ -265,6 +319,38 @@ fn http_request_plan(
     }
 }
 
+fn file_content_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+    let labeled_content = node
+        .input_ports
+        .iter()
+        .find(|port| port.label == FILE_CONTENT_INPUT_LABEL)
+        .and_then(|port| inputs.get(&port.id));
+    if labeled_content.is_some() {
+        return labeled_content;
+    }
+
+    node.input_ports.iter().find_map(|port| inputs.get(&port.id))
+}
+
+fn file_operation_plan(
+    node: &Node,
+    operation: FileOperationKind,
+    path: &str,
+    content: &Option<String>,
+    overwrite: bool,
+    allowed_roots: &[String],
+    inputs: &HashMap<PortId, Value>,
+) -> FileOperationPlan {
+    let resolved_content = content.clone().or_else(|| file_content_value(node, inputs).map(Value::as_display_string));
+    FileOperationPlan {
+        kind: operation,
+        path: path.to_string(),
+        content: resolved_content,
+        overwrite,
+        allowed_roots: allowed_roots.to_vec(),
+    }
+}
+
 fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
     let stdout = node
         .output_ports
@@ -320,6 +406,50 @@ fn http_outputs_by_real_port(ports: HttpOutputPortIds, response: http::HttpRespo
     mapped
 }
 
+fn file_output_port_ids(node: &Node) -> Result<FileOutputPortIds, String> {
+    let content = node
+        .output_ports
+        .get(FILE_CONTENT_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing file content output port", node.label))?;
+    let metadata = node
+        .output_ports
+        .get(FILE_METADATA_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing file metadata output port", node.label))?;
+    let bytes_written = node
+        .output_ports
+        .get(FILE_BYTES_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing file bytes output port", node.label))?;
+    Ok(FileOutputPortIds {
+        content,
+        metadata,
+        bytes_written,
+    })
+}
+
+fn file_outputs_by_real_port(
+    ports: FileOutputPortIds,
+    path: &str,
+    result: FileOperationResult,
+) -> HashMap<PortId, Value> {
+    let mut mapped = HashMap::new();
+    match result {
+        FileOperationResult::Read { content, bytes } => {
+            mapped.insert(ports.content, Value::from_string(content));
+            mapped.insert(ports.metadata, Value::from_json(serde_json::json!({ "path": path, "bytes": bytes })));
+            mapped.insert(ports.bytes_written, Value::from_string(String::new()));
+        }
+        FileOperationResult::Written { bytes } => {
+            mapped.insert(ports.content, Value::from_string(String::new()));
+            mapped.insert(ports.metadata, Value::from_json(serde_json::json!({ "path": path, "bytes": bytes })));
+            mapped.insert(ports.bytes_written, Value::from_string(bytes.to_string()));
+        }
+    }
+    mapped
+}
+
 /// Unique identifier for an execution run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RunId(pub u64);
@@ -367,6 +497,7 @@ pub struct Executor {
     next_run_id: u64,
     credential_provider: Box<dyn CredentialProvider>,
     http_client: Box<dyn HttpClient>,
+    file_system: Box<dyn FileSystem>,
 }
 
 impl Executor {
@@ -375,6 +506,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
+            file_system: Box::<NoopFileSystem>::default(),
         }
     }
 
@@ -383,6 +515,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider,
             http_client: Box::<NoopHttpClient>::default(),
+            file_system: Box::<NoopFileSystem>::default(),
         }
     }
 
@@ -391,17 +524,29 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client,
+            file_system: Box::<NoopFileSystem>::default(),
+        }
+    }
+
+    pub fn new_with_file_system(file_system: Box<dyn FileSystem>) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client: Box::<NoopHttpClient>::default(),
+            file_system,
         }
     }
 
     pub fn new_with_clients(
         credential_provider: Box<dyn CredentialProvider>,
         http_client: Box<dyn HttpClient>,
+        file_system: Box<dyn FileSystem>,
     ) -> Self {
         Self {
             next_run_id: 0,
             credential_provider,
             http_client,
+            file_system,
         }
     }
 
@@ -523,6 +668,42 @@ impl Executor {
                         node_id,
                         status: NodeStatus::Completed {
                             outputs: http_outputs_by_real_port(output_ports, response),
+                            cached: false,
+                        },
+                        input_hash,
+                    },
+                    Err(error) => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
+                        input_hash,
+                    },
+                }
+            }
+            NodeConfig::File {
+                operation,
+                path,
+                content,
+                overwrite,
+                allowed_roots,
+            } => {
+                let output_ports = match file_output_port_ids(node) {
+                    Ok(ports) => ports,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let plan = file_operation_plan(node, *operation, path, content, *overwrite, allowed_roots, inputs);
+                match self.file_system.execute(&plan) {
+                    Ok(result) => StepResult {
+                        node_id,
+                        status: NodeStatus::Completed {
+                            outputs: file_outputs_by_real_port(output_ports, path, result),
                             cached: false,
                         },
                         input_hash,

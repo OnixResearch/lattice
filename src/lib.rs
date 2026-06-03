@@ -2,6 +2,7 @@ pub mod config;
 pub mod credentials;
 pub mod engine;
 pub mod error;
+pub mod file_node;
 pub mod headless;
 pub mod http;
 pub mod store;
