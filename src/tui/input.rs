@@ -121,6 +121,9 @@ fn handle_run_history_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         RunHistoryKeyAction::SelectNext => app.select_next_run_history(),
         RunHistoryKeyAction::SelectPrevious => app.select_previous_run_history(),
         RunHistoryKeyAction::Inspect => app.inspect_selected_run_history(),
+        RunHistoryKeyAction::Rerun => {
+            app.rerun_selected_run_history();
+        }
         RunHistoryKeyAction::Ignore => {}
     }
     None
@@ -139,6 +142,7 @@ enum RunHistoryKeyAction {
     SelectNext,
     SelectPrevious,
     Inspect,
+    Rerun,
     Ignore,
 }
 
@@ -148,6 +152,7 @@ fn run_history_key_action(key: &KeyEvent) -> RunHistoryKeyAction {
         KeyCode::Down => RunHistoryKeyAction::SelectNext,
         KeyCode::Up => RunHistoryKeyAction::SelectPrevious,
         KeyCode::Enter => RunHistoryKeyAction::Inspect,
+        KeyCode::Char('r') | KeyCode::Char('R') if accepts_palette_text(key.modifiers) => RunHistoryKeyAction::Rerun,
         _ => RunHistoryKeyAction::Ignore,
     }
 }

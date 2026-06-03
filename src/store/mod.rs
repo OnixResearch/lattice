@@ -4,11 +4,13 @@
 //!  - workflows: name → serialized Workflow
 //!  - values: ContentHash → serialized Value (dedup blob store)
 //!  - runs: RunId → execution log
+//!  - run_details: RunId → per-node execution detail log
 //!  - cache: input_hash → output values (skip re-execution)
 
 use std::collections::HashMap;
 use std::path::Path;
 
+use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use redb::Database;
 use redb::ReadableDatabase;
@@ -26,6 +28,7 @@ const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows"
 const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
 const CACHE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cache");
 const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
+const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_details");
 const INITIAL_RUN_ID_VALUE: u64 = 0;
 const NEXT_RUN_ID_INCREMENT: u64 = 1;
 
@@ -39,6 +42,38 @@ pub struct RunRecord {
     pub node_count: usize,
     pub cache_hits: usize,
     pub failures: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RunNodeDetailStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunOutputDetail {
+    pub port_id: PortId,
+    pub port_label: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunNodeDetail {
+    pub node_id: NodeId,
+    pub node_label: String,
+    pub status: RunNodeDetailStatus,
+    pub cached: bool,
+    pub outputs: Vec<RunOutputDetail>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunDetailRecord {
+    pub run_id: RunId,
+    pub nodes: Vec<RunNodeDetail>,
 }
 
 /// Persistent store backed by redb.
@@ -58,6 +93,7 @@ impl Store {
             let _ = txn.open_table(VALUES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(CACHE).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -195,6 +231,33 @@ impl Store {
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
+    }
+
+    /// Store detailed per-node records for a run.
+    pub fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.insert(record.run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Load detailed per-node records for a run.
+    pub fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
+        match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
+            Some(data) => {
+                let bytes: &[u8] = data.value();
+                let record: RunDetailRecord =
+                    serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                Ok(Some(record))
+            }
+            None => Ok(None),
+        }
     }
 
     /// List recent runs (newest first).

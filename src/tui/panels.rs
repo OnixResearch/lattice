@@ -25,6 +25,9 @@ use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 
 use crate::engine::workflow::NodeConfig;
+use crate::store::RunDetailRecord;
+use crate::store::RunNodeDetail;
+use crate::store::RunNodeDetailStatus;
 use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
@@ -459,7 +462,7 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     if context.run_history_open {
-        return " ↑/↓: choose run │ Enter: inspect │ Esc: close ";
+        return " ↑/↓: choose │ Enter: inspect │ r: rerun │ Esc: close ";
     }
 
     if context.diagnostics_open {
@@ -565,6 +568,11 @@ fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
     let inner = block.inner(history_area);
     block.render(history_area, buf);
 
+    if let Some(detail_record) = &app.run_history.detail_record {
+        render_run_detail_record(detail_record, app.run_history.selected_detail_node, inner, buf);
+        return;
+    }
+
     if let Some(detail) = &app.run_history.detail {
         Paragraph::new(detail.as_str())
             .alignment(Alignment::Center)
@@ -602,6 +610,81 @@ fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
         .collect::<Vec<_>>();
 
     Paragraph::new(lines).render(inner, buf);
+}
+
+// r[impl n8nclone.tui_ux.run_history.timeline]
+// r[impl n8nclone.tui_ux.run_history.node_outputs]
+fn render_run_detail_record(record: &RunDetailRecord, selected_node: usize, area: Rect, buf: &mut Buffer) {
+    if record.nodes.is_empty() {
+        Paragraph::new("No node details available")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::DarkGray))
+            .render(area, buf);
+        return;
+    }
+
+    let selected_node = selected_node.min(record.nodes.len().saturating_sub(1));
+    let selected_detail = &record.nodes[selected_node];
+    let mut lines = record
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, detail)| run_detail_timeline_line(index == selected_node, detail))
+        .collect::<Vec<_>>();
+
+    lines.push(Line::from(""));
+    lines.push(Line::styled(
+        format!("Outputs for {}", selected_detail.node_label),
+        Style::default().fg(Color::DarkGray),
+    ));
+    append_selected_run_detail_output_lines(&mut lines, selected_detail);
+
+    Paragraph::new(lines).render(area, buf);
+}
+
+fn run_detail_timeline_line(selected: bool, detail: &RunNodeDetail) -> Line<'static> {
+    let status = run_detail_status_label(detail.status);
+    let cache = if detail.cached { " cached" } else { "" };
+    let prefix = if selected { "› " } else { "  " };
+    let style = if selected {
+        Style::default().fg(Color::Black).bg(Color::Magenta)
+    } else {
+        run_detail_status_style(detail.status)
+    };
+    Line::styled(format!("{prefix}{} — {status}{cache}", detail.node_label), style)
+}
+
+fn append_selected_run_detail_output_lines(lines: &mut Vec<Line<'static>>, detail: &RunNodeDetail) {
+    if let Some(error) = &detail.error {
+        lines.push(Line::styled(format!("error: {error}"), Style::default().fg(Color::Red)));
+    }
+    if detail.outputs.is_empty() && detail.error.is_none() {
+        lines.push(Line::styled("No output details", Style::default().fg(Color::DarkGray)));
+        return;
+    }
+    for output in &detail.outputs {
+        lines.push(Line::styled(format!("{}: {}", output.port_label, output.text), Style::default().fg(Color::Gray)));
+    }
+}
+
+fn run_detail_status_label(status: RunNodeDetailStatus) -> &'static str {
+    match status {
+        RunNodeDetailStatus::Pending => "pending",
+        RunNodeDetailStatus::Running => "running",
+        RunNodeDetailStatus::Completed => "completed",
+        RunNodeDetailStatus::Failed => "failed",
+        RunNodeDetailStatus::Skipped => "skipped",
+    }
+}
+
+fn run_detail_status_style(status: RunNodeDetailStatus) -> Style {
+    match status {
+        RunNodeDetailStatus::Pending => Style::default().fg(Color::DarkGray),
+        RunNodeDetailStatus::Running => Style::default().fg(Color::Yellow),
+        RunNodeDetailStatus::Completed => Style::default().fg(Color::Green),
+        RunNodeDetailStatus::Failed => Style::default().fg(Color::Red),
+        RunNodeDetailStatus::Skipped => Style::default().fg(Color::Gray),
+    }
 }
 
 fn render_add_node_flow(app: &App, area: Rect, buf: &mut Buffer) {

@@ -36,6 +36,10 @@ use crate::engine::executor::StepResult;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::store::RunDetailRecord;
+use crate::store::RunNodeDetail;
+use crate::store::RunNodeDetailStatus;
+use crate::store::RunOutputDetail;
 use crate::store::RunRecord;
 use crate::store::Store;
 use crate::tui::input;
@@ -103,6 +107,7 @@ impl AppRunState {
 
 struct ActiveRun {
     run_id: RunId,
+    workflow: Workflow,
     receiver: mpsc::UnboundedReceiver<RunEvent>,
     handle: JoinHandle<()>,
 }
@@ -266,6 +271,103 @@ fn append_output_value_records(
     }));
 }
 
+// r[impl n8nclone.tui_ux.run_history.details.persist]
+pub fn run_detail_record_from_results(run_id: RunId, workflow: &Workflow, results: &[StepResult]) -> RunDetailRecord {
+    let nodes = results.iter().map(|step| run_node_detail_from_step(run_id, workflow, step)).collect::<Vec<_>>();
+    RunDetailRecord { run_id, nodes }
+}
+
+fn run_node_detail_from_step(run_id: RunId, workflow: &Workflow, step: &StepResult) -> RunNodeDetail {
+    let node_label =
+        workflow.graph.node(step.node_id).map(|node| node.label.clone()).unwrap_or_else(|| "?".to_string());
+    match &step.status {
+        NodeStatus::Completed { outputs, cached } => RunNodeDetail {
+            node_id: step.node_id,
+            node_label,
+            status: RunNodeDetailStatus::Completed,
+            cached: *cached,
+            outputs: completed_output_records(run_id, workflow, step.node_id, outputs)
+                .into_iter()
+                .map(run_output_line_to_detail)
+                .collect(),
+            error: None,
+        },
+        NodeStatus::Failed { error } => RunNodeDetail {
+            node_id: step.node_id,
+            node_label,
+            status: RunNodeDetailStatus::Failed,
+            cached: false,
+            outputs: Vec::new(),
+            error: Some(error.clone()),
+        },
+        NodeStatus::Skipped => RunNodeDetail {
+            node_id: step.node_id,
+            node_label,
+            status: RunNodeDetailStatus::Skipped,
+            cached: false,
+            outputs: Vec::new(),
+            error: None,
+        },
+        NodeStatus::Pending => RunNodeDetail {
+            node_id: step.node_id,
+            node_label,
+            status: RunNodeDetailStatus::Pending,
+            cached: false,
+            outputs: Vec::new(),
+            error: None,
+        },
+        NodeStatus::Running => RunNodeDetail {
+            node_id: step.node_id,
+            node_label,
+            status: RunNodeDetailStatus::Running,
+            cached: false,
+            outputs: Vec::new(),
+            error: None,
+        },
+    }
+}
+
+fn run_output_line_to_detail(line: RunOutputLine) -> RunOutputDetail {
+    RunOutputDetail {
+        port_id: line.port_id,
+        port_label: line.port_label,
+        text: line.text,
+    }
+}
+
+fn canceled_run_detail_record(
+    run_id: RunId,
+    workflow: &Workflow,
+    statuses: &HashMap<u64, NodeRunStatus>,
+) -> RunDetailRecord {
+    let nodes = workflow
+        .graph
+        .nodes()
+        .map(|node| {
+            let status = statuses.get(&node.id.0).copied().unwrap_or(NodeRunStatus::Skipped);
+            RunNodeDetail {
+                node_id: node.id,
+                node_label: node.label.clone(),
+                status: run_detail_status_from_node_run_status(status),
+                cached: false,
+                outputs: Vec::new(),
+                error: None,
+            }
+        })
+        .collect::<Vec<_>>();
+    RunDetailRecord { run_id, nodes }
+}
+
+fn run_detail_status_from_node_run_status(status: NodeRunStatus) -> RunNodeDetailStatus {
+    match status {
+        NodeRunStatus::Pending => RunNodeDetailStatus::Pending,
+        NodeRunStatus::Running => RunNodeDetailStatus::Running,
+        NodeRunStatus::Completed => RunNodeDetailStatus::Completed,
+        NodeRunStatus::Failed => RunNodeDetailStatus::Failed,
+        NodeRunStatus::Skipped => RunNodeDetailStatus::Skipped,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddNodeStep {
     TemplateSelect,
@@ -369,6 +471,8 @@ pub struct RunHistoryState {
     pub records: Vec<RunRecord>,
     pub selected: usize,
     pub detail: Option<String>,
+    pub detail_record: Option<RunDetailRecord>,
+    pub selected_detail_node: usize,
     pub message: Option<String>,
 }
 
@@ -379,6 +483,8 @@ impl RunHistoryState {
             records: Vec::new(),
             selected: 0,
             detail: None,
+            detail_record: None,
+            selected_detail_node: 0,
             message: None,
         }
     }
@@ -389,6 +495,8 @@ impl RunHistoryState {
             records,
             selected: 0,
             detail: None,
+            detail_record: None,
+            selected_detail_node: 0,
             message,
         }
     }
@@ -801,11 +909,20 @@ impl App {
             return;
         }
         let last_index = self.run_history.records.len() - 1;
+        if let Some(detail_record) = &self.run_history.detail_record {
+            let last_node_index = detail_record.nodes.len().saturating_sub(1);
+            self.run_history.selected_detail_node = (self.run_history.selected_detail_node + 1).min(last_node_index);
+            return;
+        }
         self.run_history.selected = (self.run_history.selected + 1).min(last_index);
         self.run_history.detail = None;
     }
 
     pub fn select_previous_run_history(&mut self) {
+        if self.run_history.detail_record.is_some() {
+            self.run_history.selected_detail_node = self.run_history.selected_detail_node.saturating_sub(1);
+            return;
+        }
         self.run_history.selected = self.run_history.selected.saturating_sub(1);
         self.run_history.detail = None;
     }
@@ -815,6 +932,53 @@ impl App {
             return;
         };
         self.run_history.detail = Some(format_run_record(record));
+        self.run_history.selected_detail_node = 0;
+
+        let Some(store) = &self.store else {
+            let message = "No database available".to_string();
+            self.run_history.detail = Some(message.clone());
+            self.run_history.message = Some(message);
+            self.output.push_line("No database available");
+            return;
+        };
+        match store.load_run_details(record.run_id) {
+            Ok(Some(detail_record)) => self.run_history.detail_record = Some(detail_record),
+            Ok(None) => {
+                let message = "No run details available".to_string();
+                self.run_history.detail_record = None;
+                self.run_history.detail = Some(message.clone());
+                self.run_history.message = Some(message);
+            }
+            Err(error) => {
+                let message = format!("Run details failed: {error}");
+                self.output.push_line(&message);
+                self.run_history.detail_record = None;
+                self.run_history.detail = Some(message.clone());
+                self.run_history.message = Some(message);
+            }
+        }
+    }
+
+    pub fn rerun_selected_run_history(&mut self) -> bool {
+        let Some(record) = self.run_history.records.get(self.run_history.selected).cloned() else {
+            return false;
+        };
+        let Some(store) = &self.store else {
+            self.output.push_line("No database available");
+            return false;
+        };
+        let workflow = match store.load_workflow(&record.workflow_name) {
+            Ok(Some(workflow)) => workflow,
+            Ok(None) => {
+                self.output.push_line(&format!("Workflow not found: {}", record.workflow_name));
+                return false;
+            }
+            Err(error) => {
+                self.output.push_line(&format!("Rerun failed: {error}"));
+                return false;
+            }
+        };
+        self.start_workflow_snapshot(workflow, "▶ Rerunning workflow from history…")
     }
 
     /// Return whether the workflow browser modal is open.
@@ -1136,6 +1300,15 @@ impl App {
         }
 
         let workflow = self.workflow.clone();
+        self.start_workflow_snapshot(workflow, "▶ Running workflow…")
+    }
+
+    fn start_workflow_snapshot(&mut self, workflow: Workflow, message: &str) -> bool {
+        if self.run_state.active {
+            self.output.push_line("Workflow already running");
+            return false;
+        }
+
         let run_id = RunId(self.next_tui_run_id);
         self.next_tui_run_id += 1;
         let (sender, receiver) = mpsc::unbounded_channel();
@@ -1146,8 +1319,9 @@ impl App {
             active: true,
             node_statuses,
         };
-        self.output.push_line("▶ Running workflow…");
+        self.output.push_line(message);
 
+        let active_workflow = workflow.clone();
         let handle = tokio::spawn(async move {
             let mut executor = Executor::new();
             let cache = HashMap::new();
@@ -1160,6 +1334,7 @@ impl App {
         });
         self.active_run = Some(ActiveRun {
             run_id,
+            workflow: active_workflow,
             receiver,
             handle,
         });
@@ -1180,8 +1355,13 @@ impl App {
             }
         }
         self.run_state.active = false;
-        let workflow_name = self.workflow.meta.name.clone();
+        let workflow_name = active_run.workflow.meta.name.clone();
         self.save_run_record(active_run.run_id, &workflow_name, 0, 0, self.run_state.node_statuses.len());
+        self.save_run_detail_record(canceled_run_detail_record(
+            active_run.run_id,
+            &active_run.workflow,
+            &self.run_state.node_statuses,
+        ));
         self.output.push_line("Workflow run canceled");
         true
     }
@@ -1247,6 +1427,7 @@ impl App {
             .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
             .count();
         self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
+        self.save_run_detail_record(run_detail_record_from_results(run_id, run_workflow, &results));
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
@@ -1273,6 +1454,15 @@ impl App {
         };
         if let Err(e) = store.save_run(&record) {
             self.output.push_line(&format!("Run history save failed: {e}"));
+        }
+    }
+
+    fn save_run_detail_record(&mut self, record: RunDetailRecord) {
+        let Some(store) = &self.store else {
+            return;
+        };
+        if let Err(error) = store.save_run_details(&record) {
+            self.output.push_line(&format!("Run details save failed: {error}"));
         }
     }
 
@@ -1948,6 +2138,7 @@ mod tests {
         app.run_history = RunHistoryState::open(vec![record], None);
         app.inspect_selected_run_history();
 
-        assert_eq!(app.run_history.detail.as_deref(), Some("run:7 │ 2 nodes │ 0 failures │ 1 cache hits"),);
+        assert_eq!(app.run_history.detail.as_deref(), Some("No run details available"));
+        assert!(app.run_history.detail_record.is_none());
     }
 }
