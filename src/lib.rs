@@ -5,3 +5,4 @@ pub mod headless;
 pub mod store;
 pub mod tui;
 pub mod workflow_format;
+pub mod workflow_validation;

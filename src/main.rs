@@ -10,6 +10,7 @@ use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::store::Store;
 use n8nclone::tui::App;
 use n8nclone::workflow_format;
+use n8nclone::workflow_validation;
 use tracing::info;
 
 const DEFAULT_CONFIG_PATH: &str = "~/.n8nclone/config.ncl";
@@ -164,8 +165,17 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
             process_result_to_exit_code(headless::process_result_for_summary(&summary))
         }
         Err(error) => {
-            eprintln!("Run failed: {error}");
+            print_headless_run_error(&error);
             ExitCode::FAILURE
+        }
+    }
+}
+
+fn print_headless_run_error(error: &headless::HeadlessRunError) {
+    eprintln!("Run failed: {error}");
+    if let headless::HeadlessRunError::Validation(diagnostics) = error {
+        for diagnostic in diagnostics {
+            eprintln!("  {}", workflow_validation::format_diagnostic(diagnostic));
         }
     }
 }

@@ -17,6 +17,8 @@ use crate::engine::workflow::Workflow;
 use crate::store::RunRecord;
 use crate::store::Store;
 use crate::store::StoreError;
+use crate::workflow_validation;
+use crate::workflow_validation::WorkflowDiagnostic;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -56,6 +58,7 @@ pub struct HeadlessRunSummary {
 pub enum HeadlessRunError {
     Store(String),
     WorkflowNotFound(String),
+    Validation(Vec<WorkflowDiagnostic>),
 }
 
 impl std::fmt::Display for HeadlessRunError {
@@ -63,6 +66,9 @@ impl std::fmt::Display for HeadlessRunError {
         match self {
             Self::Store(message) => write!(f, "store error: {message}"),
             Self::WorkflowNotFound(name) => write!(f, "workflow not found: {name}"),
+            Self::Validation(diagnostics) => {
+                write!(f, "workflow validation failed with {} fatal diagnostics", diagnostics.len())
+            }
         }
     }
 }
@@ -154,6 +160,10 @@ pub async fn run_saved_workflow(
     let workflow = store
         .load_workflow(workflow_name)?
         .ok_or_else(|| HeadlessRunError::WorkflowNotFound(workflow_name.to_string()))?;
+    let diagnostics = workflow_validation::validate_workflow(&workflow);
+    if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+        return Err(HeadlessRunError::Validation(workflow_validation::fatal_diagnostics(&diagnostics)));
+    }
 
     let started_epoch_ms = chrono::Utc::now().timestamp_millis();
     let mut executor = Executor::new();

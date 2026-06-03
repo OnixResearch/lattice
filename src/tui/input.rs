@@ -64,6 +64,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         return handle_run_history_key(app, key);
     }
 
+    if app.is_diagnostics_open() {
+        return handle_diagnostics_key(app, key);
+    }
+
     if app.is_workflow_browser_open() {
         return handle_workflow_browser_key(app, key);
     }
@@ -88,6 +92,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Some(AppAction::RunWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => return Some(AppAction::CancelRun),
         (KeyModifiers::CONTROL, KeyCode::Char('h')) => return Some(AppAction::OpenRunHistory),
+        (KeyModifiers::CONTROL, KeyCode::Char('d')) => return Some(AppAction::OpenDiagnostics),
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Some(AppAction::SaveWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
@@ -117,6 +122,13 @@ fn handle_run_history_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         RunHistoryKeyAction::SelectPrevious => app.select_previous_run_history(),
         RunHistoryKeyAction::Inspect => app.inspect_selected_run_history(),
         RunHistoryKeyAction::Ignore => {}
+    }
+    None
+}
+
+fn handle_diagnostics_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
+        app.close_diagnostics();
     }
     None
 }

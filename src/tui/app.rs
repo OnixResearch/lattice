@@ -40,6 +40,8 @@ use crate::store::RunRecord;
 use crate::store::Store;
 use crate::tui::input;
 use crate::tui::panels;
+use crate::workflow_validation;
+use crate::workflow_validation::WorkflowDiagnostic;
 
 const INITIAL_VIEWPORT_WIDTH: u16 = 80;
 const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
@@ -64,6 +66,7 @@ pub enum AppAction {
     RunWorkflow,
     CancelRun,
     OpenRunHistory,
+    OpenDiagnostics,
     SaveWorkflow,
     AddNode,
     OpenWorkflow,
@@ -311,6 +314,28 @@ impl AddNodeFlowState {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticsState {
+    pub open: bool,
+    pub diagnostics: Vec<WorkflowDiagnostic>,
+}
+
+impl DiagnosticsState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    fn open(diagnostics: Vec<WorkflowDiagnostic>) -> Self {
+        Self {
+            open: true,
+            diagnostics,
+        }
+    }
+}
+
 pub struct WorkflowBrowserState {
     pub open: bool,
     pub names: Vec<String>,
@@ -415,6 +440,12 @@ impl PaletteData {
                 icon: Some('◷'),
             },
             FuzzyCandidate {
+                id: "diagnostics".into(),
+                text: "Workflow Diagnostics (Ctrl-D)".into(),
+                context: None,
+                icon: Some('!'),
+            },
+            FuzzyCandidate {
                 id: "save".into(),
                 text: "Save Workflow (Ctrl-S)".into(),
                 context: None,
@@ -456,6 +487,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "run" => Some(AppAction::RunWorkflow),
         "cancel_run" => Some(AppAction::CancelRun),
         "history" => Some(AppAction::OpenRunHistory),
+        "diagnostics" => Some(AppAction::OpenDiagnostics),
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
         "layout" => Some(AppAction::AutoLayout),
@@ -483,6 +515,7 @@ pub struct App {
     pub node_templates: Vec<NodeTemplate>,
     pub run_state: AppRunState,
     pub run_history: RunHistoryState,
+    pub diagnostics: DiagnosticsState,
     pub store: Option<Store>,
     active_run: Option<ActiveRun>,
     next_tui_run_id: u64,
@@ -529,6 +562,7 @@ impl App {
             node_templates: Vec::new(),
             run_state: AppRunState::idle(),
             run_history: RunHistoryState::closed(),
+            diagnostics: DiagnosticsState::closed(),
             store,
             active_run: None,
             next_tui_run_id,
@@ -583,6 +617,25 @@ impl App {
         self.add_node_flow.open
     }
 
+    /// Return whether the diagnostics modal is open.
+    pub fn is_diagnostics_open(&self) -> bool {
+        self.diagnostics.open
+    }
+
+    /// Open workflow diagnostics for the current workflow snapshot.
+    pub fn open_diagnostics(&mut self) {
+        self.show_palette = false;
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.add_node_flow = AddNodeFlowState::closed();
+        self.run_history = RunHistoryState::closed();
+        self.diagnostics = DiagnosticsState::open(workflow_validation::validate_workflow(&self.workflow));
+    }
+
+    /// Close the diagnostics modal without mutating workflow state.
+    pub fn close_diagnostics(&mut self) {
+        self.diagnostics.open = false;
+    }
+
     /// Replace the configured node templates.
     pub fn set_node_templates(&mut self, templates: Vec<NodeTemplate>) {
         self.node_templates = templates;
@@ -592,6 +645,7 @@ impl App {
     pub fn open_add_node_flow(&mut self) {
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
+        self.diagnostics.open = false;
         self.property_edit = None;
         self.add_node_flow = if self.node_templates.is_empty() {
             AddNodeFlowState::shell(self.next_shell_node_label())
@@ -709,6 +763,7 @@ impl App {
     pub fn open_run_history(&mut self) {
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
+        self.diagnostics.open = false;
         self.add_node_flow = AddNodeFlowState::closed();
         let Some(store) = &self.store else {
             let message = "No database available".to_string();
@@ -770,6 +825,7 @@ impl App {
     /// Open the saved-workflow browser.
     pub fn open_workflow_browser(&mut self) {
         self.show_palette = false;
+        self.diagnostics.open = false;
         let Some(store) = &self.store else {
             let message = "No database available".to_string();
             self.output.push_line(&message);
@@ -1064,6 +1120,21 @@ impl App {
             return false;
         }
 
+        let diagnostics = workflow_validation::validate_workflow(&self.workflow);
+        self.diagnostics.diagnostics = diagnostics.clone();
+        self.diagnostics.open = false;
+        if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+            self.diagnostics = DiagnosticsState::open(diagnostics.clone());
+            self.output.push_line("Workflow validation failed; open diagnostics for details");
+            for diagnostic in workflow_validation::fatal_diagnostics(&diagnostics) {
+                self.output.push_line(&workflow_validation::format_diagnostic(&diagnostic));
+            }
+            return false;
+        }
+        for diagnostic in &diagnostics {
+            self.output.push_line(&workflow_validation::format_diagnostic(diagnostic));
+        }
+
         let workflow = self.workflow.clone();
         let run_id = RunId(self.next_tui_run_id);
         self.next_tui_run_id += 1;
@@ -1275,6 +1346,9 @@ impl App {
                         }
                         AppAction::OpenRunHistory => {
                             self.open_run_history();
+                        }
+                        AppAction::OpenDiagnostics => {
+                            self.open_diagnostics();
                         }
                         AppAction::SaveWorkflow => {
                             self.save_workflow();

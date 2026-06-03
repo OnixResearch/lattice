@@ -31,6 +31,8 @@ use crate::tui::app::FocusPanel;
 use crate::tui::app::NodeRunStatus;
 use crate::tui::app::PropertyEditField;
 use crate::tui::app::rendered_latest_node_output_lines;
+use crate::workflow_validation;
+use crate::workflow_validation::DiagnosticSeverity;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
@@ -47,6 +49,9 @@ const ADD_NODE_TOP_OFFSET: u16 = 2;
 const RUN_HISTORY_WIDTH: u16 = 72;
 const RUN_HISTORY_HEIGHT: u16 = 16;
 const RUN_HISTORY_TOP_OFFSET: u16 = 2;
+const DIAGNOSTICS_WIDTH: u16 = 78;
+const DIAGNOSTICS_HEIGHT: u16 = 16;
+const DIAGNOSTICS_TOP_OFFSET: u16 = 2;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -77,6 +82,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
     // Overlay: fuzzy palette.
     if app.show_palette {
         render_palette(app, area, buf);
+    }
+
+    if app.is_diagnostics_open() {
+        render_diagnostics(app, area, buf);
     }
 
     if app.is_run_history_open() {
@@ -391,6 +400,7 @@ fn render_status_bar(app: &App, area: Rect, buf: &mut Buffer) {
         workflow_browser_open: app.is_workflow_browser_open(),
         add_node_open: app.is_add_node_flow_open(),
         run_history_open: app.is_run_history_open(),
+        diagnostics_open: app.is_diagnostics_open(),
         interaction_mode: footer_interaction_mode(&app.graph_state.mode),
         width: area.width,
     });
@@ -417,6 +427,7 @@ struct FooterHelpContext {
     workflow_browser_open: bool,
     add_node_open: bool,
     run_history_open: bool,
+    diagnostics_open: bool,
     interaction_mode: FooterInteractionMode,
     width: u16,
 }
@@ -451,12 +462,16 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " ↑/↓: choose run │ Enter: inspect │ Esc: close ";
     }
 
+    if context.diagnostics_open {
+        return " Diagnostics │ Enter/Esc: close ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target port: connect │ Esc: cancel wiring ";
     }
 
     match context.focus {
-        FocusPanel::Canvas => " e: cmd │ l: label │ t: timeout │ C-N: add │ C-R: run │ C-P: palette ",
+        FocusPanel::Canvas => " e: cmd │ l: label │ t: timeout │ C-D: diagnostics │ C-R: run │ C-P: palette ",
         FocusPanel::Properties => " e: cmd │ l: label │ t: timeout │ C-S: save │ A-Tab: focus ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
@@ -479,6 +494,10 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         return " Enter inspect │ Esc ";
     }
 
+    if context.diagnostics_open {
+        return " Enter/Esc close ";
+    }
+
     if context.interaction_mode == FooterInteractionMode::Wiring {
         return " Click target │ Esc ";
     }
@@ -488,6 +507,47 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
         FocusPanel::Properties => " e cmd │ l label ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
+}
+
+fn render_diagnostics(app: &App, area: Rect, buf: &mut Buffer) {
+    let width = area.width.min(DIAGNOSTICS_WIDTH);
+    let height = area.height.min(DIAGNOSTICS_HEIGHT);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = DIAGNOSTICS_TOP_OFFSET.min(area.height.saturating_sub(height));
+    let diagnostics_area = Rect::new(x, y, width, height);
+
+    Clear.render(diagnostics_area, buf);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Workflow Diagnostics ")
+        .border_style(Style::default().fg(Color::Red));
+    let inner = block.inner(diagnostics_area);
+    block.render(diagnostics_area, buf);
+
+    if app.diagnostics.diagnostics.is_empty() {
+        Paragraph::new("Workflow ready to run")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Green))
+            .render(inner, buf);
+        return;
+    }
+
+    let visible_rows = inner.height as usize;
+    let lines = app
+        .diagnostics
+        .diagnostics
+        .iter()
+        .take(visible_rows)
+        .map(|diagnostic| {
+            let style = match diagnostic.severity {
+                DiagnosticSeverity::Fatal => Style::default().fg(Color::Red),
+                DiagnosticSeverity::Warning => Style::default().fg(Color::Yellow),
+            };
+            Line::styled(workflow_validation::format_diagnostic(diagnostic), style)
+        })
+        .collect::<Vec<_>>();
+
+    Paragraph::new(lines).render(inner, buf);
 }
 
 fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
@@ -707,6 +767,7 @@ mod tests {
             workflow_browser_open: false,
             add_node_open: false,
             run_history_open: false,
+            diagnostics_open: false,
             interaction_mode: FooterInteractionMode::Default,
             width: WIDE_STATUS_WIDTH,
         }
@@ -722,7 +783,7 @@ mod tests {
     fn contextual_help_matches_canvas_and_wiring_modes() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Canvas)),
-            " e: cmd │ l: label │ t: timeout │ C-N: add │ C-R: run │ C-P: palette ",
+            " e: cmd │ l: label │ t: timeout │ C-D: diagnostics │ C-R: run │ C-P: palette ",
         );
 
         let wiring = FooterHelpContext {

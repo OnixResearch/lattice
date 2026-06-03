@@ -3,6 +3,7 @@
 use std::process::Command;
 
 use n8nclone::engine::executor::RunId;
+use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::headless::HeadlessRunError;
@@ -11,7 +12,6 @@ use n8nclone::headless::process_result_for_summary;
 use n8nclone::headless::render_run_summary_text;
 use n8nclone::headless::run_saved_workflow;
 use n8nclone::store::Store;
-use rat_nodegraph::model::PortSpec;
 
 const SUCCESS_WORKFLOW_NAME: &str = "headless-success";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
@@ -19,7 +19,7 @@ const BROKEN_WORKFLOW_NAME: &str = "headless-broken";
 const SUCCESS_NODE_LABEL: &str = "say hello";
 const SUCCESS_COMMAND: &str = "printf hello";
 const BROKEN_NODE_LABEL: &str = "broken";
-const STRING_TYPE_TAG: &str = "string";
+const MISSING_CWD: &str = "/definitely/missing/n8nclone/headless-test";
 const SUCCESS_RUN_ID: u64 = 7;
 const MISSING_RUN_ID: u64 = 11;
 const FAILED_RUN_ID: u64 = 13;
@@ -134,12 +134,14 @@ async fn headless_run_missing_workflow_fails_without_history_record() {
 async fn headless_run_failed_node_returns_failure_summary() {
     let (store, _temp_dir) = temp_store();
     let mut workflow = Workflow::new(BROKEN_WORKFLOW_NAME);
-    workflow
-        .graph
-        .add_node(BROKEN_NODE_LABEL, &[PortSpec::new("stdin", STRING_TYPE_TAG)], &[PortSpec::new(
-            "stdout",
-            STRING_TYPE_TAG,
-        )]);
+    let node_id = workflow.add_shell_node(BROKEN_NODE_LABEL, SUCCESS_COMMAND);
+    workflow.set_node_config(node_id, NodeConfig::Shell {
+        command: SUCCESS_COMMAND.to_string(),
+        cwd: Some(MISSING_CWD.to_string()),
+        env: std::collections::HashMap::new(),
+        timeout_secs: DEFAULT_TIMEOUT_SECS,
+        pipe_stdin: true,
+    });
     store.save_workflow(&workflow).expect("workflow saves");
 
     let summary = run_saved_workflow(&store, BROKEN_WORKFLOW_NAME, RunId(FAILED_RUN_ID))
