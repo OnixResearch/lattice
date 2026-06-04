@@ -1,9 +1,15 @@
 //! Tests for headless workflow runs.
 
 use std::collections::HashMap;
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
+use n8nclone::agent_node::AgentOutputMode;
+use n8nclone::agent_node::AgentRuntimeConfig;
+use n8nclone::agent_node::AgentTarget;
 use n8nclone::config::DEFAULT_NODE_TEMPLATE_FILES;
 use n8nclone::config::NodeTemplate;
 use n8nclone::config::load_node_templates_with_diagnostics;
@@ -21,6 +27,7 @@ use n8nclone::headless::HeadlessRunStatus;
 use n8nclone::headless::process_result_for_summary;
 use n8nclone::headless::render_run_summary_text;
 use n8nclone::headless::run_saved_workflow;
+use n8nclone::headless::run_saved_workflow_with_agent_runtime_config;
 use n8nclone::store::Store;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -30,17 +37,21 @@ const SUCCESS_WORKFLOW_NAME: &str = "headless-success";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
 const BROKEN_WORKFLOW_NAME: &str = "headless-broken";
 const IMAGE_WORKFLOW_NAME: &str = "headless-image";
+const AGENT_WORKFLOW_NAME: &str = "headless-agent";
 const SUCCESS_NODE_LABEL: &str = "say hello";
 const SUCCESS_COMMAND: &str = "printf hello";
 const BROKEN_NODE_LABEL: &str = "broken";
 const IMAGE_NODE_LABEL: &str = "load image";
+const AGENT_NODE_LABEL: &str = "summarize";
 const IMAGE_OUTPUT_PORT_LABEL: &str = "image";
+const AGENT_TEXT_OUTPUT_PORT_LABEL: &str = "text";
 const HEADLESS_IMAGE_FILE_NAME: &str = "headless-selfie.png";
 const MISSING_CWD: &str = "/definitely/missing/n8nclone/headless-test";
 const SUCCESS_RUN_ID: u64 = 7;
 const MISSING_RUN_ID: u64 = 11;
 const FAILED_RUN_ID: u64 = 13;
 const IMAGE_RUN_ID: u64 = 17;
+const AGENT_RUN_ID: u64 = 19;
 const RECENT_RUN_LIMIT: usize = 8;
 const SINGLE_NODE_COUNT: usize = 1;
 const NO_FAILURES: usize = 0;
@@ -73,6 +84,9 @@ const TEMPLATE_RUN_ID_START: u64 = 100;
 const TEMPLATE_WORKFLOW_NODE_COUNT: usize = 2;
 const TEMPLATE_WORKFLOW_STEP_COUNT: usize = 2;
 const PNG_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\nfixture";
+const HEADLESS_AGENT_FILE_NAME: &str = "headless-agent.sh";
+const HEADLESS_AGENT_OUTPUT: &str = "headless agent text";
+const EXECUTABLE_MODE: u32 = 0o755;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TemplateHeadlessCase {
@@ -120,6 +134,16 @@ fn temp_store() -> (Store, tempfile::TempDir) {
     let temp_dir = tempfile::tempdir().expect("temporary store directory");
     let store = Store::new(temp_dir.path().join("test.redb")).expect("store opens");
     (store, temp_dir)
+}
+
+#[cfg(unix)]
+fn write_agent_script(temp_dir: &tempfile::TempDir) -> String {
+    let path = temp_dir.path().join(HEADLESS_AGENT_FILE_NAME);
+    fs::write(&path, format!("#!/bin/sh\nprintf '{HEADLESS_AGENT_OUTPUT}'\n")).expect("agent script written");
+    let mut permissions = fs::metadata(&path).expect("agent script metadata").permissions();
+    permissions.set_mode(EXECUTABLE_MODE);
+    fs::set_permissions(&path, permissions).expect("agent script made executable");
+    path.display().to_string()
 }
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
@@ -302,6 +326,39 @@ async fn headless_run_loads_local_image_with_default_executor() {
     let image = outputs.get(&image_port).expect("image output cached");
     assert_eq!(image.type_tag(), TypeTag::Image);
     assert!(image.as_display_string().contains("image/png"));
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+#[cfg(unix)]
+#[tokio::test]
+async fn headless_run_uses_configured_production_agent_runtime() {
+    let (store, temp_dir) = temp_store();
+    let command = write_agent_script(&temp_dir);
+    let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, "summarize this", AgentOutputMode::Text);
+    let text_port = output_port_id(&workflow, node_id, AGENT_TEXT_OUTPUT_PORT_LABEL);
+    let input_hash = node_execution_cache_key(
+        node_id,
+        workflow.node_config(node_id).expect("agent node config exists"),
+        &HashMap::new(),
+    );
+    store.save_workflow(&workflow).expect("workflow saves");
+    let agent_runtime = AgentRuntimeConfig {
+        pi_command: Some(command),
+        clankers_command: None,
+    };
+
+    let summary =
+        run_saved_workflow_with_agent_runtime_config(&store, AGENT_WORKFLOW_NAME, RunId(AGENT_RUN_ID), agent_runtime)
+            .await
+            .expect("headless agent workflow runs");
+
+    assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
+    assert_eq!(summary.failures, NO_FAILURES);
+    let outputs = store.get_cache(&input_hash).expect("agent cache lookup succeeds").expect("agent outputs cached");
+    let text = string_output(&outputs, text_port);
+    assert_eq!(text, HEADLESS_AGENT_OUTPUT);
 }
 
 // r[verify n8nclone.node_templates.catalog]

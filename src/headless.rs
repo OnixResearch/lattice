@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::agent_node::AgentRuntimeConfig;
 use crate::engine::executor::Executor;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
@@ -157,6 +158,28 @@ pub async fn run_saved_workflow(
     workflow_name: &str,
     run_id: RunId,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, Executor::new).await
+}
+
+// r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
+pub async fn run_saved_workflow_with_agent_runtime_config(
+    store: &Store,
+    workflow_name: &str,
+    run_id: RunId,
+    agent_runtime: AgentRuntimeConfig,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, || {
+        Executor::new_with_agent_runtime_config(agent_runtime.clone())
+    })
+    .await
+}
+
+async fn run_saved_workflow_with_executor_factory(
+    store: &Store,
+    workflow_name: &str,
+    run_id: RunId,
+    executor_factory: impl FnOnce() -> Executor,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
     let workflow = store
         .load_workflow(workflow_name)?
         .ok_or_else(|| HeadlessRunError::WorkflowNotFound(workflow_name.to_string()))?;
@@ -166,7 +189,7 @@ pub async fn run_saved_workflow(
     }
 
     let started_epoch_ms = chrono::Utc::now().timestamp_millis();
-    let mut executor = Executor::new();
+    let mut executor = executor_factory();
     let cache = HashMap::new();
     let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
     persist_completed_outputs_to_cache(store, &results);

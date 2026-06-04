@@ -784,6 +784,7 @@ impl App {
     pub fn new(config: AppConfig) -> Self {
         let workflow = Workflow::new("untitled");
         let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
+        let agent_runtime = config.agent_runtime.clone();
 
         let store = match Store::new(config.data_dir.join("n8nclone.redb")) {
             Ok(s) => Some(s),
@@ -824,7 +825,7 @@ impl App {
             last_drag_canvas: None,
             dirty: false,
             confirm_quit: false,
-            executor_factory: Arc::new(Executor::new),
+            executor_factory: Arc::new(move || Executor::new_with_agent_runtime_config(agent_runtime.clone())),
         }
     }
 
@@ -2831,6 +2832,7 @@ mod tests {
     async fn agent_error_feedback_is_visible_after_run_failure() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
         let mut app = App::new(test_config(&temp_dir));
+        app.set_executor_factory(agent_error_executor_factory(AgentError::Adapter("runtime unavailable".to_string())));
         app.add_agent_node("Pi agent", AgentTarget::Pi, "summarize", AgentOutputMode::Text);
         let node_id = app.graph_state.focused.expect("focused node");
 
@@ -2839,7 +2841,7 @@ mod tests {
 
         assert!(!app.run_state.active);
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
-        assert!(output_text_lines(&app).iter().any(|line| line.contains("unsupported agent target: pi")));
+        assert!(output_text_lines(&app).iter().any(|line| line.contains("runtime unavailable")));
 
         let mut preflight_app = App::new(test_config(&temp_dir));
         preflight_app.set_executor_factory(agent_error_executor_factory(AgentError::PreflightRejected(

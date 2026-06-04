@@ -175,7 +175,14 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
         }
     };
 
-    match headless::run_saved_workflow(&store, &args.workflow, run_id).await {
+    match headless::run_saved_workflow_with_agent_runtime_config(
+        &store,
+        &args.workflow,
+        run_id,
+        app_config.agent_runtime.clone(),
+    )
+    .await
+    {
         Ok(summary) => {
             match args.output {
                 RunOutputFormat::Text => println!("{}", headless::render_run_summary_text(&summary)),
@@ -249,7 +256,14 @@ async fn run_scheduler_daemon_once(
                 continue;
             }
         };
-        let outcome = match headless::run_saved_workflow(&store, &plan.workflow_name, run_id).await {
+        let outcome = match headless::run_saved_workflow_with_agent_runtime_config(
+            &store,
+            &plan.workflow_name,
+            run_id,
+            app_config.agent_runtime.clone(),
+        )
+        .await
+        {
             Ok(summary) => ScheduleDaemonOutcome::Started {
                 schedule_id: plan.schedule_id.clone(),
                 workflow_name: plan.workflow_name.clone(),

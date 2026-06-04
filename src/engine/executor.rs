@@ -21,7 +21,8 @@ use crate::agent_node::AgentAdapter;
 use crate::agent_node::AgentNodeSettings;
 use crate::agent_node::AgentOutput;
 use crate::agent_node::AgentRequest;
-use crate::agent_node::NoopAgentAdapter;
+use crate::agent_node::AgentRuntimeConfig;
+use crate::agent_node::ProductionAgentAdapter;
 use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::EmptyCredentialProvider;
@@ -776,6 +777,11 @@ fn default_image_io() -> Box<dyn ImageIo> {
     Box::<LocalImageIo>::default()
 }
 
+// r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
+fn default_agent_adapter() -> Box<dyn AgentAdapter> {
+    Box::<ProductionAgentAdapter>::default()
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
@@ -784,7 +790,7 @@ impl Executor {
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
             image_io: default_image_io(),
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
         }
     }
 
@@ -795,7 +801,19 @@ impl Executor {
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
             image_io: default_image_io(),
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
+        }
+    }
+
+    // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.config]
+    pub fn new_with_agent_runtime_config(agent_runtime: AgentRuntimeConfig) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client: Box::<NoopHttpClient>::default(),
+            file_system: Box::<NoopFileSystem>::default(),
+            image_io: default_image_io(),
+            agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
         }
     }
 
@@ -806,7 +824,7 @@ impl Executor {
             http_client,
             file_system: Box::<NoopFileSystem>::default(),
             image_io: default_image_io(),
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
         }
     }
 
@@ -817,7 +835,7 @@ impl Executor {
             http_client: Box::<NoopHttpClient>::default(),
             file_system,
             image_io: default_image_io(),
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
         }
     }
 
@@ -828,7 +846,7 @@ impl Executor {
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
             image_io,
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
         }
     }
 
@@ -854,7 +872,7 @@ impl Executor {
             http_client,
             file_system,
             image_io: default_image_io(),
-            agent_adapter: Box::<NoopAgentAdapter>::default(),
+            agent_adapter: default_agent_adapter(),
         }
     }
 

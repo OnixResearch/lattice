@@ -18,6 +18,8 @@ use nickel_lang_core::serialize::{self};
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::agent_node::AgentRuntimeConfig;
+
 /// Application-level configuration loaded from Nickel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -29,6 +31,9 @@ pub struct AppConfig {
     pub shell: String,
     /// Max parallel node executions.
     pub max_parallelism: usize,
+    /// Production agent runtime command configuration.
+    #[serde(default)]
+    pub agent_runtime: AgentRuntimeConfig,
 }
 
 impl Default for AppConfig {
@@ -39,6 +44,7 @@ impl Default for AppConfig {
             default_timeout_secs: 60,
             shell: "sh".into(),
             max_parallelism: 4,
+            agent_runtime: AgentRuntimeConfig::default(),
         }
     }
 }
@@ -422,6 +428,10 @@ pub fn default_config_ncl() -> &'static str {
   default_timeout_secs = 60,
   shell = "sh",
   max_parallelism = 4,
+  agent_runtime = {
+    pi_command = "pi",
+    clankers_command = "clankers",
+  },
 }
 "#
 }
