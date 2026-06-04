@@ -6,6 +6,42 @@ Defines the `node-templates` capability.
 
 ## Requirements
 
+### Requirement: Built-in template catalog
+r[n8nclone.node_templates.catalog] The system MUST provide a built-in Nickel node template catalog for common shell workflow steps.
+
+#### Scenario: Load built-in templates
+r[n8nclone.node_templates.catalog.load]
+- GIVEN the built-in template files are written to a template directory
+- WHEN the template loader evaluates the directory
+- THEN the system loads every built-in template without diagnostics
+
+#### Scenario: Render built-in templates
+r[n8nclone.node_templates.catalog.render]
+- GIVEN built-in templates declare defaults and required parameters
+- WHEN the renderer receives defaulted and required values
+- THEN the system renders valid shell commands for those templates
+
+#### Scenario: Initialize built-in templates
+r[n8nclone.node_templates.catalog.init]
+- GIVEN a user initializes configuration
+- WHEN the init command creates the templates directory
+- THEN the system writes every built-in template file
+
+#### Scenario: Run built-in templates headlessly
+r[n8nclone.node_templates.catalog.headless]
+- GIVEN every built-in template has a headless execution case
+- WHEN each rendered template workflow runs through headless execution
+- THEN the system records successful runs and cached template outputs
+
+### Requirement: Complex template examples
+r[n8nclone.node_templates.examples.complex] The system MUST keep complex example node templates loadable, renderable, and runnable.
+
+#### Scenario: Run complex example templates headlessly
+r[n8nclone.node_templates.examples.headless]
+- GIVEN complex example templates declare parameters and shell commands
+- WHEN each example template is rendered into a workflow and run headlessly
+- THEN the system records successful runs and expected template outputs
+
 ### Requirement: Template parameter schema
 r[n8nclone.node_templates.parameters.schema] The system MUST let Nickel node templates declare typed parameters with defaults and validation constraints.
 

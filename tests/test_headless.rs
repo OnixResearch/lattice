@@ -1,8 +1,17 @@
 //! Tests for headless workflow runs.
 
+use std::collections::HashMap;
+use std::path::Path;
 use std::process::Command;
 
+use n8nclone::config::DEFAULT_NODE_TEMPLATE_FILES;
+use n8nclone::config::NodeTemplate;
+use n8nclone::config::load_node_templates_with_diagnostics;
+use n8nclone::config::render_template_command;
 use n8nclone::engine::executor::RunId;
+use n8nclone::engine::executor::node_execution_cache_key;
+use n8nclone::engine::value::Value;
+use n8nclone::engine::value::ValueData;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::headless::HeadlessProcessResult;
@@ -12,6 +21,9 @@ use n8nclone::headless::process_result_for_summary;
 use n8nclone::headless::render_run_summary_text;
 use n8nclone::headless::run_saved_workflow;
 use n8nclone::store::Store;
+use rat_nodegraph::model::NodeId;
+use rat_nodegraph::model::PortId;
+use rat_nodegraph::model::PortSpec;
 
 const SUCCESS_WORKFLOW_NAME: &str = "headless-success";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
@@ -31,6 +43,71 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
 const CONFIG_FILE_NAME: &str = "config.ncl";
 const STORE_FILE_NAME: &str = "n8nclone.redb";
+const TEMPLATES_DIR_NAME: &str = "templates";
+const TEMPLATE_WORKFLOW_NAME_PREFIX: &str = "headless-template-";
+const TEMPLATE_SOURCE_NODE_LABEL: &str = "template stdin";
+const TEMPLATE_SOURCE_COMMAND: &str = "printf 'alpha\\nneedle\\nneedle beta\\n'";
+const TEMPLATE_STDIN_TEXT: &str = "alpha\nneedle\nneedle beta\n";
+const TEMPLATE_STDIN_PORT_LABEL: &str = "stdin";
+const TEMPLATE_STDOUT_PORT_LABEL: &str = "stdout";
+const TEMPLATE_EXIT_PORT_LABEL: &str = "exit";
+const TEMPLATE_GREP_NAME: &str = "grep";
+const TEMPLATE_HEAD_NAME: &str = "head";
+const TEMPLATE_REPLACE_NAME: &str = "replace";
+const TEMPLATE_WORD_COUNT_NAME: &str = "word-count";
+const PARAM_PATTERN: &str = "pattern";
+const PARAM_REPLACEMENT: &str = "replacement";
+const PARAM_NEEDLE_VALUE: &str = "needle";
+const PARAM_THREAD_VALUE: &str = "thread";
+const GREP_EXPECTED_STDOUT: &str = "needle\nneedle beta\n";
+const REPLACE_EXPECTED_STDOUT: &str = "alpha\nthread\nthread beta\n";
+const WORD_COUNT_EXPECTED_TOKEN: &str = "3";
+const SUCCESS_EXIT_CODE: i32 = 0;
+const TEMPLATE_RUN_ID_START: u64 = 100;
+const TEMPLATE_WORKFLOW_NODE_COUNT: usize = 2;
+const TEMPLATE_WORKFLOW_STEP_COUNT: usize = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TemplateHeadlessCase {
+    name: &'static str,
+    values: &'static [(&'static str, &'static str)],
+    expected_stdout: ExpectedStdout,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExpectedStdout {
+    Exact(&'static str),
+    ContainsToken(&'static str),
+}
+
+const GREP_TEMPLATE_VALUES: &[(&str, &str)] = &[(PARAM_PATTERN, PARAM_NEEDLE_VALUE)];
+const REPLACE_TEMPLATE_VALUES: &[(&str, &str)] = &[
+    (PARAM_PATTERN, PARAM_NEEDLE_VALUE),
+    (PARAM_REPLACEMENT, PARAM_THREAD_VALUE),
+];
+const DEFAULTED_TEMPLATE_VALUES: &[(&str, &str)] = &[];
+const DEFAULT_TEMPLATE_HEADLESS_CASES: &[TemplateHeadlessCase] = &[
+    TemplateHeadlessCase {
+        name: TEMPLATE_GREP_NAME,
+        values: GREP_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(GREP_EXPECTED_STDOUT),
+    },
+    TemplateHeadlessCase {
+        name: TEMPLATE_HEAD_NAME,
+        values: DEFAULTED_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(TEMPLATE_STDIN_TEXT),
+    },
+    TemplateHeadlessCase {
+        name: TEMPLATE_REPLACE_NAME,
+        values: REPLACE_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(REPLACE_EXPECTED_STDOUT),
+    },
+    TemplateHeadlessCase {
+        name: TEMPLATE_WORD_COUNT_NAME,
+        values: DEFAULTED_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::ContainsToken(WORD_COUNT_EXPECTED_TOKEN),
+    },
+];
 
 fn temp_store() -> (Store, tempfile::TempDir) {
     let temp_dir = tempfile::tempdir().expect("temporary store directory");
@@ -52,6 +129,115 @@ fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::
     )
     .expect("config written");
     (config_path, data_dir)
+}
+
+fn write_default_template_catalog(dir: &Path) {
+    std::fs::create_dir_all(dir).expect("template directory created");
+    for template_file in DEFAULT_NODE_TEMPLATE_FILES {
+        std::fs::write(dir.join(template_file.file_name), template_file.contents).expect("default template written");
+    }
+}
+
+fn template_by_name<'a>(templates: &'a [NodeTemplate], name: &str) -> &'a NodeTemplate {
+    templates.iter().find(|template| template.name == name).expect("default template should load")
+}
+
+fn sorted_template_names(templates: &[NodeTemplate]) -> Vec<&str> {
+    let mut names = templates.iter().map(|template| template.name.as_str()).collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+fn sorted_headless_case_names(cases: &[TemplateHeadlessCase]) -> Vec<&str> {
+    let mut names = cases.iter().map(|case| case.name).collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+fn raw_template_values(case: &TemplateHeadlessCase) -> HashMap<String, String> {
+    case.values.iter().map(|(name, value)| ((*name).to_string(), (*value).to_string())).collect()
+}
+
+fn template_workflow(
+    template: &NodeTemplate,
+    case: &TemplateHeadlessCase,
+) -> (Workflow, NodeId, PortId, PortId, PortId) {
+    let mut workflow = Workflow::new(format!("{TEMPLATE_WORKFLOW_NAME_PREFIX}{}", template.name));
+    let source_id = workflow.add_shell_node(TEMPLATE_SOURCE_NODE_LABEL, TEMPLATE_SOURCE_COMMAND);
+    let input_specs = template
+        .input_ports
+        .iter()
+        .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+        .collect::<Vec<_>>();
+    let output_specs = template
+        .output_ports
+        .iter()
+        .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+        .collect::<Vec<_>>();
+    let template_id = workflow.graph.add_node(template.name.clone(), &input_specs, &output_specs);
+    let command = render_template_command(template, &raw_template_values(case)).expect("template command renders");
+    workflow.set_node_config(template_id, NodeConfig::shell(command));
+
+    let source_stdout = output_port_id(&workflow, source_id, TEMPLATE_STDOUT_PORT_LABEL);
+    let template_stdin = input_port_id(&workflow, template_id, TEMPLATE_STDIN_PORT_LABEL);
+    workflow.graph.add_edge(source_stdout, template_stdin).expect("template stdin wired");
+
+    let template_stdout = output_port_id(&workflow, template_id, TEMPLATE_STDOUT_PORT_LABEL);
+    let template_exit = output_port_id(&workflow, template_id, TEMPLATE_EXIT_PORT_LABEL);
+    (workflow, template_id, template_stdin, template_stdout, template_exit)
+}
+
+fn input_port_id(workflow: &Workflow, node_id: NodeId, label: &str) -> PortId {
+    workflow
+        .graph
+        .node(node_id)
+        .expect("node exists")
+        .input_ports
+        .iter()
+        .find(|port| port.label == label)
+        .map(|port| port.id)
+        .expect("input port exists")
+}
+
+fn output_port_id(workflow: &Workflow, node_id: NodeId, label: &str) -> PortId {
+    workflow
+        .graph
+        .node(node_id)
+        .expect("node exists")
+        .output_ports
+        .iter()
+        .find(|port| port.label == label)
+        .map(|port| port.id)
+        .expect("output port exists")
+}
+
+fn template_input_cache_key(workflow: &Workflow, node_id: NodeId, stdin_port: PortId) -> n8nclone::engine::ContentHash {
+    let inputs = HashMap::from([(stdin_port, Value::from_string(TEMPLATE_STDIN_TEXT.to_string()))]);
+    node_execution_cache_key(node_id, workflow.node_config(node_id).expect("template config exists"), &inputs)
+}
+
+fn assert_cached_stdout(outputs: &HashMap<PortId, Value>, stdout_port: PortId, expected: ExpectedStdout) {
+    let stdout = string_output(outputs, stdout_port);
+    match expected {
+        ExpectedStdout::Exact(expected_stdout) => assert_eq!(stdout, expected_stdout),
+        ExpectedStdout::ContainsToken(expected_token) => {
+            assert!(stdout.split_whitespace().any(|token| token == expected_token), "stdout was {stdout:?}");
+        }
+    }
+}
+
+fn assert_cached_exit_code(outputs: &HashMap<PortId, Value>, exit_port: PortId) {
+    match &outputs.get(&exit_port).expect("exit output cached").data {
+        ValueData::ExitCode(code) => assert_eq!(*code, SUCCESS_EXIT_CODE),
+        other => panic!("expected exit code output, got {other:?}"),
+    }
+}
+
+fn string_output(outputs: &HashMap<PortId, Value>, port: PortId) -> &str {
+    match &outputs.get(&port).expect("string output cached").data {
+        ValueData::String(value) => value,
+        other => panic!("expected string output, got {other:?}"),
+    }
 }
 
 // r[verify n8nclone.workflow_execution.headless.run]
@@ -81,6 +267,51 @@ async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     assert_eq!(records.len(), SINGLE_NODE_COUNT);
     assert_eq!(records[0].run_id, RunId(SUCCESS_RUN_ID));
     assert_eq!(records[0].failures, NO_FAILURES);
+}
+
+// r[verify n8nclone.node_templates.catalog]
+// r[verify n8nclone.node_templates.catalog.headless]
+// r[verify n8nclone.workflow_execution.headless.run]
+#[tokio::test]
+async fn default_template_catalog_runs_every_template_headlessly() {
+    let (store, temp_dir) = temp_store();
+    let templates_dir = temp_dir.path().join(TEMPLATES_DIR_NAME);
+    write_default_template_catalog(&templates_dir);
+    let load_result = load_node_templates_with_diagnostics(&templates_dir);
+
+    assert!(load_result.diagnostics.is_empty());
+    assert_eq!(
+        sorted_template_names(&load_result.templates),
+        sorted_headless_case_names(DEFAULT_TEMPLATE_HEADLESS_CASES)
+    );
+
+    for (case_index, case) in DEFAULT_TEMPLATE_HEADLESS_CASES.iter().enumerate() {
+        let template = template_by_name(&load_result.templates, case.name);
+        let (workflow, template_node_id, template_stdin, template_stdout, template_exit) =
+            template_workflow(template, case);
+        let workflow_name = workflow.meta.name.clone();
+        let run_id = RunId(TEMPLATE_RUN_ID_START + u64::try_from(case_index).expect("case index fits in u64"));
+        let template_input_hash = template_input_cache_key(&workflow, template_node_id, template_stdin);
+        store.save_workflow(&workflow).expect("template workflow saves");
+
+        let summary =
+            run_saved_workflow(&store, &workflow_name, run_id).await.expect("template workflow runs headlessly");
+
+        assert_eq!(summary.workflow_name, workflow_name);
+        assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
+        assert_eq!(summary.node_count, TEMPLATE_WORKFLOW_NODE_COUNT);
+        assert_eq!(summary.steps_run, TEMPLATE_WORKFLOW_STEP_COUNT);
+        assert_eq!(summary.failures, NO_FAILURES);
+        let outputs = store
+            .get_cache(&template_input_hash)
+            .expect("template cache lookup succeeds")
+            .expect("template outputs are cached");
+        assert_cached_stdout(&outputs, template_stdout, case.expected_stdout);
+        assert_cached_exit_code(&outputs, template_exit);
+    }
+
+    let records = store.list_runs(DEFAULT_NODE_TEMPLATE_FILES.len()).expect("template run history lists");
+    assert_eq!(records.len(), DEFAULT_NODE_TEMPLATE_FILES.len());
 }
 
 // r[verify n8nclone.workflow_execution.headless.run]

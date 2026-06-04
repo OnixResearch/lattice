@@ -381,8 +381,10 @@ fn init_config(config_path: &PathBuf) -> Result<(), n8nclone::error::Error> {
 
     let templates_dir = config_path.parent().unwrap_or(&PathBuf::from(".")).join("templates");
     std::fs::create_dir_all(&templates_dir).map_err(|e| n8nclone::error::Error::Io { source: e })?;
-    std::fs::write(templates_dir.join("grep.ncl"), config::example_template_ncl())
-        .map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    for template_file in config::DEFAULT_NODE_TEMPLATE_FILES {
+        std::fs::write(templates_dir.join(template_file.file_name), template_file.contents)
+            .map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    }
 
     Ok(())
 }

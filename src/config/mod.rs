@@ -426,9 +426,18 @@ pub fn default_config_ncl() -> &'static str {
 "#
 }
 
-/// Generate an example node template.
-pub fn example_template_ncl() -> &'static str {
-    r#"{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DefaultNodeTemplateFile {
+    pub file_name: &'static str,
+    pub contents: &'static str,
+}
+
+const GREP_TEMPLATE_FILE_NAME: &str = "grep.ncl";
+const HEAD_TEMPLATE_FILE_NAME: &str = "head.ncl";
+const REPLACE_TEMPLATE_FILE_NAME: &str = "replace.ncl";
+const WORD_COUNT_TEMPLATE_FILE_NAME: &str = "word-count.ncl";
+
+const GREP_TEMPLATE_NCL: &str = r#"{
   name = "grep",
   description = "Filter lines matching a pattern",
   kind = "shell",
@@ -450,5 +459,113 @@ pub fn example_template_ncl() -> &'static str {
     { label = "exit",   type_tag = "exitcode" },
   ],
 }
-"#
+"#;
+
+const HEAD_TEMPLATE_NCL: &str = r#"let default_line_count = 10 in
+let minimum_line_count = 1 in
+let maximum_line_count = 1000 in
+{
+  name = "head",
+  description = "Take the first lines from stdin",
+  kind = "shell",
+  command = "head -n ${lines}",
+  parameters = [
+    {
+      name = "lines",
+      type = "number",
+      description = "Number of leading lines to keep",
+      default = default_line_count,
+      required = false,
+      min = minimum_line_count,
+      max = maximum_line_count,
+    },
+  ],
+  input_ports = [
+    { label = "stdin", type_tag = "string" },
+  ],
+  output_ports = [
+    { label = "stdout", type_tag = "string" },
+    { label = "stderr", type_tag = "string" },
+    { label = "exit",   type_tag = "exitcode" },
+  ],
+}
+"#;
+
+const REPLACE_TEMPLATE_NCL: &str = r#"{
+  name = "replace",
+  description = "Replace matching text in stdin with sed",
+  kind = "shell",
+  command = "sed 's/${pattern}/${replacement}/g'",
+  parameters = [
+    {
+      name = "pattern",
+      type = "string",
+      description = "Text or regex pattern to replace",
+      required = true,
+    },
+    {
+      name = "replacement",
+      type = "string",
+      description = "Replacement text",
+      required = true,
+    },
+  ],
+  input_ports = [
+    { label = "stdin", type_tag = "string" },
+  ],
+  output_ports = [
+    { label = "stdout", type_tag = "string" },
+    { label = "stderr", type_tag = "string" },
+    { label = "exit",   type_tag = "exitcode" },
+  ],
+}
+"#;
+
+const WORD_COUNT_TEMPLATE_NCL: &str = r#"{
+  name = "word-count",
+  description = "Count lines, words, bytes, or characters from stdin",
+  kind = "shell",
+  command = "wc -${mode}",
+  parameters = [
+    {
+      name = "mode",
+      type = "string",
+      description = "wc mode flag without the dash: l, w, c, or m",
+      default = "l",
+      required = false,
+    },
+  ],
+  input_ports = [
+    { label = "stdin", type_tag = "string" },
+  ],
+  output_ports = [
+    { label = "stdout", type_tag = "string" },
+    { label = "stderr", type_tag = "string" },
+    { label = "exit",   type_tag = "exitcode" },
+  ],
+}
+"#;
+
+pub const DEFAULT_NODE_TEMPLATE_FILES: &[DefaultNodeTemplateFile] = &[
+    DefaultNodeTemplateFile {
+        file_name: GREP_TEMPLATE_FILE_NAME,
+        contents: GREP_TEMPLATE_NCL,
+    },
+    DefaultNodeTemplateFile {
+        file_name: HEAD_TEMPLATE_FILE_NAME,
+        contents: HEAD_TEMPLATE_NCL,
+    },
+    DefaultNodeTemplateFile {
+        file_name: REPLACE_TEMPLATE_FILE_NAME,
+        contents: REPLACE_TEMPLATE_NCL,
+    },
+    DefaultNodeTemplateFile {
+        file_name: WORD_COUNT_TEMPLATE_FILE_NAME,
+        contents: WORD_COUNT_TEMPLATE_NCL,
+    },
+];
+
+/// Generate an example node template.
+pub fn example_template_ncl() -> &'static str {
+    GREP_TEMPLATE_NCL
 }

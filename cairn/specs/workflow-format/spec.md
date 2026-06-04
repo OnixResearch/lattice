@@ -45,6 +45,15 @@ r[n8nclone.workflow_format.nickel.round_trip.preserve]
 - WHEN the workflow is exported to Nickel and imported again
 - THEN the imported workflow has equivalent runnable topology and configuration
 
+### Requirement: Complex workflow examples
+r[n8nclone.workflow_examples.complex] The system MUST keep complex Nickel workflow examples importable and runnable.
+
+#### Scenario: Run complex workflow examples headlessly
+r[n8nclone.workflow_examples.headless]
+- GIVEN complex Nickel workflow examples exist in the repository
+- WHEN each example is imported and run headlessly
+- THEN the system records successful runs with every node executed
+
 ### Requirement: Invalid workflow fixtures
 r[n8nclone.workflow_format.nickel.invalid] The system MUST cover invalid Nickel workflow inputs with deterministic diagnostics.
 
