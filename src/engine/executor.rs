@@ -1238,6 +1238,21 @@ impl Executor {
                 }
             }
             NodeConfig::Agent(settings) => {
+                let _secret_env = match credentials::resolve_secret_env(
+                    node_credentials.unwrap_or(&NodeCredentialRefs::default()),
+                    self.credential_provider.as_ref(),
+                ) {
+                    Ok(secret_env) => secret_env,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        };
+                    }
+                };
                 let output_ports = match agent_output_port_ids(node) {
                     Ok(ports) => ports,
                     Err(error) => {

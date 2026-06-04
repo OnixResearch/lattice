@@ -193,8 +193,11 @@ async fn complex_example_templates_render_and_run_headlessly() {
 #[tokio::test]
 async fn complex_example_workflows_import_and_run_headlessly() {
     let (store, _temp_dir) = temp_store();
-    let workflow_paths =
-        collect_nickel_files(Path::new(EXAMPLE_WORKFLOWS_DIR)).expect("example workflow paths collect");
+    let workflow_paths = collect_nickel_files(Path::new(EXAMPLE_WORKFLOWS_DIR))
+        .expect("example workflow paths collect")
+        .into_iter()
+        .filter(|path| path.file_stem().and_then(|stem| stem.to_str()).is_some_and(is_text_workflow_case))
+        .collect::<Vec<_>>();
 
     assert_eq!(workflow_paths.len(), EXAMPLE_WORKFLOW_CASES.len());
     for (workflow_index, workflow_path) in workflow_paths.iter().enumerate() {
@@ -291,6 +294,10 @@ fn sorted_case_names(cases: &[ExampleTemplateCase]) -> Vec<&str> {
 
 fn template_by_name<'a>(templates: &'a [NodeTemplate], name: &str) -> &'a NodeTemplate {
     templates.iter().find(|template| template.name == name).expect("example template should load")
+}
+
+fn is_text_workflow_case(name: &str) -> bool {
+    EXAMPLE_WORKFLOW_CASES.iter().any(|case| case.name == name)
 }
 
 fn workflow_case_by_name(name: &str) -> &'static ExampleWorkflowCase {

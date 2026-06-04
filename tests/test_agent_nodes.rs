@@ -10,6 +10,8 @@ use n8nclone::agent_node::AgentOutputMode;
 use n8nclone::agent_node::AgentRequest;
 use n8nclone::agent_node::AgentResponse;
 use n8nclone::agent_node::AgentTarget;
+use n8nclone::credentials::NodeCredentialRefs;
+use n8nclone::credentials::SecretRef;
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
 use n8nclone::engine::executor::node_execution_cache_key;
@@ -37,6 +39,9 @@ const JSON_INPUT_INDEX: usize = 2;
 const TEXT_OUTPUT_INDEX: usize = 0;
 const IMAGE_OUTPUT_INDEX: usize = 2;
 const METADATA_OUTPUT_INDEX: usize = 4;
+const SECRET_ENV_NAME: &str = "AGENT_TOKEN";
+const SECRET_PROVIDER: &str = "env";
+const SECRET_KEY: &str = "agent_token";
 
 #[derive(Clone)]
 struct StaticAgentAdapter {
@@ -61,6 +66,32 @@ impl AgentAdapter for StaticAgentAdapter {
     fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError> {
         self.requests.lock().push(request.clone());
         Ok(self.response.clone())
+    }
+}
+
+#[derive(Clone)]
+struct ErrorAgentAdapter {
+    error: AgentError,
+    calls: Arc<Mutex<usize>>,
+}
+
+impl ErrorAgentAdapter {
+    fn new(error: AgentError) -> Self {
+        Self {
+            error,
+            calls: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    fn calls(&self) -> usize {
+        *self.calls.lock()
+    }
+}
+
+impl AgentAdapter for ErrorAgentAdapter {
+    fn execute(&self, _request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+        *self.calls.lock() += 1;
+        Err(self.error.clone())
     }
 }
 
@@ -205,4 +236,73 @@ fn empty_agent_prompt_is_validation_diagnostic() {
     let diagnostics = validate_workflow(&workflow);
 
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::EmptyAgentPrompt));
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.errors]
+#[tokio::test]
+async fn preflight_rejection_marks_node_failed() {
+    let adapter = ErrorAgentAdapter::new(AgentError::PreflightRejected("missing model".to_string()));
+    let mut workflow = Workflow::new("agent-workflow");
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let executor = Executor::new_with_agent_adapter(Box::new(adapter));
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    match result.status {
+        NodeStatus::Failed { error } => assert!(error.contains("preflight rejected"), "error: {error}"),
+        other => panic!("expected failed agent node, got {other:?}"),
+    }
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.errors]
+#[tokio::test]
+async fn session_failure_marks_node_failed() {
+    let adapter = ErrorAgentAdapter::new(AgentError::Session("session unavailable".to_string()));
+    let mut workflow = Workflow::new("agent-workflow");
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Text);
+    let executor = Executor::new_with_agent_adapter(Box::new(adapter));
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    match result.status {
+        NodeStatus::Failed { error } => assert!(error.contains("session unavailable"), "error: {error}"),
+        other => panic!("expected failed agent node, got {other:?}"),
+    }
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.errors]
+#[tokio::test]
+async fn adapter_failure_marks_node_failed() {
+    let adapter = ErrorAgentAdapter::new(AgentError::Adapter("adapter exploded".to_string()));
+    let mut workflow = Workflow::new("agent-workflow");
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let executor = Executor::new_with_agent_adapter(Box::new(adapter));
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    match result.status {
+        NodeStatus::Failed { error } => assert!(error.contains("adapter exploded"), "error: {error}"),
+        other => panic!("expected failed agent node, got {other:?}"),
+    }
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.errors]
+#[tokio::test]
+async fn credential_failure_skips_agent_adapter_call() {
+    let adapter = ErrorAgentAdapter::new(AgentError::Adapter("should not be called".to_string()));
+    let observed_adapter = adapter.clone();
+    let mut workflow = Workflow::new("agent-workflow");
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    workflow.set_node_credentials(node_id, NodeCredentialRefs {
+        env: [(SECRET_ENV_NAME.to_string(), SecretRef::new(SECRET_PROVIDER, SECRET_KEY, None))].into(),
+    });
+    let executor = Executor::new_with_agent_adapter(Box::new(adapter));
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    match result.status {
+        NodeStatus::Failed { error } => assert!(error.contains("missing secret"), "error: {error}"),
+        other => panic!("expected failed agent node, got {other:?}"),
+    }
+    assert_eq!(observed_adapter.calls(), 0);
 }

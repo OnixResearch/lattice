@@ -28,11 +28,13 @@ use crate::engine::workflow::NodeConfig;
 use crate::store::RunDetailRecord;
 use crate::store::RunNodeDetail;
 use crate::store::RunNodeDetailStatus;
+use crate::tui::app::AddNodeKind;
 use crate::tui::app::AddNodeStep;
 use crate::tui::app::App;
 use crate::tui::app::FocusPanel;
 use crate::tui::app::NodeRunStatus;
 use crate::tui::app::PropertyEditField;
+use crate::tui::app::credentials_to_draft;
 use crate::tui::app::rendered_latest_node_output_lines;
 use crate::workflow_validation;
 use crate::workflow_validation::DiagnosticSeverity;
@@ -349,6 +351,19 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
                     Span::styled("Prompt: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(settings.prompt.clone(), Style::default().fg(Color::Gray)),
                 ]));
+                if let Some(session) = &settings.session {
+                    lines.push(Line::from(vec![
+                        Span::styled("Session: ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(session.clone(), Style::default().fg(Color::Gray)),
+                    ]));
+                }
+                let credentials = credentials_to_draft(app.workflow.node_credentials(node_id));
+                if !credentials.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled("Credentials: ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(credentials, Style::default().fg(Color::Gray)),
+                    ]));
+                }
             }
         }
     }
@@ -409,6 +424,16 @@ fn property_field_title(field: PropertyEditField) -> &'static str {
         PropertyEditField::Label => "Label",
         PropertyEditField::Command => "Command",
         PropertyEditField::TimeoutSecs => "Timeout",
+        PropertyEditField::ImagePath => "Image Path",
+        PropertyEditField::AgentPrompt => "Agent Prompt",
+        PropertyEditField::AgentTarget => "Agent Target",
+        PropertyEditField::AgentOutputMode => "Agent Output Mode",
+        PropertyEditField::AgentModelHint => "Agent Model Hint",
+        PropertyEditField::AgentToolPolicy => "Agent Tool Policy",
+        PropertyEditField::AgentContextRefs => "Agent Context Refs",
+        PropertyEditField::AgentCwd => "Agent CWD",
+        PropertyEditField::AgentSession => "Agent Session",
+        PropertyEditField::AgentCredentials => "Agent Credentials",
     }
 }
 
@@ -547,7 +572,7 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
 
     match context.focus {
         FocusPanel::Canvas => " e: cmd │ l: label │ t: timeout │ C-D: diagnostics │ C-R: run │ C-P: palette ",
-        FocusPanel::Properties => " e: cmd │ l: label │ t: timeout │ C-S: save │ A-Tab: focus ",
+        FocusPanel::Properties => " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
 }
@@ -579,7 +604,7 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
 
     match context.focus {
         FocusPanel::Canvas => " e cmd │ l label ",
-        FocusPanel::Properties => " e cmd │ l label ",
+        FocusPanel::Properties => " e cmd │ p agent ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
 }
@@ -775,21 +800,52 @@ fn render_add_node_flow(app: &App, area: Rect, buf: &mut Buffer) {
     block.render(flow_area, buf);
 
     let lines = match app.add_node_flow.step {
+        AddNodeStep::Kind => render_add_node_kind_lines(),
         AddNodeStep::TemplateSelect => render_add_node_template_lines(app),
         AddNodeStep::Label => vec![
-            Line::styled("Shell node label", Style::default().fg(Color::Yellow)),
+            Line::styled(add_node_label_title(app.add_node_flow.kind), Style::default().fg(Color::Yellow)),
             Line::from(app.add_node_flow.label.clone()),
-            Line::styled("Enter: command │ Esc: cancel", Style::default().fg(Color::DarkGray)),
+            Line::styled("Enter: next │ Esc: cancel", Style::default().fg(Color::DarkGray)),
         ],
         AddNodeStep::TemplateParameter => render_add_node_parameter_lines(app),
         AddNodeStep::Command => vec![
-            Line::styled("Shell command", Style::default().fg(Color::Yellow)),
+            Line::styled(add_node_config_title(app.add_node_flow.kind), Style::default().fg(Color::Yellow)),
             Line::from(app.add_node_flow.command.clone()),
             Line::styled("Enter: create │ Esc: cancel", Style::default().fg(Color::DarkGray)),
         ],
     };
 
     Paragraph::new(lines).render(inner, buf);
+}
+
+fn render_add_node_kind_lines() -> Vec<Line<'static>> {
+    vec![
+        Line::styled("Choose node type", Style::default().fg(Color::Yellow)),
+        Line::from("s: shell"),
+        Line::from("i: image input"),
+        Line::from("p: Pi agent"),
+        Line::from("c: Clankers agent"),
+        Line::from("t: templates"),
+        Line::styled("Enter: shell │ Esc: cancel", Style::default().fg(Color::DarkGray)),
+    ]
+}
+
+fn add_node_label_title(kind: AddNodeKind) -> &'static str {
+    match kind {
+        AddNodeKind::Shell => "Shell node label",
+        AddNodeKind::ImageInput => "Image input label",
+        AddNodeKind::PiAgent => "Pi agent label",
+        AddNodeKind::ClankersAgent => "Clankers agent label",
+    }
+}
+
+fn add_node_config_title(kind: AddNodeKind) -> &'static str {
+    match kind {
+        AddNodeKind::Shell => "Shell command",
+        AddNodeKind::ImageInput => "Image path",
+        AddNodeKind::PiAgent => "Pi agent prompt",
+        AddNodeKind::ClankersAgent => "Clankers agent prompt",
+    }
 }
 
 fn render_add_node_template_lines(app: &App) -> Vec<Line<'static>> {
@@ -979,7 +1035,7 @@ mod tests {
     fn contextual_help_matches_properties_and_output_focus() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Properties)),
-            " e: cmd │ l: label │ t: timeout │ C-S: save │ A-Tab: focus ",
+            " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds ",
         );
         assert_eq!(contextual_help_text(context(FocusPanel::Output)), " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",);
     }

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::sync::Arc;
 
 use crossterm::cursor;
 use crossterm::event;
@@ -27,9 +28,14 @@ use tokio::task::JoinHandle;
 use tracing::error;
 use tracing::info;
 
+use crate::agent_node;
+use crate::agent_node::AgentOutputMode;
+use crate::agent_node::AgentTarget;
 use crate::config::AppConfig;
 use crate::config::NodeTemplate;
 use crate::config::render_template_command;
+use crate::credentials::NodeCredentialRefs;
+use crate::credentials::SecretRef;
 use crate::engine::executor::Executor;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
@@ -53,6 +59,10 @@ const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
 const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
 const RUN_HISTORY_LIMIT: usize = 20;
 const INITIAL_TUI_RUN_ID: u64 = 0;
+const CREDENTIAL_ENTRY_SEPARATOR: &str = ",";
+const CREDENTIAL_BINDING_SEPARATOR: &str = "=";
+const SECRET_IDENTITY_SEPARATOR: &str = ":";
+const SECRET_FIELD_SEPARATOR: &str = ".";
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,6 +141,16 @@ pub enum PropertyEditField {
     Label,
     Command,
     TimeoutSecs,
+    ImagePath,
+    AgentPrompt,
+    AgentTarget,
+    AgentOutputMode,
+    AgentModelHint,
+    AgentToolPolicy,
+    AgentContextRefs,
+    AgentCwd,
+    AgentSession,
+    AgentCredentials,
 }
 
 impl PropertyEditField {
@@ -139,6 +159,16 @@ impl PropertyEditField {
             Self::Label => "label",
             Self::Command => "command",
             Self::TimeoutSecs => "timeout",
+            Self::ImagePath => "image path",
+            Self::AgentPrompt => "agent prompt",
+            Self::AgentTarget => "agent target",
+            Self::AgentOutputMode => "agent output mode",
+            Self::AgentModelHint => "agent model hint",
+            Self::AgentToolPolicy => "agent tool policy",
+            Self::AgentContextRefs => "agent context refs",
+            Self::AgentCwd => "agent cwd",
+            Self::AgentSession => "agent session",
+            Self::AgentCredentials => "agent credentials",
         }
     }
 }
@@ -157,10 +187,67 @@ pub enum PropertyEditError {
     NodeNotFound,
     MissingConfig,
     InvalidTimeout,
+    InvalidAgentTarget,
+    InvalidAgentOutputMode,
+    InvalidAgentCredentials,
 }
 
 pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
     input.trim().parse::<u64>().map_err(|_| PropertyEditError::InvalidTimeout)
+}
+
+pub fn validate_agent_target(input: &str) -> Result<AgentTarget, PropertyEditError> {
+    agent_node::parse_agent_target(input.trim()).map_err(|_| PropertyEditError::InvalidAgentTarget)
+}
+
+pub fn validate_agent_output_mode(input: &str) -> Result<AgentOutputMode, PropertyEditError> {
+    agent_node::parse_agent_output_mode(input.trim()).map_err(|_| PropertyEditError::InvalidAgentOutputMode)
+}
+
+fn optional_draft_value(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn context_refs_from_draft(input: &str) -> Vec<String> {
+    input.split(',').map(str::trim).filter(|value| !value.is_empty()).map(str::to_string).collect()
+}
+
+fn credentials_from_draft(input: &str) -> Result<NodeCredentialRefs, PropertyEditError> {
+    let mut refs = NodeCredentialRefs::default();
+    for entry in input.split(CREDENTIAL_ENTRY_SEPARATOR).map(str::trim).filter(|entry| !entry.is_empty()) {
+        let Some((env_name, identity)) = entry.split_once(CREDENTIAL_BINDING_SEPARATOR) else {
+            return Err(PropertyEditError::InvalidAgentCredentials);
+        };
+        let Some((provider, key_with_field)) = identity.trim().split_once(SECRET_IDENTITY_SEPARATOR) else {
+            return Err(PropertyEditError::InvalidAgentCredentials);
+        };
+        let (key, field) = match key_with_field.split_once(SECRET_FIELD_SEPARATOR) {
+            Some((key, field)) => (key, optional_draft_value(field)),
+            None => (key_with_field, None),
+        };
+        let env_name = env_name.trim();
+        let provider = provider.trim();
+        let key = key.trim();
+        if env_name.is_empty() || provider.is_empty() || key.is_empty() {
+            return Err(PropertyEditError::InvalidAgentCredentials);
+        }
+        refs.env.insert(env_name.to_string(), SecretRef::new(provider, key, field));
+    }
+    Ok(refs)
+}
+
+pub(crate) fn credentials_to_draft(credentials: Option<&NodeCredentialRefs>) -> String {
+    let mut refs = credentials.map(|credentials| credentials.env.iter().collect::<Vec<_>>()).unwrap_or_default();
+    refs.sort_by_key(|(env_name, _)| *env_name);
+    refs.into_iter()
+        .map(|(env_name, secret_ref)| format!("{}={}", env_name, secret_ref.identity()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub fn normalized_node_label(input: &str, default_label: &str) -> String {
@@ -380,16 +467,26 @@ fn run_detail_status_from_node_run_status(status: NodeRunStatus) -> RunNodeDetai
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddNodeStep {
+    Kind,
     TemplateSelect,
     TemplateParameter,
     Label,
     Command,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddNodeKind {
+    Shell,
+    ImageInput,
+    PiAgent,
+    ClankersAgent,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddNodeFlowState {
     pub open: bool,
     pub step: AddNodeStep,
+    pub kind: AddNodeKind,
     pub label: String,
     pub command: String,
     pub selected_template: usize,
@@ -402,6 +499,20 @@ impl AddNodeFlowState {
         Self {
             open: false,
             step: AddNodeStep::Label,
+            kind: AddNodeKind::Shell,
+            label: String::new(),
+            command: String::new(),
+            selected_template: 0,
+            parameter_values: Vec::new(),
+            parameter_index: 0,
+        }
+    }
+
+    fn kind() -> Self {
+        Self {
+            open: true,
+            step: AddNodeStep::Kind,
+            kind: AddNodeKind::Shell,
             label: String::new(),
             command: String::new(),
             selected_template: 0,
@@ -414,6 +525,20 @@ impl AddNodeFlowState {
         Self {
             open: true,
             step: AddNodeStep::Label,
+            kind: AddNodeKind::Shell,
+            label: default_label,
+            command: String::new(),
+            selected_template: 0,
+            parameter_values: Vec::new(),
+            parameter_index: 0,
+        }
+    }
+
+    fn typed(kind: AddNodeKind, default_label: String) -> Self {
+        Self {
+            open: true,
+            step: AddNodeStep::Label,
+            kind,
             label: default_label,
             command: String::new(),
             selected_template: 0,
@@ -426,6 +551,7 @@ impl AddNodeFlowState {
         Self {
             open: true,
             step: AddNodeStep::TemplateSelect,
+            kind: AddNodeKind::Shell,
             label: String::new(),
             command: String::new(),
             selected_template: 0,
@@ -650,6 +776,7 @@ pub struct App {
     pub last_drag_canvas: Option<(i32, i32)>,
     dirty: bool,
     confirm_quit: bool,
+    executor_factory: Arc<dyn Fn() -> Executor + Send + Sync>,
 }
 
 impl App {
@@ -697,7 +824,13 @@ impl App {
             last_drag_canvas: None,
             dirty: false,
             confirm_quit: false,
+            executor_factory: Arc::new(Executor::new),
         }
+    }
+
+    #[cfg(test)]
+    fn set_executor_factory(&mut self, factory: Arc<dyn Fn() -> Executor + Send + Sync>) {
+        self.executor_factory = factory;
     }
 
     /// Return whether the workflow has unsaved changes.
@@ -774,11 +907,7 @@ impl App {
         self.workflow_browser = WorkflowBrowserState::closed();
         self.diagnostics.open = false;
         self.property_edit = None;
-        self.add_node_flow = if self.node_templates.is_empty() {
-            AddNodeFlowState::shell(self.next_shell_node_label())
-        } else {
-            AddNodeFlowState::templates()
-        };
+        self.add_node_flow = AddNodeFlowState::kind();
     }
 
     /// Cancel guided add-node state without mutating the workflow.
@@ -789,6 +918,26 @@ impl App {
     /// Switch from template selection to manual shell-node entry.
     pub fn start_manual_shell_node_flow(&mut self) {
         self.add_node_flow = AddNodeFlowState::shell(self.next_shell_node_label());
+    }
+
+    pub fn start_template_node_flow(&mut self) {
+        if self.node_templates.is_empty() {
+            self.output.push_line("No node templates configured");
+            return;
+        }
+        self.add_node_flow = AddNodeFlowState::templates();
+    }
+
+    pub fn start_image_input_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::ImageInput, self.next_image_node_label());
+    }
+
+    pub fn start_pi_agent_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::PiAgent, self.next_agent_node_label());
+    }
+
+    pub fn start_clankers_agent_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::ClankersAgent, self.next_agent_node_label());
     }
 
     /// Move add-node template selection down.
@@ -808,6 +957,7 @@ impl App {
     /// Append one character to the active add-node draft field.
     pub fn push_add_node_char(&mut self, ch: char) {
         match self.add_node_flow.step {
+            AddNodeStep::Kind => {}
             AddNodeStep::Label => self.add_node_flow.label.push(ch),
             AddNodeStep::Command => self.add_node_flow.command.push(ch),
             AddNodeStep::TemplateParameter => {
@@ -822,6 +972,7 @@ impl App {
     /// Remove one character from the active add-node draft field.
     pub fn pop_add_node_char(&mut self) {
         match self.add_node_flow.step {
+            AddNodeStep::Kind => {}
             AddNodeStep::Label => {
                 self.add_node_flow.label.pop();
             }
@@ -840,10 +991,20 @@ impl App {
     /// Advance or finish the guided add-node flow.
     pub fn confirm_add_node_flow(&mut self) {
         match self.add_node_flow.step {
+            AddNodeStep::Kind => self.start_manual_shell_node_flow(),
             AddNodeStep::TemplateSelect => self.confirm_template_node(),
             AddNodeStep::TemplateParameter => self.confirm_template_parameter(),
             AddNodeStep::Label => self.add_node_flow.step = AddNodeStep::Command,
-            AddNodeStep::Command => self.confirm_shell_node_from_flow(),
+            AddNodeStep::Command => self.confirm_typed_node_from_flow(),
+        }
+    }
+
+    fn confirm_typed_node_from_flow(&mut self) {
+        match self.add_node_flow.kind {
+            AddNodeKind::Shell => self.confirm_shell_node_from_flow(),
+            AddNodeKind::ImageInput => self.confirm_image_input_node_from_flow(),
+            AddNodeKind::PiAgent => self.confirm_agent_node_from_flow(AgentTarget::Pi),
+            AddNodeKind::ClankersAgent => self.confirm_agent_node_from_flow(AgentTarget::Clankers),
         }
     }
 
@@ -851,6 +1012,20 @@ impl App {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_shell_node_label());
         let command = self.add_node_flow.command.clone();
         self.add_shell_node(&label, &command);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_image_input_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_image_node_label());
+        let path = self.add_node_flow.command.clone();
+        self.add_image_input_node(&label, &path);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_agent_node_from_flow(&mut self, target: AgentTarget) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_agent_node_label());
+        let prompt = self.add_node_flow.command.clone();
+        self.add_agent_node(&label, target, &prompt, AgentOutputMode::Image);
         self.cancel_add_node_flow();
     }
 
@@ -926,6 +1101,14 @@ impl App {
 
     fn next_shell_node_label(&self) -> String {
         format!("Shell {}", self.workflow.graph.node_count() + 1)
+    }
+
+    fn next_image_node_label(&self) -> String {
+        format!("Image {}", self.workflow.graph.node_count() + 1)
+    }
+
+    fn next_agent_node_label(&self) -> String {
+        format!("Agent {}", self.workflow.graph.node_count() + 1)
     }
 
     /// Return whether the run-history modal is open.
@@ -1197,6 +1380,18 @@ impl App {
                 self.output.push_line("Invalid timeout; enter whole seconds");
                 false
             }
+            Err(PropertyEditError::InvalidAgentTarget) => {
+                self.output.push_line("Invalid agent target; enter pi or clankers");
+                false
+            }
+            Err(PropertyEditError::InvalidAgentOutputMode) => {
+                self.output.push_line("Invalid agent output mode; enter text, json, image, or artifact");
+                false
+            }
+            Err(PropertyEditError::InvalidAgentCredentials) => {
+                self.output.push_line("Invalid agent credentials; use ENV=provider:key[, ENV=provider:key.field]");
+                false
+            }
             Err(_) => {
                 self.output.push_line("Property edit failed");
                 false
@@ -1226,6 +1421,46 @@ impl App {
                     Some(timeout_secs.to_string())
                 }
                 NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => None,
+            },
+            PropertyEditField::ImagePath => match self.workflow.node_config(node_id)? {
+                NodeConfig::ImageInput { path, .. } => Some(path.clone()),
+                _ => None,
+            },
+            PropertyEditField::AgentPrompt => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.prompt.clone()),
+                _ => None,
+            },
+            PropertyEditField::AgentTarget => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(agent_node::agent_target_label(settings.target).to_string()),
+                _ => None,
+            },
+            PropertyEditField::AgentOutputMode => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.output_mode.as_str().to_string()),
+                _ => None,
+            },
+            PropertyEditField::AgentModelHint => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.model_hint.clone().unwrap_or_default()),
+                _ => None,
+            },
+            PropertyEditField::AgentToolPolicy => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.tool_policy.clone()),
+                _ => None,
+            },
+            PropertyEditField::AgentContextRefs => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.context_refs.join(", ")),
+                _ => None,
+            },
+            PropertyEditField::AgentCwd => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.cwd.clone().unwrap_or_default()),
+                _ => None,
+            },
+            PropertyEditField::AgentSession => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(settings) => Some(settings.session.clone().unwrap_or_default()),
+                _ => None,
+            },
+            PropertyEditField::AgentCredentials => match self.workflow.node_config(node_id)? {
+                NodeConfig::Agent(_) => Some(credentials_to_draft(self.workflow.node_credentials(node_id))),
+                _ => None,
             },
         }
     }
@@ -1312,6 +1547,64 @@ impl App {
                     }
                 }
             }
+            PropertyEditField::ImagePath => {
+                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                match config {
+                    NodeConfig::ImageInput {
+                        allowed_roots,
+                        max_bytes,
+                        ..
+                    } => {
+                        self.workflow.set_node_config(edit.node_id, NodeConfig::ImageInput {
+                            path: edit.draft.clone(),
+                            allowed_roots,
+                            max_bytes,
+                        });
+                        Ok(())
+                    }
+                    _ => Err(PropertyEditError::MissingConfig),
+                }
+            }
+            PropertyEditField::AgentPrompt
+            | PropertyEditField::AgentTarget
+            | PropertyEditField::AgentOutputMode
+            | PropertyEditField::AgentModelHint
+            | PropertyEditField::AgentToolPolicy
+            | PropertyEditField::AgentContextRefs
+            | PropertyEditField::AgentCwd
+            | PropertyEditField::AgentSession => {
+                let Some(NodeConfig::Agent(mut settings)) = self.workflow.node_config(edit.node_id).cloned() else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                match edit.field {
+                    PropertyEditField::AgentPrompt => settings.prompt = edit.draft.clone(),
+                    PropertyEditField::AgentTarget => settings.target = validate_agent_target(&edit.draft)?,
+                    PropertyEditField::AgentOutputMode => {
+                        settings.output_mode = validate_agent_output_mode(&edit.draft)?;
+                    }
+                    PropertyEditField::AgentModelHint => settings.model_hint = optional_draft_value(&edit.draft),
+                    PropertyEditField::AgentToolPolicy => settings.tool_policy = edit.draft.clone(),
+                    PropertyEditField::AgentContextRefs => settings.context_refs = context_refs_from_draft(&edit.draft),
+                    PropertyEditField::AgentCwd => settings.cwd = optional_draft_value(&edit.draft),
+                    PropertyEditField::AgentSession => settings.session = optional_draft_value(&edit.draft),
+                    PropertyEditField::Label
+                    | PropertyEditField::Command
+                    | PropertyEditField::TimeoutSecs
+                    | PropertyEditField::ImagePath
+                    | PropertyEditField::AgentCredentials => return Err(PropertyEditError::MissingConfig),
+                }
+                self.workflow.set_node_config(edit.node_id, NodeConfig::Agent(settings));
+                Ok(())
+            }
+            PropertyEditField::AgentCredentials => match self.workflow.node_config(edit.node_id) {
+                Some(NodeConfig::Agent(_)) => {
+                    self.workflow.set_node_credentials(edit.node_id, credentials_from_draft(&edit.draft)?);
+                    Ok(())
+                }
+                _ => Err(PropertyEditError::MissingConfig),
+            },
         }
     }
 
@@ -1327,6 +1620,22 @@ impl App {
     /// Add a new shell node to the workflow.
     pub fn add_shell_node(&mut self, label: &str, command: &str) {
         let id = self.workflow.add_shell_node(label, command);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    pub fn add_image_input_node(&mut self, label: &str, path: &str) {
+        let id = self.workflow.add_image_input_node(label, path);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    pub fn add_agent_node(&mut self, label: &str, target: AgentTarget, prompt: &str, output_mode: AgentOutputMode) {
+        let id = self.workflow.add_agent_node(label, target, prompt, output_mode);
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -1418,8 +1727,9 @@ impl App {
         self.output.push_line(message);
 
         let active_workflow = workflow.clone();
+        let executor_factory = self.executor_factory.clone();
         let handle = tokio::spawn(async move {
-            let mut executor = Executor::new();
+            let mut executor = executor_factory();
             let cache = HashMap::new();
             let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
             let _ = sender.send(RunEvent::Completed {
@@ -1678,11 +1988,18 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::agent_node::AgentAdapter;
+    use crate::agent_node::AgentError;
+    use crate::agent_node::AgentRequest;
+    use crate::agent_node::AgentResponse;
     use crate::config::PortTemplate;
     use crate::config::TemplateParameter;
     use crate::config::TemplateParameterDefault;
     use crate::config::TemplateParameterType;
     use crate::engine::value::ContentHash;
+    use crate::engine::value::ImageMetadata;
+    use crate::engine::value::ImageValue;
+    use crate::image_node::MemoryImageIo;
 
     const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
     const RUN_EVENT_POLL_LIMIT: usize = 50;
@@ -1690,6 +2007,7 @@ mod tests {
     const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
     const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
     const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
+    const AGENT_IMAGE_OUTPUT_INDEX: usize = 2;
     const EXIT_CODE_SUCCESS: i32 = 0;
     const EXIT_CODE_GREP_NO_MATCH: i32 = 1;
     const SNAPSHOT_RUN_ID: u64 = 0;
@@ -1709,6 +2027,21 @@ mod tests {
     const TEMPLATE_NUMBER_DEFAULT: f64 = 10.0;
     const TEMPLATE_NUMBER_MIN: f64 = 1.0;
     const TEMPLATE_NUMBER_MAX: f64 = 10.0;
+    const IMAGE_PREVIEW_BYTES: &[u8] = b"raw-image-bytes";
+    const TUI_MISSING_IMAGE_PATH: &str = "/tui/missing.png";
+    const TUI_BAD_IMAGE_PATH: &str = "/tui/bad.png";
+    const TUI_BAD_IMAGE_BYTES: &[u8] = b"not an image";
+
+    #[derive(Debug)]
+    struct TuiErrorAgentAdapter {
+        error: AgentError,
+    }
+
+    impl AgentAdapter for TuiErrorAgentAdapter {
+        fn execute(&self, _request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+            Err(self.error.clone())
+        }
+    }
 
     fn test_config(temp_dir: &TempDir) -> AppConfig {
         let data_dir = temp_dir.path().join("data");
@@ -1726,6 +2059,24 @@ mod tests {
                 DisplayLine::Omitted(_) => None,
             })
             .collect()
+    }
+
+    fn image_executor_factory(files: HashMap<String, Vec<u8>>) -> Arc<dyn Fn() -> Executor + Send + Sync> {
+        Arc::new(move || Executor::new_with_image_io(Box::new(MemoryImageIo::new(files.clone()))))
+    }
+
+    fn agent_error_executor_factory(error: AgentError) -> Arc<dyn Fn() -> Executor + Send + Sync> {
+        Arc::new(move || Executor::new_with_agent_adapter(Box::new(TuiErrorAgentAdapter { error: error.clone() })))
+    }
+
+    async fn drain_run(app: &mut App) {
+        for _ in 0..RUN_EVENT_POLL_LIMIT {
+            app.poll_run_events();
+            if !app.run_state.active {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(RUN_EVENT_POLL_DELAY_MS)).await;
+        }
     }
 
     fn parameterized_grep_template() -> NodeTemplate {
@@ -1945,6 +2296,7 @@ mod tests {
         let mut app = App::new(test_config(&temp_dir));
 
         app.open_add_node_flow();
+        app.start_manual_shell_node_flow();
         app.add_node_flow.label = "Custom".to_string();
         app.confirm_add_node_flow();
         app.add_node_flow.command = "echo custom".to_string();
@@ -1959,6 +2311,123 @@ mod tests {
         }
         assert!(!app.is_add_node_flow_open());
         assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn add_node_flow_creates_image_input_node() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_add_node_flow();
+        app.start_image_input_node_flow();
+        app.add_node_flow.label = "Selfie".to_string();
+        app.confirm_add_node_flow();
+        app.add_node_flow.command = "/tmp/selfie.png".to_string();
+        app.confirm_add_node_flow();
+
+        let node_id = app.graph_state.focused.expect("new node focused");
+        match app.workflow.node_config(node_id).expect("node config") {
+            NodeConfig::ImageInput { path, .. } => assert_eq!(path, "/tmp/selfie.png"),
+            _ => panic!("expected image input config"),
+        }
+        assert!(!app.is_add_node_flow_open());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn add_node_flow_creates_pi_and_clankers_agent_nodes() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+
+        app.open_add_node_flow();
+        app.start_pi_agent_node_flow();
+        app.add_node_flow.label = "Pi image agent".to_string();
+        app.confirm_add_node_flow();
+        app.add_node_flow.command = "make art".to_string();
+        app.confirm_add_node_flow();
+        let pi_node_id = app.graph_state.focused.expect("pi node focused");
+        match app.workflow.node_config(pi_node_id).expect("pi node config") {
+            NodeConfig::Agent(settings) => {
+                assert_eq!(settings.target, AgentTarget::Pi);
+                assert_eq!(settings.prompt, "make art");
+            }
+            _ => panic!("expected agent config"),
+        }
+
+        app.open_add_node_flow();
+        app.start_clankers_agent_node_flow();
+        app.add_node_flow.label = "Clankers image agent".to_string();
+        app.confirm_add_node_flow();
+        app.add_node_flow.command = "make ink art".to_string();
+        app.confirm_add_node_flow();
+        let clankers_node_id = app.graph_state.focused.expect("clankers node focused");
+        match app.workflow.node_config(clankers_node_id).expect("clankers node config") {
+            NodeConfig::Agent(settings) => {
+                assert_eq!(settings.target, AgentTarget::Clankers);
+                assert_eq!(settings.output_mode, AgentOutputMode::Image);
+            }
+            _ => panic!("expected agent config"),
+        }
+    }
+
+    #[test]
+    fn image_and_agent_property_edits_update_config_and_reject_invalid_values() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_image_input_node("Selfie", "/tmp/old.png");
+        let image_node_id = app.graph_state.focused.expect("image node focused");
+        assert!(app.start_property_edit(PropertyEditField::ImagePath));
+        app.property_edit.as_mut().expect("image edit").draft = "/tmp/new.png".to_string();
+        assert!(app.save_property_edit());
+        match app.workflow.node_config(image_node_id).expect("image config") {
+            NodeConfig::ImageInput { path, .. } => assert_eq!(path, "/tmp/new.png"),
+            _ => panic!("expected image input config"),
+        }
+
+        app.add_agent_node("Agent", AgentTarget::Pi, "old prompt", AgentOutputMode::Text);
+        let agent_node_id = app.graph_state.focused.expect("agent node focused");
+        assert!(app.start_property_edit(PropertyEditField::AgentPrompt));
+        app.property_edit.as_mut().expect("prompt edit").draft = "new prompt".to_string();
+        assert!(app.save_property_edit());
+        assert!(app.start_property_edit(PropertyEditField::AgentTarget));
+        app.property_edit.as_mut().expect("target edit").draft = "clankers".to_string();
+        assert!(app.save_property_edit());
+        assert!(app.start_property_edit(PropertyEditField::AgentOutputMode));
+        app.property_edit.as_mut().expect("mode edit").draft = "image".to_string();
+        assert!(app.save_property_edit());
+        assert!(app.start_property_edit(PropertyEditField::AgentContextRefs));
+        app.property_edit.as_mut().expect("context edit").draft = "@one.png, @two.png".to_string();
+        assert!(app.save_property_edit());
+        assert!(app.start_property_edit(PropertyEditField::AgentSession));
+        app.property_edit.as_mut().expect("session edit").draft = "session-1".to_string();
+        assert!(app.save_property_edit());
+        assert!(app.start_property_edit(PropertyEditField::AgentCredentials));
+        app.property_edit.as_mut().expect("credential edit").draft = "TOKEN=env:artist-token".to_string();
+        assert!(app.save_property_edit());
+        match app.workflow.node_config(agent_node_id).expect("agent config") {
+            NodeConfig::Agent(settings) => {
+                assert_eq!(settings.prompt, "new prompt");
+                assert_eq!(settings.target, AgentTarget::Clankers);
+                assert_eq!(settings.output_mode, AgentOutputMode::Image);
+                assert_eq!(settings.context_refs, vec!["@one.png".to_string(), "@two.png".to_string()]);
+                assert_eq!(settings.session.as_deref(), Some("session-1"));
+            }
+            _ => panic!("expected agent config"),
+        }
+
+        let credentials = app.workflow.node_credentials(agent_node_id).expect("credentials");
+        assert_eq!(credentials.env.get("TOKEN").expect("token ref").identity(), "env:artist-token");
+
+        assert!(app.start_property_edit(PropertyEditField::AgentTarget));
+        app.property_edit.as_mut().expect("bad target edit").draft = "bad-target".to_string();
+        assert!(!app.save_property_edit());
+        assert!(app.property_edit.is_some());
+        app.cancel_property_edit();
+
+        assert!(app.start_property_edit(PropertyEditField::AgentCredentials));
+        app.property_edit.as_mut().expect("bad credentials edit").draft = "not-a-ref".to_string();
+        assert!(!app.save_property_edit());
+        assert!(app.property_edit.is_some());
     }
 
     #[test]
@@ -1982,6 +2451,7 @@ mod tests {
         }]);
 
         app.open_add_node_flow();
+        app.start_template_node_flow();
         app.confirm_add_node_flow();
 
         assert_eq!(app.workflow.graph.node_count(), 1);
@@ -2017,6 +2487,7 @@ mod tests {
         app.set_node_templates(vec![parameterized_grep_template()]);
 
         app.open_add_node_flow();
+        app.start_template_node_flow();
         app.confirm_add_node_flow();
 
         assert_eq!(app.add_node_flow.step, AddNodeStep::TemplateParameter);
@@ -2040,6 +2511,7 @@ mod tests {
         app.set_node_templates(vec![parameterized_grep_template()]);
 
         app.open_add_node_flow();
+        app.start_template_node_flow();
         app.confirm_add_node_flow();
         app.cancel_add_node_flow();
 
@@ -2066,6 +2538,7 @@ mod tests {
         app.set_node_templates(vec![template]);
 
         app.open_add_node_flow();
+        app.start_template_node_flow();
         app.confirm_add_node_flow();
         app.add_node_flow.parameter_values[TEMPLATE_FIRST_PARAMETER_INDEX] = "not-a-number".to_string();
         app.confirm_add_node_flow();
@@ -2100,6 +2573,29 @@ mod tests {
                 "  │ exit: exit code: 0".to_string()
             ],
         );
+    }
+
+    #[test]
+    fn completed_image_outputs_render_bounded_preview_metadata() {
+        let mut workflow = Workflow::new("image-preview");
+        let node_id = workflow.add_agent_node("Image agent", AgentTarget::Clankers, "make art", AgentOutputMode::Image);
+        let node = workflow.graph.node(node_id).expect("node exists");
+        let image_port = node.output_ports[AGENT_IMAGE_OUTPUT_INDEX].id;
+        let mut outputs = HashMap::new();
+        outputs.insert(
+            image_port,
+            Value::from_image(ImageValue::new(
+                IMAGE_PREVIEW_BYTES.to_vec(),
+                "image/png".to_string(),
+                ImageMetadata::default(),
+            )),
+        );
+
+        let rendered =
+            rendered_output_records(completed_output_records(RunId(SNAPSHOT_RUN_ID), &workflow, node_id, &outputs));
+
+        assert!(rendered.iter().any(|line| line.contains("image: image/png image")));
+        assert!(!rendered.iter().any(|line| line.contains("raw-image-bytes")));
     }
 
     #[test]
@@ -2281,6 +2777,62 @@ mod tests {
 
         assert!(!app.run_state.active);
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
+    }
+
+    #[tokio::test]
+    async fn image_node_error_feedback_is_visible_after_run_failure() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut missing_app = App::new(test_config(&temp_dir));
+        missing_app.set_executor_factory(image_executor_factory(HashMap::new()));
+        missing_app.add_image_input_node("Missing image", TUI_MISSING_IMAGE_PATH);
+        let missing_node_id = missing_app.graph_state.focused.expect("missing image node focused");
+
+        assert!(missing_app.start_workflow_run());
+        drain_run(&mut missing_app).await;
+
+        assert_eq!(missing_app.run_state.node_statuses.get(&missing_node_id.0), Some(&NodeRunStatus::Failed),);
+        assert!(output_text_lines(&missing_app).iter().any(|line| line.contains("missing image")));
+
+        let mut invalid_app = App::new(test_config(&temp_dir));
+        invalid_app.set_executor_factory(image_executor_factory(
+            [(TUI_BAD_IMAGE_PATH.to_string(), TUI_BAD_IMAGE_BYTES.to_vec())].into(),
+        ));
+        invalid_app.add_image_input_node("Bad image", TUI_BAD_IMAGE_PATH);
+        let invalid_node_id = invalid_app.graph_state.focused.expect("invalid image node focused");
+
+        assert!(invalid_app.start_workflow_run());
+        drain_run(&mut invalid_app).await;
+
+        assert_eq!(invalid_app.run_state.node_statuses.get(&invalid_node_id.0), Some(&NodeRunStatus::Failed),);
+        assert!(output_text_lines(&invalid_app).iter().any(|line| line.contains("unsupported image format")));
+    }
+
+    #[tokio::test]
+    async fn agent_error_feedback_is_visible_after_run_failure() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_agent_node("Pi agent", AgentTarget::Pi, "summarize", AgentOutputMode::Text);
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert!(app.start_workflow_run());
+        drain_run(&mut app).await;
+
+        assert!(!app.run_state.active);
+        assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
+        assert!(output_text_lines(&app).iter().any(|line| line.contains("unsupported agent target: pi")));
+
+        let mut preflight_app = App::new(test_config(&temp_dir));
+        preflight_app.set_executor_factory(agent_error_executor_factory(AgentError::PreflightRejected(
+            "model unavailable".to_string(),
+        )));
+        preflight_app.add_agent_node("Preflight agent", AgentTarget::Clankers, "summarize", AgentOutputMode::Text);
+        let preflight_node_id = preflight_app.graph_state.focused.expect("preflight node focused");
+
+        assert!(preflight_app.start_workflow_run());
+        drain_run(&mut preflight_app).await;
+
+        assert_eq!(preflight_app.run_state.node_statuses.get(&preflight_node_id.0), Some(&NodeRunStatus::Failed),);
+        assert!(output_text_lines(&preflight_app).iter().any(|line| line.contains("preflight rejected")));
     }
 
     #[tokio::test]

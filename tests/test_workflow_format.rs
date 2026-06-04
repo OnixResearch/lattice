@@ -192,6 +192,24 @@ fn portable_import_rejects_invalid_agent_output_mode() {
 }
 
 #[test]
+fn portable_import_rejects_incompatible_image_agent_port() {
+    let mut workflow = Workflow::new("invalid-image-port-workflow");
+    let image_id = workflow.add_image_input_node("Selfie", IMAGE_PATH);
+    let shell_id = workflow.add_shell_node("String consumer", "cat");
+    let image_output = workflow.graph.node(image_id).expect("image node").output_ports[0].id;
+    let shell_input = workflow.graph.node(shell_id).expect("shell node").input_ports[0].id;
+    let mut portable = workflow_to_portable(&workflow);
+    portable.edges.push(PortableEdge {
+        source: image_output.0,
+        target: shell_input.0,
+    });
+
+    let error = portable_to_workflow(portable).expect_err("incompatible image edge rejected");
+
+    assert!(matches!(error, WorkflowFormatError::InvalidGraph(_)));
+}
+
+#[test]
 fn nickel_import_rejects_missing_required_field() {
     let temp_dir = tempfile::tempdir().expect("temporary workflow format directory");
     let workflow_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);

@@ -19,6 +19,7 @@ They are useful for demos, import/export validation, and headless regression tes
 - `csv-cleanup-report.ncl` — filters active CSV records, sorts/deduplicates them, and renders a team report.
 - `log-triage.ncl` — filters warning/error log lines and renders an incident summary.
 - `complex-text-normalization.ncl` — sorts, deduplicates, filters, replaces, and counts text lines.
+- `selfie-to-fine-art.ncl` — routes a selfie plus inspiration images through a generic Clankers agent node.
 
 Import and run one with a temporary config/store:
 

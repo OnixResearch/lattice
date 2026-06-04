@@ -16,6 +16,7 @@ const IMAGE_NODE_LABEL: &str = "selfie";
 const PATH_ALLOWED_PNG: &str = "/allowed/selfie.png";
 const PATH_ALLOWED_JPEG: &str = "/allowed/selfie.jpg";
 const PATH_OTHER: &str = "/other/selfie.png";
+const PATH_MISSING: &str = "/allowed/missing.png";
 const ROOT_ALLOWED: &str = "/allowed";
 const IMAGE_OUTPUT_INDEX: usize = 0;
 const METADATA_OUTPUT_INDEX: usize = 1;
@@ -104,6 +105,21 @@ async fn unsupported_image_format_marks_node_failed() {
 
     match result.status {
         NodeStatus::Failed { error } => assert!(error.contains("unsupported image format"), "error: {error}"),
+        other => panic!("expected failed image node, got {other:?}"),
+    }
+}
+
+// r[verify n8nclone.workflow_execution.image_input_nodes.load]
+#[tokio::test]
+async fn missing_image_marks_node_failed() {
+    let mut workflow = Workflow::new("missing-image-workflow");
+    let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_MISSING);
+    let executor = Executor::new_with_image_io(Box::new(image_io()));
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    match result.status {
+        NodeStatus::Failed { error } => assert!(error.contains("missing image"), "error: {error}"),
         other => panic!("expected failed image node, got {other:?}"),
     }
 }

@@ -166,6 +166,10 @@ fn handle_add_node_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         AddNodeKeyAction::SelectNextTemplate => app.select_next_node_template(),
         AddNodeKeyAction::SelectPreviousTemplate => app.select_previous_node_template(),
         AddNodeKeyAction::ManualShell => app.start_manual_shell_node_flow(),
+        AddNodeKeyAction::ImageInput => app.start_image_input_node_flow(),
+        AddNodeKeyAction::PiAgent => app.start_pi_agent_node_flow(),
+        AddNodeKeyAction::ClankersAgent => app.start_clankers_agent_node_flow(),
+        AddNodeKeyAction::TemplateSelect => app.start_template_node_flow(),
         AddNodeKeyAction::Ignore => {}
     }
     None
@@ -180,6 +184,10 @@ enum AddNodeKeyAction {
     SelectNextTemplate,
     SelectPreviousTemplate,
     ManualShell,
+    ImageInput,
+    PiAgent,
+    ClankersAgent,
+    TemplateSelect,
     Ignore,
 }
 
@@ -191,11 +199,27 @@ fn add_node_key_action(key: &KeyEvent, step: AddNodeStep) -> AddNodeKeyAction {
         KeyCode::Down if step == AddNodeStep::TemplateSelect => AddNodeKeyAction::SelectNextTemplate,
         KeyCode::Up if step == AddNodeStep::TemplateSelect => AddNodeKeyAction::SelectPreviousTemplate,
         KeyCode::Char('s') | KeyCode::Char('S')
-            if step == AddNodeStep::TemplateSelect && accepts_palette_text(key.modifiers) =>
+            if matches!(step, AddNodeStep::Kind | AddNodeStep::TemplateSelect)
+                && accepts_palette_text(key.modifiers) =>
         {
             AddNodeKeyAction::ManualShell
         }
-        KeyCode::Char(ch) if accepts_palette_text(key.modifiers) && step != AddNodeStep::TemplateSelect => {
+        KeyCode::Char('i') | KeyCode::Char('I') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::ImageInput
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::PiAgent
+        }
+        KeyCode::Char('c') | KeyCode::Char('C') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::ClankersAgent
+        }
+        KeyCode::Char('t') | KeyCode::Char('T') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::TemplateSelect
+        }
+        KeyCode::Char(ch)
+            if accepts_palette_text(key.modifiers)
+                && !matches!(step, AddNodeStep::Kind | AddNodeStep::TemplateSelect) =>
+        {
             AddNodeKeyAction::TypeChar(ch)
         }
         _ => AddNodeKeyAction::Ignore,
@@ -400,6 +424,16 @@ fn property_edit_shortcut(key: &KeyEvent) -> Option<PropertyEditField> {
         KeyCode::Char('l') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::Label),
         KeyCode::Char('e') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::Command),
         KeyCode::Char('t') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::TimeoutSecs),
+        KeyCode::Char('i') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::ImagePath),
+        KeyCode::Char('p') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentPrompt),
+        KeyCode::Char('r') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentTarget),
+        KeyCode::Char('o') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentOutputMode),
+        KeyCode::Char('m') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentModelHint),
+        KeyCode::Char('y') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentToolPolicy),
+        KeyCode::Char('x') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentContextRefs),
+        KeyCode::Char('w') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCwd),
+        KeyCode::Char('n') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentSession),
+        KeyCode::Char('k') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCredentials),
         _ => None,
     }
 }
@@ -1113,10 +1147,36 @@ mod tests {
     }
 
     #[test]
+    fn property_key_edits_agent_credentials() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_agent_node(
+            "Agent",
+            crate::agent_node::AgentTarget::Pi,
+            "prompt",
+            crate::agent_node::AgentOutputMode::Text,
+        );
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Properties;
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('k'))), None,);
+        for ch in "TOKEN=env:key".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
+        let credentials = app.workflow.node_credentials(node_id).expect("credentials");
+        assert_eq!(credentials.env.get("TOKEN").expect("token ref").identity(), "env:key");
+        assert!(app.property_edit.is_none());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
     fn add_node_keys_create_shell_node_and_cancel_flow() {
         let (_temp_dir, mut app) = test_app();
 
         app.open_add_node_flow();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('s'))), None,);
         for _ in 0.."Shell 1".chars().count() {
             assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Backspace)), None,);
         }
@@ -1134,6 +1194,28 @@ mod tests {
 
         app.open_add_node_flow();
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Esc)), None,);
+        assert_eq!(app.workflow.graph.node_count(), 1);
+        assert!(!app.is_add_node_flow_open());
+    }
+
+    #[test]
+    fn add_node_keys_create_image_input_node() {
+        let (_temp_dir, mut app) = test_app();
+
+        app.open_add_node_flow();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('i'))), None,);
+        for _ in 0.."Image 1".chars().count() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Backspace)), None,);
+        }
+        for ch in "Selfie".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+        for ch in "/tmp/selfie.png".chars() {
+            assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char(ch))), None,);
+        }
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None,);
+
         assert_eq!(app.workflow.graph.node_count(), 1);
         assert!(!app.is_add_node_flow_open());
     }
