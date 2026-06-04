@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: octet
+        name: octet
+        entry: nix develop -c octet-precommit-check
+        language: system
+        pass_filenames: false

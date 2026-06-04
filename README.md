@@ -4,10 +4,15 @@
 
 ```bash
 nix develop          # enter devshell
+pre-commit install   # install the Octet pre-commit hook
 scripts/check.rs     # run fmt, tests, and clippy with repo-local target artifacts
+octet-precommit-check # run Octet at deny/error level against octet-baseline.json
+cargo octet check    # inspect raw Octet output
 cargo check          # quick compile check
-nix flake check      # full CI (build + test + clippy + fmt)
+nix flake check      # full CI (build + test + clippy + fmt + Octet)
 ```
+
+The Octet hook runs the lib target profile, keeps every configured Octet lint at `deny`, and accepts the current checked-in `octet-baseline.json` debt. New unaccepted Octet finding IDs fail the hook.
 
 ## Examples
 

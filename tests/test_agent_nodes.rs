@@ -56,11 +56,13 @@ const SECRET_PROVIDER: &str = "env";
 const SECRET_KEY: &str = "agent_token";
 const PI_RUNTIME_KEY: &str = "pi";
 const CLANKERS_RUNTIME_KEY: &str = "clankers";
+const PROMPT_FLAG: &str = "-p";
 const PROMPT_ARG_TEMPLATE: &str = "{prompt}";
 const MODEL_ARG_TEMPLATE: &str = "{model}";
 const SESSION_ARG_TEMPLATE: &str = "{session}";
 const OUTPUT_MODE_ARG_TEMPLATE: &str = "{output_mode}";
 const FAKE_AGENT_FILE_NAME: &str = "agent-runtime.sh";
+const SHELL_COMMAND: &str = "sh";
 const RUNTIME_TEXT_OUTPUT: &str = "runtime text";
 const RUNTIME_JSON_OUTPUT: &str = "{\"ok\":true}";
 const INVALID_JSON_OUTPUT: &str = "not-json";
@@ -156,10 +158,10 @@ fn agent_request(target: AgentTarget, output_mode: AgentOutputMode) -> AgentRequ
 fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: Option<String>) -> AgentRuntimeConfig {
     let mut runtimes = BTreeMap::new();
     if let Some(command) = pi_runtime_command {
-        runtimes.insert(PI_RUNTIME_KEY.to_string(), runtime_entry(command, &["-p", PROMPT_ARG_TEMPLATE]));
+        runtimes.insert(PI_RUNTIME_KEY.to_string(), runtime_entry(command, &[PROMPT_FLAG, PROMPT_ARG_TEMPLATE]));
     }
     if let Some(command) = clankers_runtime_command {
-        runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), runtime_entry(command, &["-p", PROMPT_ARG_TEMPLATE]));
+        runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), runtime_entry(command, &[PROMPT_FLAG, PROMPT_ARG_TEMPLATE]));
     }
     AgentRuntimeConfig {
         runtimes,
@@ -171,6 +173,32 @@ fn runtime_entry(command: impl Into<String>, args: &[&str]) -> AgentCommandRunti
     AgentCommandRuntimeConfig {
         command: command.into(),
         args: args.iter().map(|arg| (*arg).to_string()).collect(),
+    }
+}
+
+#[cfg(unix)]
+fn runtime_config_for_script(
+    pi_runtime_script: Option<String>,
+    clankers_runtime_script: Option<String>,
+) -> AgentRuntimeConfig {
+    let mut runtimes = BTreeMap::new();
+    if let Some(script) = pi_runtime_script {
+        runtimes.insert(PI_RUNTIME_KEY.to_string(), script_runtime_entry(script));
+    }
+    if let Some(script) = clankers_runtime_script {
+        runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), script_runtime_entry(script));
+    }
+    AgentRuntimeConfig {
+        runtimes,
+        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+    }
+}
+
+#[cfg(unix)]
+fn script_runtime_entry(script: String) -> AgentCommandRuntimeConfig {
+    AgentCommandRuntimeConfig {
+        command: SHELL_COMMAND.to_string(),
+        args: vec![script, PROMPT_FLAG.to_string(), PROMPT_ARG_TEMPLATE.to_string()],
     }
 }
 
@@ -272,7 +300,7 @@ fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
 fn production_pi_text_adapter_executes_command() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{RUNTIME_TEXT_OUTPUT}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config(Some(command), None));
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
     let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
 
     let response = adapter.execute(&request).expect("production pi adapter runs");
@@ -288,7 +316,7 @@ fn production_pi_text_adapter_executes_command() {
 fn production_clankers_json_adapter_executes_command() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{RUNTIME_JSON_OUTPUT}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config(None, Some(command)));
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(None, Some(command)));
     let request = agent_request(AgentTarget::Clankers, AgentOutputMode::Json);
 
     let response = adapter.execute(&request).expect("production clankers adapter runs");
@@ -329,7 +357,7 @@ fn production_image_handoff_loads_typed_image() {
     fs::write(temp_dir.path().join(HANDOFF_IMAGE_FILE_NAME), IMAGE_BYTES_A).expect("image handoff written");
     let envelope = handoff_envelope(HANDOFF_IMAGE_FILE_NAME, Some(IMAGE_MEDIA_TYPE));
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config(Some(command), None));
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
     let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Image);
     request.cwd = Some(temp_dir.path().display().to_string());
 
@@ -354,7 +382,7 @@ fn production_artifact_handoff_loads_bytes() {
         .expect("artifact handoff written");
     let envelope = handoff_envelope(HANDOFF_ARTIFACT_FILE_NAME, None);
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config(None, Some(command)));
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(None, Some(command)));
     let mut request = agent_request(AgentTarget::Clankers, AgentOutputMode::Artifact);
     request.cwd = Some(temp_dir.path().display().to_string());
 
