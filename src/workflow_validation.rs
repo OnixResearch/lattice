@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::credentials;
+use crate::engine::runner;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::expressions;
@@ -41,6 +42,7 @@ pub enum WorkflowDiagnosticCode {
     InvalidImageByteBudget,
     EmptyAgentPrompt,
     InvalidExpressionSyntax,
+    RunnerCycleDetected,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +71,7 @@ pub fn validate_workflow(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     validate_node_configs(workflow, &mut diagnostics);
     validate_credentials(workflow, &mut diagnostics);
     validate_edges(workflow, &mut diagnostics);
+    validate_runner_admission(workflow, &mut diagnostics);
 
     diagnostics
 }
@@ -369,6 +372,35 @@ fn validate_edges(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>
             ));
         }
     }
+}
+
+// r[impl n8nclone.workflow_validation.generic_runner_admission]
+fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    let build = runner::build_runner_plan(workflow);
+    let Some(plan) = build.plan else {
+        return;
+    };
+    match runner::admit_runner_plan(&plan) {
+        runner::RunnerAdmission::Accepted { .. } => {}
+        runner::RunnerAdmission::Rejected {
+            diagnostics: runner_diagnostics,
+        } => {
+            diagnostics.extend(runner_diagnostics.into_iter().filter_map(workflow_diagnostic_from_runner));
+        }
+    }
+}
+
+fn workflow_diagnostic_from_runner(diagnostic: runner::RunnerDiagnostic) -> Option<WorkflowDiagnostic> {
+    let code = match diagnostic.code {
+        runner::RunnerDiagnosticCode::CycleDetected => WorkflowDiagnosticCode::RunnerCycleDetected,
+        runner::RunnerDiagnosticCode::MissingNodeConfig
+        | runner::RunnerDiagnosticCode::ConfigWithoutNode
+        | runner::RunnerDiagnosticCode::EdgePortMissing
+        | runner::RunnerDiagnosticCode::EdgeWrongDirection
+        | runner::RunnerDiagnosticCode::EdgeSelfLoop
+        | runner::RunnerDiagnosticCode::EdgeIncompatibleType => return None,
+    };
+    Some(fatal(code, diagnostic.node_id, diagnostic.port_id, diagnostic.message))
 }
 
 fn port_types_compatible(source: &str, target: &str) -> bool {

@@ -4,6 +4,7 @@
 //! Supports both step-through debug and async parallel execution.
 
 pub mod executor;
+pub mod runner;
 pub mod value;
 pub mod workflow;
 
@@ -11,6 +12,7 @@ pub use executor::ExecutionMode;
 pub use executor::Executor;
 pub use executor::RunId;
 pub use executor::StepResult;
+pub use runner::RunnerWorkflow;
 pub use value::ContentHash;
 pub use value::TypeTag;
 pub use value::Value;

@@ -1,8 +1,8 @@
 ## Phase 1: Runner IR and pure core
 
-- [ ] [serial] r[n8nclone.workflow_execution.runner_core.plan_ir] Add a pure adapter from persisted `Workflow`/`rat_nodegraph` data into a stable runner IR with typed nodes, ports, edges, runtime bindings, policies, and credential refs.
-- [ ] [parallel] r[n8nclone.workflow_execution.runner_core.trellis_graph_admission] Add pure graph admission and ready-set planning aligned with Trellis `graph_adjacency`, `job_dag`, `job_state`, and `dependency_scheduler` semantics.
-- [ ] [parallel] r[n8nclone.workflow_execution.runner_core.lifecycle] Add step lifecycle transition checks with positive/negative tests for pending, ready, running, completed, failed, and cancelled states.
+- [x] [serial] r[n8nclone.workflow_execution.runner_core.plan_ir] Add a pure adapter from persisted `Workflow`/`rat_nodegraph` data into a stable runner IR with typed nodes, ports, edges, runtime bindings, policies, and credential refs.
+- [x] [parallel] r[n8nclone.workflow_execution.runner_core.trellis_graph_admission] Add pure graph admission and ready-set planning aligned with Trellis `graph_adjacency`, `job_dag`, `job_state`, and `dependency_scheduler` semantics.
+- [x] [parallel] r[n8nclone.workflow_execution.runner_core.lifecycle] Add step lifecycle transition checks with positive/negative tests for pending, ready, running, completed, failed, and cancelled states.
 - [ ] [parallel] r[n8nclone.workflow_validation.generic_runner_admission] Extend validation with runner-admission diagnostics for cycles, missing runtime bindings, invalid effect requirements, and terminal-state mutation attempts.
 
 ## Phase 2: Runtime registry

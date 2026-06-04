@@ -27,6 +27,7 @@ const TYPE_TAG_STRING: &str = "string";
 const INVALID_PORT_ID: u64 = 880_001;
 const HEADLESS_RUN_ID: u64 = 21;
 const SINGLE_ITEM_COUNT: usize = 1;
+const SHELL_STDIN_INPUT_INDEX: usize = 0;
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -53,6 +54,18 @@ fn workflow_with_invalid_edge() -> Workflow {
     let mut value = serde_json::to_value(&workflow).expect("workflow serializes");
     value["graph"]["edges"] = json!([{ "source": INVALID_PORT_ID, "target": INVALID_PORT_ID }]);
     serde_json::from_value(value).expect("invalid edge fixture deserializes")
+}
+
+fn workflow_with_cycle() -> Workflow {
+    let (workflow, source, target) = common::two_node_pipeline();
+    let mut value = serde_json::to_value(&workflow).expect("workflow serializes");
+    let source_input = workflow.graph.node(source).expect("source node").input_ports[SHELL_STDIN_INPUT_INDEX].id.0;
+    let target_stdout = common::stdout_port_id(&workflow, target).0;
+    value["graph"]["edges"].as_array_mut().expect("edges array").push(json!({
+        "source": target_stdout,
+        "target": source_input,
+    }));
+    serde_json::from_value(value).expect("cyclic workflow fixture deserializes")
 }
 
 // r[verify n8nclone.workflow_validation.diagnostics.core]
@@ -114,6 +127,17 @@ fn invalid_edge_reference_is_fatal_and_does_not_panic() {
 
     assert!(has_fatal_diagnostics(&diagnostics));
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::EdgePortMissing));
+}
+
+// r[verify n8nclone.workflow_validation.generic_runner_admission]
+#[test]
+fn runner_cycle_admission_is_fatal_validation_diagnostic() {
+    let workflow = workflow_with_cycle();
+
+    let diagnostics = validate_workflow(&workflow);
+
+    assert!(has_fatal_diagnostics(&diagnostics));
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::RunnerCycleDetected));
 }
 
 // r[verify n8nclone.workflow_validation.run_gate]
