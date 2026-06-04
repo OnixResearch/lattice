@@ -56,6 +56,14 @@ const FAKE_AGENT_FILE_NAME: &str = "agent-runtime.sh";
 const RUNTIME_TEXT_OUTPUT: &str = "runtime text";
 const RUNTIME_JSON_OUTPUT: &str = "{\"ok\":true}";
 const INVALID_JSON_OUTPUT: &str = "not-json";
+const HANDOFF_IMAGE_FILE_NAME: &str = "agent-output.png";
+const HANDOFF_ARTIFACT_FILE_NAME: &str = "agent-output.bin";
+const HANDOFF_MISSING_FILE_NAME: &str = "missing-output.png";
+const HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME: &str = "bad-output.img";
+const HANDOFF_OUTSIDE_FILE_NAME: &str = "outside-output.png";
+const HANDOFF_METADATA_LABEL: &str = "generated";
+const HANDOFF_ARTIFACT_BYTES: &[u8] = b"artifact bytes";
+const HANDOFF_BAD_IMAGE_BYTES: &[u8] = b"not an image";
 const NONZERO_STDERR: &str = "runtime failed";
 const MODEL_HINT: &str = "test-model";
 const SESSION_ID: &str = "session-123";
@@ -63,6 +71,7 @@ const TOOL_POLICY: &str = "read-only";
 const CONTEXT_REF: &str = "@context.md";
 const EXECUTABLE_MODE: u32 = 0o755;
 const NONZERO_EXIT_CODE: i32 = 17;
+const SMALL_OUTPUT_LIMIT_BYTES: usize = 4;
 
 #[derive(Clone)]
 struct StaticAgentAdapter {
@@ -140,6 +149,7 @@ fn runtime_config(pi_command: Option<String>, clankers_command: Option<String>) 
     AgentRuntimeConfig {
         pi_command,
         clankers_command,
+        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
     }
 }
 
@@ -154,6 +164,7 @@ fn command_plan(target: AgentTarget, output_mode: AgentOutputMode) -> AgentComma
         args: Vec::new(),
         cwd: None,
         output_mode,
+        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
     }
 }
 
@@ -165,6 +176,15 @@ fn write_agent_script(temp_dir: &tempfile::TempDir, body: &str) -> String {
     permissions.set_mode(EXECUTABLE_MODE);
     fs::set_permissions(&path, permissions).expect("fake agent made executable");
     path.display().to_string()
+}
+
+fn handoff_envelope(path: &str, media_type: Option<&str>) -> String {
+    let envelope = serde_json::json!({
+        "path": path,
+        "media_type": media_type,
+        "metadata": {"label": HANDOFF_METADATA_LABEL},
+    });
+    envelope.to_string()
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
@@ -238,15 +258,166 @@ fn production_adapter_missing_command_rejects_before_spawn() {
     assert!(error.to_string().contains("missing pi agent command"), "error: {error}");
 }
 
-// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.image]
+#[cfg(unix)]
 #[test]
-fn production_adapter_rejects_unsupported_image_mode_before_spawn() {
-    let config = runtime_config(Some("pi-test".to_string()), None);
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Image);
+fn production_image_handoff_loads_typed_image() {
+    let temp_dir = tempfile::tempdir().expect("temporary image handoff directory");
+    fs::write(temp_dir.path().join(HANDOFF_IMAGE_FILE_NAME), IMAGE_BYTES_A).expect("image handoff written");
+    let envelope = handoff_envelope(HANDOFF_IMAGE_FILE_NAME, Some(IMAGE_MEDIA_TYPE));
+    let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
+    let adapter = ProductionAgentAdapter::new(runtime_config(Some(command), None));
+    let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Image);
+    request.cwd = Some(temp_dir.path().display().to_string());
 
-    let error = plan_agent_command(&config, &request).expect_err("image command rejected");
+    let response = adapter.execute(&request).expect("production image handoff runs");
 
-    assert!(error.to_string().contains("does not support image output mode"), "error: {error}");
+    match response.output {
+        AgentOutput::Image(image) => {
+            assert_eq!(image.media_type, IMAGE_MEDIA_TYPE);
+            assert_eq!(image.bytes, IMAGE_BYTES_A);
+        }
+        other => panic!("expected image output, got {other:?}"),
+    }
+    assert_eq!(response.metadata["file_handoff"]["metadata"]["label"], HANDOFF_METADATA_LABEL);
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.artifact]
+#[cfg(unix)]
+#[test]
+fn production_artifact_handoff_loads_bytes() {
+    let temp_dir = tempfile::tempdir().expect("temporary artifact handoff directory");
+    fs::write(temp_dir.path().join(HANDOFF_ARTIFACT_FILE_NAME), HANDOFF_ARTIFACT_BYTES)
+        .expect("artifact handoff written");
+    let envelope = handoff_envelope(HANDOFF_ARTIFACT_FILE_NAME, None);
+    let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
+    let adapter = ProductionAgentAdapter::new(runtime_config(None, Some(command)));
+    let mut request = agent_request(AgentTarget::Clankers, AgentOutputMode::Artifact);
+    request.cwd = Some(temp_dir.path().display().to_string());
+
+    let response = adapter.execute(&request).expect("production artifact handoff runs");
+
+    assert_eq!(response.output, AgentOutput::Artifact(HANDOFF_ARTIFACT_BYTES.to_vec()));
+    assert_eq!(response.metadata["file_handoff"]["bytes"], HANDOFF_ARTIFACT_BYTES.len());
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn image_handoff_rejects_missing_file() {
+    let temp_dir = tempfile::tempdir().expect("temporary missing handoff directory");
+    let plan = AgentCommandPlan {
+        cwd: Some(temp_dir.path().display().to_string()),
+        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: handoff_envelope(HANDOFF_MISSING_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("missing handoff rejected");
+
+    assert!(error.to_string().contains("output file is missing"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn image_handoff_rejects_unsupported_image_bytes() {
+    let temp_dir = tempfile::tempdir().expect("temporary bad image handoff directory");
+    fs::write(temp_dir.path().join(HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME), HANDOFF_BAD_IMAGE_BYTES)
+        .expect("bad image handoff written");
+    let plan = AgentCommandPlan {
+        cwd: Some(temp_dir.path().display().to_string()),
+        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: handoff_envelope(HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("unsupported image rejected");
+
+    assert!(error.to_string().contains("unsupported image format"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn image_handoff_rejects_media_type_mismatch() {
+    let temp_dir = tempfile::tempdir().expect("temporary media mismatch handoff directory");
+    fs::write(temp_dir.path().join(HANDOFF_IMAGE_FILE_NAME), IMAGE_BYTES_A).expect("image handoff written");
+    let plan = AgentCommandPlan {
+        cwd: Some(temp_dir.path().display().to_string()),
+        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: handoff_envelope(HANDOFF_IMAGE_FILE_NAME, Some("image/jpeg")),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("media mismatch rejected");
+
+    assert!(error.to_string().contains("media type mismatch"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn artifact_handoff_rejects_oversized_file() {
+    let temp_dir = tempfile::tempdir().expect("temporary oversized handoff directory");
+    fs::write(temp_dir.path().join(HANDOFF_ARTIFACT_FILE_NAME), HANDOFF_ARTIFACT_BYTES)
+        .expect("artifact handoff written");
+    let plan = AgentCommandPlan {
+        cwd: Some(temp_dir.path().display().to_string()),
+        max_output_bytes: SMALL_OUTPUT_LIMIT_BYTES,
+        ..command_plan(AgentTarget::Clankers, AgentOutputMode::Artifact)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: handoff_envelope(HANDOFF_ARTIFACT_FILE_NAME, None),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("oversized artifact rejected");
+
+    assert!(error.to_string().contains("too large"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn handoff_rejects_output_path_outside_working_directory() {
+    let cwd_dir = tempfile::tempdir().expect("temporary cwd directory");
+    let outside_dir = tempfile::tempdir().expect("temporary outside directory");
+    let outside_path = outside_dir.path().join(HANDOFF_OUTSIDE_FILE_NAME);
+    fs::write(&outside_path, IMAGE_BYTES_A).expect("outside handoff written");
+    let plan = AgentCommandPlan {
+        cwd: Some(cwd_dir.path().display().to_string()),
+        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: handoff_envelope(&outside_path.display().to_string(), Some(IMAGE_MEDIA_TYPE)),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("outside path rejected");
+
+    assert!(error.to_string().contains("outside working directory"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[test]
+fn handoff_rejects_invalid_envelope_json() {
+    let plan = command_plan(AgentTarget::Pi, AgentOutputMode::Image);
+    let output = AgentCommandOutput {
+        status_code: Some(0),
+        stdout: INVALID_JSON_OUTPUT.to_string(),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("invalid envelope rejected");
+
+    assert!(error.to_string().contains("handoff envelope is invalid JSON"), "error: {error}");
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]

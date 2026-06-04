@@ -1,5 +1,9 @@
 //! Generic agent node request planning and adapter interface.
 
+use std::fs;
+use std::io::ErrorKind;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
@@ -8,6 +12,7 @@ use serde::Serialize;
 use crate::engine::value::ImageValue;
 use crate::engine::value::Value;
 use crate::engine::value::ValueData;
+use crate::image_node;
 
 const DEFAULT_PI_COMMAND: &str = "pi";
 const DEFAULT_CLANKERS_COMMAND: &str = "clankers";
@@ -23,6 +28,14 @@ const TOOL_POLICY_HEADING: &str = "Tool policy";
 const MODEL_HINT_HEADING: &str = "Model hint";
 const DISPLAY_INDEX_BASE: usize = 1;
 const ERROR_OUTPUT_LIMIT_CHARS: usize = 2048;
+const BYTES_PER_KIB: usize = 1024;
+const KIB_PER_MIB: usize = 1024;
+const DEFAULT_AGENT_OUTPUT_BYTE_BUDGET_MIB: usize = 64;
+const DEFAULT_AGENT_OUTPUT_MAX_BYTES: usize = DEFAULT_AGENT_OUTPUT_BYTE_BUDGET_MIB * KIB_PER_MIB * BYTES_PER_KIB;
+const HANDOFF_PATH_FIELD: &str = "path";
+const HANDOFF_MEDIA_TYPE_FIELD: &str = "media_type";
+const HANDOFF_METADATA_FIELD: &str = "metadata";
+const CURRENT_DIRECTORY: &str = ".";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AgentTarget {
@@ -56,6 +69,8 @@ pub struct AgentRuntimeConfig {
     pub pi_command: Option<String>,
     #[serde(default = "default_clankers_command")]
     pub clankers_command: Option<String>,
+    #[serde(default = "default_agent_output_max_bytes")]
+    pub max_output_bytes: usize,
 }
 
 impl Default for AgentRuntimeConfig {
@@ -63,6 +78,7 @@ impl Default for AgentRuntimeConfig {
         Self {
             pi_command: default_pi_command(),
             clankers_command: default_clankers_command(),
+            max_output_bytes: default_agent_output_max_bytes(),
         }
     }
 }
@@ -149,6 +165,7 @@ pub struct AgentCommandPlan {
     pub args: Vec<String>,
     pub cwd: Option<String>,
     pub output_mode: AgentOutputMode,
+    pub max_output_bytes: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,6 +173,27 @@ pub struct AgentCommandOutput {
     pub status_code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct AgentOutputFileEnvelope {
+    pub path: String,
+    #[serde(default)]
+    pub media_type: Option<String>,
+    #[serde(default)]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AgentOutputFile {
+    path_label: String,
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolvedHandoffPath {
+    path: PathBuf,
+    label: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -183,6 +221,10 @@ fn default_pi_command() -> Option<String> {
 
 fn default_clankers_command() -> Option<String> {
     Some(DEFAULT_CLANKERS_COMMAND.to_string())
+}
+
+fn default_agent_output_max_bytes() -> usize {
+    DEFAULT_AGENT_OUTPUT_MAX_BYTES
 }
 
 impl AgentNodeSettings {
@@ -262,8 +304,8 @@ pub fn parse_agent_output_mode(value: &str) -> Result<AgentOutputMode, AgentErro
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.contract]
 pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -> Result<AgentCommandPlan, AgentError> {
-    validate_command_supported_output_mode(request.target, request.output_mode)?;
     let program = command_for_target(config, request.target)?;
     let prompt = render_agent_command_prompt(request);
     let args = command_args_for_request(request, &prompt);
@@ -274,18 +316,8 @@ pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -
         args,
         cwd: request.cwd.clone(),
         output_mode: request.output_mode,
+        max_output_bytes: config.max_output_bytes,
     })
-}
-
-fn validate_command_supported_output_mode(target: AgentTarget, output_mode: AgentOutputMode) -> Result<(), AgentError> {
-    match output_mode {
-        AgentOutputMode::Text | AgentOutputMode::Json => Ok(()),
-        AgentOutputMode::Image | AgentOutputMode::Artifact => Err(AgentError::Adapter(format!(
-            "production {} command adapter does not support {} output mode",
-            agent_target_label(target),
-            output_mode.as_str()
-        ))),
-    }
 }
 
 fn command_for_target(config: &AgentRuntimeConfig, target: AgentTarget) -> Result<String, AgentError> {
@@ -408,6 +440,9 @@ fn run_agent_command(plan: &AgentCommandPlan) -> Result<AgentCommandOutput, Agen
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.contract]
+// r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.image]
+// r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.artifact]
 pub fn decode_agent_command_output(
     plan: &AgentCommandPlan,
     output: &AgentCommandOutput,
@@ -421,15 +456,10 @@ pub fn decode_agent_command_output(
         )));
     }
 
-    let metadata = serde_json::json!({
-        "adapter": plan.adapter_label,
-        "target": agent_target_label(plan.target),
-        "stdout_bytes": output.stdout.len(),
-    });
     match plan.output_mode {
         AgentOutputMode::Text => Ok(AgentResponse {
             output: AgentOutput::Text(output.stdout.trim_end().to_string()),
-            metadata,
+            metadata: command_metadata(plan, output, None),
         }),
         AgentOutputMode::Json => {
             let json = serde_json::from_str(output.stdout.trim()).map_err(|error| {
@@ -437,15 +467,178 @@ pub fn decode_agent_command_output(
             })?;
             Ok(AgentResponse {
                 output: AgentOutput::Json(json),
-                metadata,
+                metadata: command_metadata(plan, output, None),
             })
         }
-        AgentOutputMode::Image | AgentOutputMode::Artifact => Err(AgentError::Adapter(format!(
-            "production {} command adapter does not support {} output mode",
+        AgentOutputMode::Image => decode_image_file_handoff(plan, output),
+        AgentOutputMode::Artifact => decode_artifact_file_handoff(plan, output),
+    }
+}
+
+fn decode_image_file_handoff(
+    plan: &AgentCommandPlan,
+    output: &AgentCommandOutput,
+) -> Result<AgentResponse, AgentError> {
+    let envelope = parse_agent_output_file_envelope(plan, &output.stdout)?;
+    let output_file = load_agent_output_file(plan, &envelope)?;
+    let image =
+        image_node::image_value_from_loaded_bytes(&output_file.path_label, output_file.bytes, plan.max_output_bytes)
+            .map_err(|error| AgentError::Adapter(error.to_string()))?;
+    validate_declared_media_type(plan, envelope.media_type.as_deref(), &image.media_type)?;
+    let metadata =
+        command_metadata(plan, output, Some(file_metadata(&envelope, &output_file.path_label, image.bytes.len())));
+    Ok(AgentResponse {
+        output: AgentOutput::Image(image),
+        metadata,
+    })
+}
+
+fn decode_artifact_file_handoff(
+    plan: &AgentCommandPlan,
+    output: &AgentCommandOutput,
+) -> Result<AgentResponse, AgentError> {
+    let envelope = parse_agent_output_file_envelope(plan, &output.stdout)?;
+    let output_file = load_agent_output_file(plan, &envelope)?;
+    let metadata = command_metadata(
+        plan,
+        output,
+        Some(file_metadata(&envelope, &output_file.path_label, output_file.bytes.len())),
+    );
+    Ok(AgentResponse {
+        output: AgentOutput::Artifact(output_file.bytes),
+        metadata,
+    })
+}
+
+pub fn parse_agent_output_file_envelope(
+    plan: &AgentCommandPlan,
+    stdout: &str,
+) -> Result<AgentOutputFileEnvelope, AgentError> {
+    let envelope = serde_json::from_str::<AgentOutputFileEnvelope>(stdout.trim()).map_err(|error| {
+        AgentError::Adapter(format!(
+            "{} agent {} handoff envelope is invalid JSON: {error}",
             plan.adapter_label,
             plan.output_mode.as_str()
-        ))),
+        ))
+    })?;
+    if envelope.path.trim().is_empty() {
+        return Err(AgentError::Adapter(format!(
+            "{} agent {} handoff envelope must include a non-empty {HANDOFF_PATH_FIELD}",
+            plan.adapter_label,
+            plan.output_mode.as_str()
+        )));
     }
+    Ok(envelope)
+}
+
+fn load_agent_output_file(
+    plan: &AgentCommandPlan,
+    envelope: &AgentOutputFileEnvelope,
+) -> Result<AgentOutputFile, AgentError> {
+    let resolved = resolve_handoff_path(plan, &envelope.path)?;
+    let metadata = fs::metadata(&resolved.path).map_err(|error| output_file_io_error(plan, &resolved.label, error))?;
+    let bytes = usize::try_from(metadata.len()).map_err(|_| {
+        AgentError::Adapter(format!(
+            "{} agent output file is too large to address on this platform: {}",
+            plan.adapter_label, resolved.label
+        ))
+    })?;
+    validate_output_file_size(plan, &resolved.label, bytes)?;
+    let bytes = fs::read(&resolved.path).map_err(|error| output_file_io_error(plan, &resolved.label, error))?;
+    validate_output_file_size(plan, &resolved.label, bytes.len())?;
+    Ok(AgentOutputFile {
+        path_label: resolved.label,
+        bytes,
+    })
+}
+
+fn resolve_handoff_path(plan: &AgentCommandPlan, path: &str) -> Result<ResolvedHandoffPath, AgentError> {
+    let base = plan.cwd.as_deref().unwrap_or(CURRENT_DIRECTORY);
+    let base_path = Path::new(base);
+    let candidate_path = Path::new(path);
+    let joined_path = if candidate_path.is_absolute() {
+        candidate_path.to_path_buf()
+    } else {
+        base_path.join(candidate_path)
+    };
+    let canonical_base = fs::canonicalize(base_path).map_err(|error| {
+        AgentError::Adapter(format!("{} agent working directory is unavailable: {base}: {error}", plan.adapter_label))
+    })?;
+    let canonical_file = fs::canonicalize(&joined_path).map_err(|error| output_file_io_error(plan, path, error))?;
+    if !canonical_file.starts_with(&canonical_base) {
+        return Err(AgentError::Adapter(format!(
+            "{} agent output file is outside working directory: {path}",
+            plan.adapter_label
+        )));
+    }
+    Ok(ResolvedHandoffPath {
+        path: canonical_file,
+        label: path.to_string(),
+    })
+}
+
+fn validate_output_file_size(plan: &AgentCommandPlan, path: &str, bytes: usize) -> Result<(), AgentError> {
+    if bytes <= plan.max_output_bytes {
+        return Ok(());
+    }
+    Err(AgentError::Adapter(format!(
+        "{} agent output file is too large: {path} has {bytes} bytes, max {}",
+        plan.adapter_label, plan.max_output_bytes
+    )))
+}
+
+fn output_file_io_error(plan: &AgentCommandPlan, path: &str, error: std::io::Error) -> AgentError {
+    match error.kind() {
+        ErrorKind::NotFound => {
+            AgentError::Adapter(format!("{} agent output file is missing: {path}", plan.adapter_label))
+        }
+        ErrorKind::PermissionDenied => {
+            AgentError::Adapter(format!("{} agent output file permission denied: {path}", plan.adapter_label))
+        }
+        _ => AgentError::Adapter(format!("{} agent output file I/O error: {path}: {error}", plan.adapter_label)),
+    }
+}
+
+fn validate_declared_media_type(
+    plan: &AgentCommandPlan,
+    declared: Option<&str>,
+    sniffed: &str,
+) -> Result<(), AgentError> {
+    let Some(declared) = declared else {
+        return Ok(());
+    };
+    if declared == sniffed {
+        return Ok(());
+    }
+    Err(AgentError::Adapter(format!(
+        "{} agent image media type mismatch: declared {declared}, sniffed {sniffed}",
+        plan.adapter_label
+    )))
+}
+
+fn command_metadata(
+    plan: &AgentCommandPlan,
+    output: &AgentCommandOutput,
+    file_metadata: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let mut metadata = serde_json::json!({
+        "adapter": plan.adapter_label,
+        "target": agent_target_label(plan.target),
+        "stdout_bytes": output.stdout.len(),
+    });
+    if let Some(file_metadata) = file_metadata {
+        metadata["file_handoff"] = file_metadata;
+    }
+    metadata
+}
+
+fn file_metadata(envelope: &AgentOutputFileEnvelope, path_label: &str, bytes: usize) -> serde_json::Value {
+    serde_json::json!({
+        HANDOFF_PATH_FIELD: path_label,
+        "bytes": bytes,
+        HANDOFF_MEDIA_TYPE_FIELD: envelope.media_type.clone(),
+        HANDOFF_METADATA_FIELD: envelope.metadata.clone(),
+    })
 }
 
 fn status_label(status_code: Option<i32>) -> String {

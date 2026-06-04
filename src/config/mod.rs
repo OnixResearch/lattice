@@ -431,6 +431,7 @@ pub fn default_config_ncl() -> &'static str {
   agent_runtime = {
     pi_command = "pi",
     clankers_command = "clankers",
+    max_output_bytes = 64 * 1024 * 1024,
   },
 }
 "#
