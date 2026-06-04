@@ -1,6 +1,7 @@
 //! Image input operation planning and image I/O interface.
 
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -19,6 +20,7 @@ const MEDIA_TYPE_JPEG: &str = "image/jpeg";
 const BYTES_PER_KIB: usize = 1024;
 const KIB_PER_MIB: usize = 1024;
 const DEFAULT_IMAGE_BYTE_BUDGET_MIB: usize = 10;
+const IMAGE_IO_NOT_CONFIGURED: &str = "no image I/O configured";
 pub const DEFAULT_MAX_IMAGE_BYTES: usize = DEFAULT_IMAGE_BYTE_BUDGET_MIB * KIB_PER_MIB * BYTES_PER_KIB;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,7 +70,16 @@ pub struct NoopImageIo;
 
 impl ImageIo for NoopImageIo {
     fn load(&self, _plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
-        Err(ImageError::Io("no image I/O configured".to_string()))
+        Err(ImageError::Io(IMAGE_IO_NOT_CONFIGURED.to_string()))
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct LocalImageIo;
+
+impl ImageIo for LocalImageIo {
+    fn load(&self, plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+        load_local_image(plan)
     }
 }
 
@@ -104,13 +115,7 @@ impl ImageIo for MemoryImageIo {
             .get(&plan.path)
             .cloned()
             .ok_or_else(|| ImageError::MissingImage(plan.path.clone()))?;
-        validate_image_size(&plan.path, bytes.len(), plan.max_bytes)?;
-        let media_type =
-            sniff_image_media_type(&bytes).ok_or_else(|| ImageError::UnsupportedFormat(plan.path.clone()))?;
-        Ok(ImageValue::new(bytes, media_type.to_string(), ImageMetadata {
-            source_label: Some(plan.path.clone()),
-            ..ImageMetadata::default()
-        }))
+        image_value_from_loaded_bytes(&plan.path, bytes, plan.max_bytes)
     }
 }
 
@@ -137,6 +142,40 @@ pub fn validate_image_size(path: &str, bytes: usize, max_bytes: usize) -> Result
             bytes,
             max_bytes,
         })
+    }
+}
+
+// r[impl n8nclone.workflow_execution.image_input_nodes.production_io.local]
+pub fn image_value_from_loaded_bytes(path: &str, bytes: Vec<u8>, max_bytes: usize) -> Result<ImageValue, ImageError> {
+    validate_image_size(path, bytes.len(), max_bytes)?;
+    let media_type = sniff_image_media_type(&bytes).ok_or_else(|| ImageError::UnsupportedFormat(path.to_string()))?;
+    Ok(ImageValue::new(bytes, media_type.to_string(), ImageMetadata {
+        source_label: Some(path.to_string()),
+        ..ImageMetadata::default()
+    }))
+}
+
+// r[impl n8nclone.workflow_execution.image_input_nodes.production_io.local]
+pub fn load_local_image(plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+    validate_image_path_allowed(&plan.path, &plan.allowed_roots)?;
+    let metadata_bytes = local_image_metadata_len(&plan.path)?;
+    validate_image_size(&plan.path, metadata_bytes, plan.max_bytes)?;
+    let bytes = std::fs::read(&plan.path).map_err(|error| image_error_from_io(&plan.path, error))?;
+    image_value_from_loaded_bytes(&plan.path, bytes, plan.max_bytes)
+}
+
+fn local_image_metadata_len(path: &str) -> Result<usize, ImageError> {
+    let metadata = std::fs::metadata(path).map_err(|error| image_error_from_io(path, error))?;
+    usize::try_from(metadata.len()).map_err(|_| {
+        ImageError::Io(format!("image metadata length does not fit this platform: {path} has {} bytes", metadata.len()))
+    })
+}
+
+fn image_error_from_io(path: &str, error: std::io::Error) -> ImageError {
+    match error.kind() {
+        ErrorKind::NotFound => ImageError::MissingImage(path.to_string()),
+        ErrorKind::PermissionDenied => ImageError::PermissionDenied(path.to_string()),
+        _ => ImageError::Io(format!("{path}: {error}")),
     }
 }
 

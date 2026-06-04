@@ -15,6 +15,7 @@ use n8nclone::workflow_format::load_workflow_nickel_file;
 use n8nclone::workflow_format::portable_to_workflow;
 use n8nclone::workflow_format::workflow_to_nickel;
 use n8nclone::workflow_format::workflow_to_portable;
+use n8nclone::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const CONFIG_FILE_NAME: &str = "config.ncl";
@@ -30,6 +31,7 @@ const IMAGE_AGENT_NODE_COUNT: usize = 2;
 const IMAGE_AGENT_EDGE_COUNT: usize = 1;
 const INVALID_PORT_ID: u64 = 999_001;
 const IMAGE_PATH: &str = "/tmp/selfie.png";
+const STATIC_MISSING_IMAGE_FILE_NAME: &str = "missing-static-image.png";
 const AGENT_PROMPT: &str = "Turn this selfie into fine art";
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
@@ -162,6 +164,27 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
             assert_eq!(settings.output_mode, AgentOutputMode::Image);
         }
         _ => panic!("expected agent config"),
+    }
+}
+
+// r[verify n8nclone.workflow_execution.image_input_nodes.production_io.no_import_io]
+#[test]
+fn image_workflow_static_import_export_and_validation_do_not_read_image_bytes() {
+    let temp_dir = tempfile::tempdir().expect("temporary workflow format directory");
+    let missing_path = temp_dir.path().join(STATIC_MISSING_IMAGE_FILE_NAME).display().to_string();
+    let mut workflow = Workflow::new("static-image-workflow");
+    let node_id = workflow.add_image_input_node("Missing static image", &missing_path);
+    let workflow_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);
+
+    std::fs::write(&workflow_path, workflow_to_nickel(&workflow)).expect("workflow Nickel written");
+    let imported =
+        load_workflow_nickel_file(&workflow_path).expect("static image workflow imports without reading file");
+    let diagnostics = validate_workflow(&imported);
+
+    assert!(diagnostics.is_empty());
+    match imported.node_config(node_id).expect("image config imported") {
+        NodeConfig::ImageInput { path, .. } => assert_eq!(path, &missing_path),
+        _ => panic!("expected image input config"),
     }
 }
 

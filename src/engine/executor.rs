@@ -43,7 +43,7 @@ use crate::http::HttpRequestPlan;
 use crate::http::NoopHttpClient;
 use crate::image_node;
 use crate::image_node::ImageIo;
-use crate::image_node::NoopImageIo;
+use crate::image_node::LocalImageIo;
 
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
@@ -771,6 +771,11 @@ pub struct Executor {
     agent_adapter: Box<dyn AgentAdapter>,
 }
 
+// r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
+fn default_image_io() -> Box<dyn ImageIo> {
+    Box::<LocalImageIo>::default()
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
@@ -778,7 +783,7 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
@@ -789,7 +794,7 @@ impl Executor {
             credential_provider,
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
@@ -800,7 +805,7 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client,
             file_system: Box::<NoopFileSystem>::default(),
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
@@ -811,7 +816,7 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system,
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
@@ -833,7 +838,7 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter,
         }
     }
@@ -848,7 +853,7 @@ impl Executor {
             credential_provider,
             http_client,
             file_system,
-            image_io: Box::<NoopImageIo>::default(),
+            image_io: default_image_io(),
             agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }

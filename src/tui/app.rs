@@ -2028,6 +2028,8 @@ mod tests {
     const TEMPLATE_NUMBER_MIN: f64 = 1.0;
     const TEMPLATE_NUMBER_MAX: f64 = 10.0;
     const IMAGE_PREVIEW_BYTES: &[u8] = b"raw-image-bytes";
+    const TUI_LOCAL_IMAGE_FILE_NAME: &str = "tui-selfie.png";
+    const TUI_LOCAL_PNG_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\ntui";
     const TUI_MISSING_IMAGE_PATH: &str = "/tui/missing.png";
     const TUI_BAD_IMAGE_PATH: &str = "/tui/bad.png";
     const TUI_BAD_IMAGE_BYTES: &[u8] = b"not an image";
@@ -2777,6 +2779,24 @@ mod tests {
 
         assert!(!app.run_state.active);
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
+    }
+
+    // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.tui]
+    #[tokio::test]
+    async fn tui_background_run_loads_local_image_with_default_executor() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let image_path = temp_dir.path().join(TUI_LOCAL_IMAGE_FILE_NAME);
+        std::fs::write(&image_path, TUI_LOCAL_PNG_FIXTURE).expect("TUI image fixture written");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_image_input_node("Local image", &image_path.display().to_string());
+        let node_id = app.graph_state.focused.expect("image node focused");
+
+        assert!(app.start_workflow_run());
+        drain_run(&mut app).await;
+
+        assert!(!app.run_state.active);
+        assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Completed),);
+        assert!(output_text_lines(&app).iter().any(|line| line.contains("image/png image")));
     }
 
     #[tokio::test]

@@ -10,6 +10,7 @@ use n8nclone::config::load_node_templates_with_diagnostics;
 use n8nclone::config::render_template_command;
 use n8nclone::engine::executor::RunId;
 use n8nclone::engine::executor::node_execution_cache_key;
+use n8nclone::engine::value::TypeTag;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::value::ValueData;
 use n8nclone::engine::workflow::NodeConfig;
@@ -28,13 +29,18 @@ use rat_nodegraph::model::PortSpec;
 const SUCCESS_WORKFLOW_NAME: &str = "headless-success";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
 const BROKEN_WORKFLOW_NAME: &str = "headless-broken";
+const IMAGE_WORKFLOW_NAME: &str = "headless-image";
 const SUCCESS_NODE_LABEL: &str = "say hello";
 const SUCCESS_COMMAND: &str = "printf hello";
 const BROKEN_NODE_LABEL: &str = "broken";
+const IMAGE_NODE_LABEL: &str = "load image";
+const IMAGE_OUTPUT_PORT_LABEL: &str = "image";
+const HEADLESS_IMAGE_FILE_NAME: &str = "headless-selfie.png";
 const MISSING_CWD: &str = "/definitely/missing/n8nclone/headless-test";
 const SUCCESS_RUN_ID: u64 = 7;
 const MISSING_RUN_ID: u64 = 11;
 const FAILED_RUN_ID: u64 = 13;
+const IMAGE_RUN_ID: u64 = 17;
 const RECENT_RUN_LIMIT: usize = 8;
 const SINGLE_NODE_COUNT: usize = 1;
 const NO_FAILURES: usize = 0;
@@ -66,6 +72,7 @@ const SUCCESS_EXIT_CODE: i32 = 0;
 const TEMPLATE_RUN_ID_START: u64 = 100;
 const TEMPLATE_WORKFLOW_NODE_COUNT: usize = 2;
 const TEMPLATE_WORKFLOW_STEP_COUNT: usize = 2;
+const PNG_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\nfixture";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TemplateHeadlessCase {
@@ -267,6 +274,34 @@ async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     assert_eq!(records.len(), SINGLE_NODE_COUNT);
     assert_eq!(records[0].run_id, RunId(SUCCESS_RUN_ID));
     assert_eq!(records[0].failures, NO_FAILURES);
+}
+
+// r[verify n8nclone.workflow_execution.image_input_nodes.production_io.headless]
+#[tokio::test]
+async fn headless_run_loads_local_image_with_default_executor() {
+    let (store, temp_dir) = temp_store();
+    let image_path = temp_dir.path().join(HEADLESS_IMAGE_FILE_NAME);
+    std::fs::write(&image_path, PNG_FIXTURE).expect("headless image fixture written");
+    let mut workflow = Workflow::new(IMAGE_WORKFLOW_NAME);
+    let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, image_path.display().to_string());
+    let image_port = output_port_id(&workflow, node_id, IMAGE_OUTPUT_PORT_LABEL);
+    let input_hash = node_execution_cache_key(
+        node_id,
+        workflow.node_config(node_id).expect("image node config exists"),
+        &HashMap::new(),
+    );
+    store.save_workflow(&workflow).expect("workflow saves");
+
+    let summary = run_saved_workflow(&store, IMAGE_WORKFLOW_NAME, RunId(IMAGE_RUN_ID))
+        .await
+        .expect("headless image workflow runs");
+
+    assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
+    assert_eq!(summary.failures, NO_FAILURES);
+    let outputs = store.get_cache(&input_hash).expect("image cache lookup succeeds").expect("image outputs cached");
+    let image = outputs.get(&image_port).expect("image output cached");
+    assert_eq!(image.type_tag(), TypeTag::Image);
+    assert!(image.as_display_string().contains("image/png"));
 }
 
 // r[verify n8nclone.node_templates.catalog]
