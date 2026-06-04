@@ -429,9 +429,17 @@ pub fn default_config_ncl() -> &'static str {
   shell = "sh",
   max_parallelism = 4,
   agent_runtime = {
-    pi_command = "pi",
-    clankers_command = "clankers",
     max_output_bytes = 64 * 1024 * 1024,
+    runtimes = {
+      pi = {
+        command = "pi",
+        args = ["--no-session", "-p", "{prompt}"],
+      },
+      clankers = {
+        command = "clankers",
+        args = ["-p", "{prompt}"],
+      },
+    },
   },
 }
 "#

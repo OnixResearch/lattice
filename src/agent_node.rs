@@ -1,5 +1,6 @@
 //! Generic agent node request planning and adapter interface.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
@@ -14,12 +15,16 @@ use crate::engine::value::Value;
 use crate::engine::value::ValueData;
 use crate::image_node;
 
+const DEFAULT_PI_RUNTIME_KEY: &str = "pi";
+const DEFAULT_CLANKERS_RUNTIME_KEY: &str = "clankers";
 const DEFAULT_PI_COMMAND: &str = "pi";
 const DEFAULT_CLANKERS_COMMAND: &str = "clankers";
 const PRINT_MODE_FLAG: &str = "-p";
-const MODEL_FLAG: &str = "--model";
-const SESSION_FLAG: &str = "--session";
 const NO_SESSION_FLAG: &str = "--no-session";
+const PROMPT_PLACEHOLDER: &str = "{prompt}";
+const MODEL_PLACEHOLDER: &str = "{model}";
+const SESSION_PLACEHOLDER: &str = "{session}";
+const OUTPUT_MODE_PLACEHOLDER: &str = "{output_mode}";
 const TEXT_INPUT_HEADING: &str = "Text input";
 const JSON_INPUT_HEADING: &str = "JSON input";
 const IMAGE_INPUT_HEADING: &str = "Image input";
@@ -65,19 +70,23 @@ pub struct AgentNodeSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentRuntimeConfig {
-    #[serde(default = "default_pi_command")]
-    pub pi_command: Option<String>,
-    #[serde(default = "default_clankers_command")]
-    pub clankers_command: Option<String>,
+    #[serde(default = "default_agent_runtimes")]
+    pub runtimes: BTreeMap<String, AgentCommandRuntimeConfig>,
     #[serde(default = "default_agent_output_max_bytes")]
     pub max_output_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentCommandRuntimeConfig {
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
 }
 
 impl Default for AgentRuntimeConfig {
     fn default() -> Self {
         Self {
-            pi_command: default_pi_command(),
-            clankers_command: default_clankers_command(),
+            runtimes: default_agent_runtimes(),
             max_output_bytes: default_agent_output_max_bytes(),
         }
     }
@@ -215,12 +224,21 @@ impl AgentAdapter for ProductionAgentAdapter {
     }
 }
 
-fn default_pi_command() -> Option<String> {
-    Some(DEFAULT_PI_COMMAND.to_string())
-}
-
-fn default_clankers_command() -> Option<String> {
-    Some(DEFAULT_CLANKERS_COMMAND.to_string())
+fn default_agent_runtimes() -> BTreeMap<String, AgentCommandRuntimeConfig> {
+    BTreeMap::from([
+        (DEFAULT_PI_RUNTIME_KEY.to_string(), AgentCommandRuntimeConfig {
+            command: DEFAULT_PI_COMMAND.to_string(),
+            args: vec![
+                NO_SESSION_FLAG.to_string(),
+                PRINT_MODE_FLAG.to_string(),
+                PROMPT_PLACEHOLDER.to_string(),
+            ],
+        }),
+        (DEFAULT_CLANKERS_RUNTIME_KEY.to_string(), AgentCommandRuntimeConfig {
+            command: DEFAULT_CLANKERS_COMMAND.to_string(),
+            args: vec![PRINT_MODE_FLAG.to_string(), PROMPT_PLACEHOLDER.to_string()],
+        }),
+    ])
 }
 
 fn default_agent_output_max_bytes() -> usize {
@@ -280,15 +298,15 @@ impl AgentOutput {
 
 pub fn agent_target_label(target: AgentTarget) -> &'static str {
     match target {
-        AgentTarget::Pi => "pi",
-        AgentTarget::Clankers => "clankers",
+        AgentTarget::Pi => DEFAULT_PI_RUNTIME_KEY,
+        AgentTarget::Clankers => DEFAULT_CLANKERS_RUNTIME_KEY,
     }
 }
 
 pub fn parse_agent_target(value: &str) -> Result<AgentTarget, AgentError> {
     match value {
-        "pi" => Ok(AgentTarget::Pi),
-        "clankers" => Ok(AgentTarget::Clankers),
+        DEFAULT_PI_RUNTIME_KEY => Ok(AgentTarget::Pi),
+        DEFAULT_CLANKERS_RUNTIME_KEY => Ok(AgentTarget::Clankers),
         _ => Err(AgentError::UnsupportedTarget(value.to_string())),
     }
 }
@@ -306,9 +324,10 @@ pub fn parse_agent_output_mode(value: &str) -> Result<AgentOutputMode, AgentErro
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]
 // r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.contract]
 pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -> Result<AgentCommandPlan, AgentError> {
-    let program = command_for_target(config, request.target)?;
+    let runtime = command_runtime_for_target(config, request.target)?;
+    let program = runtime_command_for_target(runtime, request.target)?;
     let prompt = render_agent_command_prompt(request);
-    let args = command_args_for_request(request, &prompt);
+    let args = command_args_for_request(runtime, request, &prompt);
     Ok(AgentCommandPlan {
         target: request.target,
         adapter_label: agent_target_label(request.target),
@@ -320,53 +339,43 @@ pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -
     })
 }
 
-fn command_for_target(config: &AgentRuntimeConfig, target: AgentTarget) -> Result<String, AgentError> {
-    let command = match target {
-        AgentTarget::Pi => &config.pi_command,
-        AgentTarget::Clankers => &config.clankers_command,
-    };
-    let Some(command) = command.as_ref().map(|value| value.trim()).filter(|value| !value.is_empty()) else {
+fn command_runtime_for_target(
+    config: &AgentRuntimeConfig,
+    target: AgentTarget,
+) -> Result<&AgentCommandRuntimeConfig, AgentError> {
+    let target_label = agent_target_label(target);
+    config
+        .runtimes
+        .get(target_label)
+        .ok_or_else(|| AgentError::PreflightRejected(format!("missing {target_label} agent runtime configuration")))
+}
+
+fn runtime_command_for_target(runtime: &AgentCommandRuntimeConfig, target: AgentTarget) -> Result<String, AgentError> {
+    let Some(command) = non_empty_trimmed(&runtime.command) else {
         return Err(AgentError::PreflightRejected(format!(
-            "missing {} agent command configuration",
+            "missing {} agent runtime command",
             agent_target_label(target)
         )));
     };
     Ok(command.to_string())
 }
 
-fn command_args_for_request(request: &AgentRequest, prompt: &str) -> Vec<String> {
-    match request.target {
-        AgentTarget::Pi => pi_command_args(request, prompt),
-        AgentTarget::Clankers => clankers_command_args(request, prompt),
-    }
+fn non_empty_trimmed(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
-fn pi_command_args(request: &AgentRequest, prompt: &str) -> Vec<String> {
-    let mut args = Vec::new();
-    if let Some(model_hint) = request.model_hint.as_ref().filter(|value| !value.trim().is_empty()) {
-        args.push(MODEL_FLAG.to_string());
-        args.push(model_hint.clone());
-    }
-    if let Some(session) = request.session.as_ref().filter(|value| !value.trim().is_empty()) {
-        args.push(SESSION_FLAG.to_string());
-        args.push(session.clone());
-    } else {
-        args.push(NO_SESSION_FLAG.to_string());
-    }
-    args.push(PRINT_MODE_FLAG.to_string());
-    args.push(prompt.to_string());
-    args
+fn command_args_for_request(runtime: &AgentCommandRuntimeConfig, request: &AgentRequest, prompt: &str) -> Vec<String> {
+    runtime.args.iter().filter_map(|arg| render_command_arg_template(arg, request, prompt)).collect()
 }
 
-fn clankers_command_args(request: &AgentRequest, prompt: &str) -> Vec<String> {
-    let mut args = Vec::new();
-    if let Some(model_hint) = request.model_hint.as_ref().filter(|value| !value.trim().is_empty()) {
-        args.push(MODEL_FLAG.to_string());
-        args.push(model_hint.clone());
-    }
-    args.push(PRINT_MODE_FLAG.to_string());
-    args.push(prompt.to_string());
-    args
+fn render_command_arg_template(template: &str, request: &AgentRequest, prompt: &str) -> Option<String> {
+    let rendered = template
+        .replace(PROMPT_PLACEHOLDER, prompt)
+        .replace(MODEL_PLACEHOLDER, request.model_hint.as_deref().unwrap_or_default())
+        .replace(SESSION_PLACEHOLDER, request.session.as_deref().unwrap_or_default())
+        .replace(OUTPUT_MODE_PLACEHOLDER, request.output_mode.as_str());
+    non_empty_trimmed(&rendered).map(str::to_string)
 }
 
 pub fn render_agent_command_prompt(request: &AgentRequest) -> String {

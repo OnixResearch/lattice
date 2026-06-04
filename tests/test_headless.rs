@@ -1,5 +1,6 @@
 //! Tests for headless workflow runs.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fs;
 #[cfg(unix)]
@@ -7,6 +8,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
+use n8nclone::agent_node::AgentCommandRuntimeConfig;
 use n8nclone::agent_node::AgentOutputMode;
 use n8nclone::agent_node::AgentRuntimeConfig;
 use n8nclone::agent_node::AgentTarget;
@@ -42,6 +44,8 @@ const SUCCESS_NODE_LABEL: &str = "say hello";
 const SUCCESS_COMMAND: &str = "printf hello";
 const BROKEN_NODE_LABEL: &str = "broken";
 const IMAGE_NODE_LABEL: &str = "load image";
+const PI_RUNTIME_KEY: &str = "pi";
+const PROMPT_ARG_TEMPLATE: &str = "{prompt}";
 const AGENT_NODE_LABEL: &str = "summarize";
 const IMAGE_OUTPUT_PORT_LABEL: &str = "image";
 const AGENT_TEXT_OUTPUT_PORT_LABEL: &str = "text";
@@ -152,6 +156,18 @@ fn write_agent_script_with_body(temp_dir: &tempfile::TempDir, body: &str) -> Str
     permissions.set_mode(EXECUTABLE_MODE);
     fs::set_permissions(&path, permissions).expect("agent script made executable");
     path.display().to_string()
+}
+
+fn pi_agent_runtime(command: String) -> AgentRuntimeConfig {
+    let mut runtimes = BTreeMap::new();
+    runtimes.insert(PI_RUNTIME_KEY.to_string(), AgentCommandRuntimeConfig {
+        command,
+        args: vec!["-p".to_string(), PROMPT_ARG_TEMPLATE.to_string()],
+    });
+    AgentRuntimeConfig {
+        runtimes,
+        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+    }
 }
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
@@ -352,11 +368,7 @@ async fn headless_run_uses_configured_production_agent_runtime() {
         &HashMap::new(),
     );
     store.save_workflow(&workflow).expect("workflow saves");
-    let agent_runtime = AgentRuntimeConfig {
-        pi_command: Some(command),
-        clankers_command: None,
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
-    };
+    let agent_runtime = pi_agent_runtime(command);
 
     let summary =
         run_saved_workflow_with_agent_runtime_config(&store, AGENT_WORKFLOW_NAME, RunId(AGENT_RUN_ID), agent_runtime)
@@ -392,11 +404,7 @@ async fn headless_run_maps_agent_image_handoff_to_image_output_port() {
         &HashMap::new(),
     );
     store.save_workflow(&workflow).expect("workflow saves");
-    let agent_runtime = AgentRuntimeConfig {
-        pi_command: Some(command),
-        clankers_command: None,
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
-    };
+    let agent_runtime = pi_agent_runtime(command);
 
     let summary = run_saved_workflow_with_agent_runtime_config(
         &store,

@@ -1,5 +1,6 @@
 //! Tests for generic agent operation nodes.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fs;
 #[cfg(unix)]
@@ -9,6 +10,7 @@ use std::sync::Arc;
 use n8nclone::agent_node::AgentAdapter;
 use n8nclone::agent_node::AgentCommandOutput;
 use n8nclone::agent_node::AgentCommandPlan;
+use n8nclone::agent_node::AgentCommandRuntimeConfig;
 use n8nclone::agent_node::AgentError;
 use n8nclone::agent_node::AgentOutput;
 use n8nclone::agent_node::AgentOutputMode;
@@ -52,6 +54,12 @@ const METADATA_OUTPUT_INDEX: usize = 4;
 const SECRET_ENV_NAME: &str = "AGENT_TOKEN";
 const SECRET_PROVIDER: &str = "env";
 const SECRET_KEY: &str = "agent_token";
+const PI_RUNTIME_KEY: &str = "pi";
+const CLANKERS_RUNTIME_KEY: &str = "clankers";
+const PROMPT_ARG_TEMPLATE: &str = "{prompt}";
+const MODEL_ARG_TEMPLATE: &str = "{model}";
+const SESSION_ARG_TEMPLATE: &str = "{session}";
+const OUTPUT_MODE_ARG_TEMPLATE: &str = "{output_mode}";
 const FAKE_AGENT_FILE_NAME: &str = "agent-runtime.sh";
 const RUNTIME_TEXT_OUTPUT: &str = "runtime text";
 const RUNTIME_JSON_OUTPUT: &str = "{\"ok\":true}";
@@ -145,11 +153,24 @@ fn agent_request(target: AgentTarget, output_mode: AgentOutputMode) -> AgentRequ
     }
 }
 
-fn runtime_config(pi_command: Option<String>, clankers_command: Option<String>) -> AgentRuntimeConfig {
+fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: Option<String>) -> AgentRuntimeConfig {
+    let mut runtimes = BTreeMap::new();
+    if let Some(command) = pi_runtime_command {
+        runtimes.insert(PI_RUNTIME_KEY.to_string(), runtime_entry(command, &["-p", PROMPT_ARG_TEMPLATE]));
+    }
+    if let Some(command) = clankers_runtime_command {
+        runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), runtime_entry(command, &["-p", PROMPT_ARG_TEMPLATE]));
+    }
     AgentRuntimeConfig {
-        pi_command,
-        clankers_command,
+        runtimes,
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+    }
+}
+
+fn runtime_entry(command: impl Into<String>, args: &[&str]) -> AgentCommandRuntimeConfig {
+    AgentCommandRuntimeConfig {
+        command: command.into(),
+        args: args.iter().map(|arg| (*arg).to_string()).collect(),
     }
 }
 
@@ -187,9 +208,24 @@ fn handoff_envelope(path: &str, media_type: Option<&str>) -> String {
     envelope.to_string()
 }
 
-// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.config]
 #[test]
-fn production_command_plan_includes_runtime_args_and_prompt_inputs() {
+fn default_agent_runtime_config_contains_command_presets() {
+    let config = AgentRuntimeConfig::default();
+
+    let pi = config.runtimes.get(PI_RUNTIME_KEY).expect("pi runtime preset");
+    let clankers = config.runtimes.get(CLANKERS_RUNTIME_KEY).expect("clankers runtime preset");
+
+    assert_eq!(pi.command, PI_RUNTIME_KEY);
+    assert!(pi.args.iter().any(|arg| arg == PROMPT_ARG_TEMPLATE));
+    assert_eq!(clankers.command, CLANKERS_RUNTIME_KEY);
+    assert!(clankers.args.iter().any(|arg| arg == PROMPT_ARG_TEMPLATE));
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.planning]
+#[test]
+fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
     let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
     request.model_hint = Some(MODEL_HINT.to_string());
     request.session = Some(SESSION_ID.to_string());
@@ -197,7 +233,20 @@ fn production_command_plan_includes_runtime_args_and_prompt_inputs() {
     request.context_refs = vec![CONTEXT_REF.to_string()];
     request.text_inputs = vec!["extra prompt".to_string()];
     request.json_inputs = vec![serde_json::json!({"field": "value"})];
-    let config = runtime_config(Some("pi-test".to_string()), None);
+    let mut config = runtime_config(None, None);
+    config.runtimes.insert(
+        PI_RUNTIME_KEY.to_string(),
+        runtime_entry("pi-test", &[
+            "--model",
+            MODEL_ARG_TEMPLATE,
+            "--session",
+            SESSION_ARG_TEMPLATE,
+            "--mode",
+            OUTPUT_MODE_ARG_TEMPLATE,
+            "-p",
+            PROMPT_ARG_TEMPLATE,
+        ]),
+    );
 
     let plan = plan_agent_command(&config, &request).expect("command plan builds");
     let prompt = render_agent_command_prompt(&request);
@@ -207,6 +256,7 @@ fn production_command_plan_includes_runtime_args_and_prompt_inputs() {
     assert!(plan.args.iter().any(|arg| arg == MODEL_HINT));
     assert!(plan.args.iter().any(|arg| arg == "--session"));
     assert!(plan.args.iter().any(|arg| arg == SESSION_ID));
+    assert!(plan.args.iter().any(|arg| arg == "text"));
     assert!(plan.args.iter().any(|arg| arg == "-p"));
     assert!(prompt.contains(PROMPT_TEXT));
     assert!(prompt.contains("Text input"));
@@ -248,14 +298,27 @@ fn production_clankers_json_adapter_executes_command() {
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.errors]
 #[test]
-fn production_adapter_missing_command_rejects_before_spawn() {
+fn production_adapter_missing_runtime_rejects_before_spawn() {
     let config = runtime_config(None, None);
     let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
 
-    let error = plan_agent_command(&config, &request).expect_err("missing command rejected");
+    let error = plan_agent_command(&config, &request).expect_err("missing runtime rejected");
 
-    assert!(error.to_string().contains("missing pi agent command"), "error: {error}");
+    assert!(error.to_string().contains("missing pi agent runtime configuration"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.errors]
+#[test]
+fn production_adapter_empty_command_rejects_before_spawn() {
+    let config = runtime_config(Some("   ".to_string()), None);
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+
+    let error = plan_agent_command(&config, &request).expect_err("empty command rejected");
+
+    assert!(error.to_string().contains("missing pi agent runtime command"), "error: {error}");
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.image]
