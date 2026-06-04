@@ -24,3 +24,8 @@ n8nclone --config ./demo/config.ncl run daily-digest --output json
 ```bash
 verus verus/example_spec.rs
 ```
+
+## References
+
+- [Pi coding agent](https://pi.dev): SDK, print, RPC, and image prompt surfaces for generic agent-node integration.
+- [Clankers](https://github.com/brittonr/clankers): Rust terminal coding agent with one-shot, daemon, MCP/ACP, context image references, and image-generation surfaces for generic agent-node integration.
