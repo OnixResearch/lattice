@@ -315,6 +315,41 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
                     Span::styled(path.clone(), Style::default().fg(Color::Cyan)),
                 ]));
             }
+            NodeConfig::ImageInput { path, max_bytes, .. } => {
+                lines.push(Line::from(vec![
+                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Image Input", Style::default().fg(Color::Green)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(path.clone(), Style::default().fg(Color::Cyan)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Max bytes: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(max_bytes.to_string(), Style::default().fg(Color::Gray)),
+                ]));
+            }
+            NodeConfig::Agent(settings) => {
+                lines.push(Line::from(vec![
+                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Agent", Style::default().fg(Color::Green)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Target: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        crate::agent_node::agent_target_label(settings.target),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Output: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(settings.output_mode.as_str(), Style::default().fg(Color::Cyan)),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("Prompt: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(settings.prompt.clone(), Style::default().fg(Color::Gray)),
+                ]));
+            }
         }
     }
 

@@ -3,9 +3,16 @@
 mod common;
 
 use n8nclone::engine::value::ContentHash;
+use n8nclone::engine::value::ImageMetadata;
+use n8nclone::engine::value::ImageValue;
 use n8nclone::engine::value::TypeTag;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::value::ValueData;
+
+const PNG_MEDIA_TYPE: &str = "image/png";
+const JPEG_MEDIA_TYPE: &str = "image/jpeg";
+const IMAGE_BYTES_A: &[u8] = b"image-a";
+const IMAGE_BYTES_B: &[u8] = b"image-b";
 use pretty_assertions::assert_eq;
 
 // ---------------------------------------------------------------------------
@@ -104,6 +111,51 @@ fn value_from_json() {
     assert!(display.contains("key"));
 }
 
+// r[verify n8nclone.workflow_execution.image_values.model]
+#[test]
+fn value_from_image_is_typed_and_display_safe() {
+    let v = Value::from_image(ImageValue::new(IMAGE_BYTES_A.to_vec(), PNG_MEDIA_TYPE.to_string(), ImageMetadata {
+        width: Some(32),
+        height: Some(16),
+        source_label: Some("fixture.png".to_string()),
+    }));
+
+    assert_eq!(v.type_tag(), TypeTag::Image);
+    let display = v.as_display_string();
+    assert!(display.contains(PNG_MEDIA_TYPE));
+    assert!(display.contains("32x16"));
+    assert!(!display.contains("image-a"), "image display must not dump raw bytes");
+}
+
+// r[verify n8nclone.workflow_execution.image_values.model]
+#[test]
+fn image_hash_includes_bytes_and_media_type() {
+    let png_a = Value::from_image(ImageValue::new(
+        IMAGE_BYTES_A.to_vec(),
+        PNG_MEDIA_TYPE.to_string(),
+        ImageMetadata::default(),
+    ));
+    let png_a_again = Value::from_image(ImageValue::new(
+        IMAGE_BYTES_A.to_vec(),
+        PNG_MEDIA_TYPE.to_string(),
+        ImageMetadata::default(),
+    ));
+    let png_b = Value::from_image(ImageValue::new(
+        IMAGE_BYTES_B.to_vec(),
+        PNG_MEDIA_TYPE.to_string(),
+        ImageMetadata::default(),
+    ));
+    let jpeg_a = Value::from_image(ImageValue::new(
+        IMAGE_BYTES_A.to_vec(),
+        JPEG_MEDIA_TYPE.to_string(),
+        ImageMetadata::default(),
+    ));
+
+    assert_eq!(png_a.hash, png_a_again.hash);
+    assert_ne!(png_a.hash, png_b.hash);
+    assert_ne!(png_a.hash, jpeg_a.hash);
+}
+
 #[test]
 fn value_from_exit_code() {
     let v = Value::from_exit_code(42);
@@ -170,6 +222,7 @@ fn type_tag_same_is_compatible() {
     assert!(TypeTag::String.compatible_with(&TypeTag::String));
     assert!(TypeTag::Bytes.compatible_with(&TypeTag::Bytes));
     assert!(TypeTag::Json.compatible_with(&TypeTag::Json));
+    assert!(TypeTag::Image.compatible_with(&TypeTag::Image));
     assert!(TypeTag::ExitCode.compatible_with(&TypeTag::ExitCode));
 }
 
@@ -178,6 +231,7 @@ fn type_tag_any_accepts_everything() {
     assert!(TypeTag::String.compatible_with(&TypeTag::Any));
     assert!(TypeTag::Bytes.compatible_with(&TypeTag::Any));
     assert!(TypeTag::Json.compatible_with(&TypeTag::Any));
+    assert!(TypeTag::Image.compatible_with(&TypeTag::Any));
     assert!(TypeTag::ExitCode.compatible_with(&TypeTag::Any));
     assert!(TypeTag::Any.compatible_with(&TypeTag::Any));
 }
@@ -187,6 +241,7 @@ fn type_tag_mismatches() {
     assert!(!TypeTag::String.compatible_with(&TypeTag::Bytes));
     assert!(!TypeTag::ExitCode.compatible_with(&TypeTag::Json));
     assert!(!TypeTag::Bytes.compatible_with(&TypeTag::String));
+    assert!(!TypeTag::Image.compatible_with(&TypeTag::String));
 }
 
 #[test]
@@ -195,6 +250,7 @@ fn type_tag_as_str_round_trip() {
         TypeTag::String,
         TypeTag::Bytes,
         TypeTag::Json,
+        TypeTag::Image,
         TypeTag::ExitCode,
         TypeTag::Any,
     ] {

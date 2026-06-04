@@ -2,10 +2,14 @@
 
 mod common;
 
+use n8nclone::agent_node::AgentOutputMode;
+use n8nclone::agent_node::AgentTarget;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::engine::workflow::WorkflowMeta;
 use pretty_assertions::assert_eq;
+
+const AGENT_PROMPT: &str = "summarize this";
 
 // ---------------------------------------------------------------------------
 // WorkflowMeta
@@ -48,7 +52,7 @@ fn shell_config_defaults() {
             assert_eq!(*timeout_secs, 60);
             assert!(*pipe_stdin);
         }
-        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+        _ => panic!("expected shell config"),
     }
 }
 
@@ -83,7 +87,7 @@ fn node_config_serde_round_trip() {
             assert_eq!(timeout_secs, 30);
             assert!(!pipe_stdin);
         }
-        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+        _ => panic!("expected shell config"),
     }
 }
 
@@ -104,7 +108,7 @@ fn http_config_defaults() {
             assert!(body.is_none());
             assert_eq!(timeout_secs, 60);
         }
-        NodeConfig::Shell { .. } | NodeConfig::File { .. } => panic!("expected HTTP config"),
+        _ => panic!("expected HTTP config"),
     }
 }
 
@@ -125,7 +129,39 @@ fn file_config_defaults() {
             assert!(!overwrite);
             assert!(allowed_roots.is_empty());
         }
-        NodeConfig::Shell { .. } | NodeConfig::Http { .. } => panic!("expected file config"),
+        _ => panic!("expected file config"),
+    }
+}
+
+#[test]
+fn image_input_config_defaults() {
+    let cfg = NodeConfig::image_input("/tmp/selfie.png");
+    match cfg {
+        NodeConfig::ImageInput {
+            path,
+            allowed_roots,
+            max_bytes,
+        } => {
+            assert_eq!(path, "/tmp/selfie.png");
+            assert!(allowed_roots.is_empty());
+            assert_eq!(max_bytes, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+        }
+        _ => panic!("expected image input config"),
+    }
+}
+
+#[test]
+fn agent_config_defaults() {
+    let cfg = NodeConfig::agent(AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    match cfg {
+        NodeConfig::Agent(settings) => {
+            assert_eq!(settings.target, AgentTarget::Pi);
+            assert_eq!(settings.prompt, AGENT_PROMPT);
+            assert_eq!(settings.output_mode, AgentOutputMode::Text);
+            assert!(settings.model_hint.is_none());
+            assert!(settings.context_refs.is_empty());
+        }
+        _ => panic!("expected agent config"),
     }
 }
 
@@ -216,7 +252,7 @@ fn set_node_config_replaces_existing() {
     wf.set_node_config(id, NodeConfig::shell("new-command"));
     match wf.node_config(id).unwrap() {
         NodeConfig::Shell { command, .. } => assert_eq!(command, "new-command"),
-        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+        _ => panic!("expected shell config"),
     }
 }
 

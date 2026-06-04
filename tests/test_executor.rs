@@ -163,7 +163,7 @@ fn cache_config_case(mutation: ShellConfigMutation) -> CacheConfigCase {
 fn workflow_with_config(config: NodeConfig) -> (Workflow, NodeId) {
     let command = match &config {
         NodeConfig::Shell { command, .. } => command.clone(),
-        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("workflow_with_config expects shell config"),
+        _ => panic!("workflow_with_config expects shell config"),
     };
     let mut workflow = Workflow::new("cache-key");
     let node_id = workflow.add_shell_node("cache", command);

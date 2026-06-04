@@ -16,6 +16,12 @@ use tracing::debug;
 use tracing::error;
 use tracing::info;
 
+use crate::agent_node;
+use crate::agent_node::AgentAdapter;
+use crate::agent_node::AgentNodeSettings;
+use crate::agent_node::AgentOutput;
+use crate::agent_node::AgentRequest;
+use crate::agent_node::NoopAgentAdapter;
 use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::EmptyCredentialProvider;
@@ -35,6 +41,9 @@ use crate::http;
 use crate::http::HttpClient;
 use crate::http::HttpRequestPlan;
 use crate::http::NoopHttpClient;
+use crate::image_node;
+use crate::image_node::ImageIo;
+use crate::image_node::NoopImageIo;
 
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
@@ -45,6 +54,13 @@ const FILE_CONTENT_INPUT_LABEL: &str = "content";
 const FILE_CONTENT_OUTPUT_INDEX: usize = 0;
 const FILE_METADATA_OUTPUT_INDEX: usize = 1;
 const FILE_BYTES_OUTPUT_INDEX: usize = 2;
+const IMAGE_VALUE_OUTPUT_INDEX: usize = 0;
+const IMAGE_METADATA_OUTPUT_INDEX: usize = 1;
+const AGENT_TEXT_OUTPUT_INDEX: usize = 0;
+const AGENT_JSON_OUTPUT_INDEX: usize = 1;
+const AGENT_IMAGE_OUTPUT_INDEX: usize = 2;
+const AGENT_ARTIFACT_OUTPUT_INDEX: usize = 3;
+const AGENT_METADATA_OUTPUT_INDEX: usize = 4;
 const HTTP_STATUS_OUTPUT_INDEX: usize = 0;
 const HTTP_HEADERS_OUTPUT_INDEX: usize = 1;
 const HTTP_BODY_OUTPUT_INDEX: usize = 2;
@@ -53,6 +69,8 @@ const HASH_TAG_NODE_ID: &[u8] = b"node-id";
 const HASH_TAG_SHELL_CONFIG: &[u8] = b"shell-config";
 const HASH_TAG_HTTP_CONFIG: &[u8] = b"http-config";
 const HASH_TAG_FILE_CONFIG: &[u8] = b"file-config";
+const HASH_TAG_IMAGE_INPUT_CONFIG: &[u8] = b"image-input-config";
+const HASH_TAG_AGENT_CONFIG: &[u8] = b"agent-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
 const HASH_TAG_HTTP_METHOD: &[u8] = b"http-method";
 const HASH_TAG_HTTP_URL: &[u8] = b"http-url";
@@ -63,6 +81,16 @@ const HASH_TAG_FILE_PATH: &[u8] = b"file-path";
 const HASH_TAG_FILE_CONTENT: &[u8] = b"file-content";
 const HASH_TAG_FILE_OVERWRITE: &[u8] = b"file-overwrite";
 const HASH_TAG_FILE_ROOTS: &[u8] = b"file-roots";
+const HASH_TAG_IMAGE_PATH: &[u8] = b"image-path";
+const HASH_TAG_IMAGE_ROOTS: &[u8] = b"image-roots";
+const HASH_TAG_IMAGE_MAX_BYTES: &[u8] = b"image-max-bytes";
+const HASH_TAG_AGENT_TARGET: &[u8] = b"agent-target";
+const HASH_TAG_AGENT_PROMPT: &[u8] = b"agent-prompt";
+const HASH_TAG_AGENT_OUTPUT_MODE: &[u8] = b"agent-output-mode";
+const HASH_TAG_AGENT_MODEL_HINT: &[u8] = b"agent-model-hint";
+const HASH_TAG_AGENT_TOOL_POLICY: &[u8] = b"agent-tool-policy";
+const HASH_TAG_AGENT_CONTEXT_REFS: &[u8] = b"agent-context-refs";
+const HASH_TAG_AGENT_SESSION: &[u8] = b"agent-session";
 const HASH_TAG_CWD: &[u8] = b"cwd";
 const HASH_TAG_ENV: &[u8] = b"env";
 const HASH_TAG_SECRET_ENV: &[u8] = b"secret-env";
@@ -112,6 +140,21 @@ struct FileOutputPortIds {
     content: PortId,
     metadata: PortId,
     bytes_written: PortId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ImageOutputPortIds {
+    image: PortId,
+    metadata: PortId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AgentOutputPortIds {
+    text: PortId,
+    json: PortId,
+    image: PortId,
+    artifact: PortId,
+    metadata: PortId,
 }
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
@@ -185,7 +228,32 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
             update_bool(hasher, HASH_TAG_FILE_OVERWRITE, *overwrite);
             update_string_list_hash(hasher, HASH_TAG_FILE_ROOTS, allowed_roots);
         }
+        NodeConfig::ImageInput {
+            path,
+            allowed_roots,
+            max_bytes,
+        } => {
+            hasher.update(HASH_TAG_IMAGE_INPUT_CONFIG);
+            update_str(hasher, HASH_TAG_IMAGE_PATH, path);
+            update_string_list_hash(hasher, HASH_TAG_IMAGE_ROOTS, allowed_roots);
+            update_usize(hasher, HASH_TAG_IMAGE_MAX_BYTES, *max_bytes);
+        }
+        NodeConfig::Agent(settings) => {
+            hasher.update(HASH_TAG_AGENT_CONFIG);
+            update_agent_settings_hash(hasher, settings);
+        }
     }
+}
+
+fn update_agent_settings_hash(hasher: &mut blake3::Hasher, settings: &AgentNodeSettings) {
+    update_str(hasher, HASH_TAG_AGENT_TARGET, agent_node::agent_target_label(settings.target));
+    update_str(hasher, HASH_TAG_AGENT_PROMPT, &settings.prompt);
+    update_str(hasher, HASH_TAG_AGENT_OUTPUT_MODE, settings.output_mode.as_str());
+    update_optional_str(hasher, HASH_TAG_AGENT_MODEL_HINT, settings.model_hint.as_deref());
+    update_str(hasher, HASH_TAG_AGENT_TOOL_POLICY, &settings.tool_policy);
+    update_ordered_string_list_hash(hasher, HASH_TAG_AGENT_CONTEXT_REFS, &settings.context_refs);
+    update_optional_str(hasher, HASH_TAG_CWD, settings.cwd.as_deref());
+    update_optional_str(hasher, HASH_TAG_AGENT_SESSION, settings.session.as_deref());
 }
 
 fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Value>) {
@@ -228,6 +296,19 @@ fn update_string_list_hash(hasher: &mut blake3::Hasher, tag: &[u8], values: &[St
     }
 }
 
+fn update_ordered_string_list_hash(hasher: &mut blake3::Hasher, tag: &[u8], values: &[String]) {
+    hasher.update(tag);
+    update_len(hasher, values.len());
+    for value in values {
+        update_str(hasher, tag, value);
+    }
+}
+
+fn update_usize(hasher: &mut blake3::Hasher, tag: &[u8], value: usize) {
+    let encoded_value = u64::try_from(value).expect("hash input value fits in u64");
+    update_u64(hasher, tag, encoded_value);
+}
+
 fn file_operation_label(operation: FileOperationKind) -> &'static str {
     match operation {
         FileOperationKind::Read => "read",
@@ -264,6 +345,14 @@ fn resolve_config_map(
         resolved.insert(key.clone(), resolved_value.value);
     }
     Ok((resolved, sensitive_fragments))
+}
+
+fn resolve_config_list(input: &[String], context: &ExpressionContext) -> Result<Vec<String>, String> {
+    let mut resolved = Vec::new();
+    for value in input {
+        resolved.push(resolve_config_string(value, context)?.value);
+    }
+    Ok(resolved)
 }
 
 fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<String> {
@@ -408,6 +497,40 @@ fn file_operation_plan(
     }
 }
 
+fn ordered_input_values(inputs: &HashMap<PortId, Value>) -> Vec<Value> {
+    let mut input_pairs = inputs.iter().collect::<Vec<_>>();
+    input_pairs.sort_by_key(|(port_id, _)| port_id.0);
+    input_pairs.into_iter().map(|(_, value)| value.clone()).collect()
+}
+
+// r[impl n8nclone.workflow_execution.agent_nodes.execute]
+fn agent_request_from_settings(
+    settings: &AgentNodeSettings,
+    prompt: String,
+    model_hint: Option<String>,
+    tool_policy: String,
+    context_refs: Vec<String>,
+    cwd: Option<String>,
+    session: Option<String>,
+    inputs: &HashMap<PortId, Value>,
+) -> AgentRequest {
+    let ordered_values = ordered_input_values(inputs);
+    let (text_inputs, image_inputs, json_inputs) = agent_node::request_inputs_from_values(&ordered_values);
+    AgentRequest {
+        target: settings.target,
+        prompt,
+        output_mode: settings.output_mode,
+        model_hint,
+        tool_policy,
+        context_refs,
+        cwd,
+        session,
+        text_inputs,
+        image_inputs,
+        json_inputs,
+    }
+}
+
 fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
     let stdout = node
         .output_ports
@@ -507,6 +630,95 @@ fn file_outputs_by_real_port(
     mapped
 }
 
+fn image_output_port_ids(node: &Node) -> Result<ImageOutputPortIds, String> {
+    let image = node
+        .output_ports
+        .get(IMAGE_VALUE_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing image output port", node.label))?;
+    let metadata = node
+        .output_ports
+        .get(IMAGE_METADATA_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing image metadata output port", node.label))?;
+    Ok(ImageOutputPortIds { image, metadata })
+}
+
+fn image_outputs_by_real_port(
+    ports: ImageOutputPortIds,
+    image: crate::engine::value::ImageValue,
+) -> HashMap<PortId, Value> {
+    let mut mapped = HashMap::new();
+    let metadata = serde_json::json!({
+        "media_type": image.media_type.clone(),
+        "bytes": image.bytes.len(),
+        "width": image.metadata.width,
+        "height": image.metadata.height,
+        "source_label": image.metadata.source_label.clone(),
+    });
+    mapped.insert(ports.image, Value::from_image(image));
+    mapped.insert(ports.metadata, Value::from_json(metadata));
+    mapped
+}
+
+fn agent_output_port_ids(node: &Node) -> Result<AgentOutputPortIds, String> {
+    let text = node
+        .output_ports
+        .get(AGENT_TEXT_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing agent text output port", node.label))?;
+    let json = node
+        .output_ports
+        .get(AGENT_JSON_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing agent JSON output port", node.label))?;
+    let image = node
+        .output_ports
+        .get(AGENT_IMAGE_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing agent image output port", node.label))?;
+    let artifact = node
+        .output_ports
+        .get(AGENT_ARTIFACT_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing agent artifact output port", node.label))?;
+    let metadata = node
+        .output_ports
+        .get(AGENT_METADATA_OUTPUT_INDEX)
+        .map(|port| port.id)
+        .ok_or_else(|| format!("node '{}' is missing agent metadata output port", node.label))?;
+    Ok(AgentOutputPortIds {
+        text,
+        json,
+        image,
+        artifact,
+        metadata,
+    })
+}
+
+fn agent_outputs_by_real_port(
+    ports: AgentOutputPortIds,
+    response: agent_node::AgentResponse,
+) -> HashMap<PortId, Value> {
+    let mut mapped = HashMap::new();
+    match response.output {
+        AgentOutput::Text(text) => {
+            mapped.insert(ports.text, Value::from_string(text));
+        }
+        AgentOutput::Json(json) => {
+            mapped.insert(ports.json, Value::from_json(json));
+        }
+        AgentOutput::Image(image) => {
+            mapped.insert(ports.image, Value::from_image(image));
+        }
+        AgentOutput::Artifact(bytes) => {
+            mapped.insert(ports.artifact, Value::from_bytes(bytes));
+        }
+    }
+    mapped.insert(ports.metadata, Value::from_json(response.metadata));
+    mapped
+}
+
 /// Unique identifier for an execution run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RunId(pub u64);
@@ -555,6 +767,8 @@ pub struct Executor {
     credential_provider: Box<dyn CredentialProvider>,
     http_client: Box<dyn HttpClient>,
     file_system: Box<dyn FileSystem>,
+    image_io: Box<dyn ImageIo>,
+    agent_adapter: Box<dyn AgentAdapter>,
 }
 
 impl Executor {
@@ -564,6 +778,8 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
 
@@ -573,6 +789,8 @@ impl Executor {
             credential_provider,
             http_client: Box::<NoopHttpClient>::default(),
             file_system: Box::<NoopFileSystem>::default(),
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
 
@@ -582,6 +800,8 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client,
             file_system: Box::<NoopFileSystem>::default(),
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
         }
     }
 
@@ -591,6 +811,30 @@ impl Executor {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system,
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
+        }
+    }
+
+    pub fn new_with_image_io(image_io: Box<dyn ImageIo>) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client: Box::<NoopHttpClient>::default(),
+            file_system: Box::<NoopFileSystem>::default(),
+            image_io,
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
+        }
+    }
+
+    pub fn new_with_agent_adapter(agent_adapter: Box<dyn AgentAdapter>) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            http_client: Box::<NoopHttpClient>::default(),
+            file_system: Box::<NoopFileSystem>::default(),
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter,
         }
     }
 
@@ -604,6 +848,25 @@ impl Executor {
             credential_provider,
             http_client,
             file_system,
+            image_io: Box::<NoopImageIo>::default(),
+            agent_adapter: Box::<NoopAgentAdapter>::default(),
+        }
+    }
+
+    pub fn new_with_runtime_clients(
+        credential_provider: Box<dyn CredentialProvider>,
+        http_client: Box<dyn HttpClient>,
+        file_system: Box<dyn FileSystem>,
+        image_io: Box<dyn ImageIo>,
+        agent_adapter: Box<dyn AgentAdapter>,
+    ) -> Self {
+        Self {
+            next_run_id: 0,
+            credential_provider,
+            http_client,
+            file_system,
+            image_io,
+            agent_adapter,
         }
     }
 
@@ -910,6 +1173,169 @@ impl Executor {
                             cached: false,
                         },
                         input_hash,
+                    },
+                    Err(error) => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
+                        input_hash,
+                    },
+                }
+            }
+            NodeConfig::ImageInput {
+                path,
+                allowed_roots,
+                max_bytes,
+            } => {
+                let output_ports = match image_output_port_ids(node) {
+                    Ok(ports) => ports,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_path = match resolve_config_string(path, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_roots = match resolve_config_list(allowed_roots, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let plan = image_node::image_input_plan(&resolved_path.value, &resolved_roots, *max_bytes);
+                match self.image_io.load(&plan) {
+                    Ok(image) => StepResult {
+                        node_id,
+                        status: NodeStatus::Completed {
+                            outputs: image_outputs_by_real_port(output_ports, image),
+                            cached: false,
+                        },
+                        input_hash,
+                    },
+                    Err(error) => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
+                        input_hash,
+                    },
+                }
+            }
+            NodeConfig::Agent(settings) => {
+                let output_ports = match agent_output_port_ids(node) {
+                    Ok(ports) => ports,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_prompt = match resolve_config_string(&settings.prompt, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_model_hint = match resolve_optional_config_string(&settings.model_hint, expression_context)
+                {
+                    Ok(value) => value.map(|value| value.value),
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_tool_policy = match resolve_config_string(&settings.tool_policy, expression_context) {
+                    Ok(value) => value.value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_context_refs = match resolve_config_list(&settings.context_refs, expression_context) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_cwd = match resolve_optional_config_string(&settings.cwd, expression_context) {
+                    Ok(value) => value.map(|value| value.value),
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let resolved_session = match resolve_optional_config_string(&settings.session, expression_context) {
+                    Ok(value) => value.map(|value| value.value),
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed { error },
+                            input_hash,
+                        };
+                    }
+                };
+                let request = agent_request_from_settings(
+                    settings,
+                    resolved_prompt.value,
+                    resolved_model_hint,
+                    resolved_tool_policy,
+                    resolved_context_refs,
+                    resolved_cwd,
+                    resolved_session,
+                    inputs,
+                );
+                match self.agent_adapter.execute(&request) {
+                    Ok(response) => match agent_node::validate_agent_response_mode(&response, settings.output_mode) {
+                        Ok(()) => StepResult {
+                            node_id,
+                            status: NodeStatus::Completed {
+                                outputs: agent_outputs_by_real_port(output_ports, response),
+                                cached: false,
+                            },
+                            input_hash,
+                        },
+                        Err(error) => StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        },
                     },
                     Err(error) => StepResult {
                         node_id,

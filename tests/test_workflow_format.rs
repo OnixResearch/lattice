@@ -4,6 +4,8 @@ mod common;
 
 use std::process::Command;
 
+use n8nclone::agent_node::AgentOutputMode;
+use n8nclone::agent_node::AgentTarget;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::store::Store;
@@ -24,7 +26,11 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
 const IMPORTED_NODE_COUNT: usize = 2;
 const IMPORTED_EDGE_COUNT: usize = 1;
+const IMAGE_AGENT_NODE_COUNT: usize = 2;
+const IMAGE_AGENT_EDGE_COUNT: usize = 1;
 const INVALID_PORT_ID: u64 = 999_001;
+const IMAGE_PATH: &str = "/tmp/selfie.png";
+const AGENT_PROMPT: &str = "Turn this selfie into fine art";
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let data_dir = temp_dir.path().join("data");
@@ -64,7 +70,7 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
     let target_node = imported.graph.nodes().find(|node| node.label == "grep-hello").expect("target node imported");
     match imported.node_config(target_node.id).expect("target config imported") {
         NodeConfig::Shell { command, .. } => assert_eq!(command, "grep hello"),
-        NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+        _ => panic!("expected shell config"),
     }
     assert!(workflow.graph.node(target).is_some());
 }
@@ -128,6 +134,63 @@ fn cli_export_missing_workflow_writes_no_file() {
 }
 
 // r[verify n8nclone.workflow_format.nickel.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.nickel]
+#[test]
+fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
+    let mut workflow = Workflow::new("image-agent-workflow");
+    let image_id = workflow.add_image_input_node("Selfie", IMAGE_PATH);
+    let agent_id =
+        workflow.add_agent_node("Fine art agent", AgentTarget::Clankers, AGENT_PROMPT, AgentOutputMode::Image);
+    let image_out = workflow.graph.node(image_id).expect("image node").output_ports[0].id;
+    let agent_image_in = workflow.graph.node(agent_id).expect("agent node").input_ports[1].id;
+    workflow.graph.add_edge(image_out, agent_image_in).expect("connect image to agent");
+
+    let imported = exported_then_loaded(&workflow);
+
+    assert_eq!(imported.graph.node_count(), IMAGE_AGENT_NODE_COUNT);
+    assert_eq!(imported.graph.edge_count(), IMAGE_AGENT_EDGE_COUNT);
+    let image_node = imported.graph.nodes().find(|node| node.label == "Selfie").expect("image node imported");
+    let agent_node = imported.graph.nodes().find(|node| node.label == "Fine art agent").expect("agent node imported");
+    match imported.node_config(image_node.id).expect("image config imported") {
+        NodeConfig::ImageInput { path, .. } => assert_eq!(path, IMAGE_PATH),
+        _ => panic!("expected image input config"),
+    }
+    match imported.node_config(agent_node.id).expect("agent config imported") {
+        NodeConfig::Agent(settings) => {
+            assert_eq!(settings.target, AgentTarget::Clankers);
+            assert_eq!(settings.prompt, AGENT_PROMPT);
+            assert_eq!(settings.output_mode, AgentOutputMode::Image);
+        }
+        _ => panic!("expected agent config"),
+    }
+}
+
+#[test]
+fn portable_import_rejects_invalid_agent_target() {
+    let mut workflow = Workflow::new("invalid-agent-workflow");
+    workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let mut portable = workflow_to_portable(&workflow);
+    let config = portable.configs.first_mut().expect("agent config");
+    config.agent_target = "unsupported".to_string();
+
+    let error = portable_to_workflow(portable).expect_err("invalid agent target rejected");
+
+    assert!(matches!(error, WorkflowFormatError::InvalidAgentTarget { .. }));
+}
+
+#[test]
+fn portable_import_rejects_invalid_agent_output_mode() {
+    let mut workflow = Workflow::new("invalid-agent-workflow");
+    workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let mut portable = workflow_to_portable(&workflow);
+    let config = portable.configs.first_mut().expect("agent config");
+    config.agent_output_mode = "unsupported".to_string();
+
+    let error = portable_to_workflow(portable).expect_err("invalid agent output mode rejected");
+
+    assert!(matches!(error, WorkflowFormatError::InvalidAgentOutputMode { .. }));
+}
+
 #[test]
 fn nickel_import_rejects_missing_required_field() {
     let temp_dir = tempfile::tempdir().expect("temporary workflow format directory");

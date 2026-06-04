@@ -10,6 +10,10 @@ use blake3::Hash;
 use serde::Deserialize;
 use serde::Serialize;
 
+const HASH_TAG_IMAGE_VALUE: &[u8] = b"image-value:v1";
+const HASH_TAG_IMAGE_MEDIA_TYPE: &[u8] = b"image-media-type";
+const HASH_TAG_IMAGE_BYTES: &[u8] = b"image-bytes";
+
 /// Blake3 content hash of a value.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ContentHash(pub [u8; 32]);
@@ -69,6 +73,7 @@ pub enum TypeTag {
     String,
     Bytes,
     Json,
+    Image,
     ExitCode,
     Any,
 }
@@ -79,6 +84,7 @@ impl TypeTag {
             Self::String => "string",
             Self::Bytes => "bytes",
             Self::Json => "json",
+            Self::Image => "image",
             Self::ExitCode => "exitcode",
             Self::Any => "any",
         }
@@ -114,8 +120,41 @@ pub enum ValueData {
     String(String),
     Bytes(Vec<u8>),
     Json(serde_json::Value),
+    Image(ImageValue),
     ExitCode(i32),
     Error { message: String, stderr: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ImageMetadata {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub source_label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageValue {
+    pub bytes: Vec<u8>,
+    pub media_type: String,
+    pub metadata: ImageMetadata,
+}
+
+impl ImageValue {
+    pub fn new(bytes: Vec<u8>, media_type: String, metadata: ImageMetadata) -> Self {
+        Self {
+            bytes,
+            media_type,
+            metadata,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        let dimensions = match (self.metadata.width, self.metadata.height) {
+            (Some(width), Some(height)) => format!(" {width}x{height}"),
+            _ => String::new(),
+        };
+        format!("{} image{} ({} bytes)", self.media_type, dimensions, self.bytes.len())
+    }
 }
 
 impl Value {
@@ -142,6 +181,22 @@ impl Value {
         let hash = ContentHash::from_bytes(&serialized);
         Self {
             data: ValueData::Json(v),
+            hash,
+            sensitive_fragments: Vec::new(),
+        }
+    }
+
+    // r[impl n8nclone.workflow_execution.image_values.model]
+    pub fn from_image(image: ImageValue) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(HASH_TAG_IMAGE_VALUE);
+        hasher.update(HASH_TAG_IMAGE_MEDIA_TYPE);
+        hasher.update(image.media_type.as_bytes());
+        hasher.update(HASH_TAG_IMAGE_BYTES);
+        hasher.update(&image.bytes);
+        let hash = ContentHash(*hasher.finalize().as_bytes());
+        Self {
+            data: ValueData::Image(image),
             hash,
             sensitive_fragments: Vec::new(),
         }
@@ -185,6 +240,7 @@ impl Value {
             ValueData::String(_) => TypeTag::String,
             ValueData::Bytes(_) => TypeTag::Bytes,
             ValueData::Json(_) => TypeTag::Json,
+            ValueData::Image(_) => TypeTag::Image,
             ValueData::ExitCode(_) => TypeTag::ExitCode,
             ValueData::Error { .. } => TypeTag::String,
         }
@@ -196,6 +252,7 @@ impl Value {
             ValueData::String(s) => s.clone(),
             ValueData::Bytes(b) => String::from_utf8_lossy(b).into_owned(),
             ValueData::Json(v) => serde_json::to_string_pretty(v).unwrap_or_default(),
+            ValueData::Image(image) => image.summary(),
             ValueData::ExitCode(c) => format!("exit code: {c}"),
             ValueData::Error { message, stderr } => {
                 format!("ERROR: {message}\n{stderr}")

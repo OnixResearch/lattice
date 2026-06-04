@@ -1216,13 +1216,16 @@ impl App {
             PropertyEditField::Label => self.workflow.graph.node(node_id).map(|node| node.label.clone()),
             PropertyEditField::Command => match self.workflow.node_config(node_id)? {
                 NodeConfig::Shell { command, .. } => Some(command.clone()),
-                NodeConfig::Http { .. } | NodeConfig::File { .. } => None,
+                NodeConfig::Http { .. }
+                | NodeConfig::File { .. }
+                | NodeConfig::ImageInput { .. }
+                | NodeConfig::Agent(_) => None,
             },
             PropertyEditField::TimeoutSecs => match self.workflow.node_config(node_id)? {
                 NodeConfig::Shell { timeout_secs, .. } | NodeConfig::Http { timeout_secs, .. } => {
                     Some(timeout_secs.to_string())
                 }
-                NodeConfig::File { .. } => None,
+                NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => None,
             },
         }
     }
@@ -1260,7 +1263,10 @@ impl App {
                         });
                         Ok(())
                     }
-                    NodeConfig::Http { .. } | NodeConfig::File { .. } => Err(PropertyEditError::MissingConfig),
+                    NodeConfig::Http { .. }
+                    | NodeConfig::File { .. }
+                    | NodeConfig::ImageInput { .. }
+                    | NodeConfig::Agent(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::TimeoutSecs => {
@@ -1301,7 +1307,9 @@ impl App {
                         });
                         Ok(())
                     }
-                    NodeConfig::File { .. } => Err(PropertyEditError::MissingConfig),
+                    NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => {
+                        Err(PropertyEditError::MissingConfig)
+                    }
                 }
             }
         }
@@ -1880,7 +1888,7 @@ mod tests {
 
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo new"),
-            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+            _ => panic!("expected shell config"),
         }
         assert!(app.has_unsaved_changes());
     }
@@ -1901,7 +1909,7 @@ mod tests {
             NodeConfig::Shell { timeout_secs, .. } => {
                 assert_eq!(*timeout_secs, DEFAULT_SHELL_TIMEOUT_SECS)
             }
-            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+            _ => panic!("expected shell config"),
         }
         assert!(app.property_edit.is_some());
         assert!(!app.has_unsaved_changes());
@@ -1947,7 +1955,7 @@ mod tests {
         assert_eq!(app.workflow.graph.node(node_id).expect("node").label, "Custom");
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "echo custom"),
-            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+            _ => panic!("expected shell config"),
         }
         assert!(!app.is_add_node_flow_open());
         assert!(app.has_unsaved_changes());
@@ -1984,7 +1992,7 @@ mod tests {
         assert_eq!(node.output_ports.len(), 1);
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "grep needle"),
-            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+            _ => panic!("expected shell config"),
         }
     }
 
@@ -2020,7 +2028,7 @@ mod tests {
         let node_id = app.graph_state.focused.expect("new node focused");
         match app.workflow.node_config(node_id).expect("node config") {
             NodeConfig::Shell { command, .. } => assert_eq!(command, "grep -E 'needle'"),
-            NodeConfig::Http { .. } | NodeConfig::File { .. } => panic!("expected shell config"),
+            _ => panic!("expected shell config"),
         }
         assert!(!app.is_add_node_flow_open());
     }

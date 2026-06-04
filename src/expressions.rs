@@ -257,6 +257,7 @@ fn value_type_name(value: &ValueData) -> &'static str {
         ValueData::String(_) => "string",
         ValueData::Bytes(_) => "bytes",
         ValueData::Json(_) => "json",
+        ValueData::Image(_) => "image",
         ValueData::ExitCode(_) => "exit code",
         ValueData::Error { .. } => "error",
     }

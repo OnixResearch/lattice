@@ -1,3 +1,4 @@
+pub mod agent_node;
 pub mod config;
 pub mod credentials;
 pub mod engine;
@@ -6,6 +7,7 @@ pub mod expressions;
 pub mod file_node;
 pub mod headless;
 pub mod http;
+pub mod image_node;
 pub mod scheduler;
 pub mod store;
 pub mod tui;

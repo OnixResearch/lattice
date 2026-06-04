@@ -12,6 +12,7 @@ use crate::engine::workflow::Workflow;
 use crate::expressions;
 use crate::file_node;
 use crate::http;
+use crate::image_node;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +37,9 @@ pub enum WorkflowDiagnosticCode {
     InvalidHttpMethod,
     InvalidHttpUrl,
     UnsafeFilePath,
+    UnsafeImagePath,
+    InvalidImageByteBudget,
+    EmptyAgentPrompt,
     InvalidExpressionSyntax,
 }
 
@@ -141,6 +145,38 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                     ));
                 }
             }
+            Some(NodeConfig::ImageInput {
+                path,
+                allowed_roots,
+                max_bytes,
+            }) => {
+                if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::UnsafeImagePath,
+                        Some(node.id),
+                        None,
+                        error.to_string(),
+                    ));
+                }
+                if *max_bytes == 0 {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::InvalidImageByteBudget,
+                        Some(node.id),
+                        None,
+                        format!("image input node '{}' has a zero byte budget", node.label),
+                    ));
+                }
+            }
+            Some(NodeConfig::Agent(settings)) => {
+                if settings.prompt.trim().is_empty() {
+                    diagnostics.push(fatal(
+                        WorkflowDiagnosticCode::EmptyAgentPrompt,
+                        Some(node.id),
+                        None,
+                        format!("generic agent node '{}' has an empty prompt", node.label),
+                    ));
+                }
+            }
             None => diagnostics.push(fatal(
                 WorkflowDiagnosticCode::MissingNodeConfig,
                 Some(node.id),
@@ -202,6 +238,30 @@ fn validate_config_expressions(node_id: NodeId, config: &NodeConfig, diagnostics
             }
             for root in allowed_roots {
                 validate_expression_field(node_id, "allowed_root", root, diagnostics);
+            }
+        }
+        NodeConfig::ImageInput {
+            path, allowed_roots, ..
+        } => {
+            validate_expression_field(node_id, "path", path, diagnostics);
+            for root in allowed_roots {
+                validate_expression_field(node_id, "allowed_root", root, diagnostics);
+            }
+        }
+        NodeConfig::Agent(settings) => {
+            validate_expression_field(node_id, "prompt", &settings.prompt, diagnostics);
+            if let Some(model_hint) = &settings.model_hint {
+                validate_expression_field(node_id, "model_hint", model_hint, diagnostics);
+            }
+            validate_expression_field(node_id, "tool_policy", &settings.tool_policy, diagnostics);
+            for context_ref in &settings.context_refs {
+                validate_expression_field(node_id, "context_ref", context_ref, diagnostics);
+            }
+            if let Some(cwd) = &settings.cwd {
+                validate_expression_field(node_id, "cwd", cwd, diagnostics);
+            }
+            if let Some(session) = &settings.session {
+                validate_expression_field(node_id, "session", session, diagnostics);
             }
         }
     }

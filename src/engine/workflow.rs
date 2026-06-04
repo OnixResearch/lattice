@@ -11,9 +11,13 @@ use rat_nodegraph::model::PortSpec;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::agent_node::AgentNodeSettings;
+use crate::agent_node::AgentOutputMode;
+use crate::agent_node::AgentTarget;
 use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::TypeTag;
 use crate::file_node::FileOperationKind;
+use crate::image_node::DEFAULT_MAX_IMAGE_BYTES;
 
 /// Metadata about a workflow (stored alongside the graph).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +68,12 @@ pub enum NodeConfig {
         overwrite: bool,
         allowed_roots: Vec<String>,
     },
+    ImageInput {
+        path: String,
+        allowed_roots: Vec<String>,
+        max_bytes: usize,
+    },
+    Agent(AgentNodeSettings),
 }
 
 impl NodeConfig {
@@ -97,11 +107,25 @@ impl NodeConfig {
         }
     }
 
+    pub fn image_input(path: impl Into<String>) -> Self {
+        Self::ImageInput {
+            path: path.into(),
+            allowed_roots: Vec::new(),
+            max_bytes: DEFAULT_MAX_IMAGE_BYTES,
+        }
+    }
+
+    pub fn agent(target: AgentTarget, prompt: impl Into<String>, output_mode: AgentOutputMode) -> Self {
+        Self::Agent(AgentNodeSettings::new(target, prompt, output_mode))
+    }
+
     pub fn kind_label(&self) -> &'static str {
         match self {
             Self::Shell { .. } => "Shell",
             Self::Http { .. } => "HTTP",
             Self::File { .. } => "File",
+            Self::ImageInput { .. } => "Image Input",
+            Self::Agent(_) => "Agent",
         }
     }
 }
@@ -174,6 +198,45 @@ impl Workflow {
             PortSpec::new("bytes_written", TypeTag::String.as_str()),
         ]);
         self.configs.insert(id.0, NodeConfig::file(operation, path));
+        id
+    }
+
+    /// Add an image input node with image and metadata outputs.
+    /// Returns the NodeId.
+    pub fn add_image_input_node(&mut self, label: impl Into<String>, path: impl Into<String>) -> NodeId {
+        let id = self.graph.add_node(label, &[], &[
+            PortSpec::new("image", TypeTag::Image.as_str()),
+            PortSpec::new("metadata", TypeTag::Json.as_str()),
+        ]);
+        self.configs.insert(id.0, NodeConfig::image_input(path));
+        id
+    }
+
+    /// Add a generic agent node with media-aware inputs and typed outputs.
+    /// Returns the NodeId.
+    pub fn add_agent_node(
+        &mut self,
+        label: impl Into<String>,
+        target: AgentTarget,
+        prompt: impl Into<String>,
+        output_mode: AgentOutputMode,
+    ) -> NodeId {
+        let id = self.graph.add_node(
+            label,
+            &[
+                PortSpec::new("prompt", TypeTag::String.as_str()),
+                PortSpec::new("image", TypeTag::Image.as_str()),
+                PortSpec::new("json", TypeTag::Json.as_str()),
+            ],
+            &[
+                PortSpec::new("text", TypeTag::String.as_str()),
+                PortSpec::new("json", TypeTag::Json.as_str()),
+                PortSpec::new("image", TypeTag::Image.as_str()),
+                PortSpec::new("artifact", TypeTag::Bytes.as_str()),
+                PortSpec::new("metadata", TypeTag::Json.as_str()),
+            ],
+        );
+        self.configs.insert(id.0, NodeConfig::agent(target, prompt, output_mode));
         id
     }
 
