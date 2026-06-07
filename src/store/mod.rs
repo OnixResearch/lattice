@@ -25,6 +25,8 @@ use crate::engine::Value;
 use crate::engine::Workflow;
 use crate::replay::ReplayEventRecord;
 use crate::scheduler::ScheduleDefinition;
+use crate::triggers::TriggerDefinition;
+use crate::triggers::TriggerRunRecord;
 
 const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows");
 const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
@@ -33,6 +35,8 @@ const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
 const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_details");
 const RUN_REPLAY_EVENTS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_replay_events");
 const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
+const TRIGGERS: TableDefinition<&str, &[u8]> = TableDefinition::new("triggers");
+const TRIGGER_RUNS: TableDefinition<&str, &[u8]> = TableDefinition::new("trigger_runs");
 const INITIAL_RUN_ID_VALUE: u64 = 0;
 const NEXT_RUN_ID_INCREMENT: u64 = 1;
 
@@ -119,6 +123,15 @@ pub trait ScheduleStore {
     fn delete_schedule(&self, schedule_id: &str) -> Result<(), StoreError>;
 }
 
+pub trait TriggerStore {
+    fn save_trigger(&self, trigger: &TriggerDefinition) -> Result<(), StoreError>;
+    fn load_trigger(&self, trigger_id: &str) -> Result<Option<TriggerDefinition>, StoreError>;
+    fn list_triggers(&self) -> Result<Vec<TriggerDefinition>, StoreError>;
+    fn delete_trigger(&self, trigger_id: &str) -> Result<(), StoreError>;
+    fn save_trigger_run(&self, record: &TriggerRunRecord) -> Result<(), StoreError>;
+    fn list_trigger_runs(&self, limit: usize) -> Result<Vec<TriggerRunRecord>, StoreError>;
+}
+
 /// Persistent store backed by redb.
 pub struct Store {
     db: Database,
@@ -139,6 +152,8 @@ impl Store {
             let _ = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -261,6 +276,87 @@ impl Store {
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
+    }
+
+    // -- triggers ------------------------------------------------------------
+
+    // r[impl n8nclone.scheduling.triggers.model]
+    pub fn save_trigger(&self, trigger: &TriggerDefinition) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(trigger).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.insert(trigger.id.as_str(), data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    pub fn load_trigger(&self, trigger_id: &str) -> Result<Option<TriggerDefinition>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+        match table.get(trigger_id).map_err(|e| StoreError::Db(e.to_string()))? {
+            Some(data) => {
+                let bytes: &[u8] = data.value();
+                let trigger = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                Ok(Some(trigger))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn list_triggers(&self) -> Result<Vec<TriggerDefinition>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+        let mut triggers = Vec::new();
+        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
+        for entry in iter {
+            let (_key, data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
+            let bytes: &[u8] = data.value();
+            let trigger = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+            triggers.push(trigger);
+        }
+        Ok(triggers)
+    }
+
+    pub fn delete_trigger(&self, trigger_id: &str) -> Result<(), StoreError> {
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.remove(trigger_id).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    // r[impl n8nclone.scheduling.triggers.history]
+    pub fn save_trigger_run(&self, record: &TriggerRunRecord) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let key = trigger_run_record_key(record);
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.insert(key.as_str(), data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    pub fn list_trigger_runs(&self, limit: usize) -> Result<Vec<TriggerRunRecord>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+        let mut records = Vec::new();
+        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
+        for entry in iter {
+            if records.len() >= limit {
+                break;
+            }
+            let (_key, data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
+            let bytes: &[u8] = data.value();
+            let record = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+            records.push(record);
+        }
+        Ok(records)
     }
 
     // -- value store (content-addressed) ------------------------------------
@@ -419,6 +515,15 @@ impl Store {
     }
 }
 
+fn trigger_run_record_key(record: &TriggerRunRecord) -> String {
+    let suffix = record
+        .run_id
+        .map(|run_id| run_id.0.to_string())
+        .or_else(|| record.idempotency_key.clone())
+        .unwrap_or_else(|| record.message.clone());
+    format!("{}:{suffix}", record.trigger_id)
+}
+
 /// Store errors.
 #[derive(Debug)]
 pub enum StoreError {
@@ -529,5 +634,31 @@ impl ScheduleStore for Store {
 
     fn delete_schedule(&self, schedule_id: &str) -> Result<(), StoreError> {
         Store::delete_schedule(self, schedule_id)
+    }
+}
+
+impl TriggerStore for Store {
+    fn save_trigger(&self, trigger: &TriggerDefinition) -> Result<(), StoreError> {
+        Store::save_trigger(self, trigger)
+    }
+
+    fn load_trigger(&self, trigger_id: &str) -> Result<Option<TriggerDefinition>, StoreError> {
+        Store::load_trigger(self, trigger_id)
+    }
+
+    fn list_triggers(&self) -> Result<Vec<TriggerDefinition>, StoreError> {
+        Store::list_triggers(self)
+    }
+
+    fn delete_trigger(&self, trigger_id: &str) -> Result<(), StoreError> {
+        Store::delete_trigger(self, trigger_id)
+    }
+
+    fn save_trigger_run(&self, record: &TriggerRunRecord) -> Result<(), StoreError> {
+        Store::save_trigger_run(self, record)
+    }
+
+    fn list_trigger_runs(&self, limit: usize) -> Result<Vec<TriggerRunRecord>, StoreError> {
+        Store::list_trigger_runs(self, limit)
     }
 }

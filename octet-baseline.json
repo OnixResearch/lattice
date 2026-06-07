@@ -10,7 +10,7 @@
     "profile_hash": "b3:2f7a62e51992d26c5ce19e26b975ed6e0517cca7e6ef2cfea3762e3d4613edee",
     "config_hash": "b3:34672ff90dbbc2fb3556e2a59568eee2bb918053c05da0ca1180550a96da8861"
   },
-  "baseline_hash": "b3:74a36b6e57a89a670427cba34ac4f647627fcfc0d671e76ace0034e144f7bfed",
+  "baseline_hash": "b3:bb27590368ca4529c79ef4105c6af224c5ced6f075b5ec964e78537c910bdab1",
   "findings": [
     {
       "stable_id": "b3:478f88fd2f16fd6f",
@@ -26,8 +26,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:35dcc9cd77f61753",
-      "semantic_id": "b3:35dcc9cd77f61753",
+      "stable_id": "b3:3abc36d3129a11e3",
+      "semantic_id": "b3:3abc36d3129a11e3",
       "identity_status": "computed",
       "lint": "module_file_count",
       "group": "unknown",
@@ -35,7 +35,7 @@
       "file": "src/agent_node.rs",
       "line": 1,
       "column": 1,
-      "message": "module directory `src` contains 16 Rust source files (limit: 7)",
+      "message": "module directory `src` contains 17 Rust source files (limit: 7)",
       "crate_name": "n8nclone"
     },
     {
@@ -3536,8 +3536,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:8f0bcdfffe870f08",
-      "semantic_id": "b3:8f0bcdfffe870f08",
+      "stable_id": "b3:9a8b6cf2511f1b52",
+      "semantic_id": "b3:9a8b6cf2511f1b52",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -3545,7 +3545,7 @@
       "file": "src/engine/workflow.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 384 lines (limit: 300)",
+      "message": "source file is 388 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
@@ -3757,6 +3757,19 @@
       "crate_name": "n8nclone"
     },
     {
+      "stable_id": "b3:f3f3efaa7e5ec046",
+      "semantic_id": "b3:f3f3efaa7e5ec046",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/engine/workflow.rs",
+      "line": 24,
+      "column": 1,
+      "message": "non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
       "stable_id": "b3:5bc54cff9c3da430",
       "semantic_id": "b3:5bc54cff9c3da430",
       "identity_status": "computed",
@@ -3764,7 +3777,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 27,
+      "line": 28,
       "column": 1,
       "message": "item name `WorkflowMeta` repeats `workflow` from ancestor path segment `workflow`",
       "crate_name": "n8nclone"
@@ -3777,7 +3790,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 36,
+      "line": 37,
       "column": 19,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -3790,7 +3803,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 159,
+      "line": 160,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -3803,7 +3816,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 161,
+      "line": 162,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -3816,7 +3829,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 163,
+      "line": 164,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -3829,20 +3842,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 165,
+      "line": 166,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:e76afbb3d1256335",
-      "semantic_id": "b3:e76afbb3d1256335",
+      "stable_id": "b3:b057f1595174007f",
+      "semantic_id": "b3:b057f1595174007f",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 184,
+      "line": 185,
       "column": 1,
       "message": "item name `Workflow` repeats `workflow` from ancestor path segment `workflow`",
       "crate_name": "n8nclone"
@@ -3855,7 +3868,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 188,
+      "line": 189,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -3868,7 +3881,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 190,
+      "line": 191,
+      "column": 5,
+      "message": "implicit default on external type — construct with explicit values",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:22f048c06d412a17",
+      "semantic_id": "b3:22f048c06d412a17",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/engine/workflow.rs",
+      "line": 193,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -3881,7 +3907,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/engine/workflow.rs",
-      "line": 382,
+      "line": 386,
       "column": 30,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -4420,6 +4446,32 @@
       "crate_name": "n8nclone"
     },
     {
+      "stable_id": "b3:219dc9963ae29450",
+      "semantic_id": "b3:219dc9963ae29450",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/headless.rs",
+      "line": 25,
+      "column": 1,
+      "message": "non-trait import `triggers` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:7bc1c2059808c250",
+      "semantic_id": "b3:7bc1c2059808c250",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/headless.rs",
+      "line": 26,
+      "column": 1,
+      "message": "non-trait import `TriggerRunPlan` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
       "stable_id": "b3:67f411a80d4834eb",
       "semantic_id": "b3:67f411a80d4834eb",
       "identity_status": "computed",
@@ -4427,7 +4479,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 25,
+      "line": 27,
       "column": 1,
       "message": "non-trait import `workflow_validation` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "n8nclone"
@@ -4440,7 +4492,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 26,
+      "line": 28,
       "column": 1,
       "message": "non-trait import `WorkflowDiagnostic` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "n8nclone"
@@ -4453,7 +4505,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 30,
+      "line": 32,
       "column": 1,
       "message": "item name `HeadlessRunStatus` repeats `headless` from ancestor path segment `headless`",
       "crate_name": "n8nclone"
@@ -4466,7 +4518,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 45,
+      "line": 47,
       "column": 1,
       "message": "item name `HeadlessProcessResult` repeats `headless` from ancestor path segment `headless`",
       "crate_name": "n8nclone"
@@ -4479,7 +4531,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 51,
+      "line": 53,
       "column": 1,
       "message": "item name `HeadlessRunSummary` repeats `headless` from ancestor path segment `headless`",
       "crate_name": "n8nclone"
@@ -4492,7 +4544,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 63,
+      "line": 65,
       "column": 1,
       "message": "item name `HeadlessRunError` repeats `headless` from ancestor path segment `headless`",
       "crate_name": "n8nclone"
@@ -4505,7 +4557,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 90,
+      "line": 92,
       "column": 104,
       "message": "function `summarize_run` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -4518,7 +4570,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 96,
+      "line": 98,
       "column": 20,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -4531,7 +4583,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 190,
+      "line": 205,
       "column": 1,
       "message": "function `run_saved_workflow_with_executor_factory` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -4544,7 +4596,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 199,
+      "line": 214,
       "column": 28,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -4557,7 +4609,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 206,
+      "line": 221,
       "column": 29,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -4570,7 +4622,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 219,
+      "line": 234,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "n8nclone"
@@ -7202,8 +7254,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:ee69492cceac47ae",
-      "semantic_id": "b3:ee69492cceac47ae",
+      "stable_id": "b3:8a5ded39313e4313",
+      "semantic_id": "b3:8a5ded39313e4313",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -7211,7 +7263,7 @@
       "file": "src/store/mod.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 533 lines (limit: 300)",
+      "message": "source file is 664 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
@@ -7397,6 +7449,32 @@
       "crate_name": "n8nclone"
     },
     {
+      "stable_id": "b3:f3f3efaa7e5ec046",
+      "semantic_id": "b3:f3f3efaa7e5ec046",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/store/mod.rs",
+      "line": 28,
+      "column": 1,
+      "message": "non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:9a7ac23c002c0dcb",
+      "semantic_id": "b3:9a7ac23c002c0dcb",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/store/mod.rs",
+      "line": 29,
+      "column": 1,
+      "message": "non-trait import `TriggerRunRecord` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
       "stable_id": "b3:adee4b6a16e24880",
       "semantic_id": "b3:adee4b6a16e24880",
       "identity_status": "computed",
@@ -7404,7 +7482,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 123,
+      "line": 136,
       "column": 1,
       "message": "item name `Store` repeats `store` from ancestor path segment `store`",
       "crate_name": "n8nclone"
@@ -7417,7 +7495,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 194,
+      "line": 209,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -7430,9 +7508,35 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 250,
+      "line": 265,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:2e83d984c6ad2df3",
+      "semantic_id": "b3:2e83d984c6ad2df3",
+      "identity_status": "computed",
+      "lint": "unbounded_collection_growth",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/store/mod.rs",
+      "line": 317,
+      "column": 13,
+      "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:1fc75747287774cf",
+      "semantic_id": "b3:1fc75747287774cf",
+      "identity_status": "computed",
+      "lint": "usize_in_public_api",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/store/mod.rs",
+      "line": 345,
+      "column": 5,
+      "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "n8nclone"
     },
     {
@@ -7443,7 +7547,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 391,
+      "line": 487,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "n8nclone"
@@ -7456,7 +7560,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 400,
+      "line": 496,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -7469,14 +7573,300 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 424,
+      "line": 529,
       "column": 1,
       "message": "item name `StoreError` repeats `store` from ancestor path segment `store`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:d35753532571db17",
-      "semantic_id": "b3:d35753532571db17",
+      "stable_id": "b3:dffbe9a33e829a2b",
+      "semantic_id": "b3:dffbe9a33e829a2b",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 542 lines (limit: 300)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:047cfd7227433fed",
+      "semantic_id": "b3:047cfd7227433fed",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 3,
+      "column": 1,
+      "message": "non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:7e6130d94f9cfe43",
+      "semantic_id": "b3:7e6130d94f9cfe43",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 4,
+      "column": 1,
+      "message": "non-trait import `HashSet` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:a4264202f3cfc314",
+      "semantic_id": "b3:a4264202f3cfc314",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 6,
+      "column": 1,
+      "message": "non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:2cf8ab7c41eea9e8",
+      "semantic_id": "b3:2cf8ab7c41eea9e8",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 7,
+      "column": 1,
+      "message": "non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:9a06289bddeeb00d",
+      "semantic_id": "b3:9a06289bddeeb00d",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 9,
+      "column": 1,
+      "message": "non-trait import `credentials` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:276f0b07b2137a65",
+      "semantic_id": "b3:276f0b07b2137a65",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 11,
+      "column": 1,
+      "message": "non-trait import `SecretRef` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:12fa42e67471c04e",
+      "semantic_id": "b3:12fa42e67471c04e",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 12,
+      "column": 1,
+      "message": "non-trait import `RunId` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6a239131cebf57f6",
+      "semantic_id": "b3:6a239131cebf57f6",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 13,
+      "column": 1,
+      "message": "non-trait import `Value` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:15a0e4664a747094",
+      "semantic_id": "b3:15a0e4664a747094",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 14,
+      "column": 1,
+      "message": "non-trait import `scheduler` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:e09957dc1de90712",
+      "semantic_id": "b3:e09957dc1de90712",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 15,
+      "column": 1,
+      "message": "non-trait import `MissedRunPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:9e23e453fafd885e",
+      "semantic_id": "b3:9e23e453fafd885e",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 16,
+      "column": 1,
+      "message": "non-trait import `OverlapPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:d1e3a415d97d9b70",
+      "semantic_id": "b3:d1e3a415d97d9b70",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 17,
+      "column": 1,
+      "message": "non-trait import `RecurrenceRule` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:cfae88e62124d65f",
+      "semantic_id": "b3:cfae88e62124d65f",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 18,
+      "column": 1,
+      "message": "non-trait import `ScheduleDefinition` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:3881e4a2bf250b87",
+      "semantic_id": "b3:3881e4a2bf250b87",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 171,
+      "column": 29,
+      "message": "function `validate_trigger_definition` has 0 assertion(s) in 21 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:d76215d38f43bc78",
+      "semantic_id": "b3:d76215d38f43bc78",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 212,
+      "column": 61,
+      "message": "function `bind_trigger_payload` has 0 assertion(s) in 27 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:17d6c7eeee3c93d3",
+      "semantic_id": "b3:17d6c7eeee3c93d3",
+      "identity_status": "computed",
+      "lint": "unbounded_collection_growth",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 218,
+      "column": 17,
+      "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:f2018212cef5ffd4",
+      "semantic_id": "b3:f2018212cef5ffd4",
+      "identity_status": "computed",
+      "lint": "unbounded_collection_growth",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 220,
+      "column": 24,
+      "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6d58c910b9e3977e",
+      "semantic_id": "b3:6d58c910b9e3977e",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 267,
+      "column": 53,
+      "message": "function `admit_trigger_event` has 0 assertion(s) in 30 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:b41f9f1d874967f0",
+      "semantic_id": "b3:b41f9f1d874967f0",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 309,
+      "column": 29,
+      "message": "function `validate_webhook_admission` has 0 assertion(s) in 20 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:a48f4d4a2ebf4370",
+      "semantic_id": "b3:a48f4d4a2ebf4370",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 406,
+      "column": 29,
+      "message": "function `validate_idempotency` has 0 assertion(s) in 21 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:0e699795ca8b6f23",
+      "semantic_id": "b3:0e699795ca8b6f23",
+      "identity_status": "computed",
+      "lint": "ambiguous_params",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/triggers.rs",
+      "line": 428,
+      "column": 1,
+      "message": "2 consecutive `&str` parameters are easy to swap by accident",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:2f85687996886f99",
+      "semantic_id": "b3:2f85687996886f99",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -7484,7 +7874,7 @@
       "file": "src/tui/app.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 3236 lines (limit: 300)",
+      "message": "source file is 3252 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
@@ -8626,7 +9016,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1970,
+      "line": 1986,
       "column": 48,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -8639,7 +9029,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2010,
+      "line": 2026,
       "column": 34,
       "message": "unbounded channel — use a bounded channel with explicit capacity",
       "crate_name": "n8nclone"
@@ -8652,7 +9042,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2026,
+      "line": 2042,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "n8nclone"
@@ -8665,7 +9055,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2056,
+      "line": 2072,
       "column": 41,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8678,7 +9068,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2109,
+      "line": 2125,
       "column": 25,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "n8nclone"
@@ -8691,7 +9081,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2131,
+      "line": 2147,
       "column": 40,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8704,7 +9094,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2158,
+      "line": 2174,
       "column": 19,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8717,7 +9107,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2212,
+      "line": 2228,
       "column": 13,
       "message": "`old_viewport` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -8730,7 +9120,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2233,
+      "line": 2249,
       "column": 9,
       "message": "loop without visible iteration bound",
       "crate_name": "n8nclone"
@@ -11557,8 +11947,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:7f8d948c2b60e9ae",
-      "semantic_id": "b3:7f8d948c2b60e9ae",
+      "stable_id": "b3:b43d139e844b979c",
+      "semantic_id": "b3:b43d139e844b979c",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -11566,12 +11956,12 @@
       "file": "src/workflow_format.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1451 lines (limit: 300)",
+      "message": "source file is 1812 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:1eb604a39f6edfda",
-      "semantic_id": "b3:1eb604a39f6edfda",
+      "stable_id": "b3:5905f01b237b306e",
+      "semantic_id": "b3:5905f01b237b306e",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "unknown",
@@ -11947,16 +12337,159 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:535bab147df57ff8",
-      "semantic_id": "b3:535bab147df57ff8",
+      "stable_id": "b3:e09957dc1de90712",
+      "semantic_id": "b3:e09957dc1de90712",
       "identity_status": "computed",
-      "lint": "path_segment_repetition",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 36,
+      "column": 1,
+      "message": "non-trait import `MissedRunPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:9e23e453fafd885e",
+      "semantic_id": "b3:9e23e453fafd885e",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 37,
+      "column": 1,
+      "message": "non-trait import `OverlapPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:d1e3a415d97d9b70",
+      "semantic_id": "b3:d1e3a415d97d9b70",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 38,
+      "column": 1,
+      "message": "non-trait import `RecurrenceRule` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6ee29f1777302218",
+      "semantic_id": "b3:6ee29f1777302218",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 39,
+      "column": 1,
+      "message": "non-trait import `IdempotencyPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:f3f3efaa7e5ec046",
+      "semantic_id": "b3:f3f3efaa7e5ec046",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 40,
+      "column": 1,
+      "message": "non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:8665cb6a7071e6b8",
+      "semantic_id": "b3:8665cb6a7071e6b8",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 41,
+      "column": 1,
+      "message": "non-trait import `TriggerInputBinding` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:0f0a0dd7533b7149",
+      "semantic_id": "b3:0f0a0dd7533b7149",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 42,
+      "column": 1,
+      "message": "non-trait import `TriggerKind` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:0463bfdf51e8ad8d",
+      "semantic_id": "b3:0463bfdf51e8ad8d",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 43,
+      "column": 1,
+      "message": "non-trait import `TriggerPayloadSource` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:033a2c4811e2850c",
+      "semantic_id": "b3:033a2c4811e2850c",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
       "line": 44,
       "column": 1,
+      "message": "non-trait import `WebhookAuthPolicy` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:8e9c41484117a3e4",
+      "semantic_id": "b3:8e9c41484117a3e4",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 45,
+      "column": 1,
+      "message": "non-trait import `WebhookTrigger` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:531f10b32d978eee",
+      "semantic_id": "b3:531f10b32d978eee",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 72,
+      "column": 1,
       "message": "item name `PortableWorkflow` repeats `workflow` from ancestor path segment `workflow_format`",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:e04b658f49c54b7d",
+      "semantic_id": "b3:e04b658f49c54b7d",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 77,
+      "column": 5,
+      "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
     },
     {
@@ -11967,7 +12500,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 53,
+      "line": 83,
       "column": 1,
       "message": "item name `PortableWorkflowMeta` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -11980,7 +12513,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 91,
+      "line": 121,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -11993,7 +12526,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 93,
+      "line": 123,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12006,7 +12539,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 95,
+      "line": 125,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12019,7 +12552,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 97,
+      "line": 127,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12032,7 +12565,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 99,
+      "line": 129,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12045,7 +12578,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 101,
+      "line": 131,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12058,7 +12591,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 106,
+      "line": 136,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12071,7 +12604,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 108,
+      "line": 138,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12084,7 +12617,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 110,
+      "line": 140,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12097,7 +12630,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 112,
+      "line": 142,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12110,7 +12643,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 114,
+      "line": 144,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12123,7 +12656,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 116,
+      "line": 146,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12136,7 +12669,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 118,
+      "line": 148,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12149,7 +12682,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 120,
+      "line": 150,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12162,7 +12695,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 124,
+      "line": 154,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12175,7 +12708,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 126,
+      "line": 156,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12188,7 +12721,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 128,
+      "line": 158,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12201,7 +12734,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 132,
+      "line": 162,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12214,7 +12747,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 134,
+      "line": 164,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12227,7 +12760,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 136,
+      "line": 166,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12240,7 +12773,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 138,
+      "line": 168,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12253,7 +12786,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 140,
+      "line": 170,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12266,7 +12799,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 142,
+      "line": 172,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12279,7 +12812,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 144,
+      "line": 174,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12292,7 +12825,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 146,
+      "line": 176,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12305,7 +12838,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 148,
+      "line": 178,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12318,7 +12851,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 150,
+      "line": 180,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12331,7 +12864,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 152,
+      "line": 182,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12344,7 +12877,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 154,
+      "line": 184,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12357,7 +12890,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 156,
+      "line": 186,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12370,7 +12903,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 158,
+      "line": 188,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -12383,48 +12916,61 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 177,
+      "line": 207,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:953c5bb5ce21ec97",
-      "semantic_id": "b3:953c5bb5ce21ec97",
+      "stable_id": "b3:6dfca5ef4ab66c02",
+      "semantic_id": "b3:6dfca5ef4ab66c02",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 245,
+      "column": 5,
+      "message": "implicit default on external type — construct with explicit values",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:149abc4312651d28",
+      "semantic_id": "b3:149abc4312651d28",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 203,
+      "line": 268,
       "column": 1,
       "message": "item name `WorkflowFormatError` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:88c88ed2f26be720",
-      "semantic_id": "b3:88c88ed2f26be720",
+      "stable_id": "b3:dbff264937eefee7",
+      "semantic_id": "b3:dbff264937eefee7",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 288,
+      "line": 357,
       "column": 1,
       "message": "item name `workflow_to_portable` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:0528feaf2fccf976",
-      "semantic_id": "b3:0528feaf2fccf976",
+      "stable_id": "b3:b6a9fa7e7e336df6",
+      "semantic_id": "b3:b6a9fa7e7e336df6",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 288,
+      "line": 357,
       "column": 70,
-      "message": "function `workflow_to_portable` has 0 assertion(s) in 44 lines (need 2+)",
+      "message": "function `workflow_to_portable` has 0 assertion(s) in 47 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -12435,7 +12981,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 354,
+      "line": 427,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -12448,7 +12994,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 369,
+      "line": 442,
       "column": 1,
       "message": "item name `workflow_for_config` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -12461,7 +13007,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 393,
+      "line": 466,
       "column": 25,
       "message": "function `node_config_to_portable` has 0 assertion(s) in 406 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12474,7 +13020,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 393,
+      "line": 466,
       "column": 25,
       "message": "function `node_config_to_portable` is 406 lines (limit: 70)",
       "crate_name": "n8nclone"
@@ -12487,35 +13033,74 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 394,
+      "line": 467,
       "column": 9,
       "message": "`portable_runner` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:4b818a6c4705f18a",
-      "semantic_id": "b3:4b818a6c4705f18a",
-      "identity_status": "computed",
-      "lint": "path_segment_repetition",
-      "group": "unknown",
-      "severity": "error",
-      "file": "src/workflow_format.rs",
-      "line": 847,
-      "column": 1,
-      "message": "item name `portable_to_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
-      "crate_name": "n8nclone"
-    },
-    {
-      "stable_id": "b3:3f7857f54afd18ad",
-      "semantic_id": "b3:3f7857f54afd18ad",
+      "stable_id": "b3:f54fb1560cfdff52",
+      "semantic_id": "b3:f54fb1560cfdff52",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 847,
+      "line": 920,
+      "column": 72,
+      "message": "function `trigger_to_portable` has 0 assertion(s) in 35 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:2af774851ab77d81",
+      "semantic_id": "b3:2af774851ab77d81",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 980,
+      "column": 107,
+      "message": "function `portable_auth_parts` has 0 assertion(s) in 24 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:d503487cee46bdb8",
+      "semantic_id": "b3:d503487cee46bdb8",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1077,
+      "column": 55,
+      "message": "function `portable_trigger_binding_to_binding` has 0 assertion(s) in 20 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:bd691a34b1c854b9",
+      "semantic_id": "b3:bd691a34b1c854b9",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1159,
+      "column": 1,
+      "message": "item name `portable_to_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:68b95e50f810e270",
+      "semantic_id": "b3:68b95e50f810e270",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1159,
       "column": 98,
-      "message": "function `portable_to_workflow` has 0 assertion(s) in 56 lines (need 2+)",
+      "message": "function `portable_to_workflow` has 0 assertion(s) in 57 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -12526,7 +13111,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 858,
+      "line": 1171,
       "column": 13,
       "message": "`port_id_map` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -12539,7 +13124,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 876,
+      "line": 1189,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -12552,7 +13137,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 882,
+      "line": 1195,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -12565,7 +13150,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 911,
+      "line": 1224,
       "column": 95,
       "message": "function `validate_portable_identity` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12578,7 +13163,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 913,
+      "line": 1226,
       "column": 13,
       "message": "`port_ids` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -12591,7 +13176,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 955,
+      "line": 1268,
       "column": 113,
       "message": "function `portable_shell_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12604,7 +13189,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 982,
+      "line": 1295,
       "column": 112,
       "message": "function `portable_http_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12617,7 +13202,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1033,
+      "line": 1346,
       "column": 113,
       "message": "function `portable_agent_config_to_node_config` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12630,7 +13215,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1065,
+      "line": 1378,
       "column": 117,
       "message": "function `portable_condition_config_to_node_config` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12643,7 +13228,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1103,
+      "line": 1416,
       "column": 119,
       "message": "function `portable_subworkflow_config_to_node_config` has 0 assertion(s) in 28 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12656,7 +13241,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1180,
+      "line": 1493,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -12669,7 +13254,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1181,
+      "line": 1494,
       "column": 9,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -12682,7 +13267,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1207,
+      "line": 1520,
       "column": 120,
       "message": "function `portable_config_to_node_credentials` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12695,48 +13280,48 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1239,
+      "line": 1552,
       "column": 1,
       "message": "item name `workflow_to_nickel` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:649300183ad116d3",
-      "semantic_id": "b3:649300183ad116d3",
+      "stable_id": "b3:9c6eee068a7791fc",
+      "semantic_id": "b3:9c6eee068a7791fc",
       "identity_status": "computed",
       "lint": "borrowed_argument_types",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1258,
+      "line": 1571,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:007e24d9c66913f2",
-      "semantic_id": "b3:007e24d9c66913f2",
+      "stable_id": "b3:1c72ee190f19a027",
+      "semantic_id": "b3:1c72ee190f19a027",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1258,
+      "line": 1571,
       "column": 1,
       "message": "item name `render_portable_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:4bd78d9d36a419ec",
-      "semantic_id": "b3:4bd78d9d36a419ec",
+      "stable_id": "b3:d93006741de28bc1",
+      "semantic_id": "b3:d93006741de28bc1",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1258,
+      "line": 1571,
       "column": 79,
-      "message": "function `render_portable_workflow` has 0 assertion(s) in 25 lines (need 2+)",
+      "message": "function `render_portable_workflow` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -12747,7 +13332,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1284,
+      "line": 1602,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12760,7 +13345,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1303,
+      "line": 1621,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12773,7 +13358,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1312,
+      "line": 1630,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12786,7 +13371,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1312,
+      "line": 1630,
       "column": 68,
       "message": "function `render_config` has 0 assertion(s) in 129 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12799,9 +13384,35 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1312,
+      "line": 1630,
       "column": 68,
       "message": "function `render_config` is 129 lines (limit: 70)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:0744630b6fe047c8",
+      "semantic_id": "b3:0744630b6fe047c8",
+      "identity_status": "computed",
+      "lint": "borrowed_argument_types",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1760,
+      "column": 1,
+      "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:0b4292d830c29282",
+      "semantic_id": "b3:0b4292d830c29282",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1760,
+      "column": 67,
+      "message": "function `render_trigger` has 0 assertion(s) in 42 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -12812,7 +13423,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1443,
+      "line": 1804,
       "column": 5,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -12825,7 +13436,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1447,
+      "line": 1808,
       "column": 1,
       "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -12838,14 +13449,14 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1449,
+      "line": 1810,
       "column": 9,
       "message": "`portable` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:8069df8033a49589",
-      "semantic_id": "b3:8069df8033a49589",
+      "stable_id": "b3:c4c7ae7def8c577f",
+      "semantic_id": "b3:c4c7ae7def8c577f",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -12853,12 +13464,12 @@
       "file": "src/workflow_validation.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 579 lines (limit: 300)",
+      "message": "source file is 599 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:de70b17031996aef",
-      "semantic_id": "b3:de70b17031996aef",
+      "stable_id": "b3:7aec833948334097",
+      "semantic_id": "b3:7aec833948334097",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "unknown",
@@ -13026,6 +13637,19 @@
       "crate_name": "n8nclone"
     },
     {
+      "stable_id": "b3:219dc9963ae29450",
+      "semantic_id": "b3:219dc9963ae29450",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 16,
+      "column": 1,
+      "message": "non-trait import `triggers` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
       "stable_id": "b3:7c4016367a43ea8c",
       "semantic_id": "b3:7c4016367a43ea8c",
       "identity_status": "computed",
@@ -13033,7 +13657,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 58,
+      "line": 60,
       "column": 1,
       "message": "item name `WorkflowDiagnostic` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
@@ -13046,7 +13670,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 68,
+      "line": 70,
       "column": 1,
       "message": "item name `validate_workflow` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
@@ -13059,20 +13683,20 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 75,
+      "line": 77,
       "column": 1,
       "message": "item name `validate_workflow_with_credential_registry` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:6ce250050615c1ee",
-      "semantic_id": "b3:6ce250050615c1ee",
+      "stable_id": "b3:67f5eca2dc3691aa",
+      "semantic_id": "b3:67f5eca2dc3691aa",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 84,
+      "line": 86,
       "column": 1,
       "message": "item name `base_workflow_diagnostics` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
@@ -13085,7 +13709,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 131,
+      "line": 134,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13098,9 +13722,22 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 131,
+      "line": 134,
       "column": 90,
       "message": "function `validate_node_configs` has 0 assertion(s) in 27 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:1ffd270a35fb248f",
+      "semantic_id": "b3:1ffd270a35fb248f",
+      "identity_status": "computed",
+      "lint": "borrowed_argument_types",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 164,
+      "column": 1,
+      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
     },
     {
@@ -13111,7 +13748,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 168,
+      "line": 188,
       "column": 1,
       "message": "item name `workflow_code_from_provider_code` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
@@ -13124,7 +13761,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 183,
+      "line": 203,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13137,7 +13774,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 252,
+      "line": 272,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "n8nclone"
@@ -13150,7 +13787,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 252,
+      "line": 272,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13163,7 +13800,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 268,
+      "line": 288,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13176,7 +13813,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 303,
+      "line": 323,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13189,7 +13826,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 307,
+      "line": 327,
       "column": 3,
       "message": "function `validate_credentials_with_registry` has 0 assertion(s) in 23 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -13202,7 +13839,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 333,
+      "line": 353,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13215,7 +13852,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 351,
+      "line": 371,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13228,7 +13865,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 355,
+      "line": 375,
       "column": 3,
       "message": "function `validate_condition_topology` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -13241,7 +13878,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 383,
+      "line": 403,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13254,7 +13891,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 387,
+      "line": 407,
       "column": 3,
       "message": "function `validate_merge_topology` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -13267,7 +13904,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 394,
+      "line": 414,
       "column": 9,
       "message": "`input_port_ids` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -13280,7 +13917,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 413,
+      "line": 433,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13293,7 +13930,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 418,
+      "line": 438,
       "column": 3,
       "message": "function `validate_subworkflow_topology` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -13306,7 +13943,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 449,
+      "line": 469,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13319,7 +13956,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 505,
+      "line": 525,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -13332,7 +13969,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 525,
+      "line": 545,
       "column": 104,
       "message": "function `workflow_diagnostic_from_runner` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -13345,7 +13982,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 547,
+      "line": 567,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "n8nclone"

@@ -14,6 +14,7 @@ pub mod node_kind_provider;
 pub mod replay;
 pub mod scheduler;
 pub mod store;
+pub mod triggers;
 pub mod tui;
 pub mod workflow_format;
 pub mod workflow_validation;

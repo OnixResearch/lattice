@@ -13,6 +13,7 @@ use crate::engine::workflow::Workflow;
 use crate::expressions;
 use crate::node_kind_provider;
 use crate::node_kind_provider::NodeKindValidationCode;
+use crate::triggers;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -45,6 +46,7 @@ pub enum WorkflowDiagnosticCode {
     InvalidConditionConfig,
     InvalidMergeConfig,
     InvalidSubworkflowConfig,
+    InvalidTriggerConfig,
     InvalidExpressionSyntax,
     RunnerCycleDetected,
     RunnerMissingRuntimeBinding,
@@ -97,6 +99,7 @@ fn base_workflow_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     validate_edges(workflow, &mut diagnostics);
     validate_control_flow_topology(workflow, &mut diagnostics);
     validate_runner_admission(workflow, &mut diagnostics);
+    validate_triggers(workflow, &mut diagnostics);
 
     diagnostics
 }
@@ -154,6 +157,23 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 "node config references a missing graph node".to_string(),
             ));
         }
+    }
+}
+
+// r[impl n8nclone.scheduling.triggers.model]
+fn validate_triggers(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    let workflow_names = std::collections::HashSet::from([workflow.meta.name.clone()]);
+    for trigger in &workflow.triggers {
+        diagnostics.extend(triggers::validate_trigger_definition(trigger, &workflow_names).into_iter().map(
+            |trigger_diagnostic| {
+                fatal(
+                    WorkflowDiagnosticCode::InvalidTriggerConfig,
+                    None,
+                    None,
+                    format!("trigger {}: {}", trigger_diagnostic.trigger_id, trigger_diagnostic.message),
+                )
+            },
+        ));
     }
 }
 

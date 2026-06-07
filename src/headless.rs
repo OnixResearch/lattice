@@ -22,6 +22,8 @@ use crate::store::RunRecord;
 use crate::store::Store;
 use crate::store::StoreError;
 use crate::store::WorkflowRepository;
+use crate::triggers;
+use crate::triggers::TriggerRunPlan;
 use crate::workflow_validation;
 use crate::workflow_validation::WorkflowDiagnostic;
 
@@ -163,6 +165,19 @@ pub async fn run_saved_workflow(
     run_id: RunId,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
     run_saved_workflow_with_executor_factory(store, workflow_name, run_id, Executor::new).await
+}
+
+// r[impl n8nclone.scheduling.triggers.webhook.headless_run]
+// r[impl n8nclone.scheduling.triggers.history]
+pub async fn run_admitted_trigger_plan(
+    store: &Store,
+    plan: &TriggerRunPlan,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    let run_id = store.next_run_id()?;
+    let summary = run_saved_workflow(store, &plan.workflow_name, run_id).await?;
+    let record = triggers::trigger_run_record_started(plan, summary.run_id);
+    store.save_trigger_run(&record)?;
+    Ok(summary)
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]

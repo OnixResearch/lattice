@@ -21,6 +21,7 @@ use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::TypeTag;
 use crate::file_node::FileOperationKind;
 use crate::image_node::DEFAULT_MAX_IMAGE_BYTES;
+use crate::triggers::TriggerDefinition;
 
 /// Metadata about a workflow (stored alongside the graph).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,6 +190,8 @@ pub struct Workflow {
     pub credentials: HashMap<u64, NodeCredentialRefs>,
     #[serde(default)]
     pub runner: HashMap<u64, NodeRunnerSettings>,
+    #[serde(default)]
+    pub triggers: Vec<TriggerDefinition>,
 }
 
 impl Workflow {
@@ -204,6 +207,7 @@ impl Workflow {
             configs: HashMap::new(),
             credentials: HashMap::new(),
             runner: HashMap::new(),
+            triggers: Vec::new(),
         }
     }
 

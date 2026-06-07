@@ -12,6 +12,8 @@ use n8nclone::scheduler;
 use n8nclone::scheduler::ScheduleDaemonOutcome;
 use n8nclone::scheduler::ScheduleSkipReason;
 use n8nclone::store::Store;
+use n8nclone::triggers::TriggerDefinition;
+use n8nclone::triggers::TriggerRunRecord;
 use n8nclone::tui::App;
 use n8nclone::workflow_format;
 use n8nclone::workflow_validation;
@@ -20,6 +22,7 @@ use tracing::info;
 const DEFAULT_CONFIG_PATH: &str = "~/.n8nclone/config.ncl";
 const LOG_FILE_PATH: &str = "/tmp/n8nclone.log";
 const STORE_FILE_NAME: &str = "n8nclone.redb";
+const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 
 #[derive(Parser, Debug)]
 #[command(name = "n8nclone", about = "TUI workflow automation — like n8n, in your terminal")]
@@ -54,6 +57,8 @@ enum CliCommand {
     ExportN8n(ExportN8nWorkflowArgs),
     /// Run one scheduler daemon evaluation without starting the TUI
     SchedulerDaemon(SchedulerDaemonArgs),
+    /// Inspect persisted triggers and trigger run history
+    Triggers(TriggersCommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -111,6 +116,24 @@ struct SchedulerDaemonArgs {
     now_epoch_ms: Option<i64>,
 }
 
+#[derive(clap::Args, Debug)]
+struct TriggersCommandArgs {
+    #[command(subcommand)]
+    command: TriggerCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum TriggerCliCommand {
+    /// List persisted trigger definitions
+    List,
+    /// List recent trigger run history
+    History {
+        /// Maximum trigger run records to print
+        #[arg(long, default_value_t = DEFAULT_TRIGGER_HISTORY_LIMIT)]
+        limit: usize,
+    },
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum RunOutputFormat {
     Text,
@@ -157,6 +180,7 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         Some(CliCommand::SchedulerDaemon(scheduler_args)) => {
             run_scheduler_daemon_once(&app_config, &scheduler_args).await
         }
+        Some(CliCommand::Triggers(trigger_args)) => Ok(run_triggers_command(&app_config, &trigger_args)),
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -322,6 +346,71 @@ fn update_schedule_next_run(store: &Store, schedule_id: &str, next_run_epoch_ms:
     if let Err(error) = store.save_schedule(&schedule) {
         eprintln!("Scheduler failed to update schedule {schedule_id}: {error}");
     }
+}
+
+// r[impl n8nclone.tui_ux.triggers.manage]
+fn run_triggers_command(app_config: &config::AppConfig, args: &TriggersCommandArgs) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Triggers failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match &args.command {
+        TriggerCliCommand::List => match store.list_triggers() {
+            Ok(triggers) => {
+                print!("{}", render_trigger_list(&triggers));
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("Triggers failed: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        TriggerCliCommand::History { limit } => match store.list_trigger_runs(*limit) {
+            Ok(records) => {
+                print!("{}", render_trigger_history(&records));
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("Triggers failed: {error}");
+                ExitCode::FAILURE
+            }
+        },
+    }
+}
+
+fn render_trigger_list(triggers: &[TriggerDefinition]) -> String {
+    if triggers.is_empty() {
+        return "No triggers configured\n".to_string();
+    }
+    let mut output = String::new();
+    for trigger in triggers {
+        output.push_str(&format!(
+            "{} | {} | {:?} | {}\n",
+            trigger.id,
+            trigger.workflow_name,
+            trigger.kind,
+            if trigger.enabled { "enabled" } else { "disabled" },
+        ));
+    }
+    output
+}
+
+fn render_trigger_history(records: &[TriggerRunRecord]) -> String {
+    if records.is_empty() {
+        return "No trigger runs recorded\n".to_string();
+    }
+    let mut output = String::new();
+    for record in records {
+        let run_id = record.run_id.map(|run_id| run_id.to_string()).unwrap_or_else(|| "-".to_string());
+        output.push_str(&format!(
+            "{} | {} | {} | {:?} | {}\n",
+            record.trigger_id, record.workflow_name, run_id, record.status, record.message,
+        ));
+    }
+    output
 }
 
 // r[impl n8nclone.workflow_format.nickel.export]

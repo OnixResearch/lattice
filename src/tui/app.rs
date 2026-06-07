@@ -1881,6 +1881,22 @@ impl App {
         };
     }
 
+    // r[impl n8nclone.tui_ux.triggers.manage]
+    pub fn trigger_status_lines(&self) -> Vec<String> {
+        self.workflow
+            .triggers
+            .iter()
+            .map(|trigger| {
+                format!(
+                    "{} │ {:?} │ {}",
+                    trigger.id,
+                    trigger.kind,
+                    if trigger.enabled { "enabled" } else { "disabled" },
+                )
+            })
+            .collect()
+    }
+
     /// Add a new shell node to the workflow.
     pub fn add_shell_node(&mut self, label: &str, command: &str) {
         let id = self.workflow.add_shell_node(label, command);
