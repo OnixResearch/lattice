@@ -14,6 +14,9 @@ use serde::Serialize;
 use crate::agent_node::AgentNodeSettings;
 use crate::agent_node::AgentOutputMode;
 use crate::agent_node::AgentTarget;
+use crate::control_flow::ConditionNodeConfig;
+use crate::control_flow::MergeNodeConfig;
+use crate::control_flow::SubworkflowNodeConfig;
 use crate::credentials::NodeCredentialRefs;
 use crate::engine::value::TypeTag;
 use crate::file_node::FileOperationKind;
@@ -74,6 +77,9 @@ pub enum NodeConfig {
         max_bytes: usize,
     },
     Agent(AgentNodeSettings),
+    Condition(ConditionNodeConfig),
+    Merge(MergeNodeConfig),
+    Subworkflow(SubworkflowNodeConfig),
 }
 
 impl NodeConfig {
@@ -119,6 +125,18 @@ impl NodeConfig {
         Self::Agent(AgentNodeSettings::new(target, prompt, output_mode))
     }
 
+    pub fn condition(config: ConditionNodeConfig) -> Self {
+        Self::Condition(config)
+    }
+
+    pub fn merge(config: MergeNodeConfig) -> Self {
+        Self::Merge(config)
+    }
+
+    pub fn subworkflow(config: SubworkflowNodeConfig) -> Self {
+        Self::Subworkflow(config)
+    }
+
     pub fn kind_label(&self) -> &'static str {
         match self {
             Self::Shell { .. } => "Shell",
@@ -126,6 +144,9 @@ impl NodeConfig {
             Self::File { .. } => "File",
             Self::ImageInput { .. } => "Image Input",
             Self::Agent(_) => "Agent",
+            Self::Condition(_) => "Condition",
+            Self::Merge(_) => "Merge",
+            Self::Subworkflow(_) => "Subworkflow",
         }
     }
 }
@@ -268,6 +289,57 @@ impl Workflow {
             ],
         );
         self.configs.insert(id.0, NodeConfig::agent(target, prompt, output_mode));
+        id
+    }
+
+    /// Add a condition node with one input and one output per branch.
+    pub fn add_condition_node(&mut self, label: impl Into<String>, config: ConditionNodeConfig) -> NodeId {
+        let output_specs = config
+            .branches
+            .iter()
+            .map(|branch| PortSpec::new(branch.label.clone(), TypeTag::Any.as_str()))
+            .collect::<Vec<_>>();
+        let id = self.graph.add_node(label, &[PortSpec::new("value", TypeTag::Any.as_str())], &output_specs);
+        self.configs.insert(id.0, NodeConfig::condition(config));
+        id
+    }
+
+    /// Add a merge node with explicit input labels and one merged output.
+    pub fn add_merge_node(&mut self, label: impl Into<String>, config: MergeNodeConfig) -> NodeId {
+        let input_specs = config
+            .required_inputs
+            .iter()
+            .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
+            .collect::<Vec<_>>();
+        let id = self.graph.add_node(label, &input_specs, &[PortSpec::new(
+            crate::control_flow::merge_output_port_label(),
+            TypeTag::Any.as_str(),
+        )]);
+        self.configs.insert(id.0, NodeConfig::merge(config));
+        id
+    }
+
+    /// Add a subworkflow invocation node with declared parent-facing ports.
+    pub fn add_subworkflow_node(&mut self, label: impl Into<String>, config: SubworkflowNodeConfig) -> NodeId {
+        let input_specs = config
+            .input_mappings
+            .iter()
+            .map(|mapping| PortSpec::new(mapping.parent_input.clone(), TypeTag::Any.as_str()))
+            .collect::<Vec<_>>();
+        let output_specs = if config.output_mappings.is_empty() {
+            vec![PortSpec::new(
+                crate::control_flow::subworkflow_default_output_port_label(),
+                TypeTag::Any.as_str(),
+            )]
+        } else {
+            config
+                .output_mappings
+                .iter()
+                .map(|mapping| PortSpec::new(mapping.parent_output.clone(), TypeTag::Any.as_str()))
+                .collect::<Vec<_>>()
+        };
+        let id = self.graph.add_node(label, &input_specs, &output_specs);
+        self.configs.insert(id.0, NodeConfig::subworkflow(config));
         id
     }
 

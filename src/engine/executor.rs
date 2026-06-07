@@ -23,6 +23,7 @@ use crate::agent_node::AgentOutput;
 use crate::agent_node::AgentRequest;
 use crate::agent_node::AgentRuntimeConfig;
 use crate::agent_node::ProductionAgentAdapter;
+use crate::control_flow;
 use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::EmptyCredentialProvider;
@@ -73,6 +74,9 @@ const HASH_TAG_HTTP_CONFIG: &[u8] = b"http-config";
 const HASH_TAG_FILE_CONFIG: &[u8] = b"file-config";
 const HASH_TAG_IMAGE_INPUT_CONFIG: &[u8] = b"image-input-config";
 const HASH_TAG_AGENT_CONFIG: &[u8] = b"agent-config";
+const HASH_TAG_CONDITION_CONFIG: &[u8] = b"condition-config";
+const HASH_TAG_MERGE_CONFIG: &[u8] = b"merge-config";
+const HASH_TAG_SUBWORKFLOW_CONFIG: &[u8] = b"subworkflow-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
 const HASH_TAG_HTTP_METHOD: &[u8] = b"http-method";
 const HASH_TAG_HTTP_URL: &[u8] = b"http-url";
@@ -109,6 +113,10 @@ const HASH_TAG_SOME: &[u8] = b"some";
 const HASH_TAG_NONE: &[u8] = b"none";
 const HASH_TAG_TRUE: &[u8] = b"true";
 const HASH_TAG_FALSE: &[u8] = b"false";
+const HASH_TAG_BRANCH: &[u8] = b"branch";
+const HASH_TAG_PREDICATE: &[u8] = b"predicate";
+const HASH_TAG_MERGE_POLICY: &[u8] = b"merge-policy";
+const HASH_TAG_SUBWORKFLOW_NAME: &[u8] = b"subworkflow-name";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ShellOutputPortIds {
@@ -243,6 +251,22 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
         NodeConfig::Agent(settings) => {
             hasher.update(HASH_TAG_AGENT_CONFIG);
             update_agent_settings_hash(hasher, settings);
+        }
+        NodeConfig::Condition(config) => {
+            hasher.update(HASH_TAG_CONDITION_CONFIG);
+            for branch in &config.branches {
+                update_str(hasher, HASH_TAG_BRANCH, &branch.label);
+                update_str(hasher, HASH_TAG_PREDICATE, &format!("{:?}", branch.predicate));
+            }
+        }
+        NodeConfig::Merge(config) => {
+            hasher.update(HASH_TAG_MERGE_CONFIG);
+            update_str(hasher, HASH_TAG_MERGE_POLICY, &format!("{:?}", config.policy));
+            update_ordered_string_list_hash(hasher, HASH_TAG_INPUTS, &config.required_inputs);
+        }
+        NodeConfig::Subworkflow(config) => {
+            hasher.update(HASH_TAG_SUBWORKFLOW_CONFIG);
+            update_str(hasher, HASH_TAG_SUBWORKFLOW_NAME, &config.workflow_name);
         }
     }
 }
@@ -719,6 +743,110 @@ fn agent_outputs_by_real_port(
     }
     mapped.insert(ports.metadata, Value::from_json(response.metadata));
     mapped
+}
+
+fn first_input_value(inputs: &HashMap<PortId, Value>) -> Option<&Value> {
+    inputs.iter().min_by_key(|(port_id, _)| port_id.0).map(|(_, value)| value)
+}
+
+// r[impl n8nclone.workflow_execution.control_flow.condition]
+fn condition_outputs_by_real_port(
+    node: &Node,
+    matched_labels: &[String],
+    value: Option<&Value>,
+) -> HashMap<PortId, Value> {
+    let matched = matched_labels.iter().collect::<std::collections::BTreeSet<_>>();
+    node.output_ports
+        .iter()
+        .filter(|port| matched.contains(&port.label))
+        .map(|port| {
+            let output = value.cloned().unwrap_or_else(|| {
+                Value::from_json(serde_json::json!({
+                    "branch": port.label,
+                    "matched": true,
+                }))
+            });
+            (port.id, output)
+        })
+        .collect()
+}
+
+fn merge_inputs_by_label(node: &Node, inputs: &HashMap<PortId, Value>) -> Vec<control_flow::MergeInputValue> {
+    node.input_ports
+        .iter()
+        .enumerate()
+        .filter_map(|(sequence, port)| {
+            inputs.get(&port.id).cloned().map(|value| control_flow::MergeInputValue {
+                label: port.label.clone(),
+                sequence: u64::try_from(sequence).expect("input port sequence fits in u64"),
+                value,
+            })
+        })
+        .collect()
+}
+
+// r[impl n8nclone.workflow_execution.control_flow.merge]
+fn merge_outputs_by_real_port(
+    node: &Node,
+    policy: control_flow::MergePolicy,
+    selected: Vec<control_flow::MergeInputValue>,
+) -> HashMap<PortId, Value> {
+    let Some(output_port) = node.output_ports.first() else {
+        return HashMap::new();
+    };
+    let output_value = merge_output_value(policy, selected);
+    HashMap::from([(output_port.id, output_value)])
+}
+
+fn merge_output_value(policy: control_flow::MergePolicy, selected: Vec<control_flow::MergeInputValue>) -> Value {
+    if policy != control_flow::MergePolicy::Collect && selected.len() == 1 {
+        return selected.into_iter().next().expect("selected merge value exists").value;
+    }
+    let sensitive_fragments =
+        selected.iter().flat_map(|input| input.value.sensitive_fragments.clone()).collect::<Vec<_>>();
+    let values = selected
+        .into_iter()
+        .map(|input| {
+            serde_json::json!({
+                "label": input.label,
+                "sequence": input.sequence,
+                "value": value_to_json(&input.value),
+            })
+        })
+        .collect::<Vec<_>>();
+    Value::from_json(serde_json::json!(values)).with_sensitive_fragments(sensitive_fragments)
+}
+
+fn value_to_json(value: &Value) -> serde_json::Value {
+    match &value.data {
+        crate::engine::ValueData::String(value) => serde_json::json!(value),
+        crate::engine::ValueData::Bytes(value) => serde_json::json!(value),
+        crate::engine::ValueData::Json(value) => value.clone(),
+        crate::engine::ValueData::Image(image) => serde_json::json!({
+            "media_type": image.media_type,
+            "summary": image.summary(),
+        }),
+        crate::engine::ValueData::ExitCode(value) => serde_json::json!(value),
+        crate::engine::ValueData::Error { message, stderr } => serde_json::json!({
+            "message": message,
+            "stderr": stderr,
+        }),
+    }
+}
+
+// r[impl n8nclone.workflow_execution.subworkflows.events]
+fn subworkflow_invocation_event_value(
+    node_id: NodeId,
+    config: &control_flow::SubworkflowNodeConfig,
+    inputs: &HashMap<PortId, Value>,
+) -> Value {
+    let input_count = inputs.len();
+    Value::from_json(serde_json::json!({
+        "event": "subworkflow_invocation_admitted",
+        "subworkflow_node_id": node_id.0,
+        "workflow_name": config.workflow_name,
+        "input_count": input_count,
+    }))
 }
 
 // r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
@@ -1447,6 +1575,68 @@ impl Executor {
                         input_hash,
                     },
                 }
+            }
+            NodeConfig::Condition(config) => {
+                let value = first_input_value(inputs);
+                let matched_labels = control_flow::evaluate_condition(config, value);
+                completed_step_result(
+                    node_id,
+                    input_hash,
+                    node,
+                    condition_outputs_by_real_port(node, &matched_labels, value),
+                    false,
+                )
+            }
+            NodeConfig::Merge(config) => {
+                let decision = match control_flow::merge_decision(config, merge_inputs_by_label(node, inputs)) {
+                    Ok(decision) => decision,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        };
+                    }
+                };
+                if !decision.ready {
+                    return StepResult {
+                        node_id,
+                        status: NodeStatus::Skipped,
+                        input_hash,
+                    };
+                }
+                completed_step_result(
+                    node_id,
+                    input_hash,
+                    node,
+                    merge_outputs_by_real_port(node, config.policy, decision.selected),
+                    false,
+                )
+            }
+            NodeConfig::Subworkflow(config) => {
+                if let Err(error) =
+                    control_flow::validate_subworkflow_admission(config, std::slice::from_ref(&workflow.meta.name))
+                {
+                    return StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
+                        input_hash,
+                    };
+                }
+                completed_step_result(
+                    node_id,
+                    input_hash,
+                    node,
+                    node.output_ports
+                        .iter()
+                        .map(|port| (port.id, subworkflow_invocation_event_value(node_id, config, inputs)))
+                        .collect(),
+                    false,
+                )
             }
         }
     }

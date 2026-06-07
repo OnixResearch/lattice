@@ -21,10 +21,13 @@ use crate::engine::workflow::NodeRunnerSettings;
 use crate::engine::workflow::Workflow;
 
 const RUNTIME_KIND_AGENT: &str = "agent";
+const RUNTIME_KIND_CONDITION: &str = "condition";
 const RUNTIME_KIND_FILE: &str = "file";
 const RUNTIME_KIND_HTTP: &str = "http";
 const RUNTIME_KIND_IMAGE_INPUT: &str = "image_input";
+const RUNTIME_KIND_MERGE: &str = "merge";
 const RUNTIME_KIND_SHELL: &str = "shell";
+const RUNTIME_KIND_SUBWORKFLOW: &str = "subworkflow";
 const RUNTIME_KEY_DEFAULT: &str = "default";
 const RUNTIME_KEY_READ_FILE: &str = "read";
 const RUNTIME_KEY_WRITE_FILE: &str = "write";
@@ -360,6 +363,9 @@ fn runtime_binding_for_config(config: &NodeConfig) -> RuntimeBinding {
         NodeConfig::Agent(settings) => {
             runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(settings.target))
         }
+        NodeConfig::Condition(_) => runtime_binding(RUNTIME_KIND_CONDITION, RUNTIME_KEY_DEFAULT),
+        NodeConfig::Merge(_) => runtime_binding(RUNTIME_KIND_MERGE, RUNTIME_KEY_DEFAULT),
+        NodeConfig::Subworkflow(_) => runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
     }
 }
 
@@ -611,6 +617,9 @@ pub fn builtin_runtime_registry() -> RuntimeRegistry {
         runtime_binding(RUNTIME_KIND_FILE, RUNTIME_KEY_WRITE_FILE),
         runtime_binding(RUNTIME_KIND_FILE, RUNTIME_KEY_APPEND_FILE),
         runtime_binding(RUNTIME_KIND_IMAGE_INPUT, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_CONDITION, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_MERGE, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Pi)),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Clankers)),
     ])

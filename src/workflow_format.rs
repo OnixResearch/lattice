@@ -16,6 +16,15 @@ use crate::agent_node::AgentNodeSettings;
 use crate::agent_node::AgentOutputMode;
 use crate::agent_node::AgentTarget;
 use crate::config;
+use crate::control_flow;
+use crate::control_flow::ConditionBranch;
+use crate::control_flow::ConditionNodeConfig;
+use crate::control_flow::ConditionPredicate;
+use crate::control_flow::MergeNodeConfig;
+use crate::control_flow::MergePolicy;
+use crate::control_flow::SubworkflowInputMapping;
+use crate::control_flow::SubworkflowNodeConfig;
+use crate::control_flow::SubworkflowOutputMapping;
 use crate::credentials::NodeCredentialRefs;
 use crate::credentials::SecretRef;
 use crate::engine::runner;
@@ -136,6 +145,18 @@ pub struct PortableNodeConfig {
     pub agent_cwd: Vec<String>,
     #[serde(default)]
     pub agent_session: Vec<String>,
+    #[serde(default)]
+    pub condition_branches: Vec<PortableConditionBranch>,
+    #[serde(default)]
+    pub merge_policy: String,
+    #[serde(default)]
+    pub merge_required_inputs: Vec<String>,
+    #[serde(default)]
+    pub subworkflow_name: String,
+    #[serde(default)]
+    pub subworkflow_input_mappings: Vec<PortableSubworkflowInputMapping>,
+    #[serde(default)]
+    pub subworkflow_output_mappings: Vec<PortableSubworkflowOutputMapping>,
     pub timeout_secs: u64,
     pub pipe_stdin: bool,
 }
@@ -155,6 +176,27 @@ pub struct PortableSecretEnvVar {
     pub key: String,
     #[serde(default)]
     pub field: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PortableConditionBranch {
+    pub label: String,
+    pub predicate: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PortableSubworkflowInputMapping {
+    pub parent_input: String,
+    pub child_input: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PortableSubworkflowOutputMapping {
+    pub child_output: String,
+    pub parent_output: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -181,6 +223,7 @@ pub enum WorkflowFormatError {
     InvalidAgentModelHint { node_id: u64, count: usize },
     InvalidAgentCwd { node_id: u64, count: usize },
     InvalidAgentSession { node_id: u64, count: usize },
+    InvalidControlFlowConfig { node_id: u64, message: String },
     InvalidGraph(String),
 }
 
@@ -230,6 +273,9 @@ impl std::fmt::Display for WorkflowFormatError {
             }
             Self::InvalidAgentSession { node_id, count } => {
                 write!(f, "node {node_id} has {count} agent session values; expected zero or one")
+            }
+            Self::InvalidControlFlowConfig { node_id, message } => {
+                write!(f, "node {node_id} has invalid control-flow config: {message}")
             }
             Self::InvalidGraph(message) => write!(f, "invalid graph: {message}"),
         }
@@ -330,6 +376,9 @@ fn workflow_for_config(config: NodeConfig) -> Workflow {
         NodeConfig::Agent(settings) => {
             workflow.add_agent_node("node", settings.target, &settings.prompt, settings.output_mode)
         }
+        NodeConfig::Condition(config) => workflow.add_condition_node("node", config.clone()),
+        NodeConfig::Merge(config) => workflow.add_merge_node("node", config.clone()),
+        NodeConfig::Subworkflow(config) => workflow.add_subworkflow_node("node", config.clone()),
     };
     workflow.set_node_config(node_id, config);
     workflow
@@ -410,6 +459,12 @@ fn node_config_to_portable(
                 agent_context_refs: Vec::new(),
                 agent_cwd: Vec::new(),
                 agent_session: Vec::new(),
+                condition_branches: Vec::new(),
+                merge_policy: String::new(),
+                merge_required_inputs: Vec::new(),
+                subworkflow_name: String::new(),
+                subworkflow_input_mappings: Vec::new(),
+                subworkflow_output_mappings: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: *pipe_stdin,
             }
@@ -463,6 +518,12 @@ fn node_config_to_portable(
                 agent_context_refs: Vec::new(),
                 agent_cwd: Vec::new(),
                 agent_session: Vec::new(),
+                condition_branches: Vec::new(),
+                merge_policy: String::new(),
+                merge_required_inputs: Vec::new(),
+                subworkflow_name: String::new(),
+                subworkflow_input_mappings: Vec::new(),
+                subworkflow_output_mappings: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: false,
             }
@@ -506,6 +567,12 @@ fn node_config_to_portable(
             agent_context_refs: Vec::new(),
             agent_cwd: Vec::new(),
             agent_session: Vec::new(),
+            condition_branches: Vec::new(),
+            merge_policy: String::new(),
+            merge_required_inputs: Vec::new(),
+            subworkflow_name: String::new(),
+            subworkflow_input_mappings: Vec::new(),
+            subworkflow_output_mappings: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -546,6 +613,12 @@ fn node_config_to_portable(
             agent_context_refs: Vec::new(),
             agent_cwd: Vec::new(),
             agent_session: Vec::new(),
+            condition_branches: Vec::new(),
+            merge_policy: String::new(),
+            merge_required_inputs: Vec::new(),
+            subworkflow_name: String::new(),
+            subworkflow_input_mappings: Vec::new(),
+            subworkflow_output_mappings: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -582,9 +655,191 @@ fn node_config_to_portable(
             agent_context_refs: settings.context_refs.clone(),
             agent_cwd: settings.cwd.iter().cloned().collect(),
             agent_session: settings.session.iter().cloned().collect(),
+            condition_branches: Vec::new(),
+            merge_policy: String::new(),
+            merge_required_inputs: Vec::new(),
+            subworkflow_name: String::new(),
+            subworkflow_input_mappings: Vec::new(),
+            subworkflow_output_mappings: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
+        NodeConfig::Condition(condition) => PortableNodeConfig {
+            node_id,
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
+            command: String::new(),
+            cwd: Vec::new(),
+            env: Vec::new(),
+            secret_env: Vec::new(),
+            http_method: String::new(),
+            url: String::new(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            file_operation: String::new(),
+            file_path: String::new(),
+            file_content: Vec::new(),
+            overwrite: false,
+            allowed_roots: Vec::new(),
+            image_path: String::new(),
+            image_allowed_roots: Vec::new(),
+            image_max_bytes: 0,
+            agent_target: String::new(),
+            agent_prompt: String::new(),
+            agent_output_mode: String::new(),
+            agent_model_hint: Vec::new(),
+            agent_tool_policy: String::new(),
+            agent_context_refs: Vec::new(),
+            agent_cwd: Vec::new(),
+            agent_session: Vec::new(),
+            condition_branches: condition.branches.iter().map(portable_condition_branch).collect(),
+            merge_policy: String::new(),
+            merge_required_inputs: Vec::new(),
+            subworkflow_name: String::new(),
+            subworkflow_input_mappings: Vec::new(),
+            subworkflow_output_mappings: Vec::new(),
+            timeout_secs: 0,
+            pipe_stdin: false,
+        },
+        NodeConfig::Merge(merge) => PortableNodeConfig {
+            node_id,
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
+            command: String::new(),
+            cwd: Vec::new(),
+            env: Vec::new(),
+            secret_env: Vec::new(),
+            http_method: String::new(),
+            url: String::new(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            file_operation: String::new(),
+            file_path: String::new(),
+            file_content: Vec::new(),
+            overwrite: false,
+            allowed_roots: Vec::new(),
+            image_path: String::new(),
+            image_allowed_roots: Vec::new(),
+            image_max_bytes: 0,
+            agent_target: String::new(),
+            agent_prompt: String::new(),
+            agent_output_mode: String::new(),
+            agent_model_hint: Vec::new(),
+            agent_tool_policy: String::new(),
+            agent_context_refs: Vec::new(),
+            agent_cwd: Vec::new(),
+            agent_session: Vec::new(),
+            condition_branches: Vec::new(),
+            merge_policy: merge_policy_label(merge.policy).to_string(),
+            merge_required_inputs: merge.required_inputs.clone(),
+            subworkflow_name: String::new(),
+            subworkflow_input_mappings: Vec::new(),
+            subworkflow_output_mappings: Vec::new(),
+            timeout_secs: 0,
+            pipe_stdin: false,
+        },
+        NodeConfig::Subworkflow(subworkflow) => PortableNodeConfig {
+            node_id,
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
+            command: String::new(),
+            cwd: Vec::new(),
+            env: Vec::new(),
+            secret_env: Vec::new(),
+            http_method: String::new(),
+            url: String::new(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            file_operation: String::new(),
+            file_path: String::new(),
+            file_content: Vec::new(),
+            overwrite: false,
+            allowed_roots: Vec::new(),
+            image_path: String::new(),
+            image_allowed_roots: Vec::new(),
+            image_max_bytes: 0,
+            agent_target: String::new(),
+            agent_prompt: String::new(),
+            agent_output_mode: String::new(),
+            agent_model_hint: Vec::new(),
+            agent_tool_policy: String::new(),
+            agent_context_refs: Vec::new(),
+            agent_cwd: Vec::new(),
+            agent_session: Vec::new(),
+            condition_branches: Vec::new(),
+            merge_policy: String::new(),
+            merge_required_inputs: Vec::new(),
+            subworkflow_name: subworkflow.workflow_name.clone(),
+            subworkflow_input_mappings: subworkflow
+                .input_mappings
+                .iter()
+                .map(portable_subworkflow_input_mapping)
+                .collect(),
+            subworkflow_output_mappings: subworkflow
+                .output_mappings
+                .iter()
+                .map(portable_subworkflow_output_mapping)
+                .collect(),
+            timeout_secs: 0,
+            pipe_stdin: false,
+        },
+    }
+}
+
+fn portable_condition_branch(branch: &ConditionBranch) -> PortableConditionBranch {
+    PortableConditionBranch {
+        label: branch.label.clone(),
+        predicate: condition_predicate_label(&branch.predicate),
+    }
+}
+
+fn condition_predicate_label(predicate: &ConditionPredicate) -> String {
+    match predicate {
+        ConditionPredicate::Always => "always".to_string(),
+        ConditionPredicate::Exists => "exists".to_string(),
+        ConditionPredicate::StringEquals(value) => format!("eq:{value}"),
+        ConditionPredicate::StringContains(value) => format!("contains:{value}"),
+        ConditionPredicate::NumberGreaterThan(value) => format!("gt:{value}"),
+        ConditionPredicate::JsonPointerExists(value) => format!("json_exists:{value}"),
+        ConditionPredicate::BoolEquals(value) => format!("bool:{value}"),
+    }
+}
+
+fn merge_policy_label(policy: MergePolicy) -> &'static str {
+    match policy {
+        MergePolicy::All => "all",
+        MergePolicy::First => "first",
+        MergePolicy::Last => "last",
+        MergePolicy::Collect => "collect",
+    }
+}
+
+fn portable_subworkflow_input_mapping(mapping: &SubworkflowInputMapping) -> PortableSubworkflowInputMapping {
+    PortableSubworkflowInputMapping {
+        parent_input: mapping.parent_input.clone(),
+        child_input: mapping.child_input.clone(),
+    }
+}
+
+fn portable_subworkflow_output_mapping(mapping: &SubworkflowOutputMapping) -> PortableSubworkflowOutputMapping {
+    PortableSubworkflowOutputMapping {
+        child_output: mapping.child_output.clone(),
+        parent_output: mapping.parent_output.clone(),
     }
 }
 
@@ -690,6 +945,9 @@ fn portable_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeCon
         "file" => portable_file_config_to_node_config(config),
         "image_input" => Ok(portable_image_input_config_to_node_config(config)),
         "agent" => portable_agent_config_to_node_config(config),
+        "condition" => portable_condition_config_to_node_config(config),
+        "merge" => portable_merge_config_to_node_config(config),
+        "subworkflow" => portable_subworkflow_config_to_node_config(config),
         _ => Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone())),
     }
 }
@@ -804,6 +1062,86 @@ fn portable_agent_config_to_node_config(config: &PortableNodeConfig) -> Result<N
     }))
 }
 
+fn portable_condition_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    let branches = config
+        .condition_branches
+        .iter()
+        .map(|branch| {
+            control_flow::parse_condition_predicate(&branch.predicate)
+                .map(|predicate| ConditionBranch {
+                    label: branch.label.clone(),
+                    predicate,
+                })
+                .map_err(|error| WorkflowFormatError::InvalidControlFlowConfig {
+                    node_id: config.node_id,
+                    message: error.to_string(),
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let condition = ConditionNodeConfig { branches };
+    control_flow::validate_condition_config(&condition).map_err(|error| {
+        WorkflowFormatError::InvalidControlFlowConfig {
+            node_id: config.node_id,
+            message: error.to_string(),
+        }
+    })?;
+    Ok(NodeConfig::Condition(condition))
+}
+
+fn portable_merge_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    let merge = MergeNodeConfig {
+        policy: parse_merge_policy(config.node_id, &config.merge_policy)?,
+        required_inputs: config.merge_required_inputs.clone(),
+    };
+    control_flow::validate_merge_config(&merge).map_err(|error| WorkflowFormatError::InvalidControlFlowConfig {
+        node_id: config.node_id,
+        message: error.to_string(),
+    })?;
+    Ok(NodeConfig::Merge(merge))
+}
+
+fn portable_subworkflow_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    let subworkflow = SubworkflowNodeConfig {
+        workflow_name: config.subworkflow_name.clone(),
+        input_mappings: config
+            .subworkflow_input_mappings
+            .iter()
+            .map(|mapping| SubworkflowInputMapping {
+                parent_input: mapping.parent_input.clone(),
+                child_input: mapping.child_input.clone(),
+            })
+            .collect(),
+        output_mappings: config
+            .subworkflow_output_mappings
+            .iter()
+            .map(|mapping| SubworkflowOutputMapping {
+                child_output: mapping.child_output.clone(),
+                parent_output: mapping.parent_output.clone(),
+            })
+            .collect(),
+    };
+    control_flow::validate_subworkflow_config(&subworkflow).map_err(|error| {
+        WorkflowFormatError::InvalidControlFlowConfig {
+            node_id: config.node_id,
+            message: error.to_string(),
+        }
+    })?;
+    Ok(NodeConfig::Subworkflow(subworkflow))
+}
+
+fn parse_merge_policy(node_id: u64, policy: &str) -> Result<MergePolicy, WorkflowFormatError> {
+    match policy {
+        "all" => Ok(MergePolicy::All),
+        "first" => Ok(MergePolicy::First),
+        "last" => Ok(MergePolicy::Last),
+        "collect" => Ok(MergePolicy::Collect),
+        _ => Err(WorkflowFormatError::InvalidControlFlowConfig {
+            node_id,
+            message: format!("invalid merge policy: {policy}"),
+        }),
+    }
+}
+
 fn parse_file_operation(node_id: u64, operation: &str) -> Result<FileOperationKind, WorkflowFormatError> {
     match operation {
         "read" => Ok(FileOperationKind::Read),
@@ -914,7 +1252,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch = [], merge_policy | String = \"\", merge_required_inputs | Array String = [], subworkflow_name | String = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping = [], subworkflow_output_mappings | Array SubworkflowOutputMapping = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
@@ -1062,6 +1400,40 @@ fn render_config(output: &mut String, config: &PortableNodeConfig) {
         output.push_str(&format!("{}, ", quoted(session)));
     }
     output.push_str("],\n");
+    output.push_str("      condition_branches = [\n");
+    for branch in &config.condition_branches {
+        output.push_str(&format!(
+            "        {{ label = {}, predicate = {} }},\n",
+            quoted(&branch.label),
+            quoted(&branch.predicate),
+        ));
+    }
+    output.push_str("      ],\n");
+    output.push_str(&format!("      merge_policy = {},\n", quoted(&config.merge_policy)));
+    output.push_str("      merge_required_inputs = [");
+    for input in &config.merge_required_inputs {
+        output.push_str(&format!("{}, ", quoted(input)));
+    }
+    output.push_str("],\n");
+    output.push_str(&format!("      subworkflow_name = {},\n", quoted(&config.subworkflow_name)));
+    output.push_str("      subworkflow_input_mappings = [\n");
+    for mapping in &config.subworkflow_input_mappings {
+        output.push_str(&format!(
+            "        {{ parent_input = {}, child_input = {} }},\n",
+            quoted(&mapping.parent_input),
+            quoted(&mapping.child_input),
+        ));
+    }
+    output.push_str("      ],\n");
+    output.push_str("      subworkflow_output_mappings = [\n");
+    for mapping in &config.subworkflow_output_mappings {
+        output.push_str(&format!(
+            "        {{ child_output = {}, parent_output = {} }},\n",
+            quoted(&mapping.child_output),
+            quoted(&mapping.parent_output),
+        ));
+    }
+    output.push_str("      ],\n");
     output.push_str(&format!("      timeout_secs = {},\n", config.timeout_secs));
     output.push_str(&format!("      pipe_stdin = {},\n", config.pipe_stdin));
     output.push_str("    },\n");

@@ -527,7 +527,7 @@ pub fn test_provider_reference(provider: &dyn CredentialProvider, secret_ref: &S
         Err(error) => CredentialProbeResult {
             identity: secret_ref.identity(),
             reachable: false,
-            message: redact_text(&error.to_string(), &[secret_ref.key.clone()]),
+            message: redact_text(&error.to_string(), std::slice::from_ref(&secret_ref.key)),
         },
     }
 }

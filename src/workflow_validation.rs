@@ -42,6 +42,9 @@ pub enum WorkflowDiagnosticCode {
     UnsafeImagePath,
     InvalidImageByteBudget,
     EmptyAgentPrompt,
+    InvalidConditionConfig,
+    InvalidMergeConfig,
+    InvalidSubworkflowConfig,
     InvalidExpressionSyntax,
     RunnerCycleDetected,
     RunnerMissingRuntimeBinding,
@@ -92,6 +95,7 @@ fn base_workflow_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
 
     validate_node_configs(workflow, &mut diagnostics);
     validate_edges(workflow, &mut diagnostics);
+    validate_control_flow_topology(workflow, &mut diagnostics);
     validate_runner_admission(workflow, &mut diagnostics);
 
     diagnostics
@@ -170,6 +174,9 @@ fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDia
         NodeKindValidationCode::UnsafeImagePath => WorkflowDiagnosticCode::UnsafeImagePath,
         NodeKindValidationCode::InvalidImageByteBudget => WorkflowDiagnosticCode::InvalidImageByteBudget,
         NodeKindValidationCode::EmptyAgentPrompt => WorkflowDiagnosticCode::EmptyAgentPrompt,
+        NodeKindValidationCode::InvalidCondition => WorkflowDiagnosticCode::InvalidConditionConfig,
+        NodeKindValidationCode::InvalidMerge => WorkflowDiagnosticCode::InvalidMergeConfig,
+        NodeKindValidationCode::InvalidSubworkflow => WorkflowDiagnosticCode::InvalidSubworkflowConfig,
     }
 }
 
@@ -238,6 +245,7 @@ fn validate_config_expressions(node_id: NodeId, config: &NodeConfig, diagnostics
                 validate_expression_field(node_id, "session", session, diagnostics);
             }
         }
+        NodeConfig::Condition(_) | NodeConfig::Merge(_) | NodeConfig::Subworkflow(_) => {}
     }
 }
 
@@ -316,6 +324,124 @@ fn validate_credentials_with_registry(
                 };
                 diagnostics.push(fatal(code, Some(node_id), None, error.to_string()));
             }
+        }
+    }
+}
+
+// r[impl n8nclone.workflow_validation.control_flow]
+// r[impl n8nclone.workflow_validation.subworkflows]
+fn validate_control_flow_topology(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    for node in workflow.graph.nodes() {
+        match workflow.node_config(node.id) {
+            Some(NodeConfig::Condition(config)) => validate_condition_topology(node, config, diagnostics),
+            Some(NodeConfig::Merge(_)) => validate_merge_topology(workflow, node, diagnostics),
+            Some(NodeConfig::Subworkflow(config)) => validate_subworkflow_topology(workflow, node, config, diagnostics),
+            Some(
+                NodeConfig::Shell { .. }
+                | NodeConfig::Http { .. }
+                | NodeConfig::File { .. }
+                | NodeConfig::ImageInput { .. }
+                | NodeConfig::Agent(_),
+            )
+            | None => {}
+        }
+    }
+}
+
+fn validate_condition_topology(
+    node: &rat_nodegraph::model::Node,
+    config: &crate::control_flow::ConditionNodeConfig,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    let branch_labels = config
+        .branches
+        .iter()
+        .map(|branch| branch.label.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for branch in &config.branches {
+        if !node.output_ports.iter().any(|port| port.label == branch.label) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidConditionConfig,
+                Some(node.id),
+                None,
+                format!("condition branch '{}' has no matching output port", branch.label),
+            ));
+        }
+    }
+    for port in &node.output_ports {
+        if !branch_labels.contains(port.label.as_str()) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidConditionConfig,
+                Some(node.id),
+                Some(port.id),
+                format!("condition output port '{}' has no predicate branch", port.label),
+            ));
+        }
+    }
+}
+
+fn validate_merge_topology(
+    workflow: &Workflow,
+    node: &rat_nodegraph::model::Node,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    let Some(output_port) = node.output_ports.first() else {
+        return;
+    };
+    if output_port.type_tag == "any" {
+        return;
+    }
+    let input_port_ids = node.input_ports.iter().map(|port| port.id).collect::<Vec<_>>();
+    for edge in workflow.graph.edges().iter().filter(|edge| input_port_ids.contains(&edge.target)) {
+        let Some(source_port) = workflow.graph.port(edge.source) else {
+            continue;
+        };
+        if !port_types_compatible(&source_port.type_tag, &output_port.type_tag) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidMergeConfig,
+                Some(node.id),
+                Some(edge.target),
+                format!(
+                    "merge output type '{}' is incompatible with upstream input type '{}'",
+                    output_port.type_tag, source_port.type_tag,
+                ),
+            ));
+        }
+    }
+}
+
+fn validate_subworkflow_topology(
+    workflow: &Workflow,
+    node: &rat_nodegraph::model::Node,
+    config: &crate::control_flow::SubworkflowNodeConfig,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    if config.workflow_name == workflow.meta.name {
+        diagnostics.push(fatal(
+            WorkflowDiagnosticCode::InvalidSubworkflowConfig,
+            Some(node.id),
+            None,
+            format!("subworkflow '{}' recursively references the parent workflow", config.workflow_name),
+        ));
+    }
+    for mapping in &config.input_mappings {
+        if !node.input_ports.iter().any(|port| port.label == mapping.parent_input) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidSubworkflowConfig,
+                Some(node.id),
+                None,
+                format!("subworkflow input mapping references unknown parent input '{}'", mapping.parent_input),
+            ));
+        }
+    }
+    for mapping in &config.output_mappings {
+        if !node.output_ports.iter().any(|port| port.label == mapping.parent_output) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidSubworkflowConfig,
+                Some(node.id),
+                None,
+                format!("subworkflow output mapping references unknown parent output '{}'", mapping.parent_output),
+            ));
         }
     }
 }

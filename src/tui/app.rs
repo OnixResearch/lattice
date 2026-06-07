@@ -34,6 +34,12 @@ use crate::agent_node::AgentTarget;
 use crate::config::AppConfig;
 use crate::config::NodeTemplate;
 use crate::config::render_template_command;
+use crate::control_flow;
+use crate::control_flow::ConditionBranch;
+use crate::control_flow::ConditionNodeConfig;
+use crate::control_flow::MergeNodeConfig;
+use crate::control_flow::MergePolicy;
+use crate::control_flow::SubworkflowNodeConfig;
 use crate::credentials::NodeCredentialRefs;
 use crate::credentials::SecretRef;
 use crate::engine::executor::Executor;
@@ -66,6 +72,14 @@ const CREDENTIAL_ENTRY_SEPARATOR: &str = ",";
 const CREDENTIAL_BINDING_SEPARATOR: &str = "=";
 const SECRET_IDENTITY_SEPARATOR: &str = ":";
 const SECRET_FIELD_SEPARATOR: &str = ".";
+const CONDITION_BRANCH_ENTRY_SEPARATOR: &str = ",";
+const CONDITION_BRANCH_BINDING_SEPARATOR: &str = "=";
+const MERGE_POLICY_INPUT_SEPARATOR: &str = ":";
+const MERGE_INPUT_SEPARATOR: &str = ",";
+const DEFAULT_CONDITION_BRANCH_LABEL: &str = "match";
+const DEFAULT_CONDITION_PREDICATE: &str = "always";
+const DEFAULT_MERGE_INPUT_LEFT: &str = "left";
+const DEFAULT_MERGE_INPUT_RIGHT: &str = "right";
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,6 +168,7 @@ pub enum PropertyEditField {
     AgentCwd,
     AgentSession,
     AgentCredentials,
+    ConditionBranches,
 }
 
 impl PropertyEditField {
@@ -172,6 +187,7 @@ impl PropertyEditField {
             Self::AgentCwd => "agent cwd",
             Self::AgentSession => "agent session",
             Self::AgentCredentials => "agent credentials",
+            Self::ConditionBranches => "condition branches",
         }
     }
 }
@@ -193,6 +209,8 @@ pub enum PropertyEditError {
     InvalidAgentTarget,
     InvalidAgentOutputMode,
     InvalidAgentCredentials,
+    InvalidConditionBranches,
+    InvalidMergePolicy,
 }
 
 pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
@@ -205,6 +223,84 @@ pub fn validate_agent_target(input: &str) -> Result<AgentTarget, PropertyEditErr
 
 pub fn validate_agent_output_mode(input: &str) -> Result<AgentOutputMode, PropertyEditError> {
     agent_node::parse_agent_output_mode(input.trim()).map_err(|_| PropertyEditError::InvalidAgentOutputMode)
+}
+
+fn condition_branches_from_draft(input: &str) -> Result<Vec<ConditionBranch>, PropertyEditError> {
+    let mut branches = Vec::new();
+    for entry in input.split(CONDITION_BRANCH_ENTRY_SEPARATOR).map(str::trim).filter(|entry| !entry.is_empty()) {
+        let Some((label, predicate)) = entry.split_once(CONDITION_BRANCH_BINDING_SEPARATOR) else {
+            return Err(PropertyEditError::InvalidConditionBranches);
+        };
+        let label = label.trim();
+        if label.is_empty() {
+            return Err(PropertyEditError::InvalidConditionBranches);
+        }
+        let predicate = control_flow::parse_condition_predicate(predicate.trim())
+            .map_err(|_| PropertyEditError::InvalidConditionBranches)?;
+        branches.push(ConditionBranch {
+            label: label.to_string(),
+            predicate,
+        });
+    }
+    let config = ConditionNodeConfig { branches };
+    control_flow::validate_condition_config(&config).map_err(|_| PropertyEditError::InvalidConditionBranches)?;
+    Ok(config.branches)
+}
+
+fn condition_branches_to_draft(config: &ConditionNodeConfig) -> String {
+    config
+        .branches
+        .iter()
+        .map(|branch| format!("{}={}", branch.label, condition_predicate_to_draft(&branch.predicate)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn condition_predicate_to_draft(predicate: &control_flow::ConditionPredicate) -> String {
+    match predicate {
+        control_flow::ConditionPredicate::Always => "always".to_string(),
+        control_flow::ConditionPredicate::Exists => "exists".to_string(),
+        control_flow::ConditionPredicate::StringEquals(value) => format!("eq:{value}"),
+        control_flow::ConditionPredicate::StringContains(value) => format!("contains:{value}"),
+        control_flow::ConditionPredicate::NumberGreaterThan(value) => format!("gt:{value}"),
+        control_flow::ConditionPredicate::JsonPointerExists(value) => format!("json_exists:{value}"),
+        control_flow::ConditionPredicate::BoolEquals(value) => format!("bool:{value}"),
+    }
+}
+
+fn merge_config_from_draft(input: &str) -> Result<MergeNodeConfig, PropertyEditError> {
+    let trimmed = input.trim();
+    let (policy, inputs) = match trimmed.split_once(MERGE_POLICY_INPUT_SEPARATOR) {
+        Some((policy, inputs)) => (policy.trim(), inputs),
+        None => (trimmed, ""),
+    };
+    let policy = match policy {
+        "all" | "" => MergePolicy::All,
+        "first" => MergePolicy::First,
+        "last" => MergePolicy::Last,
+        "collect" => MergePolicy::Collect,
+        _ => return Err(PropertyEditError::InvalidMergePolicy),
+    };
+    let required_inputs = inputs
+        .split(MERGE_INPUT_SEPARATOR)
+        .map(str::trim)
+        .filter(|input| !input.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let required_inputs = if required_inputs.is_empty() {
+        vec![
+            DEFAULT_MERGE_INPUT_LEFT.to_string(),
+            DEFAULT_MERGE_INPUT_RIGHT.to_string(),
+        ]
+    } else {
+        required_inputs
+    };
+    let config = MergeNodeConfig {
+        policy,
+        required_inputs,
+    };
+    control_flow::validate_merge_config(&config).map_err(|_| PropertyEditError::InvalidMergePolicy)?;
+    Ok(config)
 }
 
 fn optional_draft_value(input: &str) -> Option<String> {
@@ -484,6 +580,9 @@ pub enum AddNodeKind {
     ImageInput,
     PiAgent,
     ClankersAgent,
+    Condition,
+    Merge,
+    Subworkflow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -951,6 +1050,23 @@ impl App {
         self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::ClankersAgent, self.next_agent_node_label());
     }
 
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn start_condition_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::Condition, self.next_condition_node_label());
+        self.add_node_flow.command = format!("{DEFAULT_CONDITION_BRANCH_LABEL}={DEFAULT_CONDITION_PREDICATE}");
+    }
+
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn start_merge_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::Merge, self.next_merge_node_label());
+        self.add_node_flow.command = format!("all:{DEFAULT_MERGE_INPUT_LEFT},{DEFAULT_MERGE_INPUT_RIGHT}");
+    }
+
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn start_subworkflow_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::Subworkflow, self.next_subworkflow_node_label());
+    }
+
     /// Move add-node template selection down.
     pub fn select_next_node_template(&mut self) {
         if self.node_templates.is_empty() {
@@ -1016,6 +1132,9 @@ impl App {
             AddNodeKind::ImageInput => self.confirm_image_input_node_from_flow(),
             AddNodeKind::PiAgent => self.confirm_agent_node_from_flow(AgentTarget::Pi),
             AddNodeKind::ClankersAgent => self.confirm_agent_node_from_flow(AgentTarget::Clankers),
+            AddNodeKind::Condition => self.confirm_condition_node_from_flow(),
+            AddNodeKind::Merge => self.confirm_merge_node_from_flow(),
+            AddNodeKind::Subworkflow => self.confirm_subworkflow_node_from_flow(),
         }
     }
 
@@ -1037,6 +1156,47 @@ impl App {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_agent_node_label());
         let prompt = self.add_node_flow.command.clone();
         self.add_agent_node(&label, target, &prompt, AgentOutputMode::Image);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_condition_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_condition_node_label());
+        let branches = match condition_branches_from_draft(&self.add_node_flow.command) {
+            Ok(branches) => branches,
+            Err(_) => {
+                self.output.push_line("Invalid condition branches; use label=predicate entries");
+                return;
+            }
+        };
+        self.add_condition_node(&label, ConditionNodeConfig { branches });
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_merge_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_merge_node_label());
+        let config = match merge_config_from_draft(&self.add_node_flow.command) {
+            Ok(config) => config,
+            Err(_) => {
+                self.output.push_line("Invalid merge policy; use all|first|last|collect:input_a,input_b");
+                return;
+            }
+        };
+        self.add_merge_node(&label, config);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_subworkflow_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_subworkflow_node_label());
+        let workflow_name = self.add_node_flow.command.trim();
+        if workflow_name.is_empty() {
+            self.output.push_line("Subworkflow name is required");
+            return;
+        }
+        self.add_subworkflow_node(&label, SubworkflowNodeConfig {
+            workflow_name: workflow_name.to_string(),
+            input_mappings: Vec::new(),
+            output_mappings: Vec::new(),
+        });
         self.cancel_add_node_flow();
     }
 
@@ -1120,6 +1280,18 @@ impl App {
 
     fn next_agent_node_label(&self) -> String {
         format!("Agent {}", self.workflow.graph.node_count() + 1)
+    }
+
+    fn next_condition_node_label(&self) -> String {
+        format!("Condition {}", self.workflow.graph.node_count() + 1)
+    }
+
+    fn next_merge_node_label(&self) -> String {
+        format!("Merge {}", self.workflow.graph.node_count() + 1)
+    }
+
+    fn next_subworkflow_node_label(&self) -> String {
+        format!("Subworkflow {}", self.workflow.graph.node_count() + 1)
     }
 
     /// Return whether the run-history modal is open.
@@ -1437,6 +1609,14 @@ impl App {
                 self.output.push_line("Invalid agent credentials; use ENV=provider:key[, ENV=provider:key.field]");
                 false
             }
+            Err(PropertyEditError::InvalidConditionBranches) => {
+                self.output.push_line("Invalid condition branches; use label=predicate entries");
+                false
+            }
+            Err(PropertyEditError::InvalidMergePolicy) => {
+                self.output.push_line("Invalid merge policy; use all|first|last|collect");
+                false
+            }
             Err(_) => {
                 self.output.push_line("Property edit failed");
                 false
@@ -1459,13 +1639,21 @@ impl App {
                 NodeConfig::Http { .. }
                 | NodeConfig::File { .. }
                 | NodeConfig::ImageInput { .. }
-                | NodeConfig::Agent(_) => None,
+                | NodeConfig::Agent(_)
+                | NodeConfig::Condition(_)
+                | NodeConfig::Merge(_)
+                | NodeConfig::Subworkflow(_) => None,
             },
             PropertyEditField::TimeoutSecs => match self.workflow.node_config(node_id)? {
                 NodeConfig::Shell { timeout_secs, .. } | NodeConfig::Http { timeout_secs, .. } => {
                     Some(timeout_secs.to_string())
                 }
-                NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => None,
+                NodeConfig::File { .. }
+                | NodeConfig::ImageInput { .. }
+                | NodeConfig::Agent(_)
+                | NodeConfig::Condition(_)
+                | NodeConfig::Merge(_)
+                | NodeConfig::Subworkflow(_) => None,
             },
             PropertyEditField::ImagePath => match self.workflow.node_config(node_id)? {
                 NodeConfig::ImageInput { path, .. } => Some(path.clone()),
@@ -1507,6 +1695,10 @@ impl App {
                 NodeConfig::Agent(_) => Some(credentials_to_draft(self.workflow.node_credentials(node_id))),
                 _ => None,
             },
+            PropertyEditField::ConditionBranches => match self.workflow.node_config(node_id)? {
+                NodeConfig::Condition(config) => Some(condition_branches_to_draft(config)),
+                _ => None,
+            },
         }
     }
 
@@ -1546,7 +1738,10 @@ impl App {
                     NodeConfig::Http { .. }
                     | NodeConfig::File { .. }
                     | NodeConfig::ImageInput { .. }
-                    | NodeConfig::Agent(_) => Err(PropertyEditError::MissingConfig),
+                    | NodeConfig::Agent(_)
+                    | NodeConfig::Condition(_)
+                    | NodeConfig::Merge(_)
+                    | NodeConfig::Subworkflow(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::TimeoutSecs => {
@@ -1587,9 +1782,12 @@ impl App {
                         });
                         Ok(())
                     }
-                    NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => {
-                        Err(PropertyEditError::MissingConfig)
-                    }
+                    NodeConfig::File { .. }
+                    | NodeConfig::ImageInput { .. }
+                    | NodeConfig::Agent(_)
+                    | NodeConfig::Condition(_)
+                    | NodeConfig::Merge(_)
+                    | NodeConfig::Subworkflow(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::ImagePath => {
@@ -1638,7 +1836,8 @@ impl App {
                     | PropertyEditField::Command
                     | PropertyEditField::TimeoutSecs
                     | PropertyEditField::ImagePath
-                    | PropertyEditField::AgentCredentials => return Err(PropertyEditError::MissingConfig),
+                    | PropertyEditField::AgentCredentials
+                    | PropertyEditField::ConditionBranches => return Err(PropertyEditError::MissingConfig),
                 }
                 self.workflow.set_node_config(edit.node_id, NodeConfig::Agent(settings));
                 Ok(())
@@ -1650,6 +1849,26 @@ impl App {
                 }
                 _ => Err(PropertyEditError::MissingConfig),
             },
+            PropertyEditField::ConditionBranches => {
+                let Some(NodeConfig::Condition(mut config)) = self.workflow.node_config(edit.node_id).cloned() else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                config.branches = condition_branches_from_draft(&edit.draft)?;
+                if let Some(node) = self.workflow.graph.node_mut(edit.node_id) {
+                    node.output_ports = config
+                        .branches
+                        .iter()
+                        .zip(node.output_ports.iter())
+                        .map(|(branch, port)| rat_nodegraph::model::Port {
+                            label: branch.label.clone(),
+                            ..port.clone()
+                        })
+                        .collect();
+                }
+                self.workflow.set_node_config(edit.node_id, NodeConfig::Condition(config));
+                self.sync_graph_state();
+                Ok(())
+            }
         }
     }
 
@@ -1681,6 +1900,33 @@ impl App {
 
     pub fn add_agent_node(&mut self, label: &str, target: AgentTarget, prompt: &str, output_mode: AgentOutputMode) {
         let id = self.workflow.add_agent_node(label, target, prompt, output_mode);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn add_condition_node(&mut self, label: &str, config: ConditionNodeConfig) {
+        let id = self.workflow.add_condition_node(label, config);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn add_merge_node(&mut self, label: &str, config: MergeNodeConfig) {
+        let id = self.workflow.add_merge_node(label, config);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    // r[impl n8nclone.tui_ux.control_flow.add_flow]
+    pub fn add_subworkflow_node(&mut self, label: &str, config: SubworkflowNodeConfig) {
+        let id = self.workflow.add_subworkflow_node(label, config);
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);

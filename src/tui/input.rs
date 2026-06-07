@@ -169,6 +169,9 @@ fn handle_add_node_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         AddNodeKeyAction::ImageInput => app.start_image_input_node_flow(),
         AddNodeKeyAction::PiAgent => app.start_pi_agent_node_flow(),
         AddNodeKeyAction::ClankersAgent => app.start_clankers_agent_node_flow(),
+        AddNodeKeyAction::Condition => app.start_condition_node_flow(),
+        AddNodeKeyAction::Merge => app.start_merge_node_flow(),
+        AddNodeKeyAction::Subworkflow => app.start_subworkflow_node_flow(),
         AddNodeKeyAction::TemplateSelect => app.start_template_node_flow(),
         AddNodeKeyAction::Ignore => {}
     }
@@ -187,6 +190,9 @@ enum AddNodeKeyAction {
     ImageInput,
     PiAgent,
     ClankersAgent,
+    Condition,
+    Merge,
+    Subworkflow,
     TemplateSelect,
     Ignore,
 }
@@ -212,6 +218,15 @@ fn add_node_key_action(key: &KeyEvent, step: AddNodeStep) -> AddNodeKeyAction {
         }
         KeyCode::Char('c') | KeyCode::Char('C') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
             AddNodeKeyAction::ClankersAgent
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::Condition
+        }
+        KeyCode::Char('m') | KeyCode::Char('M') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::Merge
+        }
+        KeyCode::Char('w') | KeyCode::Char('W') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::Subworkflow
         }
         KeyCode::Char('t') | KeyCode::Char('T') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
             AddNodeKeyAction::TemplateSelect
@@ -434,6 +449,7 @@ fn property_edit_shortcut(key: &KeyEvent) -> Option<PropertyEditField> {
         KeyCode::Char('w') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCwd),
         KeyCode::Char('n') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentSession),
         KeyCode::Char('k') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCredentials),
+        KeyCode::Char('b') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::ConditionBranches),
         _ => None,
     }
 }

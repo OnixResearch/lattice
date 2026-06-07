@@ -334,6 +334,7 @@ fn property_field_title(field: PropertyEditField) -> &'static str {
         PropertyEditField::AgentCwd => "Agent CWD",
         PropertyEditField::AgentSession => "Agent Session",
         PropertyEditField::AgentCredentials => "Agent Credentials",
+        PropertyEditField::ConditionBranches => "Condition Branches",
     }
 }
 
@@ -779,6 +780,9 @@ fn render_add_node_kind_lines() -> Vec<Line<'static>> {
         Line::from("i: image input"),
         Line::from("p: Pi agent"),
         Line::from("c: Clankers agent"),
+        Line::from("d: condition"),
+        Line::from("m: merge"),
+        Line::from("w: subworkflow"),
         Line::from("t: templates"),
         Line::styled("Enter: shell │ Esc: cancel", Style::default().fg(Color::DarkGray)),
     ]
@@ -790,6 +794,9 @@ fn add_node_label_title(kind: AddNodeKind) -> &'static str {
         AddNodeKind::ImageInput => "Image input label",
         AddNodeKind::PiAgent => "Pi agent label",
         AddNodeKind::ClankersAgent => "Clankers agent label",
+        AddNodeKind::Condition => "Condition node label",
+        AddNodeKind::Merge => "Merge node label",
+        AddNodeKind::Subworkflow => "Subworkflow node label",
     }
 }
 
@@ -799,6 +806,9 @@ fn add_node_config_title(kind: AddNodeKind) -> &'static str {
         AddNodeKind::ImageInput => "Image path",
         AddNodeKind::PiAgent => "Pi agent prompt",
         AddNodeKind::ClankersAgent => "Clankers agent prompt",
+        AddNodeKind::Condition => "Branches (label=predicate, ...)",
+        AddNodeKind::Merge => "Merge policy (all|first|last|collect:inputs)",
+        AddNodeKind::Subworkflow => "Saved workflow name",
     }
 }
 

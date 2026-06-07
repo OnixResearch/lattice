@@ -507,7 +507,12 @@ fn export_node_to_n8n_json(
             }
             (N8N_HTTP_REQUEST_TYPE, parameters)
         }
-        NodeConfig::File { .. } | NodeConfig::ImageInput { .. } | NodeConfig::Agent(_) => {
+        NodeConfig::File { .. }
+        | NodeConfig::ImageInput { .. }
+        | NodeConfig::Agent(_)
+        | NodeConfig::Condition(_)
+        | NodeConfig::Merge(_)
+        | NodeConfig::Subworkflow(_) => {
             return Err(export_unsupported_node_diagnostic(node_id, label, "unsupported node kind"));
         }
     };

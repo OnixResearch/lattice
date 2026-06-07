@@ -4,6 +4,7 @@
 //! node-kind behavior needed by validation, format handlers, and TUI metadata.
 
 use crate::agent_node;
+use crate::control_flow;
 use crate::engine::workflow::NodeConfig;
 use crate::file_node;
 use crate::http;
@@ -14,11 +15,17 @@ const KIND_HTTP: &str = "http";
 const KIND_FILE: &str = "file";
 const KIND_IMAGE_INPUT: &str = "image_input";
 const KIND_AGENT: &str = "agent";
+const KIND_CONDITION: &str = "condition";
+const KIND_MERGE: &str = "merge";
+const KIND_SUBWORKFLOW: &str = "subworkflow";
 const DISPLAY_SHELL: &str = "Shell";
 const DISPLAY_HTTP: &str = "HTTP";
 const DISPLAY_FILE: &str = "File";
 const DISPLAY_IMAGE_INPUT: &str = "Image Input";
 const DISPLAY_AGENT: &str = "Agent";
+const DISPLAY_CONDITION: &str = "Condition";
+const DISPLAY_MERGE: &str = "Merge";
+const DISPLAY_SUBWORKFLOW: &str = "Subworkflow";
 const MIN_IMAGE_BYTE_BUDGET: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +35,9 @@ pub enum NodeKind {
     File,
     ImageInput,
     Agent,
+    Condition,
+    Merge,
+    Subworkflow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +49,9 @@ pub enum NodeKindValidationCode {
     UnsafeImagePath,
     InvalidImageByteBudget,
     EmptyAgentPrompt,
+    InvalidCondition,
+    InvalidMerge,
+    InvalidSubworkflow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +86,13 @@ static IMAGE_INPUT_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
     kind: NodeKind::ImageInput,
 };
 static AGENT_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider { kind: NodeKind::Agent };
+static CONDITION_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
+    kind: NodeKind::Condition,
+};
+static MERGE_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider { kind: NodeKind::Merge };
+static SUBWORKFLOW_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
+    kind: NodeKind::Subworkflow,
+};
 
 impl NodeKindProvider for BuiltinNodeKindProvider {
     fn kind(&self) -> NodeKind {
@@ -111,6 +131,9 @@ pub fn node_kind_for_config(config: &NodeConfig) -> NodeKind {
         NodeConfig::File { .. } => NodeKind::File,
         NodeConfig::ImageInput { .. } => NodeKind::ImageInput,
         NodeConfig::Agent(_) => NodeKind::Agent,
+        NodeConfig::Condition(_) => NodeKind::Condition,
+        NodeConfig::Merge(_) => NodeKind::Merge,
+        NodeConfig::Subworkflow(_) => NodeKind::Subworkflow,
     }
 }
 
@@ -165,6 +188,22 @@ pub fn property_lines_for_config(config: &NodeConfig) -> Vec<NodePropertyLine> {
             }
             lines
         }
+        NodeConfig::Condition(config) => vec![
+            property_line("Type", DISPLAY_CONDITION),
+            property_line(
+                "Branches",
+                config.branches.iter().map(|branch| branch.label.clone()).collect::<Vec<_>>().join(", "),
+            ),
+        ],
+        NodeConfig::Merge(config) => vec![
+            property_line("Type", DISPLAY_MERGE),
+            property_line("Policy", format!("{:?}", config.policy).to_lowercase()),
+            property_line("Inputs", config.required_inputs.join(", ")),
+        ],
+        NodeConfig::Subworkflow(config) => vec![
+            property_line("Type", DISPLAY_SUBWORKFLOW),
+            property_line("Workflow", &config.workflow_name),
+        ],
     }
 }
 
@@ -247,6 +286,21 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
                 ));
             }
         }
+        NodeConfig::Condition(config) => {
+            if let Err(error) = control_flow::validate_condition_config(config) {
+                issues.push(issue(NodeKindValidationCode::InvalidCondition, error.to_string()));
+            }
+        }
+        NodeConfig::Merge(config) => {
+            if let Err(error) = control_flow::validate_merge_config(config) {
+                issues.push(issue(NodeKindValidationCode::InvalidMerge, error.to_string()));
+            }
+        }
+        NodeConfig::Subworkflow(config) => {
+            if let Err(error) = control_flow::validate_subworkflow_config(config) {
+                issues.push(issue(NodeKindValidationCode::InvalidSubworkflow, error.to_string()));
+            }
+        }
     }
     issues
 }
@@ -262,6 +316,9 @@ fn node_kind_for_portable_kind(kind: &str) -> Option<NodeKind> {
         KIND_FILE => Some(NodeKind::File),
         KIND_IMAGE_INPUT => Some(NodeKind::ImageInput),
         KIND_AGENT => Some(NodeKind::Agent),
+        KIND_CONDITION => Some(NodeKind::Condition),
+        KIND_MERGE => Some(NodeKind::Merge),
+        KIND_SUBWORKFLOW => Some(NodeKind::Subworkflow),
         _ => None,
     }
 }
@@ -273,6 +330,9 @@ fn provider_for_kind(kind: NodeKind) -> &'static dyn NodeKindProvider {
         NodeKind::File => &FILE_PROVIDER,
         NodeKind::ImageInput => &IMAGE_INPUT_PROVIDER,
         NodeKind::Agent => &AGENT_PROVIDER,
+        NodeKind::Condition => &CONDITION_PROVIDER,
+        NodeKind::Merge => &MERGE_PROVIDER,
+        NodeKind::Subworkflow => &SUBWORKFLOW_PROVIDER,
     }
 }
 
@@ -283,6 +343,9 @@ fn portable_kind_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::File => KIND_FILE,
         NodeKind::ImageInput => KIND_IMAGE_INPUT,
         NodeKind::Agent => KIND_AGENT,
+        NodeKind::Condition => KIND_CONDITION,
+        NodeKind::Merge => KIND_MERGE,
+        NodeKind::Subworkflow => KIND_SUBWORKFLOW,
     }
 }
 
@@ -293,5 +356,8 @@ fn display_label_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::File => DISPLAY_FILE,
         NodeKind::ImageInput => DISPLAY_IMAGE_INPUT,
         NodeKind::Agent => DISPLAY_AGENT,
+        NodeKind::Condition => DISPLAY_CONDITION,
+        NodeKind::Merge => DISPLAY_MERGE,
+        NodeKind::Subworkflow => DISPLAY_SUBWORKFLOW,
     }
 }
