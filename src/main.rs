@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -11,6 +12,7 @@ use n8nclone::credentials::CredentialProviderCapabilities;
 use n8nclone::credentials::CredentialProviderMetadata;
 use n8nclone::credentials::CredentialProviderRegistry;
 use n8nclone::credentials::EnvironmentCredentialProvider;
+use n8nclone::doctor;
 use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::n8n_json;
@@ -73,6 +75,8 @@ enum CliCommand {
     Triggers(TriggersCommandArgs),
     /// Listen for persisted webhook trigger HTTP requests
     WebhookListen(WebhookListenArgs),
+    /// Diagnose local operator configuration and readiness
+    Doctor(DoctorCommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -151,6 +155,13 @@ struct WebhookListenArgs {
     max_body_bytes: usize,
 }
 
+#[derive(clap::Args, Debug)]
+struct DoctorCommandArgs {
+    /// Output format for the doctor report
+    #[arg(long, value_enum, default_value_t = DoctorOutputFormat::Text)]
+    output: DoctorOutputFormat,
+}
+
 #[derive(Subcommand, Debug)]
 enum TriggerCliCommand {
     /// List persisted trigger definitions
@@ -165,6 +176,12 @@ enum TriggerCliCommand {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum RunOutputFormat {
+    Text,
+    Json,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+enum DoctorOutputFormat {
     Text,
     Json,
 }
@@ -192,6 +209,10 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    if let Some(CliCommand::Doctor(doctor_args)) = &args.command {
+        return Ok(run_doctor_command(&config_path, doctor_args));
+    }
+
     let app_config = config::load_app_config(&config_path);
 
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
@@ -213,6 +234,7 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         Some(CliCommand::WebhookListen(webhook_args)) => {
             Ok(run_webhook_listener_command(&app_config, &webhook_args).await)
         }
+        Some(CliCommand::Doctor(_)) => unreachable!("doctor command returns before app config side effects"),
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -242,6 +264,201 @@ fn setup_logging(verbose: bool) {
             }))
             .with_writer(file)
             .init();
+    }
+}
+
+// r[impl n8nclone.operator_diagnostics.doctor_command]
+fn run_doctor_command(config_path: &Path, args: &DoctorCommandArgs) -> ExitCode {
+    let facts = collect_doctor_facts(config_path);
+    let report = doctor::evaluate_doctor_facts(&facts);
+    let rendered = match args.output {
+        DoctorOutputFormat::Text => doctor::render_doctor_text(&report),
+        DoctorOutputFormat::Json => doctor::render_doctor_json(&report),
+    };
+    if let Err(error) = write_stdout_and_flush(&rendered) {
+        eprintln!("Doctor failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    if doctor::doctor_has_fatal(&report) {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+// r[impl n8nclone.operator_diagnostics.doctor_checks]
+fn collect_doctor_facts(config_path: &Path) -> doctor::DoctorFacts {
+    let mut checks = Vec::new();
+    let app_config = match config::load_app_config_checked(config_path) {
+        Ok(app_config) => {
+            checks.push(doctor::DoctorFact::healthy(
+                doctor::CHECK_CONFIG,
+                format!("config loaded from {}", config_path.display()),
+            ));
+            app_config
+        }
+        Err(error) => {
+            checks.push(
+                doctor::DoctorFact::fatal(doctor::CHECK_CONFIG, error)
+                    .with_remediation("run `n8nclone --init --config <path>` or fix the Nickel config"),
+            );
+            return doctor::DoctorFacts::new(checks);
+        }
+    };
+
+    let store_path = app_config.data_dir.join(STORE_FILE_NAME);
+    if !store_path.exists() {
+        checks.push(
+            doctor::DoctorFact::fatal(
+                doctor::CHECK_STORE,
+                format!("store database not found: {}", store_path.display()),
+            )
+            .with_remediation("import or run a workflow to initialize the configured store"),
+        );
+        return doctor::DoctorFacts::new(checks);
+    }
+
+    let store = match Store::new(&store_path) {
+        Ok(store) => {
+            checks.push(doctor::DoctorFact::healthy(
+                doctor::CHECK_STORE,
+                format!("store opened at {}", store_path.display()),
+            ));
+            store
+        }
+        Err(error) => {
+            checks.push(
+                doctor::DoctorFact::fatal(doctor::CHECK_STORE, format!("store open failed: {error}"))
+                    .with_remediation("check store path permissions and redb file integrity"),
+            );
+            return doctor::DoctorFacts::new(checks);
+        }
+    };
+
+    collect_workflow_doctor_facts(&store, &mut checks);
+    let triggers = collect_trigger_doctor_facts(&store, &mut checks);
+    collect_credential_doctor_facts(&triggers, &mut checks);
+    collect_webhook_listener_doctor_facts(&triggers, &mut checks);
+    doctor::DoctorFacts::new(checks)
+}
+
+// r[impl n8nclone.operator_diagnostics.doctor_checks.config_store]
+fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorFact>) {
+    let workflow_names = match store.list_workflows() {
+        Ok(workflow_names) => workflow_names,
+        Err(error) => {
+            checks.push(
+                doctor::DoctorFact::fatal(doctor::CHECK_WORKFLOWS, format!("workflow listing failed: {error}"))
+                    .with_remediation("check store integrity"),
+            );
+            return;
+        }
+    };
+    let mut fatal_diagnostic_count = 0usize;
+    for workflow_name in &workflow_names {
+        match store.load_workflow(workflow_name) {
+            Ok(Some(workflow)) => {
+                let diagnostics = workflow_validation::validate_workflow(&workflow);
+                if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+                    fatal_diagnostic_count += diagnostics.len();
+                }
+            }
+            Ok(None) => {
+                checks.push(
+                    doctor::DoctorFact::fatal(
+                        doctor::CHECK_WORKFLOWS,
+                        format!("workflow disappeared while checking: {workflow_name}"),
+                    )
+                    .with_remediation("rerun doctor or inspect the store"),
+                );
+            }
+            Err(error) => {
+                checks.push(
+                    doctor::DoctorFact::fatal(
+                        doctor::CHECK_WORKFLOWS,
+                        format!("workflow load failed for {workflow_name}: {error}"),
+                    )
+                    .with_remediation("inspect or re-import the workflow"),
+                );
+            }
+        }
+    }
+    if fatal_diagnostic_count == 0 {
+        checks.push(doctor::DoctorFact::healthy(
+            doctor::CHECK_WORKFLOWS,
+            format!("{} workflows validated", workflow_names.len()),
+        ));
+    } else {
+        checks.push(
+            doctor::DoctorFact::fatal(
+                doctor::CHECK_WORKFLOWS,
+                format!("workflow validation found {fatal_diagnostic_count} fatal diagnostics"),
+            )
+            .with_remediation("run workflow validation or re-import invalid workflows"),
+        );
+    }
+}
+
+fn collect_trigger_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorFact>) -> Vec<TriggerDefinition> {
+    match store.list_triggers() {
+        Ok(triggers) => triggers,
+        Err(error) => {
+            checks.push(
+                doctor::DoctorFact::fatal(doctor::CHECK_WEBHOOK_LISTENER, format!("trigger listing failed: {error}"))
+                    .with_remediation("check store trigger table integrity"),
+            );
+            Vec::new()
+        }
+    }
+}
+
+// r[impl n8nclone.operator_diagnostics.doctor_checks.credentials]
+fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::DoctorFact>) {
+    let secret_refs = webhooks::secret_refs(triggers);
+    let missing_env_count = secret_refs
+        .iter()
+        .filter(|secret_ref| secret_ref.provider == ENV_CREDENTIAL_PROVIDER_ID)
+        .filter(|secret_ref| std::env::var_os(&secret_ref.key).is_none())
+        .count();
+    let unsupported_provider_count =
+        secret_refs.iter().filter(|secret_ref| secret_ref.provider != ENV_CREDENTIAL_PROVIDER_ID).count();
+
+    if secret_refs.is_empty() {
+        checks.push(doctor::DoctorFact::healthy(
+            doctor::CHECK_CREDENTIALS,
+            "no credential-backed webhook triggers configured",
+        ));
+    } else if missing_env_count == 0 && unsupported_provider_count == 0 {
+        checks.push(doctor::DoctorFact::healthy(
+            doctor::CHECK_CREDENTIALS,
+            format!("{} credential references are reachable", secret_refs.len()),
+        ));
+    } else {
+        checks.push(
+            doctor::DoctorFact::fatal(
+                doctor::CHECK_CREDENTIALS,
+                format!(
+                    "credential readiness failed: {missing_env_count} missing env refs, {unsupported_provider_count} unsupported providers"
+                ),
+            )
+            .with_remediation("set required environment variables or configure a supported provider"),
+        );
+    }
+}
+
+// r[impl n8nclone.operator_diagnostics.doctor_checks.webhook_listener]
+fn collect_webhook_listener_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::DoctorFact>) {
+    let enabled_webhook_count = webhooks::enabled_trigger_count(triggers);
+    if enabled_webhook_count == 0 {
+        checks.push(doctor::DoctorFact::healthy(
+            doctor::CHECK_WEBHOOK_LISTENER,
+            "no enabled webhook triggers require listener startup",
+        ));
+    } else {
+        checks.push(doctor::DoctorFact::healthy(
+            doctor::CHECK_WEBHOOK_LISTENER,
+            format!("{enabled_webhook_count} enabled webhook triggers are ready for listener dry-run"),
+        ));
     }
 }
 

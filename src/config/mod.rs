@@ -323,23 +323,23 @@ fn validate_number_constraints(parameter: &TemplateParameter, value: f64) -> Res
 
 /// Load app config from a Nickel file. Falls back to defaults on any error.
 pub fn load_app_config(path: &Path) -> AppConfig {
-    if !path.exists() {
-        return AppConfig::default();
-    }
-
-    match load_nickel_as_json(path) {
-        Ok(json) => match serde_json::from_value(json) {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(path = %path.display(), error = %e, "invalid config, using defaults");
-                AppConfig::default()
-            }
-        },
-        Err(e) => {
-            tracing::warn!(path = %path.display(), error = %e, "failed to load config, using defaults");
+    match load_app_config_checked(path) {
+        Ok(config) => config,
+        Err(error) => {
+            tracing::warn!(path = %path.display(), error = %error, "failed to load config, using defaults");
             AppConfig::default()
         }
     }
+}
+
+/// Load app config from a Nickel file and report parse or decoding errors.
+pub fn load_app_config_checked(path: &Path) -> Result<AppConfig, String> {
+    if !path.exists() {
+        return Err(format!("config file not found: {}", path.display()));
+    }
+
+    let json = load_nickel_as_json(path)?;
+    serde_json::from_value(json).map_err(|error| format!("config JSON decode failed: {error}"))
 }
 
 /// Load node templates from a directory of .ncl files.
