@@ -12,7 +12,6 @@ use n8nclone::credentials::CredentialProviderCapabilities;
 use n8nclone::credentials::CredentialProviderMetadata;
 use n8nclone::credentials::CredentialProviderRegistry;
 use n8nclone::credentials::EnvironmentCredentialProvider;
-use n8nclone::doctor;
 use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::n8n_json;
@@ -37,6 +36,184 @@ const STORE_FILE_NAME: &str = "n8nclone.redb";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
+
+mod doctor {
+    const FATAL_SORT_RANK: u8 = 0;
+    const WARNING_SORT_RANK: u8 = 1;
+    const HEALTHY_SORT_RANK: u8 = 2;
+    const REDACTED_MARKER: &str = "[redacted]";
+
+    pub const CHECK_CONFIG: &str = "config";
+    pub const CHECK_STORE: &str = "store";
+    pub const CHECK_WORKFLOWS: &str = "workflows";
+    pub const CHECK_CREDENTIALS: &str = "credentials";
+    pub const CHECK_WEBHOOK_LISTENER: &str = "webhook_listener";
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum Severity {
+        Healthy,
+        Warning,
+        Fatal,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum Status {
+        Healthy,
+        Warning,
+        Fatal,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Fact {
+        pub id: String,
+        pub severity: Severity,
+        pub message: String,
+        pub remediation: Option<String>,
+        pub redactions: Vec<String>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Facts {
+        pub checks: Vec<Fact>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    pub struct Finding {
+        pub id: String,
+        pub severity: Severity,
+        pub message: String,
+        pub remediation: Option<String>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    pub struct Report {
+        pub status: Status,
+        pub findings: Vec<Finding>,
+    }
+
+    impl Fact {
+        pub fn healthy(id: impl Into<String>, message: impl Into<String>) -> Self {
+            Self::new(id, Severity::Healthy, message)
+        }
+
+        pub fn fatal(id: impl Into<String>, message: impl Into<String>) -> Self {
+            Self::new(id, Severity::Fatal, message)
+        }
+
+        pub fn with_remediation(mut self, remediation: impl Into<String>) -> Self {
+            self.remediation = Some(remediation.into());
+            self
+        }
+
+        fn new(id: impl Into<String>, severity: Severity, message: impl Into<String>) -> Self {
+            Self {
+                id: id.into(),
+                severity,
+                message: message.into(),
+                remediation: None,
+                redactions: Vec::new(),
+            }
+        }
+    }
+
+    impl Facts {
+        pub fn new(checks: Vec<Fact>) -> Self {
+            Self { checks }
+        }
+    }
+
+    pub fn evaluate(facts: &Facts) -> Report {
+        let mut findings = facts.checks.iter().map(finding_from_fact).collect::<Vec<_>>();
+        findings.sort_by(|left, right| {
+            severity_sort_rank(left.severity)
+                .cmp(&severity_sort_rank(right.severity))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Report {
+            status: report_status(&findings),
+            findings,
+        }
+    }
+
+    pub fn render_text(report: &Report) -> String {
+        let mut output = format!("doctor status={}\n", status_label(report.status));
+        for finding in &report.findings {
+            output.push_str(&format!("{} {}: {}\n", severity_label(finding.severity), finding.id, finding.message));
+            if let Some(remediation) = &finding.remediation {
+                output.push_str(&format!("  hint: {remediation}\n"));
+            }
+        }
+        output
+    }
+
+    pub fn render_json(report: &Report) -> String {
+        match serde_json::to_string_pretty(report) {
+            Ok(json) => json,
+            Err(error) => format!(
+                "{{\"status\":\"fatal\",\"findings\":[{{\"id\":\"doctor_output\",\"severity\":\"fatal\",\"message\":\"json render failed: {error}\",\"remediation\":null}}]}}"
+            ),
+        }
+    }
+
+    pub fn has_fatal(report: &Report) -> bool {
+        report.status == Status::Fatal
+    }
+
+    fn finding_from_fact(fact: &Fact) -> Finding {
+        Finding {
+            id: fact.id.clone(),
+            severity: fact.severity,
+            message: sanitize_text(&fact.message, &fact.redactions),
+            remediation: fact.remediation.as_ref().map(|remediation| sanitize_text(remediation, &fact.redactions)),
+        }
+    }
+
+    fn report_status(findings: &[Finding]) -> Status {
+        if findings.iter().any(|finding| finding.severity == Severity::Fatal) {
+            Status::Fatal
+        } else if findings.iter().any(|finding| finding.severity == Severity::Warning) {
+            Status::Warning
+        } else {
+            Status::Healthy
+        }
+    }
+
+    fn sanitize_text(input: &str, redactions: &[String]) -> String {
+        let mut output = input.to_string();
+        for redaction in redactions {
+            if !redaction.is_empty() {
+                output = output.replace(redaction, REDACTED_MARKER);
+            }
+        }
+        output
+    }
+
+    fn severity_sort_rank(severity: Severity) -> u8 {
+        match severity {
+            Severity::Fatal => FATAL_SORT_RANK,
+            Severity::Warning => WARNING_SORT_RANK,
+            Severity::Healthy => HEALTHY_SORT_RANK,
+        }
+    }
+
+    fn status_label(status: Status) -> &'static str {
+        match status {
+            Status::Healthy => "healthy",
+            Status::Warning => "warning",
+            Status::Fatal => "fatal",
+        }
+    }
+
+    fn severity_label(severity: Severity) -> &'static str {
+        match severity {
+            Severity::Healthy => "healthy",
+            Severity::Warning => "warning",
+            Severity::Fatal => "fatal",
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "n8nclone", about = "TUI workflow automation — like n8n, in your terminal")]
@@ -270,28 +447,49 @@ fn setup_logging(verbose: bool) {
 // r[impl n8nclone.operator_diagnostics.doctor_command]
 fn run_doctor_command(config_path: &Path, args: &DoctorCommandArgs) -> ExitCode {
     let facts = collect_doctor_facts(config_path);
-    let report = doctor::evaluate_doctor_facts(&facts);
+    let report = doctor::evaluate(&facts);
     let rendered = match args.output {
-        DoctorOutputFormat::Text => doctor::render_doctor_text(&report),
-        DoctorOutputFormat::Json => doctor::render_doctor_json(&report),
+        DoctorOutputFormat::Text => doctor::render_text(&report),
+        DoctorOutputFormat::Json => doctor::render_json(&report),
     };
     if let Err(error) = write_stdout_and_flush(&rendered) {
         eprintln!("Doctor failed: {error}");
         return ExitCode::FAILURE;
     }
-    if doctor::doctor_has_fatal(&report) {
+    if doctor::has_fatal(&report) {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
     }
 }
 
+fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppConfig, String> {
+    if !config_path.exists() {
+        return Err(format!("config file not found: {}", config_path.display()));
+    }
+    let mut program = nickel_lang_core::program::Program::<nickel_lang_core::eval::cache::CacheImpl>::new_from_file(
+        config_path,
+        std::io::sink(),
+        nickel_lang_core::error::NullReporter {},
+    )
+    .map_err(|error| format!("failed to load {}: {error:?}", config_path.display()))?;
+    let runtime = program
+        .eval_full_for_export()
+        .map_err(|error| format!("eval error in {}: {error:?}", config_path.display()))?;
+    nickel_lang_core::serialize::validate(nickel_lang_core::serialize::ExportFormat::Json, &runtime)
+        .map_err(|error| format!("validation error in {}: {error:?}", config_path.display()))?;
+    let mut json = Vec::new();
+    serde_json::to_writer(&mut json, &runtime).map_err(|error| format!("json serialize error: {error}"))?;
+    let value = serde_json::from_slice(&json).map_err(|error| format!("json parse error: {error}"))?;
+    serde_json::from_value(value).map_err(|error| format!("config JSON decode failed: {error}"))
+}
+
 // r[impl n8nclone.operator_diagnostics.doctor_checks]
-fn collect_doctor_facts(config_path: &Path) -> doctor::DoctorFacts {
+fn collect_doctor_facts(config_path: &Path) -> doctor::Facts {
     let mut checks = Vec::new();
-    let app_config = match config::load_app_config_checked(config_path) {
+    let app_config = match load_app_config_checked_for_doctor(config_path) {
         Ok(app_config) => {
-            checks.push(doctor::DoctorFact::healthy(
+            checks.push(doctor::Fact::healthy(
                 doctor::CHECK_CONFIG,
                 format!("config loaded from {}", config_path.display()),
             ));
@@ -299,39 +497,34 @@ fn collect_doctor_facts(config_path: &Path) -> doctor::DoctorFacts {
         }
         Err(error) => {
             checks.push(
-                doctor::DoctorFact::fatal(doctor::CHECK_CONFIG, error)
+                doctor::Fact::fatal(doctor::CHECK_CONFIG, error)
                     .with_remediation("run `n8nclone --init --config <path>` or fix the Nickel config"),
             );
-            return doctor::DoctorFacts::new(checks);
+            return doctor::Facts::new(checks);
         }
     };
 
     let store_path = app_config.data_dir.join(STORE_FILE_NAME);
     if !store_path.exists() {
         checks.push(
-            doctor::DoctorFact::fatal(
-                doctor::CHECK_STORE,
-                format!("store database not found: {}", store_path.display()),
-            )
-            .with_remediation("import or run a workflow to initialize the configured store"),
+            doctor::Fact::fatal(doctor::CHECK_STORE, format!("store database not found: {}", store_path.display()))
+                .with_remediation("import or run a workflow to initialize the configured store"),
         );
-        return doctor::DoctorFacts::new(checks);
+        return doctor::Facts::new(checks);
     }
 
     let store = match Store::new(&store_path) {
         Ok(store) => {
-            checks.push(doctor::DoctorFact::healthy(
-                doctor::CHECK_STORE,
-                format!("store opened at {}", store_path.display()),
-            ));
+            checks
+                .push(doctor::Fact::healthy(doctor::CHECK_STORE, format!("store opened at {}", store_path.display())));
             store
         }
         Err(error) => {
             checks.push(
-                doctor::DoctorFact::fatal(doctor::CHECK_STORE, format!("store open failed: {error}"))
+                doctor::Fact::fatal(doctor::CHECK_STORE, format!("store open failed: {error}"))
                     .with_remediation("check store path permissions and redb file integrity"),
             );
-            return doctor::DoctorFacts::new(checks);
+            return doctor::Facts::new(checks);
         }
     };
 
@@ -339,16 +532,16 @@ fn collect_doctor_facts(config_path: &Path) -> doctor::DoctorFacts {
     let triggers = collect_trigger_doctor_facts(&store, &mut checks);
     collect_credential_doctor_facts(&triggers, &mut checks);
     collect_webhook_listener_doctor_facts(&triggers, &mut checks);
-    doctor::DoctorFacts::new(checks)
+    doctor::Facts::new(checks)
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.config_store]
-fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorFact>) {
+fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::Fact>) {
     let workflow_names = match store.list_workflows() {
         Ok(workflow_names) => workflow_names,
         Err(error) => {
             checks.push(
-                doctor::DoctorFact::fatal(doctor::CHECK_WORKFLOWS, format!("workflow listing failed: {error}"))
+                doctor::Fact::fatal(doctor::CHECK_WORKFLOWS, format!("workflow listing failed: {error}"))
                     .with_remediation("check store integrity"),
             );
             return;
@@ -365,7 +558,7 @@ fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorF
             }
             Ok(None) => {
                 checks.push(
-                    doctor::DoctorFact::fatal(
+                    doctor::Fact::fatal(
                         doctor::CHECK_WORKFLOWS,
                         format!("workflow disappeared while checking: {workflow_name}"),
                     )
@@ -374,7 +567,7 @@ fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorF
             }
             Err(error) => {
                 checks.push(
-                    doctor::DoctorFact::fatal(
+                    doctor::Fact::fatal(
                         doctor::CHECK_WORKFLOWS,
                         format!("workflow load failed for {workflow_name}: {error}"),
                     )
@@ -384,13 +577,13 @@ fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorF
         }
     }
     if fatal_diagnostic_count == 0 {
-        checks.push(doctor::DoctorFact::healthy(
+        checks.push(doctor::Fact::healthy(
             doctor::CHECK_WORKFLOWS,
             format!("{} workflows validated", workflow_names.len()),
         ));
     } else {
         checks.push(
-            doctor::DoctorFact::fatal(
+            doctor::Fact::fatal(
                 doctor::CHECK_WORKFLOWS,
                 format!("workflow validation found {fatal_diagnostic_count} fatal diagnostics"),
             )
@@ -399,12 +592,12 @@ fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorF
     }
 }
 
-fn collect_trigger_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorFact>) -> Vec<TriggerDefinition> {
+fn collect_trigger_doctor_facts(store: &Store, checks: &mut Vec<doctor::Fact>) -> Vec<TriggerDefinition> {
     match store.list_triggers() {
         Ok(triggers) => triggers,
         Err(error) => {
             checks.push(
-                doctor::DoctorFact::fatal(doctor::CHECK_WEBHOOK_LISTENER, format!("trigger listing failed: {error}"))
+                doctor::Fact::fatal(doctor::CHECK_WEBHOOK_LISTENER, format!("trigger listing failed: {error}"))
                     .with_remediation("check store trigger table integrity"),
             );
             Vec::new()
@@ -413,7 +606,7 @@ fn collect_trigger_doctor_facts(store: &Store, checks: &mut Vec<doctor::DoctorFa
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.credentials]
-fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::DoctorFact>) {
+fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::Fact>) {
     let secret_refs = webhooks::secret_refs(triggers);
     let missing_env_count = secret_refs
         .iter()
@@ -424,18 +617,16 @@ fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut 
         secret_refs.iter().filter(|secret_ref| secret_ref.provider != ENV_CREDENTIAL_PROVIDER_ID).count();
 
     if secret_refs.is_empty() {
-        checks.push(doctor::DoctorFact::healthy(
-            doctor::CHECK_CREDENTIALS,
-            "no credential-backed webhook triggers configured",
-        ));
+        checks
+            .push(doctor::Fact::healthy(doctor::CHECK_CREDENTIALS, "no credential-backed webhook triggers configured"));
     } else if missing_env_count == 0 && unsupported_provider_count == 0 {
-        checks.push(doctor::DoctorFact::healthy(
+        checks.push(doctor::Fact::healthy(
             doctor::CHECK_CREDENTIALS,
             format!("{} credential references are reachable", secret_refs.len()),
         ));
     } else {
         checks.push(
-            doctor::DoctorFact::fatal(
+            doctor::Fact::fatal(
                 doctor::CHECK_CREDENTIALS,
                 format!(
                     "credential readiness failed: {missing_env_count} missing env refs, {unsupported_provider_count} unsupported providers"
@@ -447,15 +638,15 @@ fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut 
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.webhook_listener]
-fn collect_webhook_listener_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::DoctorFact>) {
+fn collect_webhook_listener_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::Fact>) {
     let enabled_webhook_count = webhooks::enabled_trigger_count(triggers);
     if enabled_webhook_count == 0 {
-        checks.push(doctor::DoctorFact::healthy(
+        checks.push(doctor::Fact::healthy(
             doctor::CHECK_WEBHOOK_LISTENER,
             "no enabled webhook triggers require listener startup",
         ));
     } else {
-        checks.push(doctor::DoctorFact::healthy(
+        checks.push(doctor::Fact::healthy(
             doctor::CHECK_WEBHOOK_LISTENER,
             format!("{enabled_webhook_count} enabled webhook triggers are ready for listener dry-run"),
         ));
@@ -889,7 +1080,7 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
         }
     };
 
-    match store.save_workflow(&workflow) {
+    match save_workflow_with_import_triggers(&store, &workflow) {
         Ok(()) => {
             println!("Imported '{}'", workflow.meta.name);
             ExitCode::SUCCESS
@@ -899,6 +1090,14 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
             ExitCode::FAILURE
         }
     }
+}
+
+fn save_workflow_with_import_triggers(store: &Store, workflow: &n8nclone::engine::Workflow) -> Result<(), String> {
+    store.save_workflow(workflow).map_err(|error| error.to_string())?;
+    for trigger in &workflow.triggers {
+        store.save_trigger(trigger).map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 // r[impl n8nclone.workflow_format.n8n_json.import_cli]

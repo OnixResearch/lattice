@@ -2,7 +2,6 @@ pub mod agent_node;
 pub mod config;
 pub mod control_flow;
 pub mod credentials;
-pub mod doctor;
 pub mod engine;
 pub mod error;
 pub mod expressions;

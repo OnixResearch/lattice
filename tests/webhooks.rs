@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
+use std::process::Command;
 
 use n8nclone::credentials::MapCredentialProvider;
 use n8nclone::credentials::SecretRef;
@@ -48,6 +49,11 @@ const RUN_ID_VALUE: u64 = 42;
 const CURRENT_EPOCH_MS: i64 = 1_000;
 const HISTORY_LIMIT: usize = 1;
 const EXPECTED_TRIGGER_COUNT: u64 = 1;
+const DEFAULT_TIMEOUT_SECS: u64 = 60;
+const MAX_PARALLELISM: usize = 1;
+const CLI_CONFIG_FILE_NAME: &str = "config.ncl";
+const CLI_DATA_DIR_NAME: &str = "data";
+const STORE_FILE_NAME: &str = "n8nclone.redb";
 const COOKBOOK_WORKFLOW_PATH: &str = "examples/workflows/webhook-cookbook.ncl";
 const COOKBOOK_WORKFLOW_NAME: &str = "webhook-cookbook";
 const COOKBOOK_TRIGGER_ID: &str = "cookbook-lead";
@@ -78,6 +84,35 @@ fn cookbook_provider_with_secret() -> MapCredentialProvider {
     let mut secrets = HashMap::new();
     secrets.insert(cookbook_secret_ref().identity(), SECRET_VALUE.to_string());
     MapCredentialProvider::new(secrets)
+}
+
+fn write_cli_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
+    let data_dir = temp_dir.path().join(CLI_DATA_DIR_NAME);
+    std::fs::create_dir_all(&data_dir).expect("data directory created");
+    let config_path = temp_dir.path().join(CLI_CONFIG_FILE_NAME);
+    let data_dir_string = data_dir.display().to_string();
+    std::fs::write(
+        &config_path,
+        format!(
+            "{{\n  data_dir = {:?},\n  default_timeout_secs = {DEFAULT_TIMEOUT_SECS},\n  shell = \"sh\",\n  max_parallelism = {MAX_PARALLELISM},\n}}\n",
+            data_dir_string,
+        ),
+    )
+    .expect("config written");
+    (config_path, data_dir)
+}
+
+fn save_workflow_with_triggers(store: &Store, workflow: &n8nclone::engine::Workflow) {
+    store.save_workflow(workflow).expect("workflow saves");
+    for trigger in &workflow.triggers {
+        store.save_trigger(trigger).expect("trigger saves");
+    }
+}
+
+fn save_loaded_cookbook(store: &Store) -> n8nclone::engine::Workflow {
+    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
+    save_workflow_with_triggers(store, &workflow);
+    workflow
 }
 
 fn webhook_trigger(enabled: bool, auth_policy: WebhookAuthPolicy) -> TriggerDefinition {
@@ -340,12 +375,20 @@ fn dry_run_reports_safe_status_and_redacted_credential_diagnostics() {
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.dry_run]
 #[test]
 fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
-    let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
+    let temp_dir = tempfile::tempdir().expect("tempdir");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let status = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+        .arg("--config")
+        .arg(&config_path)
+        .arg("import")
+        .arg(COOKBOOK_WORKFLOW_PATH)
+        .status()
+        .expect("cookbook import command runs");
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store opens");
     let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
     let diagnostics = workflow_validation::validate_workflow(&workflow);
-
-    store.save_workflow(&workflow).expect("cookbook workflow saves");
     let triggers = store.list_triggers().expect("cookbook triggers list");
+
     let provider = cookbook_provider_with_secret();
     let report = webhooks::dry_run_report(
         webhooks::DEFAULT_BIND_ADDR,
@@ -354,6 +397,7 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
         &provider,
     );
 
+    assert!(status.success());
     assert_eq!(workflow.meta.name, COOKBOOK_WORKFLOW_NAME);
     assert!(diagnostics.is_empty());
     assert_eq!(triggers.len(), 1);
@@ -366,8 +410,7 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
 #[tokio::test]
 async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history() {
     let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
-    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
-    store.save_workflow(&workflow).expect("cookbook workflow saves");
+    save_loaded_cookbook(&store);
     let triggers = store.list_triggers().expect("cookbook triggers list");
     let provider = cookbook_provider_with_secret();
     let decision =
@@ -395,8 +438,7 @@ fn webhook_cookbook_rejected_requests_do_not_start_runs_or_expose_secrets() {
     let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
     let workflow_text = std::fs::read_to_string(COOKBOOK_WORKFLOW_PATH).expect("cookbook workflow text reads");
     let docs = std::fs::read_to_string("examples/README.md").expect("examples docs read");
-    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
-    store.save_workflow(&workflow).expect("cookbook workflow saves");
+    save_loaded_cookbook(&store);
     let triggers = store.list_triggers().expect("cookbook triggers list");
     let provider = cookbook_provider_with_secret();
     let missing =

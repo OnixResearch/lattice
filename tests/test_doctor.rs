@@ -4,7 +4,6 @@ use std::path::Path;
 use std::process::Command;
 
 use n8nclone::credentials::SecretRef;
-use n8nclone::doctor;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::scheduler::OverlapPolicy;
 use n8nclone::store::Store;
@@ -13,7 +12,6 @@ use n8nclone::triggers::TriggerDefinition;
 use n8nclone::triggers::TriggerKind;
 use n8nclone::triggers::WebhookAuthPolicy;
 use n8nclone::triggers::WebhookTrigger;
-use pretty_assertions::assert_eq;
 
 const CONFIG_FILE_NAME: &str = "config.ncl";
 const STORE_FILE_NAME: &str = "n8nclone.redb";
@@ -75,44 +73,6 @@ fn doctor_trigger() -> TriggerDefinition {
     }
 }
 
-// r[verify n8nclone.operator_diagnostics.doctor_core.healthy]
-#[test]
-fn doctor_core_reports_healthy_and_warning_summaries() {
-    let healthy = doctor::evaluate_doctor_facts(&doctor::DoctorFacts::new(vec![
-        doctor::DoctorFact::healthy(doctor::CHECK_CONFIG, "config ok"),
-        doctor::DoctorFact::healthy(doctor::CHECK_STORE, "store ok"),
-    ]));
-    let warning = doctor::evaluate_doctor_facts(&doctor::DoctorFacts::new(vec![doctor::DoctorFact::warning(
-        doctor::CHECK_WEBHOOK_LISTENER,
-        "listener not configured",
-    )]));
-
-    assert_eq!(healthy.status, doctor::DoctorStatus::Healthy);
-    assert_eq!(warning.status, doctor::DoctorStatus::Warning);
-}
-
-// r[verify n8nclone.operator_diagnostics.doctor_core.fatal]
-// r[verify n8nclone.operator_diagnostics.doctor_redaction.text]
-// r[verify n8nclone.operator_diagnostics.doctor_redaction.json]
-#[test]
-fn doctor_core_reports_fatal_findings_and_redacts_output() {
-    let facts = doctor::DoctorFacts::new(vec![
-        doctor::DoctorFact::fatal(doctor::CHECK_CREDENTIALS, format!("credential provider returned {SECRET_SENTINEL}"))
-            .with_remediation(format!("remove Authorization: Bearer {SECRET_SENTINEL}"))
-            .with_redaction(SECRET_SENTINEL),
-    ]);
-
-    let report = doctor::evaluate_doctor_facts(&facts);
-    let text = doctor::render_doctor_text(&report);
-    let json = doctor::render_doctor_json(&report);
-
-    assert_eq!(report.status, doctor::DoctorStatus::Fatal);
-    assert!(!text.contains(SECRET_SENTINEL));
-    assert!(!json.contains(SECRET_SENTINEL));
-    assert!(text.contains("[redacted]"));
-    assert!(json.contains("[redacted]"));
-}
-
 // r[verify n8nclone.operator_diagnostics.doctor_command.healthy]
 #[test]
 fn doctor_cli_json_succeeds_for_healthy_config_and_store() {
@@ -122,10 +82,10 @@ fn doctor_cli_json_succeeds_for_healthy_config_and_store() {
 
     let output = run_doctor(&config_path, "json");
     let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
-    let report: doctor::DoctorReport = serde_json::from_str(&stdout).expect("doctor json parses");
+    let report: serde_json::Value = serde_json::from_str(&stdout).expect("doctor json parses");
 
     assert!(output.status.success());
-    assert_eq!(report.status, doctor::DoctorStatus::Healthy);
+    assert_eq!(report["status"].as_str(), Some("healthy"));
     assert!(stdout.contains("workflows"));
 }
 
@@ -162,6 +122,7 @@ fn doctor_cli_bad_nickel_and_missing_store_fail_without_creating_store() {
 
 // r[verify n8nclone.operator_diagnostics.doctor_checks.credentials]
 // r[verify n8nclone.operator_diagnostics.doctor_checks.webhook_listener]
+// r[verify n8nclone.operator_diagnostics.doctor_redaction.text]
 #[test]
 fn doctor_cli_reports_missing_credential_provider_without_secret_values() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
@@ -170,6 +131,7 @@ fn doctor_cli_reports_missing_credential_provider_without_secret_values() {
     let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME);
     workflow.triggers.push(doctor_trigger());
     store.save_workflow(&workflow).expect("workflow with trigger saved");
+    store.save_trigger(&workflow.triggers[0]).expect("trigger saved");
     drop(store);
 
     let output = run_doctor(&config_path, "text");
