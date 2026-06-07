@@ -1,0 +1,36 @@
+{
+  "name": "n8n-parity-command-pipeline",
+  "nodes": [
+    {
+      "id": "cmd-source",
+      "name": "Source",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [10, 20],
+      "parameters": {
+        "command": "printf 'alpha\\n'"
+      }
+    },
+    {
+      "id": "cmd-upper",
+      "name": "Upper",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [110, 20],
+      "parameters": {
+        "command": "tr a-z A-Z"
+      }
+    }
+  ],
+  "connections": {
+    "Source": {
+      "main": [
+        [
+          {
+            "node": "Upper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

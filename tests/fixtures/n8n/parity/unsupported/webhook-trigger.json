@@ -1,0 +1,16 @@
+{
+  "name": "n8n-parity-webhook-trigger",
+  "nodes": [
+    {
+      "id": "webhook-1",
+      "name": "Incoming Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [0, 0],
+      "parameters": {
+        "path": "lead-created",
+        "httpMethod": "POST"
+      }
+    }
+  ],
+  "connections": {}
+}

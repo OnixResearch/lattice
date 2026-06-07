@@ -1,0 +1,29 @@
+{
+  "workflow_name": "n8n-parity-webhook-trigger",
+  "entries": [
+    {
+      "source_id": "webhook-1",
+      "source_name": "Incoming Webhook",
+      "target_node_id": null,
+      "status": "unsupported",
+      "diagnostics": [
+        {
+          "code": "unsupported_node_kind",
+          "source_id": "webhook-1",
+          "source_name": "Incoming Webhook",
+          "message": "unsupported n8n node kind 'n8n-nodes-base.webhook'"
+        }
+      ],
+      "unsupported_fields": [],
+      "credential_placeholders": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "unsupported_node_kind",
+      "source_id": "webhook-1",
+      "source_name": "Incoming Webhook",
+      "message": "unsupported n8n node kind 'n8n-nodes-base.webhook'"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "n8n-parity-malformed-connection",
+  "nodes": [
+    {
+      "id": "cmd-source",
+      "name": "Source",
+      "type": "n8n-nodes-base.executeCommand",
+      "parameters": {
+        "command": "printf hello"
+      }
+    }
+  ],
+  "connections": {
+    "Source": {
+      "main": [
+        [
+          {
+            "node": "Missing Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

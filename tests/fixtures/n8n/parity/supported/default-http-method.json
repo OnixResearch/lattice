@@ -1,0 +1,15 @@
+{
+  "name": "n8n-parity-default-http-method",
+  "nodes": [
+    {
+      "id": "http-default",
+      "name": "Fetch Default",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [50, 60],
+      "parameters": {
+        "url": "https://example.com/default"
+      }
+    }
+  ],
+  "connections": {}
+}

@@ -8,7 +8,9 @@ use n8nclone::file_node::FileOperationKind;
 use n8nclone::n8n_json::N8nDiagnosticCode;
 use n8nclone::n8n_json::export_workflow_to_n8n_json;
 use n8nclone::n8n_json::import_n8n_json_str;
+use n8nclone::n8n_json::report_to_pretty_json;
 use n8nclone::store::Store;
+use n8nclone::workflow_validation;
 use pretty_assertions::assert_eq;
 
 const SHELL_FIXTURE: &str = include_str!("fixtures/n8n/shell.json");
@@ -18,6 +20,22 @@ const PLAINTEXT_CREDENTIAL_FIXTURE: &str = include_str!("fixtures/n8n/plaintext-
 const MALFORMED_FIXTURE: &str = include_str!("fixtures/n8n/malformed.json");
 const MALFORMED_CONNECTION_FIXTURE: &str = include_str!("fixtures/n8n/malformed-connection.json");
 const UNSUPPORTED_EXPRESSION_FIXTURE: &str = include_str!("fixtures/n8n/unsupported-expression.json");
+const PARITY_README: &str = include_str!("fixtures/n8n/parity/README.md");
+const PARITY_COMMAND_PIPELINE_FIXTURE: &str = include_str!("fixtures/n8n/parity/supported/command-pipeline.json");
+const PARITY_COMMAND_PIPELINE_REPORT: &str = include_str!("fixtures/n8n/parity/supported/command-pipeline.report.json");
+const PARITY_HTTP_CREDENTIAL_CHAIN_FIXTURE: &str =
+    include_str!("fixtures/n8n/parity/supported/http-credential-chain.json");
+const PARITY_HTTP_CREDENTIAL_CHAIN_REPORT: &str =
+    include_str!("fixtures/n8n/parity/supported/http-credential-chain.report.json");
+const PARITY_DEFAULT_HTTP_METHOD_FIXTURE: &str = include_str!("fixtures/n8n/parity/supported/default-http-method.json");
+const PARITY_WEBHOOK_TRIGGER_FIXTURE: &str = include_str!("fixtures/n8n/parity/unsupported/webhook-trigger.json");
+const PARITY_WEBHOOK_TRIGGER_REPORT: &str = include_str!("fixtures/n8n/parity/unsupported/webhook-trigger.report.json");
+const PARITY_SCHEDULE_TRIGGER_FIXTURE: &str = include_str!("fixtures/n8n/parity/unsupported/schedule-trigger.json");
+const PARITY_EXPRESSION_URL_FIXTURE: &str = include_str!("fixtures/n8n/parity/unsupported/expression-url.json");
+const PARITY_PLAINTEXT_CREDENTIAL_FIXTURE: &str =
+    include_str!("fixtures/n8n/parity/unsupported/plaintext-node-credential.json");
+const PARITY_MALFORMED_CONNECTION_FIXTURE: &str =
+    include_str!("fixtures/n8n/parity/unsupported/malformed-connection.json");
 const CONFIG_FILE_NAME: &str = "config.ncl";
 const STORE_FILE_NAME: &str = "n8nclone.redb";
 const REPORT_FILE_NAME: &str = "n8n-report.json";
@@ -29,6 +47,11 @@ const EXPECTED_SINGLE_NODE_COUNT: usize = 1;
 const EXPECTED_ZERO_DIAGNOSTICS: usize = 0;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
+const EXPECTED_PIPELINE_NODE_COUNT: usize = 2;
+const EXPECTED_PIPELINE_EDGE_COUNT: usize = 1;
+const EXPECTED_EMPTY_EDGE_COUNT: usize = 0;
+const EXPECTED_PARITY_DOC_FIXTURE_COUNT: usize = 8;
+const PLAINTEXT_SECRET_SENTINEL: &str = "plaintext-secret";
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let data_dir = temp_dir.path().join(DATA_DIR_NAME);
@@ -46,8 +69,140 @@ fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::
     (config_path, data_dir)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SupportedParityFixture {
+    file_name: &'static str,
+    text: &'static str,
+    golden_report: Option<&'static str>,
+    expected_nodes: usize,
+    expected_edges: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct UnsupportedParityFixture {
+    file_name: &'static str,
+    text: &'static str,
+    golden_report: Option<&'static str>,
+    expected_code: N8nDiagnosticCode,
+}
+
+const SUPPORTED_PARITY_FIXTURES: &[SupportedParityFixture] = &[
+    SupportedParityFixture {
+        file_name: "command-pipeline.json",
+        text: PARITY_COMMAND_PIPELINE_FIXTURE,
+        golden_report: Some(PARITY_COMMAND_PIPELINE_REPORT),
+        expected_nodes: EXPECTED_PIPELINE_NODE_COUNT,
+        expected_edges: EXPECTED_PIPELINE_EDGE_COUNT,
+    },
+    SupportedParityFixture {
+        file_name: "http-credential-chain.json",
+        text: PARITY_HTTP_CREDENTIAL_CHAIN_FIXTURE,
+        golden_report: Some(PARITY_HTTP_CREDENTIAL_CHAIN_REPORT),
+        expected_nodes: EXPECTED_PIPELINE_NODE_COUNT,
+        expected_edges: EXPECTED_PIPELINE_EDGE_COUNT,
+    },
+    SupportedParityFixture {
+        file_name: "default-http-method.json",
+        text: PARITY_DEFAULT_HTTP_METHOD_FIXTURE,
+        golden_report: None,
+        expected_nodes: EXPECTED_SINGLE_NODE_COUNT,
+        expected_edges: EXPECTED_EMPTY_EDGE_COUNT,
+    },
+];
+
+const UNSUPPORTED_PARITY_FIXTURES: &[UnsupportedParityFixture] = &[
+    UnsupportedParityFixture {
+        file_name: "webhook-trigger.json",
+        text: PARITY_WEBHOOK_TRIGGER_FIXTURE,
+        golden_report: Some(PARITY_WEBHOOK_TRIGGER_REPORT),
+        expected_code: N8nDiagnosticCode::UnsupportedNodeKind,
+    },
+    UnsupportedParityFixture {
+        file_name: "schedule-trigger.json",
+        text: PARITY_SCHEDULE_TRIGGER_FIXTURE,
+        golden_report: None,
+        expected_code: N8nDiagnosticCode::UnsupportedNodeKind,
+    },
+    UnsupportedParityFixture {
+        file_name: "expression-url.json",
+        text: PARITY_EXPRESSION_URL_FIXTURE,
+        golden_report: None,
+        expected_code: N8nDiagnosticCode::UnsupportedExpression,
+    },
+    UnsupportedParityFixture {
+        file_name: "plaintext-node-credential.json",
+        text: PARITY_PLAINTEXT_CREDENTIAL_FIXTURE,
+        golden_report: None,
+        expected_code: N8nDiagnosticCode::PlaintextCredentialMaterial,
+    },
+    UnsupportedParityFixture {
+        file_name: "malformed-connection.json",
+        text: PARITY_MALFORMED_CONNECTION_FIXTURE,
+        golden_report: None,
+        expected_code: N8nDiagnosticCode::MalformedConnection,
+    },
+];
+
 fn diagnostic_codes(result: &n8nclone::n8n_json::N8nImportResult) -> Vec<N8nDiagnosticCode> {
     result.report.diagnostics.iter().map(|diagnostic| diagnostic.code).collect()
+}
+
+fn assert_report_matches_golden(actual: &n8nclone::n8n_json::N8nMappingReport, golden: &str) {
+    assert_eq!(report_to_pretty_json(actual), golden.trim_end());
+}
+
+// r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.supported]
+// r[verify n8nclone.workflow_format.n8n_parity_mapping_reports.supported]
+// r[verify n8nclone.credentials.n8n_parity_secret_safety.placeholders]
+#[test]
+fn parity_supported_fixtures_import_validate_and_match_golden_reports() {
+    for fixture in SUPPORTED_PARITY_FIXTURES {
+        let result = import_n8n_json_str(fixture.text);
+        let workflow = result.workflow.expect("supported parity fixture imports");
+        let validation = workflow_validation::validate_workflow(&workflow);
+        let report_json = report_to_pretty_json(&result.report);
+
+        assert_eq!(workflow.graph.node_count(), fixture.expected_nodes, "{} node count", fixture.file_name);
+        assert_eq!(workflow.graph.edge_count(), fixture.expected_edges, "{} edge count", fixture.file_name);
+        assert!(validation.is_empty(), "{} validation diagnostics: {validation:?}", fixture.file_name);
+        assert!(result.report.diagnostics.is_empty(), "{} import diagnostics", fixture.file_name);
+        assert!(!report_json.contains(PLAINTEXT_SECRET_SENTINEL));
+        if let Some(golden_report) = fixture.golden_report {
+            assert_report_matches_golden(&result.report, golden_report);
+        }
+    }
+}
+
+// r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.unsupported]
+// r[verify n8nclone.workflow_validation.n8n_parity_diagnostics]
+// r[verify n8nclone.workflow_format.n8n_parity_mapping_reports.unsupported]
+// r[verify n8nclone.credentials.n8n_parity_secret_safety.plaintext_rejected]
+#[test]
+fn parity_unsupported_fixtures_fail_with_stable_safe_diagnostics() {
+    for fixture in UNSUPPORTED_PARITY_FIXTURES {
+        let result = import_n8n_json_str(fixture.text);
+        let report_json = report_to_pretty_json(&result.report);
+
+        assert!(result.workflow.is_none(), "{} must not partially import", fixture.file_name);
+        assert!(diagnostic_codes(&result).contains(&fixture.expected_code), "{} diagnostic", fixture.file_name);
+        assert!(!report_json.contains(PLAINTEXT_SECRET_SENTINEL));
+        if let Some(golden_report) = fixture.golden_report {
+            assert_report_matches_golden(&result.report, golden_report);
+        }
+    }
+}
+
+// r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.docs]
+#[test]
+fn parity_fixture_documentation_lists_all_tested_fixture_files() {
+    let documented_count =
+        SUPPORTED_PARITY_FIXTURES.iter().filter(|fixture| PARITY_README.contains(fixture.file_name)).count()
+            + UNSUPPORTED_PARITY_FIXTURES
+                .iter()
+                .filter(|fixture| PARITY_README.contains(fixture.file_name))
+                .count();
+
+    assert_eq!(documented_count, EXPECTED_PARITY_DOC_FIXTURE_COUNT);
 }
 
 // r[verify n8nclone.workflow_format.n8n_json.import]

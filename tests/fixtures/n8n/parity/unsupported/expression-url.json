@@ -1,0 +1,16 @@
+{
+  "name": "n8n-parity-expression-url",
+  "nodes": [
+    {
+      "id": "http-expression",
+      "name": "Fetch Expression",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [20, 30],
+      "parameters": {
+        "method": "GET",
+        "url": "{{ $json.url }}"
+      }
+    }
+  ],
+  "connections": {}
+}
