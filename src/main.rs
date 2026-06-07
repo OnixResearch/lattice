@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -5,6 +7,10 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use n8nclone::config;
+use n8nclone::credentials::CredentialProviderCapabilities;
+use n8nclone::credentials::CredentialProviderMetadata;
+use n8nclone::credentials::CredentialProviderRegistry;
+use n8nclone::credentials::EnvironmentCredentialProvider;
 use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
 use n8nclone::n8n_json;
@@ -15,14 +21,20 @@ use n8nclone::store::Store;
 use n8nclone::triggers::TriggerDefinition;
 use n8nclone::triggers::TriggerRunRecord;
 use n8nclone::tui::App;
+use n8nclone::webhooks;
 use n8nclone::workflow_format;
 use n8nclone::workflow_validation;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 use tracing::info;
 
 const DEFAULT_CONFIG_PATH: &str = "~/.n8nclone/config.ncl";
 const LOG_FILE_PATH: &str = "/tmp/n8nclone.log";
 const STORE_FILE_NAME: &str = "n8nclone.redb";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
+const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
+const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
 
 #[derive(Parser, Debug)]
 #[command(name = "n8nclone", about = "TUI workflow automation — like n8n, in your terminal")]
@@ -59,6 +71,8 @@ enum CliCommand {
     SchedulerDaemon(SchedulerDaemonArgs),
     /// Inspect persisted triggers and trigger run history
     Triggers(TriggersCommandArgs),
+    /// Listen for persisted webhook trigger HTTP requests
+    WebhookListen(WebhookListenArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -122,6 +136,21 @@ struct TriggersCommandArgs {
     command: TriggerCliCommand,
 }
 
+#[derive(clap::Args, Debug)]
+struct WebhookListenArgs {
+    /// Bind address for the webhook HTTP listener
+    #[arg(long, default_value = webhooks::DEFAULT_BIND_ADDR)]
+    bind: String,
+
+    /// Validate listener inputs and exit without binding a socket
+    #[arg(long)]
+    dry_run: bool,
+
+    /// Maximum accepted request body size in bytes
+    #[arg(long, default_value_t = webhooks::DEFAULT_MAX_BODY_BYTES)]
+    max_body_bytes: usize,
+}
+
 #[derive(Subcommand, Debug)]
 enum TriggerCliCommand {
     /// List persisted trigger definitions
@@ -181,6 +210,9 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
             run_scheduler_daemon_once(&app_config, &scheduler_args).await
         }
         Some(CliCommand::Triggers(trigger_args)) => Ok(run_triggers_command(&app_config, &trigger_args)),
+        Some(CliCommand::WebhookListen(webhook_args)) => {
+            Ok(run_webhook_listener_command(&app_config, &webhook_args).await)
+        }
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -413,6 +445,173 @@ fn render_trigger_history(records: &[TriggerRunRecord]) -> String {
     output
 }
 
+// r[impl n8nclone.scheduling.webhook_listener.process]
+// r[impl n8nclone.tui_ux.webhook_listener.cli]
+async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &WebhookListenArgs) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let triggers = match store.list_triggers() {
+        Ok(triggers) => triggers,
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let provider = match webhook_credential_provider(&triggers) {
+        Ok(provider) => provider,
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if args.dry_run {
+        return run_webhook_listener_dry_run(&store, &triggers, &provider, args);
+    }
+
+    let listener = match TcpListener::bind(&args.bind).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let bind_addr = match listener.local_addr() {
+        Ok(addr) => addr.to_string(),
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let status = webhooks::render_status(&webhooks::Status::listening(
+        &bind_addr,
+        count_to_u64(triggers.len()),
+        webhooks::enabled_trigger_count(&triggers),
+    ));
+    if let Err(error) = write_stdout_and_flush(&status) {
+        eprintln!("Webhook listener failed: {error}");
+        return ExitCode::FAILURE;
+    }
+
+    let limits = webhooks::RequestLimits {
+        max_body_bytes: args.max_body_bytes,
+    };
+    loop {
+        let (mut stream, _peer_addr) = match listener.accept().await {
+            Ok(connection) => connection,
+            Err(error) => {
+                eprintln!("Webhook listener failed: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let response = handle_webhook_connection(&mut stream, &store, &triggers, &provider, limits).await;
+        if let Err(error) = stream.write_all(&webhooks::render(&response)).await {
+            tracing::warn!(error = %error, "failed to write webhook listener response");
+        }
+    }
+}
+
+fn run_webhook_listener_dry_run(
+    store: &Store,
+    triggers: &[TriggerDefinition],
+    provider: &CredentialProviderRegistry,
+    args: &WebhookListenArgs,
+) -> ExitCode {
+    let workflow_names = match store.list_workflows() {
+        Ok(workflows) => workflows.into_iter().collect::<HashSet<_>>(),
+        Err(error) => {
+            eprintln!("Webhook listener failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let report = webhooks::dry_run_report(&args.bind, triggers, &workflow_names, provider);
+    if let Err(error) = write_stdout_and_flush(&webhooks::render_dry_run_report(&report)) {
+        eprintln!("Webhook listener failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    if report.diagnostics.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+async fn handle_webhook_connection(
+    stream: &mut TcpStream,
+    store: &Store,
+    triggers: &[TriggerDefinition],
+    provider: &CredentialProviderRegistry,
+    limits: webhooks::RequestLimits,
+) -> webhooks::Reply {
+    let request = match webhooks::read_raw(stream, limits).await {
+        Ok(request) => request,
+        Err(webhooks::ReadError::Diagnostic(diagnostic)) => {
+            return webhooks::for_planning(&diagnostic);
+        }
+        Err(webhooks::ReadError::Io(error)) => {
+            tracing::warn!(error = %error, "failed to read webhook listener request");
+            return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
+        }
+    };
+    let records = match store.list_trigger_runs(webhooks::DEFAULT_HISTORY_LOOKBACK_RECORDS) {
+        Ok(records) => records,
+        Err(error) => {
+            tracing::warn!(error = %error, "failed to load webhook trigger history");
+            Vec::new()
+        }
+    };
+    let context = webhooks::admission_context(&records, chrono::Utc::now().timestamp_millis());
+
+    match webhooks::decide_request(&request, triggers, provider, &context, limits) {
+        webhooks::Decision::Admitted(plan) => match headless::run_admitted_trigger_plan(store, &plan).await {
+            Ok(summary) => webhooks::accepted(&plan.trigger_id, summary.run_id),
+            Err(error) => {
+                tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook trigger execution failed");
+                webhooks::execution_failed(&plan.trigger_id)
+            }
+        },
+        webhooks::Decision::Rejected(rejection) => {
+            if let Some(record) = webhooks::run_record_for_rejection(&rejection)
+                && let Err(error) = store.save_trigger_run(&record)
+            {
+                tracing::warn!(error = %error, "failed to save rejected webhook trigger run");
+            }
+            webhooks::rejected(&rejection)
+        }
+    }
+}
+
+fn webhook_credential_provider(triggers: &[TriggerDefinition]) -> Result<CredentialProviderRegistry, String> {
+    let secret_refs = webhooks::secret_refs(triggers);
+    let env_keys = secret_refs
+        .iter()
+        .filter(|secret_ref| secret_ref.provider == ENV_CREDENTIAL_PROVIDER_ID)
+        .map(|secret_ref| secret_ref.key.clone())
+        .collect::<Vec<_>>();
+    let mut registry = CredentialProviderRegistry::new();
+    registry
+        .insert_provider(
+            CredentialProviderMetadata {
+                id: ENV_CREDENTIAL_PROVIDER_ID.to_string(),
+                display_name: ENV_CREDENTIAL_PROVIDER_NAME.to_string(),
+                capabilities: CredentialProviderCapabilities::read_only_without_fields(),
+            },
+            Box::new(EnvironmentCredentialProvider::from_current_env(&env_keys)),
+        )
+        .map_err(|error| error.to_string())?;
+    Ok(registry)
+}
+
+fn write_stdout_and_flush(output: &str) -> Result<(), std::io::Error> {
+    print!("{output}");
+    std::io::stdout().flush()
+}
+
 // r[impl n8nclone.workflow_format.nickel.export]
 fn export_workflow_command(app_config: &config::AppConfig, args: &ExportWorkflowArgs) -> ExitCode {
     let store = match open_store(app_config) {
@@ -583,6 +782,10 @@ fn process_result_to_exit_code(result: HeadlessProcessResult) -> ExitCode {
         HeadlessProcessResult::Success => ExitCode::SUCCESS,
         HeadlessProcessResult::Failure => ExitCode::FAILURE,
     }
+}
+
+fn count_to_u64(count: usize) -> u64 {
+    u64::try_from(count).map_or(u64::MAX, |value| value)
 }
 
 fn shellexpand(path: &str) -> PathBuf {
