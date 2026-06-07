@@ -43,6 +43,9 @@ use crate::engine::executor::StepResult;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::replay;
+use crate::replay::ReplayCursor;
+use crate::replay::ReplayTimeline;
 use crate::store::RunDetailRecord;
 use crate::store::RunNodeDetail;
 use crate::store::RunNodeDetailStatus;
@@ -618,6 +621,8 @@ pub struct RunHistoryState {
     pub detail: Option<String>,
     pub detail_record: Option<RunDetailRecord>,
     pub selected_detail_node: usize,
+    pub replay_timeline: Option<ReplayTimeline>,
+    pub replay_cursor: ReplayCursor,
     pub message: Option<String>,
 }
 
@@ -630,6 +635,8 @@ impl RunHistoryState {
             detail: None,
             detail_record: None,
             selected_detail_node: 0,
+            replay_timeline: None,
+            replay_cursor: replay::replay_cursor(0),
             message: None,
         }
     }
@@ -642,6 +649,8 @@ impl RunHistoryState {
             detail: None,
             detail_record: None,
             selected_detail_node: 0,
+            replay_timeline: None,
+            replay_cursor: replay::replay_cursor(0),
             message,
         }
     }
@@ -1159,6 +1168,10 @@ impl App {
             return;
         }
         let last_index = self.run_history.records.len() - 1;
+        if self.run_history.replay_timeline.is_some() {
+            self.run_history.replay_cursor = replay::move_replay_cursor(self.run_history.replay_cursor, 1);
+            return;
+        }
         if let Some(detail_record) = &self.run_history.detail_record {
             let last_node_index = detail_record.nodes.len().saturating_sub(1);
             self.run_history.selected_detail_node = (self.run_history.selected_detail_node + 1).min(last_node_index);
@@ -1169,6 +1182,10 @@ impl App {
     }
 
     pub fn select_previous_run_history(&mut self) {
+        if self.run_history.replay_timeline.is_some() {
+            self.run_history.replay_cursor = replay::move_replay_cursor(self.run_history.replay_cursor, -1);
+            return;
+        }
         if self.run_history.detail_record.is_some() {
             self.run_history.selected_detail_node = self.run_history.selected_detail_node.saturating_sub(1);
             return;
@@ -1205,6 +1222,31 @@ impl App {
                 self.run_history.detail_record = None;
                 self.run_history.detail = Some(message.clone());
                 self.run_history.message = Some(message);
+            }
+        }
+        self.load_selected_run_replay(record.run_id);
+    }
+
+    // r[impl n8nclone.tui_ux.replay_debugger.timeline]
+    fn load_selected_run_replay(&mut self, run_id: RunId) {
+        let Some(store) = &self.store else {
+            return;
+        };
+        match store.load_run_replay_events(run_id) {
+            Ok(Some(events)) => {
+                let timeline = replay::build_replay_timeline(run_id, &events, None);
+                self.run_history.replay_cursor = replay::replay_cursor(timeline.frames.len());
+                self.run_history.replay_timeline = Some(timeline);
+            }
+            Ok(None) => {
+                self.run_history.replay_timeline = None;
+                self.run_history.replay_cursor = replay::replay_cursor(0);
+            }
+            Err(error) => {
+                let message = format!("Replay load failed: {error}");
+                self.output.push_line(&message);
+                self.run_history.replay_timeline = None;
+                self.run_history.replay_cursor = replay::replay_cursor(0);
             }
         }
     }
@@ -1764,12 +1806,17 @@ impl App {
         }
         self.run_state.active = false;
         let workflow_name = active_run.workflow.meta.name.clone();
+        let replay_timestamp_epoch_ms = chrono::Utc::now().timestamp_millis();
         self.save_run_record(active_run.run_id, &workflow_name, 0, 0, self.run_state.node_statuses.len());
         self.save_run_detail_record(canceled_run_detail_record(
             active_run.run_id,
             &active_run.workflow,
             &self.run_state.node_statuses,
         ));
+        self.save_run_replay_events(
+            active_run.run_id,
+            replay::cancelled_replay_events(active_run.run_id, &active_run.workflow, replay_timestamp_epoch_ms),
+        );
         self.output.push_line("Workflow run canceled");
         true
     }
@@ -1834,8 +1881,19 @@ impl App {
             .iter()
             .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
             .count();
+        let replay_finished_epoch_ms = chrono::Utc::now().timestamp_millis();
         self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
         self.save_run_detail_record(run_detail_record_from_results(run_id, run_workflow, &results));
+        self.save_run_replay_events(
+            run_id,
+            replay::replay_events_from_results(
+                run_id,
+                run_workflow,
+                &results,
+                replay_finished_epoch_ms,
+                Some(replay_finished_epoch_ms),
+            ),
+        );
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
@@ -1871,6 +1929,17 @@ impl App {
         };
         if let Err(error) = store.save_run_details(&record) {
             self.output.push_line(&format!("Run details save failed: {error}"));
+        }
+    }
+
+    // r[impl n8nclone.workflow_execution.replay.event_store]
+    // r[impl n8nclone.tui_ux.replay_debugger.active_run]
+    fn save_run_replay_events(&mut self, run_id: RunId, events: Vec<replay::ReplayEventRecord>) {
+        let Some(store) = &self.store else {
+            return;
+        };
+        if let Err(error) = store.save_run_replay_events(run_id, &events) {
+            self.output.push_line(&format!("Replay save failed: {error}"));
         }
     }
 

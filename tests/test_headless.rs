@@ -18,6 +18,7 @@ use n8nclone::config::load_node_templates_with_diagnostics;
 use n8nclone::config::render_template_command;
 use n8nclone::engine::executor::RunId;
 use n8nclone::engine::executor::node_execution_cache_key;
+use n8nclone::engine::runner::RunnerEventKind;
 use n8nclone::engine::value::TypeTag;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::value::ValueData;
@@ -60,6 +61,7 @@ const AGENT_RUN_ID: u64 = 19;
 const AGENT_IMAGE_RUN_ID: u64 = 23;
 const RECENT_RUN_LIMIT: usize = 8;
 const SINGLE_NODE_COUNT: usize = 1;
+const HEADLESS_REPLAY_EVENT_COUNT: usize = 4;
 const NO_FAILURES: usize = 0;
 const ONE_FAILURE: usize = 1;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
@@ -299,6 +301,7 @@ fn string_output(outputs: &HashMap<PortId, Value>, port: PortId) -> &str {
 // r[verify n8nclone.workflow_execution.headless.summary]
 // r[verify n8nclone.workflow_execution.headless.exit_status]
 // r[verify n8nclone.workflow_execution.headless.history]
+// r[verify n8nclone.workflow_execution.replay.event_store]
 #[tokio::test]
 async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     let (store, _temp_dir) = temp_store();
@@ -322,6 +325,14 @@ async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     assert_eq!(records.len(), SINGLE_NODE_COUNT);
     assert_eq!(records[0].run_id, RunId(SUCCESS_RUN_ID));
     assert_eq!(records[0].failures, NO_FAILURES);
+
+    let replay_events = store
+        .load_run_replay_events(RunId(SUCCESS_RUN_ID))
+        .expect("replay events load")
+        .expect("replay events saved");
+    assert_eq!(replay_events.len(), HEADLESS_REPLAY_EVENT_COUNT);
+    assert_eq!(replay_events[0].kind, RunnerEventKind::RunStarted);
+    assert_eq!(replay_events[HEADLESS_REPLAY_EVENT_COUNT - 1].kind, RunnerEventKind::RunCompleted);
 }
 
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.headless]

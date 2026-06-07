@@ -25,6 +25,9 @@ use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 
 use crate::node_kind_provider;
+use crate::replay::ReplayCursor;
+use crate::replay::ReplayFrame;
+use crate::replay::ReplayTimeline;
 use crate::store::RunDetailRecord;
 use crate::store::RunNodeDetail;
 use crate::store::RunNodeDetailStatus;
@@ -563,7 +566,14 @@ fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
     block.render(history_area, buf);
 
     if let Some(detail_record) = &app.run_history.detail_record {
-        render_run_detail_record(detail_record, app.run_history.selected_detail_node, inner, buf);
+        render_run_detail_record(
+            detail_record,
+            app.run_history.selected_detail_node,
+            app.run_history.replay_timeline.as_ref(),
+            app.run_history.replay_cursor,
+            inner,
+            buf,
+        );
         return;
     }
 
@@ -608,7 +618,14 @@ fn render_run_history(app: &App, area: Rect, buf: &mut Buffer) {
 
 // r[impl n8nclone.tui_ux.run_history.timeline]
 // r[impl n8nclone.tui_ux.run_history.node_outputs]
-fn render_run_detail_record(record: &RunDetailRecord, selected_node: usize, area: Rect, buf: &mut Buffer) {
+fn render_run_detail_record(
+    record: &RunDetailRecord,
+    selected_node: usize,
+    replay_timeline: Option<&ReplayTimeline>,
+    replay_cursor: ReplayCursor,
+    area: Rect,
+    buf: &mut Buffer,
+) {
     if record.nodes.is_empty() {
         Paragraph::new("No node details available")
             .alignment(Alignment::Center)
@@ -632,8 +649,48 @@ fn render_run_detail_record(record: &RunDetailRecord, selected_node: usize, area
         Style::default().fg(Color::DarkGray),
     ));
     append_selected_run_detail_output_lines(&mut lines, selected_detail);
+    append_replay_timeline_lines(&mut lines, replay_timeline, replay_cursor);
 
     Paragraph::new(lines).render(area, buf);
+}
+
+// r[impl n8nclone.tui_ux.replay_debugger.timeline]
+// r[impl n8nclone.tui_ux.replay_debugger.redaction]
+fn append_replay_timeline_lines(
+    lines: &mut Vec<Line<'static>>,
+    replay_timeline: Option<&ReplayTimeline>,
+    replay_cursor: ReplayCursor,
+) {
+    let Some(timeline) = replay_timeline else {
+        return;
+    };
+    lines.push(Line::from(""));
+    lines.push(Line::styled("Replay Timeline", Style::default().fg(Color::DarkGray)));
+    if timeline.frames.is_empty() {
+        lines.push(Line::styled("No replay events available", Style::default().fg(Color::DarkGray)));
+        return;
+    }
+    for frame in &timeline.frames {
+        lines.push(replay_frame_line(frame.cursor == replay_cursor.position, frame));
+    }
+    if let Some(frame) = timeline.frames.get(replay_cursor.position) {
+        lines.push(Line::styled(
+            format!("selected: #{} {}", frame.event.sequence, frame.event.summary),
+            Style::default().fg(Color::Gray),
+        ));
+    }
+}
+
+fn replay_frame_line(selected: bool, frame: &ReplayFrame) -> Line<'static> {
+    let node = frame.event.node_id.map(|node_id| format!(" node {node_id}")).unwrap_or_default();
+    let redaction = if frame.event.redacted { " redacted" } else { "" };
+    let prefix = if selected { "› " } else { "  " };
+    let style = if selected {
+        Style::default().fg(Color::Black).bg(Color::Blue)
+    } else {
+        Style::default().fg(Color::Gray)
+    };
+    Line::styled(format!("{prefix}#{} {:?}{node}{redaction}", frame.event.sequence, frame.event.kind), style)
 }
 
 fn run_detail_timeline_line(selected: bool, detail: &RunNodeDetail) -> Line<'static> {

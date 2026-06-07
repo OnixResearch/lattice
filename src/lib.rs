@@ -10,6 +10,7 @@ pub mod http;
 pub mod image_node;
 pub mod n8n_json;
 pub mod node_kind_provider;
+pub mod replay;
 pub mod scheduler;
 pub mod store;
 pub mod tui;

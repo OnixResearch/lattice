@@ -23,6 +23,7 @@ use crate::engine::ContentHash;
 use crate::engine::RunId;
 use crate::engine::Value;
 use crate::engine::Workflow;
+use crate::replay::ReplayEventRecord;
 use crate::scheduler::ScheduleDefinition;
 
 const WORKFLOWS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflows");
@@ -30,6 +31,7 @@ const VALUES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("values");
 const CACHE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cache");
 const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
 const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_details");
+const RUN_REPLAY_EVENTS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_replay_events");
 const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
 const INITIAL_RUN_ID_VALUE: u64 = 0;
 const NEXT_RUN_ID_INCREMENT: u64 = 1;
@@ -91,6 +93,8 @@ pub trait RunHistoryStore {
     fn save_run(&self, record: &RunRecord) -> Result<(), StoreError>;
     fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError>;
     fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError>;
+    fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError>;
+    fn load_run_replay_events(&self, run_id: RunId) -> Result<Option<Vec<ReplayEventRecord>>, StoreError>;
     fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError>;
     fn next_run_id(&self) -> Result<RunId, StoreError>;
 }
@@ -133,6 +137,7 @@ impl Store {
             let _ = txn.open_table(CACHE).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
@@ -356,6 +361,32 @@ impl Store {
         }
     }
 
+    // r[impl n8nclone.workflow_execution.replay.event_store]
+    pub fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError> {
+        let data = serde_json::to_vec(events).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        {
+            let mut table = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
+            table.insert(run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
+        Ok(())
+    }
+
+    // r[impl n8nclone.workflow_execution.replay.event_store]
+    pub fn load_run_replay_events(&self, run_id: RunId) -> Result<Option<Vec<ReplayEventRecord>>, StoreError> {
+        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
+        match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
+            Some(data) => {
+                let bytes: &[u8] = data.value();
+                let events = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
+                Ok(Some(events))
+            }
+            None => Ok(None),
+        }
+    }
+
     /// List recent runs (newest first).
     pub fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError> {
         let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
@@ -441,6 +472,14 @@ impl RunHistoryStore for Store {
 
     fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError> {
         Store::load_run_details(self, run_id)
+    }
+
+    fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError> {
+        Store::save_run_replay_events(self, run_id, events)
+    }
+
+    fn load_run_replay_events(&self, run_id: RunId) -> Result<Option<Vec<ReplayEventRecord>>, StoreError> {
+        Store::load_run_replay_events(self, run_id)
     }
 
     fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError> {

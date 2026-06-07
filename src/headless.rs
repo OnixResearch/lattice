@@ -15,6 +15,7 @@ use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
 use crate::engine::workflow::Workflow;
+use crate::replay;
 use crate::store::ExecutionCache;
 use crate::store::RunHistoryStore;
 use crate::store::RunRecord;
@@ -205,6 +206,9 @@ where
     let finished_epoch_ms = chrono::Utc::now().timestamp_millis();
     let record = run_record_from_summary(&summary, started_epoch_ms, Some(finished_epoch_ms));
     store.save_run(&record)?;
+    let replay_events =
+        replay::replay_events_from_results(run_id, &workflow, &results, started_epoch_ms, Some(finished_epoch_ms));
+    store.save_run_replay_events(run_id, &replay_events)?;
 
     Ok(summary)
 }
