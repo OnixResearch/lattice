@@ -360,6 +360,7 @@ fn node_config_to_portable(
                 .collect::<Vec<_>>();
             env.sort_by(|left, right| left.key.cmp(&right.key));
 
+            // r[impl n8nclone.workflow_format.credentials.providers]
             let mut secret_env = credentials
                 .map(|credentials| {
                     credentials
@@ -864,6 +865,7 @@ fn non_empty_or_default(value: &str, default_value: String) -> String {
     }
 }
 
+// r[impl n8nclone.workflow_format.credentials.providers]
 fn portable_config_to_node_credentials(config: &PortableNodeConfig) -> Result<NodeCredentialRefs, WorkflowFormatError> {
     let mut env = HashMap::new();
     for secret_env in &config.secret_env {

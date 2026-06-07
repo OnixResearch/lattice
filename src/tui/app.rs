@@ -220,6 +220,7 @@ fn context_refs_from_draft(input: &str) -> Vec<String> {
     input.split(',').map(str::trim).filter(|value| !value.is_empty()).map(str::to_string).collect()
 }
 
+// r[impl n8nclone.tui_ux.credentials.providers]
 fn credentials_from_draft(input: &str) -> Result<NodeCredentialRefs, PropertyEditError> {
     let mut refs = NodeCredentialRefs::default();
     for entry in input.split(CREDENTIAL_ENTRY_SEPARATOR).map(str::trim).filter(|entry| !entry.is_empty()) {

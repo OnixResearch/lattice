@@ -2,10 +2,25 @@
 
 use std::collections::HashMap;
 
+use n8nclone::agent_node::FakeProcessRunner;
+use n8nclone::agent_node::ProcessError;
+use n8nclone::agent_node::ProcessOutput;
+use n8nclone::credentials::CommandCredentialProvider;
+use n8nclone::credentials::CommandCredentialProviderConfig;
+use n8nclone::credentials::CredentialError;
+use n8nclone::credentials::CredentialProvider;
+use n8nclone::credentials::CredentialProviderCapabilities;
+use n8nclone::credentials::CredentialProviderMetadata;
+use n8nclone::credentials::CredentialProviderRegistry;
+use n8nclone::credentials::EnvironmentCredentialProvider;
+use n8nclone::credentials::LocalCredentialVault;
+use n8nclone::credentials::LocalVaultCredentialProvider;
 use n8nclone::credentials::MapCredentialProvider;
 use n8nclone::credentials::NodeCredentialRefs;
 use n8nclone::credentials::SecretRef;
 use n8nclone::credentials::redact_text;
+use n8nclone::credentials::seal_local_vault_entry;
+use n8nclone::credentials::test_provider_reference;
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
 use n8nclone::engine::executor::node_execution_cache_key_with_credentials;
@@ -15,6 +30,7 @@ use n8nclone::workflow_format::load_workflow_nickel_file;
 use n8nclone::workflow_format::workflow_to_nickel;
 use n8nclone::workflow_validation::WorkflowDiagnosticCode;
 use n8nclone::workflow_validation::validate_workflow;
+use n8nclone::workflow_validation::validate_workflow_with_credential_registry;
 use pretty_assertions::assert_eq;
 
 const PROVIDER_NAME: &str = "env";
@@ -28,6 +44,10 @@ const WORKFLOW_NAME: &str = "credential-workflow";
 const NODE_LABEL: &str = "credential-node";
 const PRINT_TOKEN_COMMAND: &str = "printf \"$TOKEN\"";
 const SINGLE_RESULT_INDEX: usize = 0;
+const VAULT_KEY_MATERIAL: &str = "test-vault-key";
+const VAULT_NONCE: &[u8] = b"credential-nonce";
+const COMMAND_PROVIDER_PROGRAM: &str = "credential-command";
+const COMMAND_OUTPUT_LIMIT_BYTES: usize = 4;
 
 fn secret_ref() -> SecretRef {
     SecretRef::new(PROVIDER_NAME, SECRET_KEY, None)
@@ -140,6 +160,200 @@ fn cache_identity_uses_secret_reference_not_secret_value() {
 
     assert_eq!(key_from_ref, repeated_key);
     assert_ne!(key_from_ref, key_from_other_ref);
+}
+
+fn provider_metadata(provider_id: &str) -> CredentialProviderMetadata {
+    CredentialProviderMetadata {
+        id: provider_id.to_string(),
+        display_name: provider_id.to_string(),
+        capabilities: CredentialProviderCapabilities::read_only_without_fields(),
+    }
+}
+
+fn command_output(status_code: Option<i32>, stdout: &str) -> ProcessOutput {
+    ProcessOutput {
+        status_code,
+        stdout: stdout.as_bytes().to_vec(),
+        stderr: Vec::new(),
+    }
+}
+
+// r[verify n8nclone.credentials.provider_registry]
+// r[verify n8nclone.workflow_validation.credentials.providers]
+#[test]
+fn registry_resolves_registered_provider_and_validation_rejects_unknown_provider() {
+    let mut registry = CredentialProviderRegistry::new();
+    registry
+        .insert_provider(
+            provider_metadata(PROVIDER_NAME),
+            Box::new(EnvironmentCredentialProvider::from_map(
+                [(SECRET_KEY.to_string(), SECRET_VALUE.to_string())].into(),
+            )),
+        )
+        .expect("provider registered");
+    let (workflow, _node_id) = workflow_with_secret_ref();
+    let value = registry.resolve(&secret_ref()).expect("registered provider resolves");
+    let unknown_ref = SecretRef::new("missing", SECRET_KEY, None);
+    let mut unknown_workflow = Workflow::new(WORKFLOW_NAME);
+    let node_id = unknown_workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
+    unknown_workflow.set_node_credentials(node_id, credential_refs(unknown_ref));
+
+    let diagnostics = validate_workflow_with_credential_registry(&unknown_workflow, &registry);
+
+    assert_eq!(value.expose_for_execution(), SECRET_VALUE);
+    assert!(validate_workflow_with_credential_registry(&workflow, &registry).is_empty());
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::UnknownCredentialProvider)
+    );
+}
+
+// r[verify n8nclone.workflow_validation.credentials.providers]
+#[test]
+fn registry_validation_rejects_unsupported_field_access() {
+    let mut registry = CredentialProviderRegistry::new();
+    registry
+        .insert_provider(provider_metadata(PROVIDER_NAME), Box::new(MapCredentialProvider::default()))
+        .expect("provider registered");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
+    workflow.set_node_credentials(
+        node_id,
+        credential_refs(SecretRef::new(PROVIDER_NAME, SECRET_KEY, Some("field".into()))),
+    );
+
+    let diagnostics = validate_workflow_with_credential_registry(&workflow, &registry);
+
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::UnsupportedCredentialField)
+    );
+}
+
+// r[verify n8nclone.credentials.providers.env]
+#[test]
+fn environment_provider_resolves_present_secret_and_rejects_missing_or_empty_secret() {
+    let provider = EnvironmentCredentialProvider::from_map(
+        [
+            (SECRET_KEY.to_string(), SECRET_VALUE.to_string()),
+            (OTHER_SECRET_KEY.to_string(), String::new()),
+        ]
+        .into(),
+    );
+
+    let value = provider.resolve(&secret_ref()).expect("env secret resolves");
+    let missing = provider.resolve(&SecretRef::new(PROVIDER_NAME, "missing", None));
+    let empty = provider.resolve(&SecretRef::new(PROVIDER_NAME, OTHER_SECRET_KEY, None));
+
+    assert_eq!(value.expose_for_execution(), SECRET_VALUE);
+    assert!(matches!(missing, Err(CredentialError::MissingSecret { .. })));
+    assert!(matches!(empty, Err(CredentialError::MissingSecret { .. })));
+}
+
+// r[verify n8nclone.credentials.providers.local_vault]
+#[test]
+fn local_vault_provider_resolves_and_rejects_tampered_or_wrong_key_entries() {
+    let entry = seal_local_vault_entry(SECRET_KEY, SECRET_VALUE, VAULT_KEY_MATERIAL, VAULT_NONCE);
+    let provider = LocalVaultCredentialProvider::new(
+        LocalCredentialVault::new([(SECRET_KEY.to_string(), entry.clone())].into()),
+        VAULT_KEY_MATERIAL,
+    );
+    let wrong_key_provider = LocalVaultCredentialProvider::new(
+        LocalCredentialVault::new([(SECRET_KEY.to_string(), entry.clone())].into()),
+        "wrong-key",
+    );
+    let mut tampered_entry = entry;
+    tampered_entry.ciphertext_hex.push_str("00");
+    let tampered_provider = LocalVaultCredentialProvider::new(
+        LocalCredentialVault::new([(SECRET_KEY.to_string(), tampered_entry)].into()),
+        VAULT_KEY_MATERIAL,
+    );
+
+    let value = provider.resolve(&secret_ref()).expect("vault resolves");
+    let wrong_key = wrong_key_provider.resolve(&secret_ref());
+    let tampered = tampered_provider.resolve(&secret_ref());
+
+    assert_eq!(value.expose_for_execution(), SECRET_VALUE);
+    assert!(matches!(wrong_key, Err(CredentialError::TamperedSecret { .. })));
+    assert!(matches!(tampered, Err(CredentialError::TamperedSecret { .. })));
+}
+
+// r[verify n8nclone.credentials.providers.command]
+#[test]
+fn command_provider_resolves_json_and_rejects_failures() {
+    let config = CommandCredentialProviderConfig::new(COMMAND_PROVIDER_PROGRAM);
+    let provider = CommandCredentialProvider::new(
+        config.clone(),
+        FakeProcessRunner::new(Ok(command_output(Some(0), "{\"value\":\"super-secret-token\"}"))),
+    );
+    let nonzero = CommandCredentialProvider::new(
+        config.clone(),
+        FakeProcessRunner::new(Ok(command_output(Some(1), "super-secret-token"))),
+    );
+    let malformed =
+        CommandCredentialProvider::new(config.clone(), FakeProcessRunner::new(Ok(command_output(Some(0), "{"))));
+    let timeout = CommandCredentialProvider::new(config, FakeProcessRunner::new(Err(ProcessError::Timeout)));
+
+    let value = provider.resolve(&secret_ref()).expect("command resolves");
+    let failed = nonzero.resolve(&secret_ref());
+    let malformed_json = malformed.resolve(&secret_ref());
+    let timed_out = timeout.resolve(&secret_ref());
+
+    assert_eq!(value.expose_for_execution(), SECRET_VALUE);
+    assert!(matches!(failed, Err(CredentialError::ProviderFailure { .. })));
+    assert!(matches!(malformed_json, Err(CredentialError::ProviderFailure { .. })));
+    assert!(matches!(timed_out, Err(CredentialError::ProviderFailure { .. })));
+}
+
+// r[verify n8nclone.credentials.providers.command]
+#[test]
+fn command_provider_enforces_output_limit() {
+    let mut config = CommandCredentialProviderConfig::new(COMMAND_PROVIDER_PROGRAM);
+    config.output_limit_bytes = COMMAND_OUTPUT_LIMIT_BYTES;
+    let provider = CommandCredentialProvider::new(
+        config,
+        FakeProcessRunner::new(Ok(command_output(Some(0), "super-secret-token"))),
+    );
+
+    let result = provider.resolve(&secret_ref());
+
+    assert!(matches!(result, Err(CredentialError::ProviderFailure { .. })));
+}
+
+// r[verify n8nclone.credentials.provider_diagnostics.redaction]
+#[test]
+fn provider_probe_hides_resolved_secret_and_redacts_error_key() {
+    let provider = EnvironmentCredentialProvider::from_map([(SECRET_KEY.to_string(), SECRET_VALUE.to_string())].into());
+    let success = test_provider_reference(&provider, &secret_ref());
+    let failure = test_provider_reference(&provider, &SecretRef::new(PROVIDER_NAME, OTHER_SECRET_KEY, None));
+
+    assert!(success.reachable);
+    assert!(!success.message.contains(SECRET_VALUE));
+    assert!(!failure.reachable);
+    assert!(!failure.message.contains(OTHER_SECRET_KEY));
+}
+
+// r[verify n8nclone.credentials.provider_cache_identity]
+#[test]
+fn provider_backed_cache_identity_excludes_resolved_secret_values() {
+    let (workflow, node_id) = workflow_with_secret_ref();
+    let config = workflow.node_config(node_id).expect("node config exists");
+    let key_from_ref =
+        node_execution_cache_key_with_credentials(node_id, config, workflow.node_credentials(node_id), &HashMap::new());
+    let provider_a =
+        EnvironmentCredentialProvider::from_map([(SECRET_KEY.to_string(), SECRET_VALUE.to_string())].into());
+    let provider_b =
+        EnvironmentCredentialProvider::from_map([(SECRET_KEY.to_string(), OTHER_SECRET_VALUE.to_string())].into());
+
+    let value_a = provider_a.resolve(&secret_ref()).expect("secret a resolves");
+    let value_b = provider_b.resolve(&secret_ref()).expect("secret b resolves");
+    let repeated_key =
+        node_execution_cache_key_with_credentials(node_id, config, workflow.node_credentials(node_id), &HashMap::new());
+
+    assert_ne!(value_a.expose_for_execution(), value_b.expose_for_execution());
+    assert_eq!(key_from_ref, repeated_key);
 }
 
 // r[verify n8nclone.credentials.secret_refs.model]

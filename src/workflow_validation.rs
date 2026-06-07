@@ -34,6 +34,8 @@ pub enum WorkflowDiagnosticCode {
     EdgeIncompatibleType,
     MalformedSecretRef,
     CredentialRefWithoutNode,
+    UnknownCredentialProvider,
+    UnsupportedCredentialField,
     InvalidHttpMethod,
     InvalidHttpUrl,
     UnsafeFilePath,
@@ -61,6 +63,22 @@ pub struct WorkflowDiagnostic {
 // r[impl n8nclone.workflow_validation.diagnostics.core]
 // r[impl n8nclone.workflow_validation.diagnostics.negative]
 pub fn validate_workflow(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
+    let mut diagnostics = base_workflow_diagnostics(workflow);
+    validate_credentials(workflow, &mut diagnostics);
+    diagnostics
+}
+
+// r[impl n8nclone.workflow_validation.credentials.providers]
+pub fn validate_workflow_with_credential_registry(
+    workflow: &Workflow,
+    registry: &credentials::CredentialProviderRegistry,
+) -> Vec<WorkflowDiagnostic> {
+    let mut diagnostics = base_workflow_diagnostics(workflow);
+    validate_credentials_with_registry(workflow, registry, &mut diagnostics);
+    diagnostics
+}
+
+fn base_workflow_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     let mut diagnostics = Vec::new();
 
     if workflow.graph.node_count() == 0 {
@@ -73,7 +91,6 @@ pub fn validate_workflow(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     }
 
     validate_node_configs(workflow, &mut diagnostics);
-    validate_credentials(workflow, &mut diagnostics);
     validate_edges(workflow, &mut diagnostics);
     validate_runner_admission(workflow, &mut diagnostics);
 
@@ -269,6 +286,35 @@ fn validate_credentials(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagn
                     None,
                     error.to_string(),
                 ));
+            }
+        }
+    }
+}
+
+// r[impl n8nclone.workflow_validation.credentials.providers]
+fn validate_credentials_with_registry(
+    workflow: &Workflow,
+    registry: &credentials::CredentialProviderRegistry,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    validate_credentials(workflow, diagnostics);
+    for (node_id, refs) in &workflow.credentials {
+        let node_id = NodeId(*node_id);
+        if workflow.graph.node(node_id).is_none() {
+            continue;
+        }
+        for secret_ref in refs.env.values() {
+            if let Err(error) = registry.validate_secret_ref(secret_ref) {
+                let code = match error {
+                    credentials::CredentialError::UnknownProvider { .. } => {
+                        WorkflowDiagnosticCode::UnknownCredentialProvider
+                    }
+                    credentials::CredentialError::UnsupportedFieldAccess { .. } => {
+                        WorkflowDiagnosticCode::UnsupportedCredentialField
+                    }
+                    _ => WorkflowDiagnosticCode::MalformedSecretRef,
+                };
+                diagnostics.push(fatal(code, Some(node_id), None, error.to_string()));
             }
         }
     }

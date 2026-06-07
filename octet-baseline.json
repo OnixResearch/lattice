@@ -10,7 +10,7 @@
     "profile_hash": "b3:285dca721707cdd7e582946cdb184e15177cc8ce6ae20aa58e0f64128cee82e3",
     "config_hash": "b3:34672ff90dbbc2fb3556e2a59568eee2bb918053c05da0ca1180550a96da8861"
   },
-  "baseline_hash": "b3:c31adf1da608153f4e8852cbb49303db8c603bdc118568ce147a7b23f8317889",
+  "baseline_hash": "b3:0f50bb113a637c98f31e6cd779d3f094e39fa01fd7e0e1253eb2a65bb1db9e19",
   "findings": [
     {
       "stable_id": "b3:478f88fd2f16fd6f",
@@ -1222,6 +1222,32 @@
       "crate_name": "n8nclone"
     },
     {
+      "stable_id": "b3:26e58aaa13136d9d",
+      "semantic_id": "b3:26e58aaa13136d9d",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 594 lines (limit: 300)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:ceca6ce1480b1a5c",
+      "semantic_id": "b3:ceca6ce1480b1a5c",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 3,
+      "column": 1,
+      "message": "non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
       "stable_id": "b3:047cfd7227433fed",
       "semantic_id": "b3:047cfd7227433fed",
       "identity_status": "computed",
@@ -1229,7 +1255,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 3,
+      "line": 4,
       "column": 1,
       "message": "non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "n8nclone"
@@ -1242,7 +1268,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 5,
+      "line": 6,
       "column": 1,
       "message": "non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "n8nclone"
@@ -1255,9 +1281,100 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 6,
+      "line": 7,
       "column": 1,
       "message": "non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:44adaa914a92be1c",
+      "semantic_id": "b3:44adaa914a92be1c",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 9,
+      "column": 1,
+      "message": "non-trait import `ProcessOutput` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:87ab7d33748922da",
+      "semantic_id": "b3:87ab7d33748922da",
+      "identity_status": "computed",
+      "lint": "non_trait_imports",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 10,
+      "column": 1,
+      "message": "non-trait import `ProcessRequest` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6d2cd6ce1f7d2f72",
+      "semantic_id": "b3:6d2cd6ce1f7d2f72",
+      "identity_status": "computed",
+      "lint": "unbounded_collection_growth",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 241,
+      "column": 17,
+      "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:1fd09574b4046faf",
+      "semantic_id": "b3:1fd09574b4046faf",
+      "identity_status": "computed",
+      "lint": "ambiguous_params",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 323,
+      "column": 1,
+      "message": "2 consecutive `&str` parameters are easy to swap by accident",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6e06f481efc0edb8",
+      "semantic_id": "b3:6e06f481efc0edb8",
+      "identity_status": "computed",
+      "lint": "ambiguous_params",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 340,
+      "column": 1,
+      "message": "2 consecutive `&str` parameters are easy to swap by accident",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:cda1e3b3a9df6923",
+      "semantic_id": "b3:cda1e3b3a9df6923",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 344,
+      "column": 38,
+      "message": "function `decrypt_local_vault_entry` has 0 assertion(s) in 21 lines (need 2+)",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:6c65238c9e1f8620",
+      "semantic_id": "b3:6c65238c9e1f8620",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/credentials.rs",
+      "line": 489,
+      "column": 105,
+      "message": "function `parse_command_secret_stdout` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -1268,7 +1385,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 122,
+      "line": 542,
       "column": 83,
       "message": "function `validate_secret_ref` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -1281,7 +1398,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 157,
+      "line": 577,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -1294,7 +1411,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 158,
+      "line": 578,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -7085,8 +7202,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:90fce9f10f83059a",
-      "semantic_id": "b3:90fce9f10f83059a",
+      "stable_id": "b3:09166062a32a629d",
+      "semantic_id": "b3:09166062a32a629d",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -7094,7 +7211,7 @@
       "file": "src/tui/app.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 2989 lines (limit: 300)",
+      "message": "source file is 2990 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
@@ -7820,7 +7937,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 223,
+      "line": 224,
       "column": 89,
       "message": "function `credentials_from_draft` has 0 assertion(s) in 23 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -7833,7 +7950,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 256,
+      "line": 257,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "n8nclone"
@@ -7846,7 +7963,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 301,
+      "line": 302,
       "column": 13,
       "message": "`latest_by_port` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -7859,7 +7976,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 303,
+      "line": 304,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -7872,7 +7989,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 352,
+      "line": 353,
       "column": 1,
       "message": "parameter uses `&Vec<RunOutputLine>`; accept `&[RunOutputLine]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -7885,7 +8002,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 352,
+      "line": 353,
       "column": 1,
       "message": "function has 6 parameters (limit: 5) — consider an options struct",
       "crate_name": "n8nclone"
@@ -7898,7 +8015,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 380,
+      "line": 381,
       "column": 102,
       "message": "function `run_node_detail_from_step` has 0 assertion(s) in 49 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -7911,7 +8028,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 765,
+      "line": 766,
       "column": 1,
       "message": "item name `App` repeats `app` from ancestor path segment `app`",
       "crate_name": "n8nclone"
@@ -7924,7 +8041,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 958,
+      "line": 959,
       "column": 26,
       "message": "unprotected unsigned subtraction may overflow",
       "crate_name": "n8nclone"
@@ -7937,7 +8054,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 959,
+      "line": 960,
       "column": 48,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -7950,7 +8067,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1113,
+      "line": 1114,
       "column": 29,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -7963,7 +8080,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1117,
+      "line": 1118,
       "column": 29,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -7976,7 +8093,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1121,
+      "line": 1122,
       "column": 29,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -7989,7 +8106,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1170,
+      "line": 1171,
       "column": 26,
       "message": "unprotected unsigned subtraction may overflow",
       "crate_name": "n8nclone"
@@ -8002,7 +8119,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1177,
+      "line": 1178,
       "column": 53,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -8015,7 +8132,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1180,
+      "line": 1181,
       "column": 37,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -8028,7 +8145,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1323,
+      "line": 1324,
       "column": 26,
       "message": "unprotected unsigned subtraction may overflow",
       "crate_name": "n8nclone"
@@ -8041,7 +8158,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1324,
+      "line": 1325,
       "column": 42,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "n8nclone"
@@ -8054,7 +8171,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1611,
+      "line": 1612,
       "column": 21,
       "message": "catch-all `_` on enum match returns deny value — new variants will be silently handled",
       "crate_name": "n8nclone"
@@ -8067,7 +8184,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1650,
+      "line": 1651,
       "column": 17,
       "message": "catch-all `_` on enum match returns deny value — new variants will be silently handled",
       "crate_name": "n8nclone"
@@ -8080,7 +8197,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1723,
+      "line": 1724,
       "column": 48,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "n8nclone"
@@ -8093,7 +8210,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1763,
+      "line": 1764,
       "column": 34,
       "message": "unbounded channel — use a bounded channel with explicit capacity",
       "crate_name": "n8nclone"
@@ -8106,7 +8223,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1779,
+      "line": 1780,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "n8nclone"
@@ -8119,7 +8236,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1809,
+      "line": 1810,
       "column": 41,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8132,7 +8249,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1862,
+      "line": 1863,
       "column": 25,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "n8nclone"
@@ -8145,7 +8262,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1884,
+      "line": 1885,
       "column": 40,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8158,7 +8275,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1911,
+      "line": 1912,
       "column": 19,
       "message": "direct system clock read in production code",
       "crate_name": "n8nclone"
@@ -8171,7 +8288,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1965,
+      "line": 1966,
       "column": 13,
       "message": "`old_viewport` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -8184,7 +8301,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 1986,
+      "line": 1987,
       "column": 9,
       "message": "loop without visible iteration bound",
       "crate_name": "n8nclone"
@@ -10998,8 +11115,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:3177a882e379a632",
-      "semantic_id": "b3:3177a882e379a632",
+      "stable_id": "b3:5bb448ac7ee89bca",
+      "semantic_id": "b3:5bb448ac7ee89bca",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -11007,12 +11124,12 @@
       "file": "src/workflow_format.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1077 lines (limit: 300)",
+      "message": "source file is 1079 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:29cd0ef3480ceac2",
-      "semantic_id": "b3:29cd0ef3480ceac2",
+      "stable_id": "b3:2af05e327fd6d277",
+      "semantic_id": "b3:2af05e327fd6d277",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "unknown",
@@ -11700,8 +11817,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:4b1240299458a40a",
-      "semantic_id": "b3:4b1240299458a40a",
+      "stable_id": "b3:bffc9967f5c87f7c",
+      "semantic_id": "b3:bffc9967f5c87f7c",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
@@ -11713,8 +11830,8 @@
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:e7e6dae87afa676c",
-      "semantic_id": "b3:e7e6dae87afa676c",
+      "stable_id": "b3:d766dad0aa42304e",
+      "semantic_id": "b3:d766dad0aa42304e",
       "identity_status": "computed",
       "lint": "function_length",
       "group": "tigerstyle::structure",
@@ -11746,7 +11863,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 591,
+      "line": 592,
       "column": 1,
       "message": "item name `portable_to_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -11759,7 +11876,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 591,
+      "line": 592,
       "column": 98,
       "message": "function `portable_to_workflow` has 0 assertion(s) in 56 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11772,7 +11889,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 602,
+      "line": 603,
       "column": 13,
       "message": "`port_id_map` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -11785,7 +11902,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 620,
+      "line": 621,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -11798,7 +11915,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 626,
+      "line": 627,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "n8nclone"
@@ -11811,7 +11928,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 655,
+      "line": 656,
       "column": 95,
       "message": "function `validate_portable_identity` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11824,7 +11941,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 657,
+      "line": 658,
       "column": 13,
       "message": "`port_ids` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
@@ -11837,7 +11954,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 696,
+      "line": 697,
       "column": 113,
       "message": "function `portable_shell_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11850,7 +11967,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 723,
+      "line": 724,
       "column": 112,
       "message": "function `portable_http_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11863,7 +11980,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 774,
+      "line": 775,
       "column": 113,
       "message": "function `portable_agent_config_to_node_config` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11876,7 +11993,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 841,
+      "line": 842,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -11889,7 +12006,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 842,
+      "line": 843,
       "column": 9,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -11902,7 +12019,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 867,
+      "line": 869,
       "column": 120,
       "message": "function `portable_config_to_node_credentials` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11915,7 +12032,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 899,
+      "line": 901,
       "column": 1,
       "message": "item name `workflow_to_nickel` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -11928,7 +12045,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 918,
+      "line": 920,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -11941,7 +12058,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 918,
+      "line": 920,
       "column": 1,
       "message": "item name `render_portable_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -11954,7 +12071,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 918,
+      "line": 920,
       "column": 79,
       "message": "function `render_portable_workflow` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -11967,7 +12084,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 944,
+      "line": 946,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -11980,7 +12097,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 963,
+      "line": 965,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -11993,7 +12110,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 972,
+      "line": 974,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12006,7 +12123,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 972,
+      "line": 974,
       "column": 68,
       "message": "function `render_config` has 0 assertion(s) in 95 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12019,7 +12136,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 972,
+      "line": 974,
       "column": 68,
       "message": "function `render_config` is 95 lines (limit: 70)",
       "crate_name": "n8nclone"
@@ -12032,7 +12149,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1069,
+      "line": 1071,
       "column": 5,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "n8nclone"
@@ -12045,7 +12162,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1073,
+      "line": 1075,
       "column": 1,
       "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "n8nclone"
@@ -12058,14 +12175,14 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1075,
+      "line": 1077,
       "column": 9,
       "message": "`portable` looks like a quantity but has no unit suffix",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:19ca294c551e5c09",
-      "semantic_id": "b3:19ca294c551e5c09",
+      "stable_id": "b3:fbc570c10902161d",
+      "semantic_id": "b3:fbc570c10902161d",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "unknown",
@@ -12073,12 +12190,12 @@
       "file": "src/workflow_validation.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 407 lines (limit: 300)",
+      "message": "source file is 453 lines (limit: 300)",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:d42721b3ee8629b2",
-      "semantic_id": "b3:d42721b3ee8629b2",
+      "stable_id": "b3:d23be8fc98a3f66e",
+      "semantic_id": "b3:d23be8fc98a3f66e",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "unknown",
@@ -12253,22 +12370,48 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 53,
+      "line": 55,
       "column": 1,
       "message": "item name `WorkflowDiagnostic` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
     },
     {
-      "stable_id": "b3:7752a6ba2035edfd",
-      "semantic_id": "b3:7752a6ba2035edfd",
+      "stable_id": "b3:79b8be46d69cfd27",
+      "semantic_id": "b3:79b8be46d69cfd27",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 63,
+      "line": 65,
       "column": 1,
       "message": "item name `validate_workflow` repeats `workflow` from ancestor path segment `workflow_validation`",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:4f7074053955c650",
+      "semantic_id": "b3:4f7074053955c650",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 72,
+      "column": 1,
+      "message": "item name `validate_workflow_with_credential_registry` repeats `workflow` from ancestor path segment `workflow_validation`",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:e3f66f5fdfd4bfc0",
+      "semantic_id": "b3:e3f66f5fdfd4bfc0",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 81,
+      "column": 1,
+      "message": "item name `base_workflow_diagnostics` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
     },
     {
@@ -12279,7 +12422,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 110,
+      "line": 127,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12292,7 +12435,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 110,
+      "line": 127,
       "column": 90,
       "message": "function `validate_node_configs` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12305,7 +12448,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 147,
+      "line": 164,
       "column": 1,
       "message": "item name `workflow_code_from_provider_code` repeats `workflow` from ancestor path segment `workflow_validation`",
       "crate_name": "n8nclone"
@@ -12318,7 +12461,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 159,
+      "line": 176,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12331,7 +12474,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 227,
+      "line": 244,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "n8nclone"
@@ -12344,7 +12487,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 227,
+      "line": 244,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12357,9 +12500,35 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 243,
+      "line": 260,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:317f6d6140dc55f0",
+      "semantic_id": "b3:317f6d6140dc55f0",
+      "identity_status": "computed",
+      "lint": "borrowed_argument_types",
+      "group": "unknown",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 295,
+      "column": 1,
+      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "n8nclone"
+    },
+    {
+      "stable_id": "b3:cda21f4e908a8859",
+      "semantic_id": "b3:cda21f4e908a8859",
+      "identity_status": "computed",
+      "lint": "assertion_density",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 299,
+      "column": 3,
+      "message": "function `validate_credentials_with_registry` has 0 assertion(s) in 23 lines (need 2+)",
       "crate_name": "n8nclone"
     },
     {
@@ -12370,7 +12539,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 277,
+      "line": 323,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12383,7 +12552,7 @@
       "group": "unknown",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 333,
+      "line": 379,
       "column": 1,
       "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "n8nclone"
@@ -12396,7 +12565,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 353,
+      "line": 399,
       "column": 104,
       "message": "function `workflow_diagnostic_from_runner` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "n8nclone"
@@ -12409,7 +12578,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_validation.rs",
-      "line": 375,
+      "line": 421,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "n8nclone"
