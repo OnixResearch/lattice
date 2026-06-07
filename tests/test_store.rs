@@ -8,10 +8,16 @@ use n8nclone::engine::executor::RunId;
 use n8nclone::engine::value::ContentHash;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::workflow::Workflow;
+use n8nclone::scheduler::OverlapPolicy;
 use n8nclone::store::ExecutionCache;
 use n8nclone::store::RunRecord;
 use n8nclone::store::Store;
 use n8nclone::store::WorkflowRepository;
+use n8nclone::triggers::IdempotencyPolicy;
+use n8nclone::triggers::TriggerDefinition;
+use n8nclone::triggers::TriggerKind;
+use n8nclone::triggers::WebhookAuthPolicy;
+use n8nclone::triggers::WebhookTrigger;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::PortId;
 
@@ -23,6 +29,28 @@ const RUN_RECORD_NODE_COUNT: usize = 1;
 const RUN_RECORD_CACHE_HITS: usize = 0;
 const RUN_RECORD_FAILURES: usize = 0;
 const STARTED_EPOCH_MS: i64 = 1000;
+const TRIGGER_ID: &str = "store-trigger";
+const TRIGGER_WORKFLOW_NAME: &str = "triggered-workflow";
+const WEBHOOK_METHOD: &str = "POST";
+const WEBHOOK_PATH: &str = "/hooks/store-trigger";
+const WEBHOOK_CONTENT_TYPE: &str = "application/json";
+
+fn store_webhook_trigger() -> TriggerDefinition {
+    TriggerDefinition {
+        id: TRIGGER_ID.to_string(),
+        workflow_name: TRIGGER_WORKFLOW_NAME.to_string(),
+        enabled: true,
+        kind: TriggerKind::Webhook(WebhookTrigger {
+            method: WEBHOOK_METHOD.to_string(),
+            path: WEBHOOK_PATH.to_string(),
+            accepted_content_types: vec![WEBHOOK_CONTENT_TYPE.to_string()],
+            auth_policy: WebhookAuthPolicy::NoAuthLocalOnly,
+        }),
+        input_bindings: Vec::new(),
+        overlap_policy: OverlapPolicy::Forbid,
+        idempotency_policy: IdempotencyPolicy::None,
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Store creation
@@ -66,6 +94,32 @@ fn load_nonexistent_workflow_returns_none() {
     let (store, _dir) = common::temp_store();
     let result = store.load_workflow("does-not-exist").unwrap();
     assert!(result.is_none());
+}
+
+// r[verify n8nclone.workflow_format.webhook_cookbook_example.import]
+#[test]
+fn save_workflow_persists_embedded_triggers_for_listener_import() {
+    let (store, _dir) = common::temp_store();
+    let mut workflow = Workflow::new(TRIGGER_WORKFLOW_NAME);
+    workflow.triggers.push(store_webhook_trigger());
+
+    store.save_workflow(&workflow).expect("workflow with trigger saves");
+    let triggers = store.list_triggers().expect("triggers list");
+
+    assert_eq!(triggers.len(), 1);
+    assert_eq!(triggers[0].id, TRIGGER_ID);
+    assert_eq!(triggers[0].workflow_name, TRIGGER_WORKFLOW_NAME);
+}
+
+#[test]
+fn save_workflow_without_triggers_does_not_create_listener_triggers() {
+    let (store, _dir) = common::temp_store();
+    let workflow = Workflow::new(TRIGGER_WORKFLOW_NAME);
+
+    store.save_workflow(&workflow).expect("workflow without triggers saves");
+    let triggers = store.list_triggers().expect("triggers list");
+
+    assert!(triggers.is_empty());
 }
 
 // r[verify n8nclone.workflow_execution.trait_boundaries.storage_ports]

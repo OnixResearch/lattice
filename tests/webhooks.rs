@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::path::Path;
 
 use n8nclone::credentials::MapCredentialProvider;
 use n8nclone::credentials::SecretRef;
 use n8nclone::engine::RunId;
+use n8nclone::headless::HeadlessRunStatus;
+use n8nclone::headless::run_admitted_trigger_plan;
 use n8nclone::scheduler::OverlapPolicy;
 use n8nclone::store::Store;
 use n8nclone::triggers::IdempotencyPolicy;
@@ -15,6 +18,8 @@ use n8nclone::triggers::TriggerRunStatus;
 use n8nclone::triggers::WebhookAuthPolicy;
 use n8nclone::triggers::WebhookTrigger;
 use n8nclone::webhooks;
+use n8nclone::workflow_format::load_workflow_nickel_file;
+use n8nclone::workflow_validation;
 use pretty_assertions::assert_eq;
 
 const TRIGGER_ID: &str = "new-lead";
@@ -43,6 +48,11 @@ const RUN_ID_VALUE: u64 = 42;
 const CURRENT_EPOCH_MS: i64 = 1_000;
 const HISTORY_LIMIT: usize = 1;
 const EXPECTED_TRIGGER_COUNT: u64 = 1;
+const COOKBOOK_WORKFLOW_PATH: &str = "examples/workflows/webhook-cookbook.ncl";
+const COOKBOOK_WORKFLOW_NAME: &str = "webhook-cookbook";
+const COOKBOOK_TRIGGER_ID: &str = "cookbook-lead";
+const COOKBOOK_WEBHOOK_PATH: &str = "/hooks/cookbook-lead";
+const COOKBOOK_SECRET_KEY: &str = "N8NCLONE_WEBHOOK_TOKEN";
 
 fn limits() -> webhooks::RequestLimits {
     webhooks::RequestLimits {
@@ -57,6 +67,16 @@ fn secret_ref() -> SecretRef {
 fn provider_with_secret() -> MapCredentialProvider {
     let mut secrets = HashMap::new();
     secrets.insert(secret_ref().identity(), SECRET_VALUE.to_string());
+    MapCredentialProvider::new(secrets)
+}
+
+fn cookbook_secret_ref() -> SecretRef {
+    SecretRef::new(SECRET_PROVIDER, COOKBOOK_SECRET_KEY, None)
+}
+
+fn cookbook_provider_with_secret() -> MapCredentialProvider {
+    let mut secrets = HashMap::new();
+    secrets.insert(cookbook_secret_ref().identity(), SECRET_VALUE.to_string());
     MapCredentialProvider::new(secrets)
 }
 
@@ -79,6 +99,17 @@ fn webhook_trigger(enabled: bool, auth_policy: WebhookAuthPolicy) -> TriggerDefi
 
 fn valid_request() -> webhooks::RawRequest {
     request_with_parts(WEBHOOK_METHOD, WEBHOOK_PATH, CONTENT_TYPE_JSON, bearer(SECRET_VALUE), RAW_JSON_BODY)
+}
+
+fn valid_cookbook_request() -> webhooks::RawRequest {
+    request_with_parts(WEBHOOK_METHOD, COOKBOOK_WEBHOOK_PATH, CONTENT_TYPE_JSON, bearer(SECRET_VALUE), RAW_JSON_BODY)
+}
+
+fn rejected_response_body(decision: &webhooks::Decision) -> String {
+    let webhooks::Decision::Rejected(rejection) = decision else {
+        panic!("decision must be rejected");
+    };
+    String::from_utf8(webhooks::rejected(rejection).body).expect("rejection response body is utf8")
 }
 
 fn request_with_parts(
@@ -303,4 +334,118 @@ fn dry_run_reports_safe_status_and_redacted_credential_diagnostics() {
     assert!(output.contains("status=dry-run-blocked"));
     assert!(!output.contains(SECRET_KEY));
     assert!(!output.contains(SECRET_VALUE));
+}
+
+// r[verify n8nclone.workflow_format.webhook_cookbook_example.import]
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.dry_run]
+#[test]
+fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
+    let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
+    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
+    let diagnostics = workflow_validation::validate_workflow(&workflow);
+
+    store.save_workflow(&workflow).expect("cookbook workflow saves");
+    let triggers = store.list_triggers().expect("cookbook triggers list");
+    let provider = cookbook_provider_with_secret();
+    let report = webhooks::dry_run_report(
+        webhooks::DEFAULT_BIND_ADDR,
+        &triggers,
+        &HashSet::from([COOKBOOK_WORKFLOW_NAME.to_string()]),
+        &provider,
+    );
+
+    assert_eq!(workflow.meta.name, COOKBOOK_WORKFLOW_NAME);
+    assert!(diagnostics.is_empty());
+    assert_eq!(triggers.len(), 1);
+    assert_eq!(triggers[0].id, COOKBOOK_TRIGGER_ID);
+    assert!(report.diagnostics.is_empty());
+    assert_eq!(report.enabled_trigger_count, EXPECTED_TRIGGER_COUNT);
+}
+
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.accepted]
+#[tokio::test]
+async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history() {
+    let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
+    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
+    store.save_workflow(&workflow).expect("cookbook workflow saves");
+    let triggers = store.list_triggers().expect("cookbook triggers list");
+    let provider = cookbook_provider_with_secret();
+    let decision =
+        webhooks::decide_request(&valid_cookbook_request(), &triggers, &provider, &empty_context(), limits());
+    let webhooks::Decision::Admitted(plan) = decision else {
+        panic!("valid cookbook request must admit");
+    };
+
+    let summary = run_admitted_trigger_plan(&store, &plan).await.expect("cookbook trigger starts workflow");
+    let history = store.list_trigger_runs(HISTORY_LIMIT).expect("trigger history lists");
+
+    assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].trigger_id, COOKBOOK_TRIGGER_ID);
+    assert_eq!(history[0].status, TriggerRunStatus::Started);
+    assert!(!format!("{history:?}").contains(SECRET_VALUE));
+    assert!(!format!("{history:?}").contains(PAYLOAD_SECRET));
+}
+
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.rejected]
+// r[verify n8nclone.credentials.webhook_cookbook_secret_safety.references]
+// r[verify n8nclone.credentials.webhook_cookbook_secret_safety.redaction]
+#[test]
+fn webhook_cookbook_rejected_requests_do_not_start_runs_or_expose_secrets() {
+    let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
+    let workflow_text = std::fs::read_to_string(COOKBOOK_WORKFLOW_PATH).expect("cookbook workflow text reads");
+    let docs = std::fs::read_to_string("examples/README.md").expect("examples docs read");
+    let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
+    store.save_workflow(&workflow).expect("cookbook workflow saves");
+    let triggers = store.list_triggers().expect("cookbook triggers list");
+    let provider = cookbook_provider_with_secret();
+    let missing =
+        request_with_parts(WEBHOOK_METHOD, MISSING_PATH, CONTENT_TYPE_JSON, bearer(SECRET_VALUE), RAW_JSON_BODY);
+    let invalid_auth =
+        request_with_parts(WEBHOOK_METHOD, COOKBOOK_WEBHOOK_PATH, CONTENT_TYPE_JSON, bearer(BAD_TOKEN), RAW_JSON_BODY);
+    let malformed = request_with_parts(
+        WEBHOOK_METHOD,
+        COOKBOOK_WEBHOOK_PATH,
+        CONTENT_TYPE_JSON,
+        bearer(SECRET_VALUE),
+        MALFORMED_JSON_BODY,
+    );
+
+    let missing_decision = webhooks::decide_request(&missing, &triggers, &provider, &empty_context(), limits());
+    let auth_decision = webhooks::decide_request(&invalid_auth, &triggers, &provider, &empty_context(), limits());
+    let malformed_decision = webhooks::decide_request(&malformed, &triggers, &provider, &empty_context(), limits());
+    let runs = store.list_runs(HISTORY_LIMIT).expect("runs list");
+    let public_rejections = format!(
+        "{}\n{}\n{}",
+        rejected_response_body(&missing_decision),
+        rejected_response_body(&auth_decision),
+        rejected_response_body(&malformed_decision),
+    );
+    let auth_record_debug = match &auth_decision {
+        webhooks::Decision::Rejected(rejection) => webhooks::run_record_for_rejection(rejection)
+            .map(|record| format!("{record:?}"))
+            .unwrap_or_default(),
+        webhooks::Decision::Admitted(_) => String::new(),
+    };
+
+    assert!(
+        matches!(missing_decision, webhooks::Decision::Rejected(rejection) if rejection.code == webhooks::RejectionCode::NotFound)
+    );
+    assert!(
+        matches!(auth_decision, webhooks::Decision::Rejected(rejection) if rejection.code == webhooks::RejectionCode::InvalidAuth)
+    );
+    assert!(
+        matches!(malformed_decision, webhooks::Decision::Rejected(rejection) if rejection.code == webhooks::RejectionCode::MalformedJson)
+    );
+    assert!(runs.is_empty());
+    assert!(workflow_text.contains(COOKBOOK_SECRET_KEY));
+    assert!(docs.contains(COOKBOOK_SECRET_KEY));
+    assert!(!workflow_text.contains(SECRET_VALUE));
+    assert!(!docs.contains(SECRET_VALUE));
+    assert!(!public_rejections.contains(SECRET_VALUE));
+    assert!(!public_rejections.contains(BAD_TOKEN));
+    assert!(!public_rejections.contains(PAYLOAD_SECRET));
+    assert!(!auth_record_debug.contains(SECRET_VALUE));
+    assert!(!auth_record_debug.contains(BAD_TOKEN));
+    assert!(!auth_record_debug.contains(PAYLOAD_SECRET));
 }

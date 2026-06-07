@@ -16,7 +16,7 @@ The Octet hook runs the lib target profile, keeps every configured Octet lint at
 
 ## Examples
 
-Complex templates and runnable Nickel workflow examples live under `examples/`, including daily digest, CSV cleanup, and log triage workflows.
+Complex templates and runnable Nickel workflow examples live under `examples/`, including daily digest, CSV cleanup, log triage, and webhook trigger cookbook workflows.
 
 ```bash
 n8nclone --config ./demo/config.ncl --init

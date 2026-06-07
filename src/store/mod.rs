@@ -170,15 +170,25 @@ impl Store {
 
     // -- workflows ----------------------------------------------------------
 
-    /// Save a workflow.
+    /// Save a workflow and upsert its embedded trigger definitions.
     pub fn save_workflow(&self, workflow: &Workflow) -> Result<(), StoreError> {
         let data = serde_json::to_vec(workflow).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let triggers = workflow.triggers.clone();
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
             let mut table = txn.open_table(WORKFLOWS).map_err(|e| StoreError::Table(e.to_string()))?;
             table
                 .insert(workflow.meta.name.as_str(), data.as_slice())
                 .map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        {
+            let mut table = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            for trigger in triggers {
+                let trigger_data = serde_json::to_vec(&trigger).map_err(|e| StoreError::Serialize(e.to_string()))?;
+                table
+                    .insert(trigger.id.as_str(), trigger_data.as_slice())
+                    .map_err(|e| StoreError::Db(e.to_string()))?;
+            }
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
