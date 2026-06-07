@@ -1325,6 +1325,7 @@ impl App {
     }
 
     /// Start editing a selected shell-node property.
+    // r[impl n8nclone.tui_ux.node_kind_provider.unsupported_edit]
     pub fn start_property_edit(&mut self, field: PropertyEditField) -> bool {
         let Some(node_id) = self.selected_node_id() else {
             self.output.push_line("Select one node to edit properties");

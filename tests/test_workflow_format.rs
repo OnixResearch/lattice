@@ -6,7 +6,9 @@ use std::process::Command;
 
 use n8nclone::agent_node::AgentOutputMode;
 use n8nclone::agent_node::AgentTarget;
+use n8nclone::engine::runner::build_runner_plan;
 use n8nclone::engine::workflow::NodeConfig;
+use n8nclone::engine::workflow::NodeRunnerSettings;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::store::Store;
 use n8nclone::workflow_format::PortableEdge;
@@ -33,6 +35,12 @@ const INVALID_PORT_ID: u64 = 999_001;
 const IMAGE_PATH: &str = "/tmp/selfie.png";
 const STATIC_MISSING_IMAGE_FILE_NAME: &str = "missing-static-image.png";
 const AGENT_PROMPT: &str = "Turn this selfie into fine art";
+const CUSTOM_RUNTIME_KIND: &str = "shell";
+const CUSTOM_RUNTIME_KEY: &str = "custom-shell";
+const EFFECT_POLICY: &str = "process";
+const CACHE_POLICY: &str = "inputs-and-config";
+const RETRY_POLICY: &str = "never";
+const ARTIFACT_POLICY: &str = "inline-small";
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let data_dir = temp_dir.path().join("data");
@@ -57,6 +65,17 @@ fn exported_then_loaded(workflow: &Workflow) -> Workflow {
     load_workflow_nickel_file(&workflow_path).expect("workflow Nickel loads")
 }
 
+fn custom_runner_settings() -> NodeRunnerSettings {
+    NodeRunnerSettings {
+        runtime_kind: CUSTOM_RUNTIME_KIND.to_string(),
+        runtime_key: CUSTOM_RUNTIME_KEY.to_string(),
+        effect_policy: EFFECT_POLICY.to_string(),
+        cache_policy: CACHE_POLICY.to_string(),
+        retry_policy: RETRY_POLICY.to_string(),
+        artifact_policy: ARTIFACT_POLICY.to_string(),
+    }
+}
+
 // r[verify n8nclone.workflow_format.nickel.export]
 // r[verify n8nclone.workflow_format.nickel.import]
 // r[verify n8nclone.workflow_format.nickel.round_trip]
@@ -75,6 +94,46 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
         _ => panic!("expected shell config"),
     }
     assert!(workflow.graph.node(target).is_some());
+}
+
+// r[verify n8nclone.workflow_format.generic_pipeline_ir.nickel]
+// r[verify n8nclone.workflow_format.generic_pipeline_ir.import]
+#[test]
+fn nickel_export_import_preserves_runner_metadata() {
+    let (mut workflow, source, _target) = common::two_node_pipeline();
+    workflow.set_node_runner_settings(source, custom_runner_settings());
+
+    let portable = workflow_to_portable(&workflow);
+    let config = portable.configs.iter().find(|config| config.node_id == source.0).expect("source config exported");
+    assert_eq!(config.runtime_kind, CUSTOM_RUNTIME_KIND);
+    assert_eq!(config.runtime_key, CUSTOM_RUNTIME_KEY);
+    assert_eq!(config.effect_policy, EFFECT_POLICY);
+    assert_eq!(config.cache_policy, CACHE_POLICY);
+    assert_eq!(config.retry_policy, RETRY_POLICY);
+    assert_eq!(config.artifact_policy, ARTIFACT_POLICY);
+
+    let imported = exported_then_loaded(&workflow);
+    let plan = build_runner_plan(&imported).plan.expect("imported workflow builds runner plan");
+    let imported_source = plan.nodes.iter().find(|node| node.label == "echo-hello").expect("source node imported");
+    assert_eq!(imported_source.runtime.kind, CUSTOM_RUNTIME_KIND);
+    assert_eq!(imported_source.runtime.key, CUSTOM_RUNTIME_KEY);
+    assert_eq!(imported_source.policy.effect_policy, EFFECT_POLICY);
+}
+
+// r[verify n8nclone.workflow_format.generic_pipeline_ir.compatibility]
+#[test]
+fn portable_import_defaults_empty_runner_metadata_for_older_workflows() {
+    let (workflow, _source, _target) = common::two_node_pipeline();
+    let mut portable = workflow_to_portable(&workflow);
+    for config in &mut portable.configs {
+        config.runtime_kind.clear();
+        config.runtime_key.clear();
+    }
+
+    let imported = portable_to_workflow(portable).expect("older portable workflow imports");
+    let diagnostics = validate_workflow(&imported);
+
+    assert!(diagnostics.is_empty());
 }
 
 // r[verify n8nclone.workflow_format.nickel.export]
@@ -188,6 +247,7 @@ fn image_workflow_static_import_export_and_validation_do_not_read_image_bytes() 
     }
 }
 
+// r[verify n8nclone.workflow_format.node_kind_provider.handlers]
 #[test]
 fn portable_import_rejects_invalid_agent_target() {
     let mut workflow = Workflow::new("invalid-agent-workflow");

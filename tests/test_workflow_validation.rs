@@ -4,6 +4,7 @@ mod common;
 
 use n8nclone::config::AppConfig;
 use n8nclone::engine::executor::RunId;
+use n8nclone::engine::workflow::NodeRunnerSettings;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::headless::HeadlessRunError;
 use n8nclone::headless::run_saved_workflow;
@@ -28,6 +29,8 @@ const INVALID_PORT_ID: u64 = 880_001;
 const HEADLESS_RUN_ID: u64 = 21;
 const SINGLE_ITEM_COUNT: usize = 1;
 const SHELL_STDIN_INPUT_INDEX: usize = 0;
+const MISSING_RUNTIME_KIND: &str = "missing-kind";
+const MISSING_RUNTIME_KEY: &str = "missing-key";
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -93,6 +96,7 @@ fn warning_only_workflow_does_not_block_run_gate() {
 
 // r[verify n8nclone.workflow_validation.diagnostics.core]
 // r[verify n8nclone.workflow_validation.diagnostics.negative]
+// r[verify n8nclone.workflow_validation.node_kind_provider.fallback]
 #[test]
 fn empty_shell_command_is_fatal() {
     let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
@@ -138,6 +142,24 @@ fn runner_cycle_admission_is_fatal_validation_diagnostic() {
 
     assert!(has_fatal_diagnostics(&diagnostics));
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::RunnerCycleDetected));
+}
+
+// r[verify n8nclone.workflow_validation.generic_runner_admission.runtime]
+// r[verify n8nclone.workflow_validation.node_kind_provider.runtime_binding]
+#[test]
+fn missing_runtime_binding_is_fatal_validation_diagnostic() {
+    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
+    let node_id = workflow.add_shell_node(BROKEN_NODE_LABEL, VALID_COMMAND);
+    workflow.set_node_runner_settings(node_id, NodeRunnerSettings::new(MISSING_RUNTIME_KIND, MISSING_RUNTIME_KEY));
+
+    let diagnostics = validate_workflow(&workflow);
+
+    assert!(has_fatal_diagnostics(&diagnostics));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::RunnerMissingRuntimeBinding)
+    );
 }
 
 // r[verify n8nclone.workflow_validation.run_gate]

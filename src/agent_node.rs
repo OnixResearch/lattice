@@ -41,6 +41,7 @@ const HANDOFF_PATH_FIELD: &str = "path";
 const HANDOFF_MEDIA_TYPE_FIELD: &str = "media_type";
 const HANDOFF_METADATA_FIELD: &str = "metadata";
 const CURRENT_DIRECTORY: &str = ".";
+const AGENT_COMMAND_NO_TIMEOUT_SECS: u64 = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AgentTarget {
@@ -184,6 +185,78 @@ pub struct AgentCommandOutput {
     pub stderr: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessRequest {
+    pub program: String,
+    pub args: Vec<String>,
+    pub cwd: Option<String>,
+    pub env: BTreeMap<String, String>,
+    pub stdin: Vec<u8>,
+    pub timeout_secs: u64,
+    pub output_limit_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessOutput {
+    pub status_code: Option<i32>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessError {
+    Spawn(String),
+    Timeout,
+    OutputLimitExceeded { limit: usize, actual: usize },
+}
+
+impl std::fmt::Display for ProcessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Spawn(message) => write!(f, "process spawn failed: {message}"),
+            Self::Timeout => write!(f, "process timed out"),
+            Self::OutputLimitExceeded { limit, actual } => {
+                write!(f, "process output exceeded limit {limit} bytes with {actual} bytes")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ProcessError {}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
+pub trait ProcessRunner {
+    fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, ProcessError>;
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ProductionProcessRunner;
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
+impl ProcessRunner for ProductionProcessRunner {
+    fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, ProcessError> {
+        run_process_request(request)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FakeProcessRunner {
+    result: Result<ProcessOutput, ProcessError>,
+}
+
+impl FakeProcessRunner {
+    pub fn new(result: Result<ProcessOutput, ProcessError>) -> Self {
+        Self { result }
+    }
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
+impl ProcessRunner for FakeProcessRunner {
+    fn run(&self, _request: &ProcessRequest) -> Result<ProcessOutput, ProcessError> {
+        self.result.clone()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct AgentOutputFileEnvelope {
     pub path: String,
@@ -322,6 +395,7 @@ pub fn parse_agent_output_mode(value: &str) -> Result<AgentOutputMode, AgentErro
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[impl n8nclone.workflow_execution.runtime_registry.command_runtime]
 // r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.contract]
 pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -> Result<AgentCommandPlan, AgentError> {
     let runtime = command_runtime_for_target(config, request.target)?;
@@ -433,22 +507,70 @@ fn append_optional_string_section(sections: &mut Vec<String>, heading: &str, val
 }
 
 fn run_agent_command(plan: &AgentCommandPlan) -> Result<AgentCommandOutput, AgentError> {
-    let mut command = Command::new(&plan.program);
-    command.args(&plan.args);
-    if let Some(cwd) = plan.cwd.as_ref().filter(|value| !value.trim().is_empty()) {
-        command.current_dir(cwd);
-    }
-    let output = command.output().map_err(|error| {
-        AgentError::Adapter(format!("failed to spawn {} agent command '{}': {error}", plan.adapter_label, plan.program))
+    run_agent_command_with_runner(plan, &ProductionProcessRunner)
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
+pub fn run_agent_command_with_runner(
+    plan: &AgentCommandPlan,
+    runner: &impl ProcessRunner,
+) -> Result<AgentCommandOutput, AgentError> {
+    let request = process_request_for_agent_command(plan);
+    let output = runner.run(&request).map_err(|error| {
+        AgentError::Adapter(format!("failed to run {} agent command '{}': {error}", plan.adapter_label, plan.program))
     })?;
-    Ok(AgentCommandOutput {
-        status_code: output.status.code(),
+    Ok(agent_command_output_from_process_output(output))
+}
+
+fn process_request_for_agent_command(plan: &AgentCommandPlan) -> ProcessRequest {
+    ProcessRequest {
+        program: plan.program.clone(),
+        args: plan.args.clone(),
+        cwd: plan.cwd.clone(),
+        env: BTreeMap::new(),
+        stdin: Vec::new(),
+        timeout_secs: AGENT_COMMAND_NO_TIMEOUT_SECS,
+        output_limit_bytes: plan.max_output_bytes,
+    }
+}
+
+fn agent_command_output_from_process_output(output: ProcessOutput) -> AgentCommandOutput {
+    AgentCommandOutput {
+        status_code: output.status_code,
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    }
+}
+
+fn run_process_request(request: &ProcessRequest) -> Result<ProcessOutput, ProcessError> {
+    let mut command = Command::new(&request.program);
+    command.args(&request.args);
+    if let Some(cwd) = request.cwd.as_ref().filter(|value| !value.trim().is_empty()) {
+        command.current_dir(cwd);
+    }
+    for (key, value) in &request.env {
+        command.env(key, value);
+    }
+    if !request.stdin.is_empty() {
+        command.stdin(std::process::Stdio::piped());
+    }
+    let output = command.output().map_err(|error| ProcessError::Spawn(error.to_string()))?;
+    let total_output_bytes = output.stdout.len().saturating_add(output.stderr.len());
+    if total_output_bytes > request.output_limit_bytes {
+        return Err(ProcessError::OutputLimitExceeded {
+            limit: request.output_limit_bytes,
+            actual: total_output_bytes,
+        });
+    }
+    Ok(ProcessOutput {
+        status_code: output.status.code(),
+        stdout: output.stdout,
+        stderr: output.stderr,
     })
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[impl n8nclone.workflow_execution.runtime_registry.command_runtime]
 // r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.contract]
 // r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.image]
 // r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.artifact]

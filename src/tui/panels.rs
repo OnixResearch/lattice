@@ -24,7 +24,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 
-use crate::engine::workflow::NodeConfig;
+use crate::node_kind_provider;
 use crate::store::RunDetailRecord;
 use crate::store::RunNodeDetail;
 use crate::store::RunNodeDetailStatus;
@@ -248,123 +248,20 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
     }
 
     // Show config details.
+    // r[impl n8nclone.tui_ux.node_kind_provider.fallback]
     if let Some(config) = app.workflow.node_config(node_id) {
-        match config {
-            NodeConfig::Shell {
-                command,
-                cwd,
-                timeout_secs,
-                pipe_stdin,
-                ..
-            } => {
-                lines.push(Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("Shell", Style::default().fg(Color::Green)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Cmd:  ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(command.clone(), Style::default().fg(Color::Cyan)),
-                ]));
-                if let Some(dir) = cwd {
-                    lines.push(Line::from(vec![
-                        Span::styled("CWD:  ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(dir.clone(), Style::default().fg(Color::Gray)),
-                    ]));
-                }
-                lines.push(Line::from(vec![
-                    Span::styled("Timeout: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("{timeout_secs}s"), Style::default().fg(Color::Gray)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Pipe stdin: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(if *pipe_stdin { "yes" } else { "no" }, Style::default().fg(Color::Gray)),
-                ]));
-            }
-            NodeConfig::Http {
-                method,
-                url,
-                timeout_secs,
-                ..
-            } => {
-                lines.push(Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("HTTP", Style::default().fg(Color::Green)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Method: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(method.clone(), Style::default().fg(Color::Cyan)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("URL: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(url.clone(), Style::default().fg(Color::Cyan)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Timeout: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("{timeout_secs}s"), Style::default().fg(Color::Gray)),
-                ]));
-            }
-            NodeConfig::File { operation, path, .. } => {
-                lines.push(Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("File", Style::default().fg(Color::Green)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Op: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("{operation:?}"), Style::default().fg(Color::Cyan)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(path.clone(), Style::default().fg(Color::Cyan)),
-                ]));
-            }
-            NodeConfig::ImageInput { path, max_bytes, .. } => {
-                lines.push(Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("Image Input", Style::default().fg(Color::Green)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(path.clone(), Style::default().fg(Color::Cyan)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Max bytes: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(max_bytes.to_string(), Style::default().fg(Color::Gray)),
-                ]));
-            }
-            NodeConfig::Agent(settings) => {
-                lines.push(Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled("Agent", Style::default().fg(Color::Green)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Target: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        crate::agent_node::agent_target_label(settings.target),
-                        Style::default().fg(Color::Cyan),
-                    ),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Output: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(settings.output_mode.as_str(), Style::default().fg(Color::Cyan)),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::styled("Prompt: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(settings.prompt.clone(), Style::default().fg(Color::Gray)),
-                ]));
-                if let Some(session) = &settings.session {
-                    lines.push(Line::from(vec![
-                        Span::styled("Session: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(session.clone(), Style::default().fg(Color::Gray)),
-                    ]));
-                }
-                let credentials = credentials_to_draft(app.workflow.node_credentials(node_id));
-                if !credentials.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled("Credentials: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(credentials, Style::default().fg(Color::Gray)),
-                    ]));
-                }
-            }
+        for property in node_kind_provider::property_lines_for_config(config) {
+            lines.push(Line::from(vec![
+                Span::styled(format!("{}: ", property.label), Style::default().fg(Color::DarkGray)),
+                Span::styled(property.value, Style::default().fg(Color::Cyan)),
+            ]));
+        }
+        let credentials = credentials_to_draft(app.workflow.node_credentials(node_id));
+        if !credentials.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Credentials: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(credentials, Style::default().fg(Color::Gray)),
+            ]));
         }
     }
 

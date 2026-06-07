@@ -18,9 +18,12 @@ use crate::agent_node::AgentTarget;
 use crate::config;
 use crate::credentials::NodeCredentialRefs;
 use crate::credentials::SecretRef;
+use crate::engine::runner;
 use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::NodeRunnerSettings;
 use crate::engine::workflow::Workflow;
 use crate::file_node::FileOperationKind;
+use crate::node_kind_provider;
 
 const MAX_OPTIONAL_CWD_VALUES: usize = 1;
 const MAX_OPTIONAL_BODY_VALUES: usize = 1;
@@ -76,6 +79,18 @@ pub struct PortableEdge {
 pub struct PortableNodeConfig {
     pub node_id: u64,
     pub kind: String,
+    #[serde(default)]
+    pub runtime_kind: String,
+    #[serde(default)]
+    pub runtime_key: String,
+    #[serde(default)]
+    pub effect_policy: String,
+    #[serde(default)]
+    pub cache_policy: String,
+    #[serde(default)]
+    pub retry_policy: String,
+    #[serde(default)]
+    pub artifact_policy: String,
     pub command: String,
     pub cwd: Vec<String>,
     pub env: Vec<PortableEnvVar>,
@@ -253,7 +268,9 @@ pub fn workflow_to_portable(workflow: &Workflow) -> PortableWorkflow {
     let mut configs = workflow
         .configs
         .iter()
-        .map(|(node_id, config)| node_config_to_portable(*node_id, config, workflow.credentials.get(node_id)))
+        .map(|(node_id, config)| {
+            node_config_to_portable(*node_id, config, workflow.credentials.get(node_id), workflow.runner.get(node_id))
+        })
         .collect::<Vec<_>>();
     configs.sort_by_key(|config| config.node_id);
 
@@ -278,11 +295,54 @@ fn port_to_portable(port: &rat_nodegraph::model::Port) -> PortablePort {
     }
 }
 
+struct PortableRunnerFields {
+    runtime_kind: String,
+    runtime_key: String,
+    effect_policy: String,
+    cache_policy: String,
+    retry_policy: String,
+    artifact_policy: String,
+}
+
+fn portable_runner_fields(config: &NodeConfig, settings: Option<&NodeRunnerSettings>) -> PortableRunnerFields {
+    let default_binding = runner::build_runner_plan(&workflow_for_config(config.clone()))
+        .plan
+        .and_then(|plan| plan.nodes.into_iter().next())
+        .map(|node| node.runtime)
+        .expect("single-node workflow has runner binding");
+    PortableRunnerFields {
+        runtime_kind: settings.map(|settings| settings.runtime_kind.clone()).unwrap_or(default_binding.kind),
+        runtime_key: settings.map(|settings| settings.runtime_key.clone()).unwrap_or(default_binding.key),
+        effect_policy: settings.map(|settings| settings.effect_policy.clone()).unwrap_or_default(),
+        cache_policy: settings.map(|settings| settings.cache_policy.clone()).unwrap_or_default(),
+        retry_policy: settings.map(|settings| settings.retry_policy.clone()).unwrap_or_default(),
+        artifact_policy: settings.map(|settings| settings.artifact_policy.clone()).unwrap_or_default(),
+    }
+}
+
+fn workflow_for_config(config: NodeConfig) -> Workflow {
+    let mut workflow = Workflow::new("portable-runner-config");
+    let node_id = match &config {
+        NodeConfig::Shell { command, .. } => workflow.add_shell_node("node", command),
+        NodeConfig::Http { method, url, .. } => workflow.add_http_node("node", method, url),
+        NodeConfig::File { operation, path, .. } => workflow.add_file_node("node", *operation, path),
+        NodeConfig::ImageInput { path, .. } => workflow.add_image_input_node("node", path),
+        NodeConfig::Agent(settings) => {
+            workflow.add_agent_node("node", settings.target, &settings.prompt, settings.output_mode)
+        }
+    };
+    workflow.set_node_config(node_id, config);
+    workflow
+}
+
+// r[impl n8nclone.workflow_format.node_kind_provider.export]
 fn node_config_to_portable(
     node_id: u64,
     config: &NodeConfig,
     credentials: Option<&NodeCredentialRefs>,
+    runner_settings: Option<&NodeRunnerSettings>,
 ) -> PortableNodeConfig {
+    let portable_runner = portable_runner_fields(config, runner_settings);
     match config {
         NodeConfig::Shell {
             command,
@@ -318,7 +378,13 @@ fn node_config_to_portable(
 
             PortableNodeConfig {
                 node_id,
-                kind: "shell".to_string(),
+                kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+                runtime_kind: portable_runner.runtime_kind,
+                runtime_key: portable_runner.runtime_key,
+                effect_policy: portable_runner.effect_policy,
+                cache_policy: portable_runner.cache_policy,
+                retry_policy: portable_runner.retry_policy,
+                artifact_policy: portable_runner.artifact_policy,
                 command: command.clone(),
                 cwd: cwd.iter().cloned().collect(),
                 env,
@@ -365,7 +431,13 @@ fn node_config_to_portable(
 
             PortableNodeConfig {
                 node_id,
-                kind: "http".to_string(),
+                kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+                runtime_kind: portable_runner.runtime_kind,
+                runtime_key: portable_runner.runtime_key,
+                effect_policy: portable_runner.effect_policy,
+                cache_policy: portable_runner.cache_policy,
+                retry_policy: portable_runner.retry_policy,
+                artifact_policy: portable_runner.artifact_policy,
                 command: String::new(),
                 cwd: Vec::new(),
                 env: Vec::new(),
@@ -402,7 +474,13 @@ fn node_config_to_portable(
             allowed_roots,
         } => PortableNodeConfig {
             node_id,
-            kind: "file".to_string(),
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
@@ -436,7 +514,13 @@ fn node_config_to_portable(
             max_bytes,
         } => PortableNodeConfig {
             node_id,
-            kind: "image_input".to_string(),
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
@@ -466,7 +550,13 @@ fn node_config_to_portable(
         },
         NodeConfig::Agent(settings) => PortableNodeConfig {
             node_id,
-            kind: "agent".to_string(),
+            kind: node_kind_provider::portable_kind_for_config(config).to_string(),
+            runtime_kind: portable_runner.runtime_kind,
+            runtime_key: portable_runner.runtime_key,
+            effect_policy: portable_runner.effect_policy,
+            cache_policy: portable_runner.cache_policy,
+            retry_policy: portable_runner.retry_policy,
+            artifact_policy: portable_runner.artifact_policy,
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
@@ -541,6 +631,7 @@ pub fn portable_to_workflow(portable: PortableWorkflow) -> Result<Workflow, Work
             *node_id_map.get(&config.node_id).ok_or(WorkflowFormatError::UnknownConfigNode(config.node_id))?;
         workflow.set_node_config(new_node_id, portable_config_to_node_config(config)?);
         workflow.set_node_credentials(new_node_id, portable_config_to_node_credentials(config)?);
+        workflow.set_node_runner_settings(new_node_id, portable_config_to_runner_settings(config));
     }
 
     for portable_node in &portable.nodes {
@@ -586,8 +677,13 @@ fn validate_portable_identity(portable: &PortableWorkflow) -> Result<(), Workflo
     Ok(())
 }
 
+// r[impl n8nclone.workflow_format.node_kind_provider.import]
+// r[impl n8nclone.workflow_format.node_kind_provider.handlers]
 fn portable_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
-    match config.kind.as_str() {
+    let Some(provider) = node_kind_provider::provider_for_portable_kind(&config.kind) else {
+        return Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone()));
+    };
+    match provider.portable_kind() {
         "shell" => portable_shell_config_to_node_config(config),
         "http" => portable_http_config_to_node_config(config),
         "file" => portable_file_config_to_node_config(config),
@@ -741,6 +837,33 @@ fn file_operation_label(operation: FileOperationKind) -> &'static str {
     }
 }
 
+fn portable_config_to_runner_settings(config: &PortableNodeConfig) -> NodeRunnerSettings {
+    let default_binding = runner::build_runner_plan(&workflow_for_config(
+        portable_config_to_node_config(config).expect("portable config was validated before runner settings"),
+    ))
+    .plan
+    .and_then(|plan| plan.nodes.into_iter().next())
+    .map(|node| node.runtime)
+    .expect("single-node workflow has runner binding");
+
+    NodeRunnerSettings {
+        runtime_kind: non_empty_or_default(&config.runtime_kind, default_binding.kind),
+        runtime_key: non_empty_or_default(&config.runtime_key, default_binding.key),
+        effect_policy: config.effect_policy.clone(),
+        cache_policy: config.cache_policy.clone(),
+        retry_policy: config.retry_policy.clone(),
+        artifact_policy: config.artifact_policy.clone(),
+    }
+}
+
+fn non_empty_or_default(value: &str, default_value: String) -> String {
+    if value.trim().is_empty() {
+        default_value
+    } else {
+        value.to_string()
+    }
+}
+
 fn portable_config_to_node_credentials(config: &PortableNodeConfig) -> Result<NodeCredentialRefs, WorkflowFormatError> {
     let mut env = HashMap::new();
     for secret_env in &config.secret_env {
@@ -789,7 +912,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, timeout_secs | Number, pipe_stdin | Bool } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
@@ -850,6 +973,12 @@ fn render_config(output: &mut String, config: &PortableNodeConfig) {
     output.push_str("    {\n");
     output.push_str(&format!("      node_id = {},\n", config.node_id));
     output.push_str(&format!("      kind = {},\n", quoted(&config.kind)));
+    output.push_str(&format!("      runtime_kind = {},\n", quoted(&config.runtime_kind)));
+    output.push_str(&format!("      runtime_key = {},\n", quoted(&config.runtime_key)));
+    output.push_str(&format!("      effect_policy = {},\n", quoted(&config.effect_policy)));
+    output.push_str(&format!("      cache_policy = {},\n", quoted(&config.cache_policy)));
+    output.push_str(&format!("      retry_policy = {},\n", quoted(&config.retry_policy)));
+    output.push_str(&format!("      artifact_policy = {},\n", quoted(&config.artifact_policy)));
     output.push_str(&format!("      command = {},\n", quoted(&config.command)));
     output.push_str("      cwd = [");
     for cwd in &config.cwd {

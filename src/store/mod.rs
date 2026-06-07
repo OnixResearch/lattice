@@ -78,6 +78,43 @@ pub struct RunDetailRecord {
     pub nodes: Vec<RunNodeDetail>,
 }
 
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+pub trait WorkflowRepository {
+    fn save_workflow(&self, workflow: &Workflow) -> Result<(), StoreError>;
+    fn load_workflow(&self, name: &str) -> Result<Option<Workflow>, StoreError>;
+    fn list_workflows(&self) -> Result<Vec<String>, StoreError>;
+    fn delete_workflow(&self, name: &str) -> Result<(), StoreError>;
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+pub trait RunHistoryStore {
+    fn save_run(&self, record: &RunRecord) -> Result<(), StoreError>;
+    fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError>;
+    fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError>;
+    fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError>;
+    fn next_run_id(&self) -> Result<RunId, StoreError>;
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+pub trait ExecutionCache {
+    fn put_cache(&self, input_hash: &ContentHash, outputs: &HashMap<PortId, Value>) -> Result<(), StoreError>;
+    fn get_cache(&self, input_hash: &ContentHash) -> Result<Option<HashMap<PortId, Value>>, StoreError>;
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+pub trait ValueStore {
+    fn put_value(&self, value: &Value) -> Result<(), StoreError>;
+    fn get_value(&self, hash: &ContentHash) -> Result<Option<Value>, StoreError>;
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+pub trait ScheduleStore {
+    fn save_schedule(&self, schedule: &ScheduleDefinition) -> Result<(), StoreError>;
+    fn load_schedule(&self, schedule_id: &str) -> Result<Option<ScheduleDefinition>, StoreError>;
+    fn list_schedules(&self) -> Result<Vec<ScheduleDefinition>, StoreError>;
+    fn delete_schedule(&self, schedule_id: &str) -> Result<(), StoreError>;
+}
+
 /// Persistent store backed by redb.
 pub struct Store {
     db: Database,
@@ -372,3 +409,86 @@ impl std::fmt::Display for StoreError {
 }
 
 impl std::error::Error for StoreError {}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+impl WorkflowRepository for Store {
+    fn save_workflow(&self, workflow: &Workflow) -> Result<(), StoreError> {
+        Store::save_workflow(self, workflow)
+    }
+
+    fn load_workflow(&self, name: &str) -> Result<Option<Workflow>, StoreError> {
+        Store::load_workflow(self, name)
+    }
+
+    fn list_workflows(&self) -> Result<Vec<String>, StoreError> {
+        Store::list_workflows(self)
+    }
+
+    fn delete_workflow(&self, name: &str) -> Result<(), StoreError> {
+        Store::delete_workflow(self, name)
+    }
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+impl RunHistoryStore for Store {
+    fn save_run(&self, record: &RunRecord) -> Result<(), StoreError> {
+        Store::save_run(self, record)
+    }
+
+    fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError> {
+        Store::save_run_details(self, record)
+    }
+
+    fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError> {
+        Store::load_run_details(self, run_id)
+    }
+
+    fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError> {
+        Store::list_runs(self, limit)
+    }
+
+    fn next_run_id(&self) -> Result<RunId, StoreError> {
+        Store::next_run_id(self)
+    }
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+impl ExecutionCache for Store {
+    fn put_cache(&self, input_hash: &ContentHash, outputs: &HashMap<PortId, Value>) -> Result<(), StoreError> {
+        Store::put_cache(self, input_hash, outputs)
+    }
+
+    fn get_cache(&self, input_hash: &ContentHash) -> Result<Option<HashMap<PortId, Value>>, StoreError> {
+        Store::get_cache(self, input_hash)
+    }
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+impl ValueStore for Store {
+    fn put_value(&self, value: &Value) -> Result<(), StoreError> {
+        Store::put_value(self, value)
+    }
+
+    fn get_value(&self, hash: &ContentHash) -> Result<Option<Value>, StoreError> {
+        Store::get_value(self, hash)
+    }
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+impl ScheduleStore for Store {
+    fn save_schedule(&self, schedule: &ScheduleDefinition) -> Result<(), StoreError> {
+        Store::save_schedule(self, schedule)
+    }
+
+    fn load_schedule(&self, schedule_id: &str) -> Result<Option<ScheduleDefinition>, StoreError> {
+        Store::load_schedule(self, schedule_id)
+    }
+
+    fn list_schedules(&self) -> Result<Vec<ScheduleDefinition>, StoreError> {
+        Store::list_schedules(self)
+    }
+
+    fn delete_schedule(&self, schedule_id: &str) -> Result<(), StoreError> {
+        Store::delete_schedule(self, schedule_id)
+    }
+}

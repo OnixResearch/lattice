@@ -14,7 +14,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::agent_node;
+use crate::engine::value::Value;
+use crate::engine::value::ValueData;
 use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::NodeRunnerSettings;
 use crate::engine::workflow::Workflow;
 
 const RUNTIME_KIND_AGENT: &str = "agent";
@@ -28,6 +31,9 @@ const RUNTIME_KEY_WRITE_FILE: &str = "write";
 const RUNTIME_KEY_APPEND_FILE: &str = "append";
 const TYPE_TAG_ANY: &str = "any";
 const EDGE_COUNT_EMPTY: usize = 0;
+const RUNNER_EVENT_INITIAL_SEQUENCE: u64 = 0;
+const RUNNER_EVENT_SEQUENCE_INCREMENT: u64 = 1;
+const REDACTED_SUMMARY: &str = "[redacted]";
 
 pub type RunnerNodeId = u64;
 pub type RunnerPortId = u64;
@@ -45,15 +51,24 @@ pub struct RunnerNode {
     pub label: String,
     pub kind: String,
     pub runtime: RuntimeBinding,
+    pub policy: RunnerPolicy,
     pub input_ports: Vec<RunnerPort>,
     pub output_ports: Vec<RunnerPort>,
     pub credential_ref_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RuntimeBinding {
     pub kind: String,
     pub key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunnerPolicy {
+    pub effect_policy: String,
+    pub cache_policy: String,
+    pub retry_policy: String,
+    pub artifact_policy: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +104,11 @@ pub enum RunnerDiagnosticCode {
     EdgeSelfLoop,
     EdgeIncompatibleType,
     CycleDetected,
+    MissingRuntimeBinding,
+    RuntimeOutputPortMissing,
+    RuntimeOutputTypeMismatch,
+    RuntimeFailure,
+    TerminalStateMutation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,6 +163,108 @@ pub enum RunnerAdmission {
     Rejected { diagnostics: Vec<RunnerDiagnostic> },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeRegistry {
+    bindings: BTreeSet<RuntimeBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeOutputShape {
+    pub port_id: RunnerPortId,
+    pub type_tag: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeInvocation {
+    pub node_id: RunnerNodeId,
+    pub binding: RuntimeBinding,
+    pub inputs: BTreeMap<RunnerPortId, Value>,
+    pub output_ports: Vec<RunnerPort>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeOutputValue {
+    pub port_id: RunnerPortId,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum RuntimeResult {
+    Completed { outputs: Vec<RuntimeOutputValue> },
+    Failed { message: String },
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.runtime_dispatch]
+pub trait NodeRuntime: Send + Sync {
+    fn binding(&self) -> RuntimeBinding;
+    fn validate(&self, node: &RunnerNode) -> Vec<RunnerDiagnostic>;
+    fn execute(&self, invocation: RuntimeInvocation) -> RuntimeResult;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunnerEventKind {
+    RunStarted,
+    NodeReady,
+    NodeStarted,
+    CacheHit,
+    RuntimeStdout,
+    RuntimeStderr,
+    ArtifactCreated,
+    NodeCompleted,
+    NodeFailed,
+    NodeCancelled,
+    RunCompleted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunnerEvent {
+    pub run_id: String,
+    pub sequence: u64,
+    pub node_id: Option<RunnerNodeId>,
+    pub port_id: Option<RunnerPortId>,
+    pub kind: RunnerEventKind,
+    pub summary: String,
+    pub redacted: bool,
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.event_sink]
+pub trait RunnerEventSink {
+    fn emit(&mut self, event: RunnerEvent);
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CapturingRunnerEventSink {
+    pub events: Vec<RunnerEvent>,
+}
+
+// r[impl n8nclone.workflow_execution.trait_boundaries.event_sink]
+impl RunnerEventSink for CapturingRunnerEventSink {
+    fn emit(&mut self, event: RunnerEvent) {
+        self.events.push(event);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactReference {
+    pub content_hash: String,
+    pub type_tag: String,
+    pub media_type: Option<String>,
+    pub byte_length: usize,
+    pub backend_ref: String,
+    pub sensitive: bool,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurableRunnerDecision {
+    Execute,
+    AwaitDependencies,
+    SkipCompleted,
+    RejectTerminalMutation,
+    BlockedByFailedDependency,
+}
+
 // r[impl n8nclone.workflow_execution.runner_core.plan_ir]
 pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
     let mut diagnostics = Vec::new();
@@ -158,11 +280,13 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
             ));
             continue;
         };
+        let runner_settings = workflow.node_runner_settings(node.id);
         nodes.push(RunnerNode {
             id: node.id.0,
             label: node.label.clone(),
             kind: config.kind_label().to_string(),
-            runtime: runtime_binding_for_config(config),
+            runtime: runtime_binding_for_node(config, runner_settings),
+            policy: runner_policy_for_node(runner_settings),
             input_ports: node.input_ports.iter().map(runner_port_from_graph_port).collect(),
             output_ports: node.output_ports.iter().map(runner_port_from_graph_port).collect(),
             credential_ref_count: workflow.node_credentials(node.id).map_or(EDGE_COUNT_EMPTY, credential_ref_count),
@@ -196,6 +320,34 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
             plan: None,
             diagnostics,
         }
+    }
+}
+
+fn runtime_binding_for_node(config: &NodeConfig, settings: Option<&NodeRunnerSettings>) -> RuntimeBinding {
+    settings
+        .map(|settings| runtime_binding(&settings.runtime_kind, &settings.runtime_key))
+        .unwrap_or_else(|| runtime_binding_for_config(config))
+}
+
+fn runner_policy_for_node(settings: Option<&NodeRunnerSettings>) -> RunnerPolicy {
+    settings.map(runner_policy_from_settings).unwrap_or_else(default_runner_policy)
+}
+
+fn runner_policy_from_settings(settings: &NodeRunnerSettings) -> RunnerPolicy {
+    RunnerPolicy {
+        effect_policy: settings.effect_policy.clone(),
+        cache_policy: settings.cache_policy.clone(),
+        retry_policy: settings.retry_policy.clone(),
+        artifact_policy: settings.artifact_policy.clone(),
+    }
+}
+
+fn default_runner_policy() -> RunnerPolicy {
+    RunnerPolicy {
+        effect_policy: String::new(),
+        cache_policy: String::new(),
+        retry_policy: String::new(),
+        artifact_policy: String::new(),
     }
 }
 
@@ -448,6 +600,207 @@ pub fn transition_step_state(
 
 pub fn is_terminal_step_state(state: RunnerStepState) -> bool {
     matches!(state, RunnerStepState::Completed | RunnerStepState::Failed | RunnerStepState::Cancelled)
+}
+
+// r[impl n8nclone.workflow_execution.runtime_registry.dispatch]
+pub fn builtin_runtime_registry() -> RuntimeRegistry {
+    RuntimeRegistry::new([
+        runtime_binding(RUNTIME_KIND_SHELL, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_HTTP, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_FILE, RUNTIME_KEY_READ_FILE),
+        runtime_binding(RUNTIME_KIND_FILE, RUNTIME_KEY_WRITE_FILE),
+        runtime_binding(RUNTIME_KIND_FILE, RUNTIME_KEY_APPEND_FILE),
+        runtime_binding(RUNTIME_KIND_IMAGE_INPUT, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Pi)),
+        runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Clankers)),
+    ])
+}
+
+impl RuntimeRegistry {
+    pub fn new(bindings: impl IntoIterator<Item = RuntimeBinding>) -> Self {
+        Self {
+            bindings: bindings.into_iter().collect(),
+        }
+    }
+
+    pub fn contains(&self, binding: &RuntimeBinding) -> bool {
+        self.bindings.contains(binding)
+    }
+}
+
+// r[impl n8nclone.workflow_execution.runtime_registry.dispatch]
+pub fn validate_runtime_bindings(plan: &RunnerWorkflow, registry: &RuntimeRegistry) -> Vec<RunnerDiagnostic> {
+    plan.nodes
+        .iter()
+        .filter(|node| !registry.contains(&node.runtime))
+        .map(|node| {
+            runner_diagnostic(
+                RunnerDiagnosticCode::MissingRuntimeBinding,
+                Some(NodeId(node.id)),
+                None,
+                format!(
+                    "node '{}' references missing runtime '{}:{}'",
+                    node.label, node.runtime.kind, node.runtime.key
+                ),
+            )
+        })
+        .collect()
+}
+
+// r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
+pub fn admit_runtime_outputs(node: &RunnerNode, outputs: &[RuntimeOutputShape]) -> Result<(), Vec<RunnerDiagnostic>> {
+    let declared = node.output_ports.iter().map(|port| (port.id, port.type_tag.as_str())).collect::<BTreeMap<_, _>>();
+    let diagnostics = outputs
+        .iter()
+        .filter_map(|output| runtime_output_diagnostic(node, &declared, output))
+        .collect::<Vec<_>>();
+
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
+fn runtime_output_diagnostic(
+    node: &RunnerNode,
+    declared: &BTreeMap<RunnerPortId, &str>,
+    output: &RuntimeOutputShape,
+) -> Option<RunnerDiagnostic> {
+    let Some(expected_type) = declared.get(&output.port_id) else {
+        return Some(runner_diagnostic(
+            RunnerDiagnosticCode::RuntimeOutputPortMissing,
+            Some(NodeId(node.id)),
+            Some(PortId(output.port_id)),
+            format!("runtime output for node '{}' references undeclared output port", node.label),
+        ));
+    };
+    if !port_types_compatible(&output.type_tag, expected_type) {
+        return Some(runner_diagnostic(
+            RunnerDiagnosticCode::RuntimeOutputTypeMismatch,
+            Some(NodeId(node.id)),
+            Some(PortId(output.port_id)),
+            format!(
+                "runtime output for node '{}' has type '{}' but port expects '{}'",
+                node.label, output.type_tag, expected_type
+            ),
+        ));
+    }
+    None
+}
+
+// r[impl n8nclone.workflow_execution.runner_events.stream]
+pub fn runner_event(
+    run_id: impl Into<String>,
+    prior_events: &[RunnerEvent],
+    node_id: Option<RunnerNodeId>,
+    port_id: Option<RunnerPortId>,
+    kind: RunnerEventKind,
+    summary: impl Into<String>,
+    sensitive_fragments: &[String],
+) -> RunnerEvent {
+    let raw_summary = summary.into();
+    let redacted = contains_sensitive_fragment(&raw_summary, sensitive_fragments);
+    RunnerEvent {
+        run_id: run_id.into(),
+        sequence: next_event_sequence(prior_events),
+        node_id,
+        port_id,
+        kind,
+        summary: if redacted {
+            REDACTED_SUMMARY.to_string()
+        } else {
+            raw_summary
+        },
+        redacted,
+    }
+}
+
+fn next_event_sequence(prior_events: &[RunnerEvent]) -> u64 {
+    prior_events
+        .last()
+        .map(|event| event.sequence + RUNNER_EVENT_SEQUENCE_INCREMENT)
+        .unwrap_or(RUNNER_EVENT_INITIAL_SEQUENCE)
+}
+
+// r[impl n8nclone.workflow_execution.runner_events.redaction]
+fn contains_sensitive_fragment(summary: &str, sensitive_fragments: &[String]) -> bool {
+    sensitive_fragments
+        .iter()
+        .filter(|fragment| !fragment.is_empty())
+        .any(|fragment| summary.contains(fragment))
+}
+
+// r[impl n8nclone.workflow_execution.artifact_references.model]
+// r[impl n8nclone.workflow_execution.artifact_references.trellis_identity]
+pub fn artifact_reference_for_value(value: &Value, backend_ref: impl Into<String>) -> ArtifactReference {
+    ArtifactReference {
+        content_hash: value.hash.to_hex(),
+        type_tag: value.type_tag().as_str().to_string(),
+        media_type: value_media_type(value),
+        byte_length: value_byte_length(value),
+        backend_ref: backend_ref.into(),
+        sensitive: !value.sensitive_fragments.is_empty(),
+        summary: value.as_display_string(),
+    }
+}
+
+fn value_media_type(value: &Value) -> Option<String> {
+    match &value.data {
+        ValueData::Image(image) => Some(image.media_type.clone()),
+        _ => None,
+    }
+}
+
+fn value_byte_length(value: &Value) -> usize {
+    match &value.data {
+        ValueData::String(value) => value.len(),
+        ValueData::Bytes(value) => value.len(),
+        ValueData::Json(value) => serde_json::to_vec(value).map(|bytes| bytes.len()).unwrap_or_default(),
+        ValueData::Image(image) => image.bytes.len(),
+        ValueData::ExitCode(_) => std::mem::size_of::<i32>(),
+        ValueData::Error { message, stderr } => message.len() + stderr.len(),
+    }
+}
+
+// r[impl n8nclone.workflow_execution.durable_runner.resume]
+pub fn durable_runner_decision(
+    plan: &RunnerWorkflow,
+    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
+    node_id: RunnerNodeId,
+) -> DurableRunnerDecision {
+    match step_state_for_node(states, node_id) {
+        RunnerStepState::Completed => DurableRunnerDecision::SkipCompleted,
+        RunnerStepState::Failed | RunnerStepState::Cancelled => DurableRunnerDecision::RejectTerminalMutation,
+        RunnerStepState::Pending | RunnerStepState::Ready | RunnerStepState::Running => {
+            durable_decision_for_non_terminal_step(plan, states, node_id)
+        }
+    }
+}
+
+fn durable_decision_for_non_terminal_step(
+    plan: &RunnerWorkflow,
+    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
+    node_id: RunnerNodeId,
+) -> DurableRunnerDecision {
+    if has_failed_dependency(plan, states, node_id) {
+        return DurableRunnerDecision::BlockedByFailedDependency;
+    }
+    if dependencies_completed(plan, states, node_id) {
+        DurableRunnerDecision::Execute
+    } else {
+        DurableRunnerDecision::AwaitDependencies
+    }
+}
+
+fn has_failed_dependency(
+    plan: &RunnerWorkflow,
+    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
+    node_id: RunnerNodeId,
+) -> bool {
+    plan.edges.iter().filter(|edge| edge.target_node == node_id).any(|edge| {
+        matches!(step_state_for_node(states, edge.source_node), RunnerStepState::Failed | RunnerStepState::Cancelled)
+    })
 }
 
 fn runner_diagnostic(

@@ -15,9 +15,12 @@ use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
 use crate::engine::workflow::Workflow;
+use crate::store::ExecutionCache;
+use crate::store::RunHistoryStore;
 use crate::store::RunRecord;
 use crate::store::Store;
 use crate::store::StoreError;
+use crate::store::WorkflowRepository;
 use crate::workflow_validation;
 use crate::workflow_validation::WorkflowDiagnostic;
 
@@ -174,12 +177,16 @@ pub async fn run_saved_workflow_with_agent_runtime_config(
     .await
 }
 
-async fn run_saved_workflow_with_executor_factory(
-    store: &Store,
+// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+async fn run_saved_workflow_with_executor_factory<S>(
+    store: &S,
     workflow_name: &str,
     run_id: RunId,
     executor_factory: impl FnOnce() -> Executor,
-) -> Result<HeadlessRunSummary, HeadlessRunError> {
+) -> Result<HeadlessRunSummary, HeadlessRunError>
+where
+    S: WorkflowRepository + ExecutionCache + RunHistoryStore,
+{
     let workflow = store
         .load_workflow(workflow_name)?
         .ok_or_else(|| HeadlessRunError::WorkflowNotFound(workflow_name.to_string()))?;
@@ -202,7 +209,7 @@ async fn run_saved_workflow_with_executor_factory(
     Ok(summary)
 }
 
-fn persist_completed_outputs_to_cache(store: &Store, results: &[StepResult]) {
+fn persist_completed_outputs_to_cache(store: &impl ExecutionCache, results: &[StepResult]) {
     for step in results {
         if let NodeStatus::Completed { outputs, .. } = &step.status {
             let _ = store.put_cache(&step.input_hash, outputs);

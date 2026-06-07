@@ -130,6 +130,34 @@ impl NodeConfig {
     }
 }
 
+/// Optional per-node generic runner metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NodeRunnerSettings {
+    pub runtime_kind: String,
+    pub runtime_key: String,
+    #[serde(default)]
+    pub effect_policy: String,
+    #[serde(default)]
+    pub cache_policy: String,
+    #[serde(default)]
+    pub retry_policy: String,
+    #[serde(default)]
+    pub artifact_policy: String,
+}
+
+impl NodeRunnerSettings {
+    pub fn new(runtime_kind: impl Into<String>, runtime_key: impl Into<String>) -> Self {
+        Self {
+            runtime_kind: runtime_kind.into(),
+            runtime_key: runtime_key.into(),
+            effect_policy: String::new(),
+            cache_policy: String::new(),
+            retry_policy: String::new(),
+            artifact_policy: String::new(),
+        }
+    }
+}
+
 /// A complete workflow: graph topology + node configs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
@@ -138,6 +166,8 @@ pub struct Workflow {
     pub configs: HashMap<u64, NodeConfig>,
     #[serde(default)]
     pub credentials: HashMap<u64, NodeCredentialRefs>,
+    #[serde(default)]
+    pub runner: HashMap<u64, NodeRunnerSettings>,
 }
 
 impl Workflow {
@@ -152,6 +182,7 @@ impl Workflow {
             graph,
             configs: HashMap::new(),
             credentials: HashMap::new(),
+            runner: HashMap::new(),
         }
     }
 
@@ -262,6 +293,16 @@ impl Workflow {
         } else {
             self.credentials.insert(id.0, refs);
         }
+    }
+
+    /// Get generic runner settings for a node.
+    pub fn node_runner_settings(&self, id: NodeId) -> Option<&NodeRunnerSettings> {
+        self.runner.get(&id.0)
+    }
+
+    /// Set or replace generic runner settings for a node.
+    pub fn set_node_runner_settings(&mut self, id: NodeId, settings: NodeRunnerSettings) {
+        self.runner.insert(id.0, settings);
     }
 
     /// Touch the modified timestamp.

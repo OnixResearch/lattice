@@ -62,6 +62,7 @@ r[n8nclone.workflow_format.nickel.invalid.missing_field]
 - GIVEN a Nickel workflow file omits a required workflow field
 - WHEN validation runs
 - THEN the system reports the missing field and refuses to save the workflow
+
 ### Requirement: Nickel generic agent node import and export
 r[n8nclone.workflow_format.agent_nodes.nickel] The system MUST preserve image input and generic agent nodes in typed Nickel workflow import and export.
 
@@ -124,3 +125,45 @@ r[n8nclone.workflow_examples.image.invalid]
 - GIVEN an image workflow example fixture intentionally references an unsupported image format
 - WHEN the fixture is imported or run in negative tests
 - THEN the system reports the expected diagnostic and does not create partial workflow state
+
+### Requirement: Generic pipeline Nickel IR
+r[n8nclone.workflow_format.generic_pipeline_ir] The system MUST represent generic runner metadata in typed Nickel workflow import/export without losing existing workflow meaning.
+
+#### Scenario: Export runtime bindings
+r[n8nclone.workflow_format.generic_pipeline_ir.nickel]
+- GIVEN a workflow contains typed nodes with runtime bindings, effect policies, cache policy, retry policy, artifact-reference policy, ports, and edges
+- WHEN the operator exports the workflow to Nickel
+- THEN the system MUST write a typed Nickel workflow file that preserves those generic pipeline fields alongside existing node configuration
+
+#### Scenario: Import runtime bindings
+r[n8nclone.workflow_format.generic_pipeline_ir.import]
+- GIVEN a typed Nickel workflow file declares valid runtime bindings and runner policy fields
+- WHEN the operator imports it
+- THEN the system MUST validate and save a workflow whose runner plan has equivalent typed topology, runtime bindings, and policy metadata
+
+#### Scenario: Backward-compatible round trip
+r[n8nclone.workflow_format.generic_pipeline_ir.compatibility]
+- GIVEN an existing Nickel workflow omits generic runner fields and uses current shell, HTTP, file, image, or generic agent node configuration
+- WHEN the workflow is imported, exported, and run
+- THEN the system MUST preserve existing workflow meaning by applying deterministic default runtime bindings and policies
+
+### Requirement: Node-kind provider format handlers
+r[n8nclone.workflow_format.node_kind_provider] The system MUST preserve typed Nickel workflow import and export semantics while moving built-in node configuration mapping behind node-kind format handlers.
+
+#### Scenario: Provider-backed export
+r[n8nclone.workflow_format.node_kind_provider.export]
+- GIVEN a saved workflow contains built-in shell, HTTP, file, image, or generic agent nodes
+- WHEN the operator exports the workflow to Nickel
+- THEN the system MUST use registered node-kind format handlers where available and produce Nickel output equivalent to the existing format contract
+
+#### Scenario: Provider-backed import
+r[n8nclone.workflow_format.node_kind_provider.import]
+- GIVEN a Nickel workflow file declares built-in shell, HTTP, file, image, or generic agent nodes
+- WHEN the operator imports the workflow
+- THEN the system MUST use registered node-kind format handlers where available and produce equivalent persisted `NodeConfig` data
+
+#### Scenario: Malformed node config remains rejected
+r[n8nclone.workflow_format.node_kind_provider.handlers]
+- GIVEN a Nickel workflow node has missing, unknown, or malformed fields for its node kind
+- WHEN provider-backed import validation runs
+- THEN the system MUST reject the workflow with deterministic diagnostics and preserve existing saved workflows

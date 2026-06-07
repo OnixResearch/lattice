@@ -27,6 +27,7 @@ use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::EmptyCredentialProvider;
 use crate::credentials::NodeCredentialRefs;
+use crate::engine::runner;
 use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
@@ -720,6 +721,74 @@ fn agent_outputs_by_real_port(
     mapped
 }
 
+// r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
+fn completed_step_result(
+    node_id: NodeId,
+    input_hash: ContentHash,
+    node: &Node,
+    outputs: HashMap<PortId, Value>,
+    cached: bool,
+) -> StepResult {
+    match admit_completed_outputs(node, &outputs) {
+        Ok(()) => StepResult {
+            node_id,
+            status: NodeStatus::Completed { outputs, cached },
+            input_hash,
+        },
+        Err(error) => StepResult {
+            node_id,
+            status: NodeStatus::Failed { error },
+            input_hash,
+        },
+    }
+}
+
+fn admit_completed_outputs(node: &Node, outputs: &HashMap<PortId, Value>) -> Result<(), String> {
+    let runner_node = runner_node_from_graph_node(node);
+    let output_shapes = outputs
+        .iter()
+        .map(|(port_id, value)| runner::RuntimeOutputShape {
+            port_id: port_id.0,
+            type_tag: value.type_tag().as_str().to_string(),
+        })
+        .collect::<Vec<_>>();
+    runner::admit_runtime_outputs(&runner_node, &output_shapes).map_err(format_runner_output_diagnostics)
+}
+
+fn runner_node_from_graph_node(node: &Node) -> runner::RunnerNode {
+    runner::RunnerNode {
+        id: node.id.0,
+        label: node.label.clone(),
+        kind: String::new(),
+        runtime: runner::RuntimeBinding {
+            kind: String::new(),
+            key: String::new(),
+        },
+        policy: runner::RunnerPolicy {
+            effect_policy: String::new(),
+            cache_policy: String::new(),
+            retry_policy: String::new(),
+            artifact_policy: String::new(),
+        },
+        input_ports: Vec::new(),
+        output_ports: node
+            .output_ports
+            .iter()
+            .map(|port| runner::RunnerPort {
+                id: port.id.0,
+                label: port.label.clone(),
+                direction: runner::RunnerPortDirection::Output,
+                type_tag: port.type_tag.clone(),
+            })
+            .collect(),
+        credential_ref_count: 0,
+    }
+}
+
+fn format_runner_output_diagnostics(diagnostics: Vec<runner::RunnerDiagnostic>) -> String {
+    diagnostics.into_iter().map(|diagnostic| diagnostic.message).collect::<Vec<_>>().join("; ")
+}
+
 /// Unique identifier for an execution run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RunId(pub u64);
@@ -1027,17 +1096,16 @@ impl Executor {
                 .await;
 
                 match result {
-                    Ok(shell_outputs) => StepResult {
+                    Ok(shell_outputs) => completed_step_result(
                         node_id,
-                        status: NodeStatus::Completed {
-                            outputs: shell_outputs_by_real_port(
-                                output_ports,
-                                redact_shell_outputs(shell_outputs, &sensitive_fragments),
-                            ),
-                            cached: false,
-                        },
                         input_hash,
-                    },
+                        node,
+                        shell_outputs_by_real_port(
+                            output_ports,
+                            redact_shell_outputs(shell_outputs, &sensitive_fragments),
+                        ),
+                        false,
+                    ),
                     Err(e) => StepResult {
                         node_id,
                         status: NodeStatus::Failed { error: e.to_string() },
@@ -1112,14 +1180,13 @@ impl Executor {
                     inputs,
                 );
                 match self.http_client.execute(&request) {
-                    Ok(response) => StepResult {
+                    Ok(response) => completed_step_result(
                         node_id,
-                        status: NodeStatus::Completed {
-                            outputs: http_outputs_by_real_port(output_ports, response),
-                            cached: false,
-                        },
                         input_hash,
-                    },
+                        node,
+                        http_outputs_by_real_port(output_ports, response),
+                        false,
+                    ),
                     Err(error) => StepResult {
                         node_id,
                         status: NodeStatus::Failed {
@@ -1189,14 +1256,13 @@ impl Executor {
                     inputs,
                 );
                 match self.file_system.execute(&plan) {
-                    Ok(result) => StepResult {
+                    Ok(result) => completed_step_result(
                         node_id,
-                        status: NodeStatus::Completed {
-                            outputs: file_outputs_by_real_port(output_ports, &resolved_path.value, result),
-                            cached: false,
-                        },
                         input_hash,
-                    },
+                        node,
+                        file_outputs_by_real_port(output_ports, &resolved_path.value, result),
+                        false,
+                    ),
                     Err(error) => StepResult {
                         node_id,
                         status: NodeStatus::Failed {
@@ -1243,14 +1309,13 @@ impl Executor {
                 };
                 let plan = image_node::image_input_plan(&resolved_path.value, &resolved_roots, *max_bytes);
                 match self.image_io.load(&plan) {
-                    Ok(image) => StepResult {
+                    Ok(image) => completed_step_result(
                         node_id,
-                        status: NodeStatus::Completed {
-                            outputs: image_outputs_by_real_port(output_ports, image),
-                            cached: false,
-                        },
                         input_hash,
-                    },
+                        node,
+                        image_outputs_by_real_port(output_ports, image),
+                        false,
+                    ),
                     Err(error) => StepResult {
                         node_id,
                         status: NodeStatus::Failed {
@@ -1359,14 +1424,13 @@ impl Executor {
                 );
                 match self.agent_adapter.execute(&request) {
                     Ok(response) => match agent_node::validate_agent_response_mode(&response, settings.output_mode) {
-                        Ok(()) => StepResult {
+                        Ok(()) => completed_step_result(
                             node_id,
-                            status: NodeStatus::Completed {
-                                outputs: agent_outputs_by_real_port(output_ports, response),
-                                cached: false,
-                            },
                             input_hash,
-                        },
+                            node,
+                            agent_outputs_by_real_port(output_ports, response),
+                            false,
+                        ),
                         Err(error) => StepResult {
                             node_id,
                             status: NodeStatus::Failed {
@@ -1426,17 +1490,16 @@ impl Executor {
 
             if let Some(cached_outputs) = cache.get(&input_hash) {
                 debug!(node = ?node_id, "cache hit, skipping execution");
-                for (port_id, value) in cached_outputs {
-                    port_values.insert(*port_id, value.clone());
+                let Some(node) = workflow.graph.node(node_id) else {
+                    continue;
+                };
+                let step = completed_step_result(node_id, input_hash, node, cached_outputs.clone(), true);
+                if let NodeStatus::Completed { ref outputs, .. } = step.status {
+                    for (port_id, value) in outputs {
+                        port_values.insert(*port_id, value.clone());
+                    }
                 }
-                results.push(StepResult {
-                    node_id,
-                    status: NodeStatus::Completed {
-                        outputs: cached_outputs.clone(),
-                        cached: true,
-                    },
-                    input_hash,
-                });
+                results.push(step);
                 continue;
             }
 
@@ -1565,47 +1628,12 @@ fn gather_inputs(workflow: &Workflow, node_id: NodeId, port_values: &HashMap<Por
 }
 
 /// Topological sort of the workflow graph. Returns None if cycles exist.
+// r[impl n8nclone.workflow_execution.runner_core.compatibility]
+// r[impl n8nclone.workflow_execution.trait_boundaries.compatibility]
 fn topological_sort(workflow: &Workflow) -> Option<Vec<NodeId>> {
-    let node_ids = workflow.graph.node_ids();
-    let mut in_degree: HashMap<NodeId, usize> = HashMap::new();
-    let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-
-    for &id in &node_ids {
-        in_degree.insert(id, 0);
-        adjacency.insert(id, Vec::new());
-    }
-
-    for edge in workflow.graph.edges() {
-        let src_node = workflow.graph.port_owner(edge.source);
-        let tgt_node = workflow.graph.port_owner(edge.target);
-        if let (Some(src), Some(tgt)) = (src_node, tgt_node) {
-            adjacency.entry(src).or_default().push(tgt);
-            *in_degree.entry(tgt).or_default() += 1;
-        }
-    }
-
-    let mut queue: Vec<NodeId> = in_degree.iter().filter(|(_, deg)| **deg == 0).map(|(&id, _)| id).collect();
-    queue.sort(); // deterministic order
-
-    let mut order = Vec::new();
-
-    while let Some(node) = queue.pop() {
-        order.push(node);
-        if let Some(neighbors) = adjacency.get(&node) {
-            for &neighbor in neighbors {
-                if let Some(deg) = in_degree.get_mut(&neighbor) {
-                    *deg -= 1;
-                    if *deg == 0 {
-                        queue.push(neighbor);
-                    }
-                }
-            }
-        }
-    }
-
-    if order.len() == node_ids.len() {
-        Some(order)
-    } else {
-        None
+    let plan = runner::build_runner_plan(workflow).plan?;
+    match runner::admit_runner_plan(&plan) {
+        runner::RunnerAdmission::Accepted { topo_order } => Some(topo_order.into_iter().map(NodeId).collect()),
+        runner::RunnerAdmission::Rejected { .. } => None,
     }
 }

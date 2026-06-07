@@ -18,10 +18,14 @@ use n8nclone::agent_node::AgentRequest;
 use n8nclone::agent_node::AgentResponse;
 use n8nclone::agent_node::AgentRuntimeConfig;
 use n8nclone::agent_node::AgentTarget;
+use n8nclone::agent_node::FakeProcessRunner;
+use n8nclone::agent_node::ProcessError;
+use n8nclone::agent_node::ProcessOutput;
 use n8nclone::agent_node::ProductionAgentAdapter;
 use n8nclone::agent_node::decode_agent_command_output;
 use n8nclone::agent_node::plan_agent_command;
 use n8nclone::agent_node::render_agent_command_prompt;
+use n8nclone::agent_node::run_agent_command_with_runner;
 use n8nclone::credentials::NodeCredentialRefs;
 use n8nclone::credentials::SecretRef;
 use n8nclone::engine::executor::Executor;
@@ -75,6 +79,7 @@ const HANDOFF_METADATA_LABEL: &str = "generated";
 const HANDOFF_ARTIFACT_BYTES: &[u8] = b"artifact bytes";
 const HANDOFF_BAD_IMAGE_BYTES: &[u8] = b"not an image";
 const NONZERO_STDERR: &str = "runtime failed";
+const PROCESS_STATUS_SUCCESS: i32 = 0;
 const MODEL_HINT: &str = "test-model";
 const SESSION_ID: &str = "session-123";
 const TOOL_POLICY: &str = "read-only";
@@ -251,6 +256,7 @@ fn default_agent_runtime_config_contains_command_presets() {
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[verify n8nclone.workflow_execution.runtime_registry.command_runtime]
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.planning]
 #[test]
 fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
@@ -293,6 +299,37 @@ fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
     assert!(prompt.contains(CONTEXT_REF));
 }
 
+// r[verify n8nclone.workflow_execution.trait_boundaries.process_runner]
+#[test]
+fn agent_command_uses_process_runner_output() {
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let config = runtime_config(Some("pi-test".to_string()), None);
+    let plan = plan_agent_command(&config, &request).expect("command plan builds");
+    let runner = FakeProcessRunner::new(Ok(ProcessOutput {
+        status_code: Some(PROCESS_STATUS_SUCCESS),
+        stdout: RUNTIME_TEXT_OUTPUT.as_bytes().to_vec(),
+        stderr: Vec::new(),
+    }));
+
+    let output = run_agent_command_with_runner(&plan, &runner).expect("fake process runner succeeds");
+
+    assert_eq!(output.status_code, Some(PROCESS_STATUS_SUCCESS));
+    assert_eq!(output.stdout, RUNTIME_TEXT_OUTPUT);
+}
+
+// r[verify n8nclone.workflow_execution.trait_boundaries.process_runner]
+#[test]
+fn agent_command_reports_process_runner_failure() {
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let config = runtime_config(Some("pi-test".to_string()), None);
+    let plan = plan_agent_command(&config, &request).expect("command plan builds");
+    let runner = FakeProcessRunner::new(Err(ProcessError::Timeout));
+
+    let error = run_agent_command_with_runner(&plan, &runner).expect_err("fake timeout fails command");
+
+    assert!(error.to_string().contains("process timed out"), "error: {error}");
+}
+
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.route]
 #[cfg(unix)]
@@ -326,6 +363,7 @@ fn production_clankers_json_adapter_executes_command() {
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
+// r[verify n8nclone.workflow_execution.runtime_registry.command_runtime]
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.errors]
 #[test]
 fn production_adapter_missing_runtime_rejects_before_spawn() {

@@ -8,8 +8,10 @@ use n8nclone::engine::executor::RunId;
 use n8nclone::engine::value::ContentHash;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::workflow::Workflow;
+use n8nclone::store::ExecutionCache;
 use n8nclone::store::RunRecord;
 use n8nclone::store::Store;
+use n8nclone::store::WorkflowRepository;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::PortId;
 
@@ -64,6 +66,21 @@ fn load_nonexistent_workflow_returns_none() {
     let (store, _dir) = common::temp_store();
     let result = store.load_workflow("does-not-exist").unwrap();
     assert!(result.is_none());
+}
+
+// r[verify n8nclone.workflow_execution.trait_boundaries.storage_ports]
+#[test]
+fn workflow_repository_trait_saves_loads_and_reports_missing_workflows() {
+    let (store, _dir) = common::temp_store();
+    let repository: &dyn WorkflowRepository = &store;
+    let workflow = Workflow::new("trait-workflow");
+
+    repository.save_workflow(&workflow).expect("trait save succeeds");
+    let loaded = repository.load_workflow("trait-workflow").expect("trait load succeeds");
+    let missing = repository.load_workflow("missing-workflow").expect("trait missing load succeeds");
+
+    assert!(loaded.is_some());
+    assert!(missing.is_none());
 }
 
 #[test]
@@ -200,6 +217,24 @@ fn get_missing_cache_returns_none() {
     let (store, _dir) = common::temp_store();
     let hash = ContentHash::from_bytes(b"no cache");
     assert!(store.get_cache(&hash).unwrap().is_none());
+}
+
+// r[verify n8nclone.workflow_execution.trait_boundaries.storage_ports]
+#[test]
+fn execution_cache_trait_reads_written_and_missing_entries() {
+    let (store, _dir) = common::temp_store();
+    let cache: &dyn ExecutionCache = &store;
+    let input_hash = ContentHash::from_bytes(b"trait cache key");
+    let missing_hash = ContentHash::from_bytes(b"trait missing cache key");
+    let mut outputs = HashMap::new();
+    outputs.insert(PortId(100), Value::from_string("trait cached output".into()));
+
+    cache.put_cache(&input_hash, &outputs).expect("trait cache write succeeds");
+    let loaded = cache.get_cache(&input_hash).expect("trait cache read succeeds");
+    let missing = cache.get_cache(&missing_hash).expect("trait cache missing read succeeds");
+
+    assert!(loaded.is_some());
+    assert!(missing.is_none());
 }
 
 #[test]

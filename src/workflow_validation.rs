@@ -11,9 +11,8 @@ use crate::engine::runner;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::expressions;
-use crate::file_node;
-use crate::http;
-use crate::image_node;
+use crate::node_kind_provider;
+use crate::node_kind_provider::NodeKindValidationCode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -43,6 +42,11 @@ pub enum WorkflowDiagnosticCode {
     EmptyAgentPrompt,
     InvalidExpressionSyntax,
     RunnerCycleDetected,
+    RunnerMissingRuntimeBinding,
+    RunnerRuntimeOutputPortMissing,
+    RunnerRuntimeOutputTypeMismatch,
+    RunnerRuntimeFailure,
+    RunnerTerminalStateMutation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,77 +113,7 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
             validate_config_expressions(node.id, config, diagnostics);
         }
         match workflow.node_config(node.id) {
-            Some(NodeConfig::Shell { command, .. }) if command.trim().is_empty() => {
-                diagnostics.push(fatal(
-                    WorkflowDiagnosticCode::EmptyShellCommand,
-                    Some(node.id),
-                    None,
-                    format!("shell node '{}' has an empty command", node.label),
-                ));
-            }
-            Some(NodeConfig::Shell { .. }) => {}
-            Some(NodeConfig::Http { method, url, .. }) => {
-                if !http::validate_http_method(method) {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::InvalidHttpMethod,
-                        Some(node.id),
-                        None,
-                        format!("HTTP node '{}' has an invalid method", node.label),
-                    ));
-                }
-                if !http::validate_http_url(url) {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::InvalidHttpUrl,
-                        Some(node.id),
-                        None,
-                        format!("HTTP node '{}' has an invalid URL", node.label),
-                    ));
-                }
-            }
-            Some(NodeConfig::File {
-                path, allowed_roots, ..
-            }) => {
-                if let Err(error) = file_node::validate_path_allowed(path, allowed_roots) {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::UnsafeFilePath,
-                        Some(node.id),
-                        None,
-                        error.to_string(),
-                    ));
-                }
-            }
-            Some(NodeConfig::ImageInput {
-                path,
-                allowed_roots,
-                max_bytes,
-            }) => {
-                if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::UnsafeImagePath,
-                        Some(node.id),
-                        None,
-                        error.to_string(),
-                    ));
-                }
-                if *max_bytes == 0 {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::InvalidImageByteBudget,
-                        Some(node.id),
-                        None,
-                        format!("image input node '{}' has a zero byte budget", node.label),
-                    ));
-                }
-            }
-            Some(NodeConfig::Agent(settings)) => {
-                if settings.prompt.trim().is_empty() {
-                    diagnostics.push(fatal(
-                        WorkflowDiagnosticCode::EmptyAgentPrompt,
-                        Some(node.id),
-                        None,
-                        format!("generic agent node '{}' has an empty prompt", node.label),
-                    ));
-                }
-            }
+            Some(config) => diagnostics.extend(provider_diagnostics(node.id, &node.label, config)),
             None => diagnostics.push(fatal(
                 WorkflowDiagnosticCode::MissingNodeConfig,
                 Some(node.id),
@@ -199,6 +133,26 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 "node config references a missing graph node".to_string(),
             ));
         }
+    }
+}
+
+fn provider_diagnostics(node_id: NodeId, node_label: &str, config: &NodeConfig) -> Vec<WorkflowDiagnostic> {
+    node_kind_provider::provider_for_config(config)
+        .validate_config(node_label, config)
+        .into_iter()
+        .map(|issue| fatal(workflow_code_from_provider_code(issue.code), Some(node_id), None, issue.message))
+        .collect()
+}
+
+fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDiagnosticCode {
+    match code {
+        NodeKindValidationCode::EmptyShellCommand => WorkflowDiagnosticCode::EmptyShellCommand,
+        NodeKindValidationCode::InvalidHttpMethod => WorkflowDiagnosticCode::InvalidHttpMethod,
+        NodeKindValidationCode::InvalidHttpUrl => WorkflowDiagnosticCode::InvalidHttpUrl,
+        NodeKindValidationCode::UnsafeFilePath => WorkflowDiagnosticCode::UnsafeFilePath,
+        NodeKindValidationCode::UnsafeImagePath => WorkflowDiagnosticCode::UnsafeImagePath,
+        NodeKindValidationCode::InvalidImageByteBudget => WorkflowDiagnosticCode::InvalidImageByteBudget,
+        NodeKindValidationCode::EmptyAgentPrompt => WorkflowDiagnosticCode::EmptyAgentPrompt,
     }
 }
 
@@ -375,6 +329,7 @@ fn validate_edges(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>
 }
 
 // r[impl n8nclone.workflow_validation.generic_runner_admission]
+// r[impl n8nclone.workflow_validation.node_kind_provider.runtime_binding]
 fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
     let build = runner::build_runner_plan(workflow);
     let Some(plan) = build.plan else {
@@ -388,11 +343,25 @@ fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<Workflow
             diagnostics.extend(runner_diagnostics.into_iter().filter_map(workflow_diagnostic_from_runner));
         }
     }
+    diagnostics.extend(
+        runner::validate_runtime_bindings(&plan, &runner::builtin_runtime_registry())
+            .into_iter()
+            .filter_map(workflow_diagnostic_from_runner),
+    );
 }
 
 fn workflow_diagnostic_from_runner(diagnostic: runner::RunnerDiagnostic) -> Option<WorkflowDiagnostic> {
     let code = match diagnostic.code {
         runner::RunnerDiagnosticCode::CycleDetected => WorkflowDiagnosticCode::RunnerCycleDetected,
+        runner::RunnerDiagnosticCode::MissingRuntimeBinding => WorkflowDiagnosticCode::RunnerMissingRuntimeBinding,
+        runner::RunnerDiagnosticCode::RuntimeOutputPortMissing => {
+            WorkflowDiagnosticCode::RunnerRuntimeOutputPortMissing
+        }
+        runner::RunnerDiagnosticCode::RuntimeOutputTypeMismatch => {
+            WorkflowDiagnosticCode::RunnerRuntimeOutputTypeMismatch
+        }
+        runner::RunnerDiagnosticCode::RuntimeFailure => WorkflowDiagnosticCode::RunnerRuntimeFailure,
+        runner::RunnerDiagnosticCode::TerminalStateMutation => WorkflowDiagnosticCode::RunnerTerminalStateMutation,
         runner::RunnerDiagnosticCode::MissingNodeConfig
         | runner::RunnerDiagnosticCode::ConfigWithoutNode
         | runner::RunnerDiagnosticCode::EdgePortMissing
