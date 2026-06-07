@@ -1,0 +1,23 @@
+{
+  "name": "n8n-http-fixture",
+  "nodes": [
+    {
+      "id": "http-1",
+      "name": "Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [30, 40],
+      "parameters": {
+        "method": "POST",
+        "url": "https://example.com/api",
+        "body": "payload"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cred-1",
+          "name": "Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

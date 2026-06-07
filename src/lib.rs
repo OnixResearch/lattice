@@ -8,6 +8,7 @@ pub mod file_node;
 pub mod headless;
 pub mod http;
 pub mod image_node;
+pub mod n8n_json;
 pub mod node_kind_provider;
 pub mod scheduler;
 pub mod store;

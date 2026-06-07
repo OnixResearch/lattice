@@ -1,0 +1,12 @@
+{
+  "name": "n8n-unsupported-fixture",
+  "nodes": [
+    {
+      "id": "unknown-1",
+      "name": "Unknown",
+      "type": "n8n-nodes-base.unknown",
+      "parameters": {}
+    }
+  ],
+  "connections": {}
+}

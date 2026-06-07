@@ -1,0 +1,26 @@
+{
+  "name": "n8n-malformed-connection-fixture",
+  "nodes": [
+    {
+      "id": "shell-1",
+      "name": "Echo",
+      "type": "n8n-nodes-base.executeCommand",
+      "parameters": {
+        "command": "printf hello"
+      }
+    }
+  ],
+  "connections": {
+    "Echo": {
+      "main": [
+        [
+          {
+            "node": "Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

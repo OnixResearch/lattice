@@ -7,6 +7,7 @@ use clap::ValueEnum;
 use n8nclone::config;
 use n8nclone::headless;
 use n8nclone::headless::HeadlessProcessResult;
+use n8nclone::n8n_json;
 use n8nclone::scheduler;
 use n8nclone::scheduler::ScheduleDaemonOutcome;
 use n8nclone::scheduler::ScheduleSkipReason;
@@ -47,6 +48,10 @@ enum CliCommand {
     Export(ExportWorkflowArgs),
     /// Import a typed Nickel workflow file into the store
     Import(ImportWorkflowArgs),
+    /// Import an n8n workflow JSON file into the store
+    ImportN8n(ImportN8nWorkflowArgs),
+    /// Export a saved workflow to n8n workflow JSON
+    ExportN8n(ExportN8nWorkflowArgs),
     /// Run one scheduler daemon evaluation without starting the TUI
     SchedulerDaemon(SchedulerDaemonArgs),
 }
@@ -74,6 +79,29 @@ struct ExportWorkflowArgs {
 struct ImportWorkflowArgs {
     /// Nickel workflow file to import
     path: PathBuf,
+}
+
+#[derive(clap::Args, Debug)]
+struct ImportN8nWorkflowArgs {
+    /// n8n workflow JSON file to import
+    path: PathBuf,
+
+    /// Mapping report JSON file to write
+    #[arg(long)]
+    report: Option<PathBuf>,
+}
+
+#[derive(clap::Args, Debug)]
+struct ExportN8nWorkflowArgs {
+    /// Saved workflow name to export
+    workflow: String,
+
+    /// n8n workflow JSON file to write
+    output: PathBuf,
+
+    /// Mapping report JSON file to write
+    #[arg(long)]
+    report: Option<PathBuf>,
 }
 
 #[derive(clap::Args, Debug)]
@@ -124,6 +152,8 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
+        Some(CliCommand::ImportN8n(import_args)) => Ok(import_n8n_workflow_command(&app_config, &import_args)),
+        Some(CliCommand::ExportN8n(export_args)) => Ok(export_n8n_workflow_command(&app_config, &export_args)),
         Some(CliCommand::SchedulerDaemon(scheduler_args)) => {
             run_scheduler_daemon_once(&app_config, &scheduler_args).await
         }
@@ -364,6 +394,95 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
             ExitCode::FAILURE
         }
     }
+}
+
+// r[impl n8nclone.workflow_format.n8n_json.import_cli]
+fn import_n8n_workflow_command(app_config: &config::AppConfig, args: &ImportN8nWorkflowArgs) -> ExitCode {
+    let input = match std::fs::read_to_string(&args.path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("n8n import failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let result = n8n_json::import_n8n_json_str(&input);
+    if let Some(report_path) = &args.report
+        && let Err(error) = write_n8n_report(report_path, &result.report)
+    {
+        eprintln!("n8n import failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    let Some(workflow) = result.workflow else {
+        eprintln!("n8n import failed with {} diagnostics", result.report.diagnostics.len());
+        return ExitCode::FAILURE;
+    };
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("n8n import failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match store.save_workflow(&workflow) {
+        Ok(()) => {
+            println!("Imported n8n workflow '{}'", workflow.meta.name);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("n8n import failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+// r[impl n8nclone.workflow_format.n8n_json.export]
+fn export_n8n_workflow_command(app_config: &config::AppConfig, args: &ExportN8nWorkflowArgs) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("n8n export failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let workflow = match store.load_workflow(&args.workflow) {
+        Ok(Some(workflow)) => workflow,
+        Ok(None) => {
+            eprintln!("n8n export failed: workflow not found: {}", args.workflow);
+            return ExitCode::FAILURE;
+        }
+        Err(error) => {
+            eprintln!("n8n export failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let result = n8n_json::export_workflow_to_n8n_json(&workflow);
+    if let Some(report_path) = &args.report
+        && let Err(error) = write_n8n_report(report_path, &result.report)
+    {
+        eprintln!("n8n export failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    let Some(json) = result.json else {
+        eprintln!("n8n export failed with {} diagnostics", result.report.diagnostics.len());
+        return ExitCode::FAILURE;
+    };
+    if let Err(error) = write_output_file(&args.output, n8n_json::n8n_json_to_pretty_string(&json)) {
+        eprintln!("n8n export failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    println!("Exported '{}' to n8n JSON {}", workflow.meta.name, args.output.display());
+    ExitCode::SUCCESS
+}
+
+fn write_n8n_report(path: &PathBuf, report: &n8n_json::N8nMappingReport) -> Result<(), String> {
+    write_output_file(path, n8n_json::report_to_pretty_json(report))
+}
+
+fn write_output_file(path: &PathBuf, contents: String) -> Result<(), String> {
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    std::fs::write(path, contents).map_err(|error| error.to_string())
 }
 
 fn open_store(app_config: &config::AppConfig) -> Result<Store, String> {

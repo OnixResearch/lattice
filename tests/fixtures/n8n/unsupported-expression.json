@@ -1,0 +1,14 @@
+{
+  "name": "n8n-expression-fixture",
+  "nodes": [
+    {
+      "id": "shell-expression",
+      "name": "Echo Expression",
+      "type": "n8n-nodes-base.executeCommand",
+      "parameters": {
+        "command": "={{ $json.command }}"
+      }
+    }
+  ],
+  "connections": {}
+}
