@@ -8,6 +8,7 @@ use n8nclone::engine::runner::CapturingRunnerEventSink;
 use n8nclone::engine::runner::DurableRunnerDecision;
 use n8nclone::engine::runner::NodeRuntime;
 use n8nclone::engine::runner::RunnerAdmission;
+use n8nclone::engine::runner::RunnerBottleneck;
 use n8nclone::engine::runner::RunnerDiagnosticCode;
 use n8nclone::engine::runner::RunnerEventKind;
 use n8nclone::engine::runner::RunnerEventSink;
@@ -21,8 +22,10 @@ use n8nclone::engine::runner::RuntimeResult;
 use n8nclone::engine::runner::admit_runner_plan;
 use n8nclone::engine::runner::admit_runtime_outputs;
 use n8nclone::engine::runner::artifact_reference_for_value;
+use n8nclone::engine::runner::bottlenecks;
 use n8nclone::engine::runner::build_runner_plan;
 use n8nclone::engine::runner::builtin_runtime_registry;
+use n8nclone::engine::runner::critical_path;
 use n8nclone::engine::runner::durable_runner_decision;
 use n8nclone::engine::runner::ready_nodes;
 use n8nclone::engine::runner::runner_event;
@@ -54,6 +57,9 @@ const ARTIFACT_TEXT: &str = "artifact body";
 const UNDECLARED_PORT_ID: u64 = 999_777;
 const EVENT_INITIAL_SEQUENCE: u64 = 0;
 const FAKE_RUNTIME_NODE_ID: u64 = 0;
+const SOURCE_TRANSITIVE_DEPENDENT_COUNT: u32 = 3;
+const SINGLE_DEPENDENT_COUNT: u32 = 1;
+const NO_DEPENDENTS: u32 = 0;
 
 fn input_port_id(workflow: &Workflow, node_id: NodeId) -> PortId {
     workflow.graph.node(node_id).expect("node exists").input_ports[0].id
@@ -155,6 +161,44 @@ fn runner_admission_rejects_cycle() {
         panic!("cycle should be rejected");
     };
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == RunnerDiagnosticCode::CycleDetected));
+}
+
+// r[verify n8nclone.workflow_execution.seaglass_graph_core]
+#[test]
+fn shared_graph_core_reports_critical_path_and_bottlenecks() {
+    let (workflow, source, left, right, sink) = common::diamond_workflow();
+    let plan = build_runner_plan(&workflow).plan.expect("runner plan builds");
+
+    assert_eq!(critical_path(&plan).expect("critical path exists"), vec![source.0, left.0, sink.0]);
+    assert_eq!(bottlenecks(&plan).expect("bottlenecks exist"), vec![
+        RunnerBottleneck {
+            node_id: source.0,
+            dependent_count: SOURCE_TRANSITIVE_DEPENDENT_COUNT,
+        },
+        RunnerBottleneck {
+            node_id: left.0,
+            dependent_count: SINGLE_DEPENDENT_COUNT,
+        },
+        RunnerBottleneck {
+            node_id: right.0,
+            dependent_count: NO_DEPENDENTS,
+        },
+        RunnerBottleneck {
+            node_id: sink.0,
+            dependent_count: NO_DEPENDENTS,
+        },
+    ]);
+}
+
+// r[verify n8nclone.workflow_execution.seaglass_graph_core]
+#[test]
+fn shared_graph_queries_reject_cycles() {
+    let workflow = workflow_with_cycle();
+    let plan = build_runner_plan(&workflow).plan.expect("cyclic graph still converts to runner IR");
+
+    let diagnostic = critical_path(&plan).expect_err("cycle must reject graph query");
+
+    assert_eq!(diagnostic.code, RunnerDiagnosticCode::CycleDetected);
 }
 
 // r[verify n8nclone.workflow_execution.runner_core.trellis_graph_admission]

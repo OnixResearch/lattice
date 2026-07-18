@@ -17,9 +17,18 @@ const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
-const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check"];
+const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "n8nclone"];
 const TEST_ARGS: &[&str] = &["test"];
-const CLIPPY_ARGS: &[&str] = &["clippy", "--all-targets", "--", "-D", "warnings"];
+const CLIPPY_ARGS: &[&str] = &[
+    "clippy",
+    "--package",
+    "n8nclone",
+    "--all-targets",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings",
+];
 const NORMATIVE_WORDS: &[&str] = &["MUST", "SHOULD", "SHALL", "MAY"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

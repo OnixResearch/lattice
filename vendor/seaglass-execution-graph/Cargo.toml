@@ -1,0 +1,12 @@
+[package]
+name = "seaglass-execution-graph"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic functional core for execution graph admission and lifecycle planning"
+license = "AGPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }

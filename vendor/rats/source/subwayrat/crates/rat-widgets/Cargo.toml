@@ -1,0 +1,19 @@
+[package]
+name = "rat-widgets"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Small reusable TUI widgets for ratatui: dialogs, spinner, notifications, tree view, scroll state"
+
+[dependencies]
+rat-chrome = { path = "../rat-chrome" }
+rat-spinner = { path = "../rat-spinner" }
+ratatui = { workspace = true }
+serde_json = { version = "1.0", optional = true }
+
+[dev-dependencies]
+tempfile = "3.0"
+
+[features]
+default = ["persistence"]
+persistence = ["dep:serde_json"]

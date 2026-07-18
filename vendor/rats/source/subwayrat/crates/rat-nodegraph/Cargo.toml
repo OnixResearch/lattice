@@ -1,0 +1,20 @@
+[package]
+name = "rat-nodegraph"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Node-based graph editor widget for ratatui with typed ports, directed edges, and auto-layout"
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "dep:serde_json"]
+
+[dependencies]
+rat-canvas = { version = "0.1.0", path = "../rat-canvas" }
+ratatui = { workspace = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[dev-dependencies]
+crossterm = "0.28"
+serde_json = "1.0"

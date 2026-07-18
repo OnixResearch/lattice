@@ -10,6 +10,11 @@ use std::collections::BTreeSet;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortDirection;
 use rat_nodegraph::model::PortId;
+use seaglass_execution_graph as execution_graph;
+pub type DurableRunnerDecision = execution_graph::ResumeDecision;
+pub type RunnerStepAction = execution_graph::StepAction;
+pub type RunnerStepState = execution_graph::StepState;
+pub type RunnerTransitionError = execution_graph::StepTransitionError;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -33,7 +38,7 @@ const RUNTIME_KEY_READ_FILE: &str = "read";
 const RUNTIME_KEY_WRITE_FILE: &str = "write";
 const RUNTIME_KEY_APPEND_FILE: &str = "append";
 const TYPE_TAG_ANY: &str = "any";
-const EDGE_COUNT_EMPTY: usize = 0;
+const EMPTY_CREDENTIAL_REF_COUNT: usize = 0;
 const RUNNER_EVENT_INITIAL_SEQUENCE: u64 = 0;
 const RUNNER_EVENT_SEQUENCE_INCREMENT: u64 = 1;
 const REDACTED_SUMMARY: &str = "[redacted]";
@@ -126,38 +131,6 @@ pub struct RunnerDiagnostic {
 pub struct RunnerPlanBuild {
     pub plan: Option<RunnerWorkflow>,
     pub diagnostics: Vec<RunnerDiagnostic>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RunnerStepState {
-    Pending,
-    Ready,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RunnerStepAction {
-    MarkReady,
-    Start,
-    Complete,
-    Fail,
-    Cancel,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RunnerTransitionError {
-    InvalidTransition {
-        from: RunnerStepState,
-        action: RunnerStepAction,
-    },
-    TerminalState {
-        from: RunnerStepState,
-        action: RunnerStepAction,
-    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -259,13 +232,10 @@ pub struct ArtifactReference {
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DurableRunnerDecision {
-    Execute,
-    AwaitDependencies,
-    SkipCompleted,
-    RejectTerminalMutation,
-    BlockedByFailedDependency,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunnerBottleneck {
+    pub node_id: RunnerNodeId,
+    pub dependent_count: u32,
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.plan_ir]
@@ -292,7 +262,9 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
             policy: runner_policy_for_node(runner_settings),
             input_ports: node.input_ports.iter().map(runner_port_from_graph_port).collect(),
             output_ports: node.output_ports.iter().map(runner_port_from_graph_port).collect(),
-            credential_ref_count: workflow.node_credentials(node.id).map_or(EDGE_COUNT_EMPTY, credential_ref_count),
+            credential_ref_count: workflow
+                .node_credentials(node.id)
+                .map_or(EMPTY_CREDENTIAL_REF_COUNT, credential_ref_count),
         });
     }
 
@@ -477,135 +449,121 @@ pub fn admit_runner_plan(plan: &RunnerWorkflow) -> RunnerAdmission {
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.trellis_graph_admission]
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn topological_order(plan: &RunnerWorkflow) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
-    let mut incoming_counts = initial_incoming_counts(&plan.nodes, &plan.edges);
-    let mut outgoing = outgoing_edges_by_source(&plan.edges);
-    let mut ready = initial_zero_incoming_nodes(&incoming_counts);
-    let mut topo_order = Vec::with_capacity(plan.nodes.len());
-
-    while let Some(node_id) = pop_first_ready_node(&mut ready) {
-        topo_order.push(node_id);
-        if let Some(targets) = outgoing.remove(&node_id) {
-            for target in targets {
-                decrement_incoming_count(&mut incoming_counts, target, &mut ready);
-            }
-        }
-    }
-
-    if topo_order.len() == plan.nodes.len() {
-        Ok(topo_order)
-    } else {
-        Err(runner_diagnostic(
-            RunnerDiagnosticCode::CycleDetected,
-            None,
-            None,
-            "runner graph contains a cycle".to_string(),
-        ))
-    }
-}
-
-fn initial_incoming_counts(nodes: &[RunnerNode], edges: &[RunnerEdge]) -> BTreeMap<RunnerNodeId, usize> {
-    let mut incoming_counts = nodes.iter().map(|node| (node.id, EDGE_COUNT_EMPTY)).collect::<BTreeMap<_, _>>();
-    for edge in edges {
-        if let Some(incoming_count) = incoming_counts.get_mut(&edge.target_node) {
-            *incoming_count += 1;
-        }
-    }
-    incoming_counts
-}
-
-fn outgoing_edges_by_source(edges: &[RunnerEdge]) -> BTreeMap<RunnerNodeId, Vec<RunnerNodeId>> {
-    let mut outgoing = BTreeMap::new();
-    for edge in edges {
-        outgoing.entry(edge.source_node).or_insert_with(Vec::new).push(edge.target_node);
-    }
-    for targets in outgoing.values_mut() {
-        targets.sort_unstable();
-    }
-    outgoing
-}
-
-fn initial_zero_incoming_nodes(incoming_counts: &BTreeMap<RunnerNodeId, usize>) -> BTreeSet<RunnerNodeId> {
-    incoming_counts
-        .iter()
-        .filter_map(|(node_id, incoming_count)| (*incoming_count == EDGE_COUNT_EMPTY).then_some(*node_id))
-        .collect()
-}
-
-fn pop_first_ready_node(ready: &mut BTreeSet<RunnerNodeId>) -> Option<RunnerNodeId> {
-    let node_id = ready.first().copied()?;
-    ready.remove(&node_id);
-    Some(node_id)
-}
-
-fn decrement_incoming_count(
-    incoming_counts: &mut BTreeMap<RunnerNodeId, usize>,
-    node_id: RunnerNodeId,
-    ready: &mut BTreeSet<RunnerNodeId>,
-) {
-    let Some(incoming_count) = incoming_counts.get_mut(&node_id) else {
-        return;
-    };
-    if *incoming_count == EDGE_COUNT_EMPTY {
-        return;
-    }
-    *incoming_count -= 1;
-    if *incoming_count == EDGE_COUNT_EMPTY {
-        ready.insert(node_id);
-    }
+    let shared_plan = admitted_execution_plan(plan)?;
+    runner_node_ids(&shared_plan.topological_order)
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.trellis_graph_admission]
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn ready_nodes(plan: &RunnerWorkflow, states: &BTreeMap<RunnerNodeId, RunnerStepState>) -> Vec<RunnerNodeId> {
-    let mut ready = Vec::new();
-    for node in &plan.nodes {
-        if step_state_for_node(states, node.id) == RunnerStepState::Pending
-            && dependencies_completed(plan, states, node.id)
-        {
-            ready.push(node.id);
-        }
-    }
-    ready.sort_unstable();
-    ready
-}
-
-fn step_state_for_node(states: &BTreeMap<RunnerNodeId, RunnerStepState>, node_id: RunnerNodeId) -> RunnerStepState {
-    states.get(&node_id).copied().unwrap_or(RunnerStepState::Pending)
-}
-
-fn dependencies_completed(
-    plan: &RunnerWorkflow,
-    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
-    node_id: RunnerNodeId,
-) -> bool {
-    plan.edges
+    let Ok(shared_plan) = admitted_execution_plan(plan) else {
+        return Vec::new();
+    };
+    let shared_states = shared_step_states(states);
+    execution_graph::ready_nodes(&shared_plan, &shared_states)
         .iter()
-        .filter(|edge| edge.target_node == node_id)
-        .all(|edge| step_state_for_node(states, edge.source_node) == RunnerStepState::Completed)
+        .filter_map(|node_id| node_id.parse::<RunnerNodeId>().ok())
+        .collect()
+}
+
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
+pub fn critical_path(plan: &RunnerWorkflow) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
+    let shared_plan = admitted_execution_plan(plan)?;
+    runner_node_ids(&shared_plan.critical_path())
+}
+
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
+pub fn bottlenecks(plan: &RunnerWorkflow) -> Result<Vec<RunnerBottleneck>, RunnerDiagnostic> {
+    let shared_plan = admitted_execution_plan(plan)?;
+    shared_plan
+        .bottlenecks()
+        .into_iter()
+        .map(|bottleneck| {
+            parse_runner_node_id(&bottleneck.node_id).map(|node_id| RunnerBottleneck {
+                node_id,
+                dependent_count: bottleneck.dependent_count,
+            })
+        })
+        .collect()
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.lifecycle]
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn transition_step_state(
     from: RunnerStepState,
     action: RunnerStepAction,
 ) -> Result<RunnerStepState, RunnerTransitionError> {
-    if is_terminal_step_state(from) {
-        return Err(RunnerTransitionError::TerminalState { from, action });
-    }
-    match (from, action) {
-        (RunnerStepState::Pending, RunnerStepAction::MarkReady) => Ok(RunnerStepState::Ready),
-        (RunnerStepState::Ready, RunnerStepAction::Start) => Ok(RunnerStepState::Running),
-        (RunnerStepState::Running, RunnerStepAction::Complete) => Ok(RunnerStepState::Completed),
-        (RunnerStepState::Running, RunnerStepAction::Fail) => Ok(RunnerStepState::Failed),
-        (RunnerStepState::Pending | RunnerStepState::Ready | RunnerStepState::Running, RunnerStepAction::Cancel) => {
-            Ok(RunnerStepState::Cancelled)
-        }
-        _ => Err(RunnerTransitionError::InvalidTransition { from, action }),
-    }
+    execution_graph::transition_step_state(from, action)
 }
 
 pub fn is_terminal_step_state(state: RunnerStepState) -> bool {
-    matches!(state, RunnerStepState::Completed | RunnerStepState::Failed | RunnerStepState::Cancelled)
+    execution_graph::is_terminal_state(state)
+}
+
+fn admitted_execution_plan(plan: &RunnerWorkflow) -> Result<execution_graph::ExecutionPlan, RunnerDiagnostic> {
+    execution_graph::admit_graph(&execution_graph_from_runner(plan)).map_err(|diagnostics| {
+        diagnostics.first().map_or_else(invalid_shared_graph_diagnostic, shared_graph_diagnostic)
+    })
+}
+
+fn execution_graph_from_runner(plan: &RunnerWorkflow) -> execution_graph::ExecutionGraph {
+    let nodes = plan.nodes.iter().map(|node| execution_graph::ExecutionNode::new(node.id.to_string())).collect();
+    let edges = plan
+        .edges
+        .iter()
+        .map(|edge| (edge.source_node, edge.target_node))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(source, target)| execution_graph::ExecutionEdge::new(source.to_string(), target.to_string()))
+        .collect();
+    execution_graph::ExecutionGraph::new(nodes, edges)
+}
+
+fn shared_step_states(
+    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
+) -> BTreeMap<String, execution_graph::StepState> {
+    states.iter().map(|(node_id, state)| (node_id.to_string(), *state)).collect()
+}
+
+fn runner_node_ids(node_ids: &[String]) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
+    node_ids.iter().map(|node_id| parse_runner_node_id(node_id)).collect()
+}
+
+fn parse_runner_node_id(node_id: &str) -> Result<RunnerNodeId, RunnerDiagnostic> {
+    node_id.parse::<RunnerNodeId>().map_err(|_| {
+        runner_diagnostic(
+            RunnerDiagnosticCode::RuntimeFailure,
+            None,
+            None,
+            format!("shared graph core returned non-numeric runner node id '{node_id}'"),
+        )
+    })
+}
+
+fn shared_graph_diagnostic(diagnostic: &execution_graph::GraphDiagnostic) -> RunnerDiagnostic {
+    let code = match diagnostic.code {
+        execution_graph::GraphDiagnosticCode::CycleDetected => RunnerDiagnosticCode::CycleDetected,
+        execution_graph::GraphDiagnosticCode::SelfLoop => RunnerDiagnosticCode::EdgeSelfLoop,
+        execution_graph::GraphDiagnosticCode::EmptyNodeId
+        | execution_graph::GraphDiagnosticCode::DuplicateNodeId
+        | execution_graph::GraphDiagnosticCode::DuplicateEdge
+        | execution_graph::GraphDiagnosticCode::MissingSourceNode
+        | execution_graph::GraphDiagnosticCode::MissingTargetNode
+        | execution_graph::GraphDiagnosticCode::GraphTooLarge => RunnerDiagnosticCode::RuntimeFailure,
+    };
+    let node_id = diagnostic.node_id.as_deref().and_then(|node_id| node_id.parse::<RunnerNodeId>().ok()).map(NodeId);
+    runner_diagnostic(code, node_id, None, diagnostic.to_string())
+}
+
+fn invalid_shared_graph_diagnostic() -> RunnerDiagnostic {
+    runner_diagnostic(
+        RunnerDiagnosticCode::RuntimeFailure,
+        None,
+        None,
+        "shared graph core rejected the runner plan without a diagnostic".to_string(),
+    )
 }
 
 // r[impl n8nclone.workflow_execution.runtime_registry.dispatch]
@@ -773,43 +731,16 @@ fn value_byte_length(value: &Value) -> usize {
 }
 
 // r[impl n8nclone.workflow_execution.durable_runner.resume]
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn durable_runner_decision(
     plan: &RunnerWorkflow,
     states: &BTreeMap<RunnerNodeId, RunnerStepState>,
     node_id: RunnerNodeId,
 ) -> DurableRunnerDecision {
-    match step_state_for_node(states, node_id) {
-        RunnerStepState::Completed => DurableRunnerDecision::SkipCompleted,
-        RunnerStepState::Failed | RunnerStepState::Cancelled => DurableRunnerDecision::RejectTerminalMutation,
-        RunnerStepState::Pending | RunnerStepState::Ready | RunnerStepState::Running => {
-            durable_decision_for_non_terminal_step(plan, states, node_id)
-        }
-    }
-}
-
-fn durable_decision_for_non_terminal_step(
-    plan: &RunnerWorkflow,
-    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
-    node_id: RunnerNodeId,
-) -> DurableRunnerDecision {
-    if has_failed_dependency(plan, states, node_id) {
-        return DurableRunnerDecision::BlockedByFailedDependency;
-    }
-    if dependencies_completed(plan, states, node_id) {
-        DurableRunnerDecision::Execute
-    } else {
-        DurableRunnerDecision::AwaitDependencies
-    }
-}
-
-fn has_failed_dependency(
-    plan: &RunnerWorkflow,
-    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
-    node_id: RunnerNodeId,
-) -> bool {
-    plan.edges.iter().filter(|edge| edge.target_node == node_id).any(|edge| {
-        matches!(step_state_for_node(states, edge.source_node), RunnerStepState::Failed | RunnerStepState::Cancelled)
-    })
+    let Ok(shared_plan) = admitted_execution_plan(plan) else {
+        return DurableRunnerDecision::RejectTerminalMutation;
+    };
+    execution_graph::resume_decision(&shared_plan, &shared_step_states(states), &node_id.to_string())
 }
 
 fn runner_diagnostic(

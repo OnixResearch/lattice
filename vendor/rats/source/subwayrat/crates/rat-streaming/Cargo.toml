@@ -1,0 +1,17 @@
+[package]
+name = "rat-streaming"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Streaming output buffer with head/tail truncation and incremental search for ratatui"
+
+[dependencies]
+rat-chrome = { path = "../rat-chrome" }
+ratatui = { workspace = true }
+
+# Optional inline rendering support
+rat-inline = { path = "../rat-inline", optional = true }
+
+[features]
+default = []
+inline = ["dep:rat-inline"]

@@ -1,0 +1,6 @@
+name: seaglass-execution-graph
+repository: https://github.com/brittonr/seaglass
+revision: 9d8726556045cbdb990ec32024cf6145b4b6cdfc
+paths:
+- seaglass-execution-graph
+strip-prefix: seaglass-execution-graph

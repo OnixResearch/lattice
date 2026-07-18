@@ -1,0 +1,10 @@
+[package]
+name = "rat-markdown"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Markdown to ratatui Spans renderer with syntax highlighting"
+
+[dependencies]
+ratatui = { workspace = true }
+unicode-width = { workspace = true }

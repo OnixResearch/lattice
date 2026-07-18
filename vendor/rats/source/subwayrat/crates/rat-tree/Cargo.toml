@@ -1,0 +1,12 @@
+[package]
+name = "rat-tree"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Interactive tree navigation widget for ratatui with keymap integration"
+
+[dependencies]
+ratatui.workspace = true
+unicode-width.workspace = true
+rat-keymap = { path = "../rat-keymap" }
+ratcore = { workspace = true }

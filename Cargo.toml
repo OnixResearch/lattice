@@ -6,7 +6,22 @@ license = "AGPL-3.0-or-later"
 
 [workspace]
 members = ["."]
+default-members = ["."]
 resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+blake3 = "1.8.3"
+ratatui = { version = "0.30", default-features = false }
+ratcore = { path = "vendor/rats/source/ratcore" }
+unicode-width = "0.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
 
 [workspace.metadata.octet]
 default_scope = ["-p", "n8nclone"]
@@ -46,16 +61,17 @@ nickel-lang-core = "0.17.0"
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
-rat-nodegraph = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-widgets = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-keymap = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-fuzzy = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-streaming = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-layers = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-canvas = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-tree = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-table = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
-rat-editor = { git = "ssh://git@github.com/brittonr/rats.git", version = "0.1.0" }
+seaglass-execution-graph = { path = "vendor/seaglass-execution-graph" }
+rat-nodegraph = { path = "vendor/rats/source/subwayrat/crates/rat-nodegraph" }
+rat-widgets = { path = "vendor/rats/source/subwayrat/crates/rat-widgets" }
+rat-keymap = { path = "vendor/rats/source/subwayrat/crates/rat-keymap" }
+rat-fuzzy = { path = "vendor/rats/source/subwayrat/crates/rat-fuzzy" }
+rat-streaming = { path = "vendor/rats/source/subwayrat/crates/rat-streaming" }
+rat-layers = { path = "vendor/rats/source/subwayrat/crates/rat-layers" }
+rat-canvas = { path = "vendor/rats/source/subwayrat/crates/rat-canvas" }
+rat-tree = { path = "vendor/rats/source/subwayrat/crates/rat-tree" }
+rat-table = { path = "vendor/rats/source/subwayrat/crates/rat-table" }
+rat-editor = { path = "vendor/rats/source/subwayrat/crates/rat-editor" }
 home = "0.5.12"
 dirs-next = "2.0.0"
 

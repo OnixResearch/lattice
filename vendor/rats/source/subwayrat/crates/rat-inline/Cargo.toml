@@ -1,0 +1,13 @@
+[package]
+name = "rat-inline"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Inline scrollback renderer for ratatui — frame diffing, terminal growth, reconciliation via ratcore"
+
+[dependencies]
+ratcore = { workspace = true }
+rat-markdown = { path = "../rat-markdown" }
+ratatui = { workspace = true }
+crossterm = "0.29"
+unicode-width = { workspace = true }
