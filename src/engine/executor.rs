@@ -4,6 +4,7 @@
 //!  - **Run**: async parallel execution of independent branches via tokio.
 //!  - **Debug**: step-through, one node at a time, with pause after each.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use rat_nodegraph::model::Node;
@@ -92,6 +93,7 @@ const HASH_TAG_IMAGE_ROOTS: &[u8] = b"image-roots";
 const HASH_TAG_IMAGE_MAX_BYTES: &[u8] = b"image-max-bytes";
 const HASH_TAG_AGENT_TARGET: &[u8] = b"agent-target";
 const HASH_TAG_AGENT_PROMPT: &[u8] = b"agent-prompt";
+const HASH_TAG_AGENT_PROMPT_FILE: &[u8] = b"agent-prompt-file";
 const HASH_TAG_AGENT_OUTPUT_MODE: &[u8] = b"agent-output-mode";
 const HASH_TAG_AGENT_MODEL_HINT: &[u8] = b"agent-model-hint";
 const HASH_TAG_AGENT_TOOL_POLICY: &[u8] = b"agent-tool-policy";
@@ -274,6 +276,7 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
 fn update_agent_settings_hash(hasher: &mut blake3::Hasher, settings: &AgentNodeSettings) {
     update_str(hasher, HASH_TAG_AGENT_TARGET, agent_node::agent_target_label(settings.target));
     update_str(hasher, HASH_TAG_AGENT_PROMPT, &settings.prompt);
+    update_optional_str(hasher, HASH_TAG_AGENT_PROMPT_FILE, settings.prompt_file.as_deref());
     update_str(hasher, HASH_TAG_AGENT_OUTPUT_MODE, settings.output_mode.as_str());
     update_optional_str(hasher, HASH_TAG_AGENT_MODEL_HINT, settings.model_hint.as_deref());
     update_str(hasher, HASH_TAG_AGENT_TOOL_POLICY, &settings.tool_policy);
@@ -1650,10 +1653,10 @@ impl Executor {
         let run_id = RunId(self.next_run_id);
         self.next_run_id += 1;
 
-        let topo = match topological_sort(workflow) {
-            Some(order) => order,
+        let (runner_plan, topo) = match admitted_runner_execution(workflow) {
+            Some(admitted) => admitted,
             None => {
-                error!("workflow contains cycles, cannot execute");
+                error!("workflow failed shared graph admission, cannot execute");
                 return (run_id, Vec::new());
             }
         };
@@ -1662,6 +1665,7 @@ impl Executor {
 
         let mut results = Vec::new();
         let mut port_values: HashMap<PortId, Value> = HashMap::new();
+        let mut runner_states = BTreeMap::new();
 
         for node_id in topo {
             // Gather inputs from upstream edges.
@@ -1678,6 +1682,18 @@ impl Executor {
                 None => input_values_hash(&inputs),
             };
 
+            let decision = runner::durable_runner_decision(&runner_plan, &runner_states, node_id.0);
+            if decision != runner::DurableRunnerDecision::Execute {
+                debug!(node = ?node_id, ?decision, "shared graph lifecycle blocked node execution");
+                runner_states.insert(node_id.0, runner::RunnerStepState::Cancelled);
+                results.push(StepResult {
+                    node_id,
+                    status: NodeStatus::Skipped,
+                    input_hash,
+                });
+                continue;
+            }
+
             if let Some(cached_outputs) = cache.get(&input_hash) {
                 debug!(node = ?node_id, "cache hit, skipping execution");
                 let Some(node) = workflow.graph.node(node_id) else {
@@ -1689,6 +1705,7 @@ impl Executor {
                         port_values.insert(*port_id, value.clone());
                     }
                 }
+                runner_states.insert(node_id.0, runner::RunnerStepState::Completed);
                 results.push(step);
                 continue;
             }
@@ -1703,6 +1720,7 @@ impl Executor {
                 }
             }
 
+            runner_states.insert(node_id.0, runner_step_state(&step.status));
             results.push(step);
         }
 
@@ -1817,13 +1835,24 @@ fn gather_inputs(workflow: &Workflow, node_id: NodeId, port_values: &HashMap<Por
     inputs
 }
 
-/// Topological sort of the workflow graph. Returns None if cycles exist.
+fn runner_step_state(status: &NodeStatus) -> runner::RunnerStepState {
+    match status {
+        NodeStatus::Completed { .. } => runner::RunnerStepState::Completed,
+        NodeStatus::Failed { .. } => runner::RunnerStepState::Failed,
+        NodeStatus::Skipped => runner::RunnerStepState::Cancelled,
+        NodeStatus::Pending => runner::RunnerStepState::Pending,
+        NodeStatus::Running => runner::RunnerStepState::Running,
+    }
+}
+
+/// Admit the workflow through the shared graph core and return its stable order.
 // r[impl n8nclone.workflow_execution.runner_core.compatibility]
 // r[impl n8nclone.workflow_execution.trait_boundaries.compatibility]
-fn topological_sort(workflow: &Workflow) -> Option<Vec<NodeId>> {
+// r[impl n8nclone.workflow_execution.seaglass_graph_core]
+fn admitted_runner_execution(workflow: &Workflow) -> Option<(runner::RunnerWorkflow, Vec<NodeId>)> {
     let plan = runner::build_runner_plan(workflow).plan?;
     match runner::admit_runner_plan(&plan) {
-        runner::RunnerAdmission::Accepted { topo_order } => Some(topo_order.into_iter().map(NodeId).collect()),
+        runner::RunnerAdmission::Accepted { topo_order } => Some((plan, topo_order.into_iter().map(NodeId).collect())),
         runner::RunnerAdmission::Rejected { .. } => None,
     }
 }

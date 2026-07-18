@@ -61,6 +61,8 @@ pub enum AgentOutputMode {
 pub struct AgentNodeSettings {
     pub target: AgentTarget,
     pub prompt: String,
+    #[serde(default)]
+    pub prompt_file: Option<String>,
     pub output_mode: AgentOutputMode,
     pub model_hint: Option<String>,
     pub tool_policy: String,
@@ -331,6 +333,7 @@ impl AgentNodeSettings {
         Self {
             target,
             prompt: prompt.into(),
+            prompt_file: None,
             output_mode,
             model_hint: None,
             tool_policy: String::new(),

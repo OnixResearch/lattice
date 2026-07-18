@@ -11,6 +11,7 @@ use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::NodeRunnerSettings;
 use n8nclone::engine::workflow::Workflow;
 use n8nclone::store::Store;
+use n8nclone::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
 use n8nclone::workflow_format::PortableEdge;
 use n8nclone::workflow_format::WorkflowFormatError;
 use n8nclone::workflow_format::load_workflow_nickel_file;
@@ -41,6 +42,10 @@ const EFFECT_POLICY: &str = "process";
 const CACHE_POLICY: &str = "inputs-and-config";
 const RETRY_POLICY: &str = "never";
 const ARTIFACT_POLICY: &str = "inline-small";
+const ROLE_PROMPT_PATH: &str = "roles/researcher.md";
+const ROLE_PROMPT_BODY: &str = "# Researcher\n\nFind primary evidence and report uncertainty.\n";
+const ROLE_PROMPT_LABEL: &str = "Researcher";
+const OVERSIZED_PROMPT_EXTRA_BYTES: usize = 1;
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let data_dir = temp_dir.path().join("data");
@@ -74,6 +79,24 @@ fn custom_runner_settings() -> NodeRunnerSettings {
         retry_policy: RETRY_POLICY.to_string(),
         artifact_policy: ARTIFACT_POLICY.to_string(),
     }
+}
+
+fn markdown_agent_workflow(prompt_file: &str) -> Workflow {
+    let mut workflow = Workflow::new("markdown-agent-workflow");
+    let node_id = workflow.add_agent_node(ROLE_PROMPT_LABEL, AgentTarget::Pi, ROLE_PROMPT_BODY, AgentOutputMode::Text);
+    let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node_id).cloned() else {
+        panic!("agent config exists");
+    };
+    settings.prompt_file = Some(prompt_file.to_string());
+    workflow.set_node_config(node_id, NodeConfig::Agent(settings));
+    workflow
+}
+
+fn write_markdown_workflow(temp_dir: &tempfile::TempDir, prompt_file: &str) -> std::path::PathBuf {
+    let workflow = markdown_agent_workflow(prompt_file);
+    let workflow_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);
+    std::fs::write(&workflow_path, workflow_to_nickel(&workflow)).expect("Markdown workflow Nickel written");
+    workflow_path
 }
 
 // r[verify n8nclone.workflow_format.nickel.export]
@@ -224,6 +247,135 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
         }
         _ => panic!("expected agent config"),
     }
+}
+
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.valid]
+#[test]
+fn markdown_agent_prompt_file_loads_and_round_trips_source() {
+    let temp_dir = tempfile::tempdir().expect("temporary Markdown workflow directory");
+    let role_path = temp_dir.path().join(ROLE_PROMPT_PATH);
+    std::fs::create_dir_all(role_path.parent().expect("role parent directory")).expect("role directory created");
+    std::fs::write(&role_path, ROLE_PROMPT_BODY).expect("role prompt written");
+    let workflow_path = write_markdown_workflow(&temp_dir, ROLE_PROMPT_PATH);
+
+    let imported = load_workflow_nickel_file(&workflow_path).expect("Markdown workflow imports");
+    let node = imported.graph.nodes().find(|node| node.label == ROLE_PROMPT_LABEL).expect("role node imported");
+    let NodeConfig::Agent(settings) = imported.node_config(node.id).expect("role config imported") else {
+        panic!("expected agent config");
+    };
+
+    assert_eq!(settings.prompt, ROLE_PROMPT_BODY);
+    assert_eq!(settings.prompt_file.as_deref(), Some(ROLE_PROMPT_PATH));
+    let portable = workflow_to_portable(&imported);
+    let config = portable.configs.first().expect("portable role config");
+    assert!(config.agent_prompt.is_empty());
+    assert_eq!(config.agent_prompt_file, vec![ROLE_PROMPT_PATH.to_string()]);
+}
+
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+#[test]
+fn markdown_agent_prompt_source_cardinality_fails_closed() {
+    let workflow = markdown_agent_workflow(ROLE_PROMPT_PATH);
+
+    let mut missing_source = workflow_to_portable(&workflow);
+    let missing_config = missing_source.configs.first_mut().expect("missing-source config");
+    missing_config.agent_prompt.clear();
+    missing_config.agent_prompt_file.clear();
+    assert!(matches!(
+        portable_to_workflow(missing_source),
+        Err(WorkflowFormatError::InvalidAgentPromptSource { .. })
+    ));
+
+    let mut multiple_sources = workflow_to_portable(&workflow);
+    let multiple_config = multiple_sources.configs.first_mut().expect("multiple-source config");
+    multiple_config.agent_prompt = ROLE_PROMPT_BODY.to_string();
+    assert!(matches!(
+        portable_to_workflow(multiple_sources),
+        Err(WorkflowFormatError::InvalidAgentPromptSource { .. })
+    ));
+
+    let mut duplicate_files = workflow_to_portable(&workflow);
+    duplicate_files.configs.first_mut().expect("duplicate-file config").agent_prompt_file =
+        vec![ROLE_PROMPT_PATH.to_string(), ROLE_PROMPT_PATH.to_string()];
+    assert!(matches!(
+        portable_to_workflow(duplicate_files),
+        Err(WorkflowFormatError::InvalidAgentPromptSource { .. })
+    ));
+}
+
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+#[test]
+fn unsafe_or_missing_markdown_agent_prompt_paths_fail_closed() {
+    let path_cases = [
+        "",
+        "/tmp/absolute-role.md",
+        "../escaping-role.md",
+        "roles/not-markdown.txt",
+    ];
+    for prompt_file in path_cases {
+        let temp_dir = tempfile::tempdir().expect("temporary invalid-path directory");
+        let workflow_path = write_markdown_workflow(&temp_dir, prompt_file);
+        assert!(matches!(
+            load_workflow_nickel_file(&workflow_path),
+            Err(WorkflowFormatError::InvalidAgentPromptSource { .. })
+        ));
+    }
+
+    let temp_dir = tempfile::tempdir().expect("temporary missing-path directory");
+    let workflow_path = write_markdown_workflow(&temp_dir, ROLE_PROMPT_PATH);
+    assert!(matches!(
+        load_workflow_nickel_file(&workflow_path),
+        Err(WorkflowFormatError::AgentPromptFile { .. })
+    ));
+}
+
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+#[test]
+fn malformed_markdown_agent_prompt_content_fails_closed() {
+    let temp_dir = tempfile::tempdir().expect("temporary malformed-prompt directory");
+    let role_path = temp_dir.path().join(ROLE_PROMPT_PATH);
+    std::fs::create_dir_all(role_path.parent().expect("role parent directory")).expect("role directory created");
+    let workflow_path = write_markdown_workflow(&temp_dir, ROLE_PROMPT_PATH);
+
+    std::fs::write(&role_path, "   \n").expect("empty role prompt written");
+    assert!(matches!(
+        load_workflow_nickel_file(&workflow_path),
+        Err(WorkflowFormatError::AgentPromptFile { .. })
+    ));
+
+    let oversized_prompt = vec![b'x'; MAX_MARKDOWN_AGENT_PROMPT_BYTES + OVERSIZED_PROMPT_EXTRA_BYTES];
+    std::fs::write(&role_path, oversized_prompt).expect("oversized role prompt written");
+    assert!(matches!(
+        load_workflow_nickel_file(&workflow_path),
+        Err(WorkflowFormatError::AgentPromptFile { .. })
+    ));
+
+    std::fs::write(&role_path, [u8::MAX]).expect("invalid UTF-8 role prompt written");
+    assert!(matches!(
+        load_workflow_nickel_file(&workflow_path),
+        Err(WorkflowFormatError::AgentPromptFile { .. })
+    ));
+}
+
+#[cfg(unix)]
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+#[test]
+fn markdown_agent_prompt_symlink_escape_fails_closed() {
+    use std::os::unix::fs::symlink;
+
+    let temp_dir = tempfile::tempdir().expect("temporary symlink workflow directory");
+    let outside_dir = tempfile::tempdir().expect("temporary outside directory");
+    let outside_prompt = outside_dir.path().join("outside.md");
+    std::fs::write(&outside_prompt, ROLE_PROMPT_BODY).expect("outside role prompt written");
+    let role_path = temp_dir.path().join(ROLE_PROMPT_PATH);
+    std::fs::create_dir_all(role_path.parent().expect("role parent directory")).expect("role directory created");
+    symlink(&outside_prompt, &role_path).expect("escaping role symlink created");
+    let workflow_path = write_markdown_workflow(&temp_dir, ROLE_PROMPT_PATH);
+
+    assert!(matches!(
+        load_workflow_nickel_file(&workflow_path),
+        Err(WorkflowFormatError::AgentPromptFile { .. })
+    ));
 }
 
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.no_import_io]

@@ -1822,7 +1822,10 @@ impl App {
                     return Err(PropertyEditError::MissingConfig);
                 };
                 match edit.field {
-                    PropertyEditField::AgentPrompt => settings.prompt = edit.draft.clone(),
+                    PropertyEditField::AgentPrompt => {
+                        settings.prompt = edit.draft.clone();
+                        settings.prompt_file = None;
+                    }
                     PropertyEditField::AgentTarget => settings.target = validate_agent_target(&edit.draft)?,
                     PropertyEditField::AgentOutputMode => {
                         settings.output_mode = validate_agent_output_mode(&edit.draft)?;
