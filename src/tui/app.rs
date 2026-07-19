@@ -1911,6 +1911,17 @@ impl App {
 
     pub fn add_image_input_node(&mut self, label: &str, path: &str) {
         let id = self.workflow.add_image_input_node(label, path);
+        let allowed_root = std::path::Path::new(path)
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_string_lossy()
+            .into_owned();
+        self.workflow.set_node_config(id, NodeConfig::ImageInput {
+            path: path.to_string(),
+            allowed_roots: vec![allowed_root],
+            max_bytes: crate::image_node::DEFAULT_MAX_IMAGE_BYTES,
+        });
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);

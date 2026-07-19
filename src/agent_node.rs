@@ -1,10 +1,8 @@
 //! Generic agent node request planning and adapter interface.
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
-use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
@@ -301,12 +299,6 @@ pub struct AgentOutputFileEnvelope {
 struct AgentOutputFile {
     path_label: String,
     bytes: Vec<u8>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ResolvedHandoffPath {
-    path: PathBuf,
-    label: String,
 }
 
 enum RuntimeRoute<'a> {
@@ -758,49 +750,41 @@ pub fn parse_agent_output_file_envelope(
     Ok(envelope)
 }
 
+// r[impl n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read]
 fn load_agent_output_file(
     plan: &AgentCommandPlan,
     envelope: &AgentOutputFileEnvelope,
 ) -> Result<AgentOutputFile, AgentError> {
+    debug_assert!(!envelope.path.trim().is_empty());
     let resolved = resolve_handoff_path(plan, &envelope.path)?;
-    let metadata = fs::metadata(&resolved.path).map_err(|error| output_file_io_error(plan, &resolved.label, error))?;
-    let bytes = usize::try_from(metadata.len()).map_err(|_| {
+    let base = plan.cwd.as_deref().unwrap_or(CURRENT_DIRECTORY);
+    let root = crate::capability::open_root(&resolved).map_err(|error| {
+        AgentError::Adapter(format!("{} agent working directory is unavailable: {base}: {error}", plan.adapter_label))
+    })?;
+    let file = crate::capability::open_relative_read(&root, resolved.relative())
+        .map_err(|error| output_file_io_error(plan, &envelope.path, error))?;
+    let metadata = file.metadata().map_err(|error| output_file_io_error(plan, &envelope.path, error))?;
+    let metadata_bytes = usize::try_from(metadata.len()).map_err(|_| {
         AgentError::Adapter(format!(
             "{} agent output file is too large to address on this platform: {}",
-            plan.adapter_label, resolved.label
+            plan.adapter_label, envelope.path
         ))
     })?;
-    validate_output_file_size(plan, &resolved.label, bytes)?;
-    let bytes = fs::read(&resolved.path).map_err(|error| output_file_io_error(plan, &resolved.label, error))?;
-    validate_output_file_size(plan, &resolved.label, bytes.len())?;
+    validate_output_file_size(plan, &envelope.path, metadata_bytes)?;
+    let bytes = crate::capability::read_bounded(file, plan.max_output_bytes)
+        .map_err(|error| output_file_io_error(plan, &envelope.path, error))?;
+    validate_output_file_size(plan, &envelope.path, bytes.len())?;
+    debug_assert!(bytes.len() <= plan.max_output_bytes);
     Ok(AgentOutputFile {
-        path_label: resolved.label,
+        path_label: envelope.path.clone(),
         bytes,
     })
 }
 
-fn resolve_handoff_path(plan: &AgentCommandPlan, path: &str) -> Result<ResolvedHandoffPath, AgentError> {
+fn resolve_handoff_path(plan: &AgentCommandPlan, path: &str) -> Result<crate::capability::RootedPath, AgentError> {
     let base = plan.cwd.as_deref().unwrap_or(CURRENT_DIRECTORY);
-    let base_path = Path::new(base);
-    let candidate_path = Path::new(path);
-    let joined_path = if candidate_path.is_absolute() {
-        candidate_path.to_path_buf()
-    } else {
-        base_path.join(candidate_path)
-    };
-    let canonical_base = fs::canonicalize(base_path).map_err(|error| {
-        AgentError::Adapter(format!("{} agent working directory is unavailable: {base}: {error}", plan.adapter_label))
-    })?;
-    let canonical_file = fs::canonicalize(&joined_path).map_err(|error| output_file_io_error(plan, path, error))?;
-    if !canonical_file.starts_with(&canonical_base) {
-        return Err(AgentError::Adapter(format!(
-            "{} agent output file is outside working directory: {path}",
-            plan.adapter_label
-        )));
-    }
-    Ok(ResolvedHandoffPath {
-        path: canonical_file,
-        label: path.to_string(),
+    crate::capability::rooted_relative_path(Path::new(base), Path::new(path)).ok_or_else(|| {
+        AgentError::Adapter(format!("{} agent output file is outside working directory: {path}", plan.adapter_label))
     })
 }
 

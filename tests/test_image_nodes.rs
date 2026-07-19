@@ -7,6 +7,7 @@ use n8nclone::engine::executor::NodeStatus;
 use n8nclone::engine::value::TypeTag;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
+use n8nclone::image_node::ImageError;
 use n8nclone::image_node::ImageIo;
 use n8nclone::image_node::LocalImageIo;
 use n8nclone::image_node::MemoryImageIo;
@@ -58,6 +59,12 @@ fn write_local_fixture(temp_dir: &tempfile::TempDir, file_name: &str, bytes: &[u
 fn local_image_workflow(path: &str) -> (Workflow, rat_nodegraph::model::NodeId) {
     let mut workflow = Workflow::new("local-image-workflow");
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, path);
+    let allowed_root = std::path::Path::new(path).parent().expect("local image parent").to_string_lossy().into_owned();
+    workflow.set_node_config(node_id, NodeConfig::ImageInput {
+        path: path.to_string(),
+        allowed_roots: vec![allowed_root],
+        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+    });
     (workflow, node_id)
 }
 
@@ -125,17 +132,30 @@ fn local_image_io_loads_png_and_jpeg_files() {
     let png_path = write_local_fixture(&temp_dir, LOCAL_PNG_FILE_NAME, PNG_FIXTURE);
     let jpeg_path = write_local_fixture(&temp_dir, LOCAL_JPEG_FILE_NAME, JPEG_FIXTURE);
     let image_io = LocalImageIo;
+    let allowed_roots = vec![temp_dir.path().to_string_lossy().into_owned()];
 
     let png = image_io
-        .load(&image_input_plan(&png_path, &[], n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
+        .load(&image_input_plan(&png_path, &allowed_roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
         .expect("local PNG loads");
     let jpeg = image_io
-        .load(&image_input_plan(&jpeg_path, &[], n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
+        .load(&image_input_plan(&jpeg_path, &allowed_roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
         .expect("local JPEG loads");
 
     assert_eq!(png.media_type, "image/png");
     assert_eq!(jpeg.media_type, "image/jpeg");
     assert_eq!(png.metadata.source_label.as_deref(), Some(png_path.as_str()));
+}
+
+// r[verify n8nclone.workflow_execution.image_input_nodes.capability_read.scenario.rejected]
+#[test]
+fn local_image_io_rejects_missing_allowed_root() {
+    let temp_dir = tempfile::tempdir().expect("temporary image directory");
+    let png_path = write_local_fixture(&temp_dir, LOCAL_PNG_FILE_NAME, PNG_FIXTURE);
+    let plan = image_input_plan(&png_path, &[], n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+
+    let result = LocalImageIo.load(&plan);
+
+    assert_eq!(result, Err(ImageError::UnsafePath(png_path)));
 }
 
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -250,7 +270,7 @@ async fn default_executor_reports_oversized_local_image_file_before_decode() {
     let (mut workflow, node_id) = local_image_workflow(&png_path);
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: png_path,
-        allowed_roots: Vec::new(),
+        allowed_roots: vec![temp_dir.path().to_string_lossy().into_owned()],
         max_bytes: TINY_IMAGE_BYTE_BUDGET,
     });
     let executor = Executor::new();
@@ -282,6 +302,25 @@ async fn default_executor_reports_local_image_outside_allowed_roots() {
         NodeStatus::Failed { error } => assert!(error.contains("unsafe image path"), "error: {error}"),
         other => panic!("expected failed image node, got {other:?}"),
     }
+}
+
+// r[verify n8nclone.workflow_execution.image_input_nodes.capability_read.scenario.rejected]
+#[cfg(unix)]
+#[test]
+fn local_image_io_rejects_symlink_escape() {
+    let allowed = tempfile::tempdir().expect("allowed image directory");
+    let outside = tempfile::tempdir().expect("outside image directory");
+    let outside_path = outside.path().join(LOCAL_PNG_FILE_NAME);
+    std::fs::write(&outside_path, PNG_FIXTURE).expect("write outside image");
+    let link_path = allowed.path().join(LOCAL_PNG_FILE_NAME);
+    std::os::unix::fs::symlink(&outside_path, &link_path).expect("create escaping image symlink");
+    let path = link_path.to_string_lossy().into_owned();
+    let roots = vec![allowed.path().to_string_lossy().into_owned()];
+    let plan = image_input_plan(&path, &roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+
+    let result = LocalImageIo.load(&plan);
+
+    assert_eq!(result, Err(ImageError::PermissionDenied(path)));
 }
 
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.errors]

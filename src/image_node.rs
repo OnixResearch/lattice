@@ -156,19 +156,24 @@ pub fn image_value_from_loaded_bytes(path: &str, bytes: Vec<u8>, max_bytes: usiz
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.local]
+// r[impl n8nclone.workflow_execution.image_input_nodes.capability_read]
 pub fn load_local_image(plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
-    validate_image_path_allowed(&plan.path, &plan.allowed_roots)?;
-    let metadata_bytes = local_image_metadata_len(&plan.path)?;
+    let rooted_path = crate::capability::select_rooted_path(&plan.path, &plan.allowed_roots)
+        .ok_or_else(|| ImageError::UnsafePath(plan.path.clone()))?;
+    let file =
+        crate::capability::open_rooted_read(&rooted_path).map_err(|error| image_error_from_io(&plan.path, error))?;
+    let metadata = file.metadata().map_err(|error| image_error_from_io(&plan.path, error))?;
+    let metadata_bytes = usize::try_from(metadata.len()).map_err(|_| {
+        ImageError::Io(format!(
+            "image metadata length does not fit this platform: {} has {} bytes",
+            plan.path,
+            metadata.len()
+        ))
+    })?;
     validate_image_size(&plan.path, metadata_bytes, plan.max_bytes)?;
-    let bytes = std::fs::read(&plan.path).map_err(|error| image_error_from_io(&plan.path, error))?;
+    let bytes = crate::capability::read_bounded(file, plan.max_bytes)
+        .map_err(|error| image_error_from_io(&plan.path, error))?;
     image_value_from_loaded_bytes(&plan.path, bytes, plan.max_bytes)
-}
-
-fn local_image_metadata_len(path: &str) -> Result<usize, ImageError> {
-    let metadata = std::fs::metadata(path).map_err(|error| image_error_from_io(path, error))?;
-    usize::try_from(metadata.len()).map_err(|_| {
-        ImageError::Io(format!("image metadata length does not fit this platform: {path} has {} bytes", metadata.len()))
-    })
 }
 
 fn image_error_from_io(path: &str, error: std::io::Error) -> ImageError {

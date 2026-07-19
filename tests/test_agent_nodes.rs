@@ -76,6 +76,7 @@ const HANDOFF_ARTIFACT_FILE_NAME: &str = "agent-output.bin";
 const HANDOFF_MISSING_FILE_NAME: &str = "missing-output.png";
 const HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME: &str = "bad-output.img";
 const HANDOFF_OUTSIDE_FILE_NAME: &str = "outside-output.png";
+const HANDOFF_SYMLINK_FILE_NAME: &str = "linked-output.png";
 const HANDOFF_METADATA_LABEL: &str = "generated";
 const HANDOFF_ARTIFACT_BYTES: &[u8] = b"artifact bytes";
 const HANDOFF_BAD_IMAGE_BYTES: &[u8] = b"not an image";
@@ -539,6 +540,32 @@ fn handoff_rejects_output_path_outside_working_directory() {
     let error = decode_agent_command_output(&plan, &output).expect_err("outside path rejected");
 
     assert!(error.to_string().contains("outside working directory"), "error: {error}");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.
+// rejected]
+#[cfg(unix)]
+#[test]
+fn handoff_rejects_symlink_escape() {
+    let cwd_dir = tempfile::tempdir().expect("temporary cwd directory");
+    let outside_dir = tempfile::tempdir().expect("temporary outside directory");
+    let outside_path = outside_dir.path().join(HANDOFF_OUTSIDE_FILE_NAME);
+    fs::write(&outside_path, IMAGE_BYTES_A).expect("outside handoff written");
+    std::os::unix::fs::symlink(&outside_path, cwd_dir.path().join(HANDOFF_SYMLINK_FILE_NAME))
+        .expect("escaping handoff symlink created");
+    let plan = AgentCommandPlan {
+        cwd: Some(cwd_dir.path().display().to_string()),
+        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+    };
+    let output = AgentCommandOutput {
+        status_code: Some(PROCESS_STATUS_SUCCESS),
+        stdout: handoff_envelope(HANDOFF_SYMLINK_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
+        stderr: String::new(),
+    };
+
+    let error = decode_agent_command_output(&plan, &output).expect_err("escaping handoff rejected");
+
+    assert!(error.to_string().contains("permission denied"), "error: {error}");
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]

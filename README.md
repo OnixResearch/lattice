@@ -37,7 +37,7 @@ n8nclone --config examples/config/openai-compatible-agent.ncl run llm-operating-
 
 ## Local file capabilities
 
-Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured root paths are trusted authority grants; `LocalFs` does not turn untrusted workflow definitions into a host sandbox.
+Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. The same capability core confines production image inputs, Markdown prompt hydration, and generic-agent image/artifact handoffs while preserving their byte, UTF-8, and media checks. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured roots, workflow directories, and agent working directories are trusted authority grants; these readers do not turn untrusted workflow definitions into a host sandbox.
 
 ## Verification
 

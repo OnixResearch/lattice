@@ -1,4 +1,5 @@
 pub mod agent_node;
+mod capability;
 pub mod config;
 pub mod control_flow;
 pub mod credentials;

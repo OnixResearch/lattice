@@ -343,7 +343,13 @@ async fn headless_run_loads_local_image_with_default_executor() {
     let image_path = temp_dir.path().join(HEADLESS_IMAGE_FILE_NAME);
     std::fs::write(&image_path, PNG_FIXTURE).expect("headless image fixture written");
     let mut workflow = Workflow::new(IMAGE_WORKFLOW_NAME);
-    let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, image_path.display().to_string());
+    let image_path_label = image_path.display().to_string();
+    let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, &image_path_label);
+    workflow.set_node_config(node_id, NodeConfig::ImageInput {
+        path: image_path_label,
+        allowed_roots: vec![temp_dir.path().to_string_lossy().into_owned()],
+        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+    });
     let image_port = output_port_id(&workflow, node_id, IMAGE_OUTPUT_PORT_LABEL);
     let input_hash = node_execution_cache_key(
         node_id,
