@@ -39,6 +39,7 @@
         isSourceFixturePath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/examples/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/cairn/specs/" (toString path);
         src = pkgs.lib.cleanSourceWith {
           src = ./.;
@@ -204,12 +205,13 @@
               nativeBuildInputs
               buildInputs
               ;
-            cargoClippyExtraArgs = "--all-targets -- -D warnings";
+            cargoClippyExtraArgs = "--package n8nclone --all-targets --no-deps -- -D warnings";
           };
 
           # Format check
           fmt = craneLib.cargoFmt {
             inherit src;
+            cargoExtraArgs = "--package n8nclone";
           };
 
           # Octet Tiger Style lints

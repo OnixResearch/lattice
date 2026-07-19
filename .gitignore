@@ -1,11 +1,11 @@
 # Build
-target/
-coverage/
-doc/
+/target/
+/coverage/
+/doc/
 
 # Nix
-result*
-.direnv/
+/result*
+/.direnv/
 
 # IDE
 .idea/
@@ -16,5 +16,5 @@ result*
 # Runtime
 *.redb
 *.sock
-data/
+/data/
 .pi/
