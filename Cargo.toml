@@ -75,6 +75,7 @@ rat-table = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-table" 
 rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor" }
 home = "0.5.12"
 dirs-next = "2.0.0"
+cap-std = "4.0.2"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

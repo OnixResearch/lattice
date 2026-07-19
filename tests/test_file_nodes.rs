@@ -12,6 +12,7 @@ use n8nclone::file_node::FileOperationKind;
 use n8nclone::file_node::FileOperationPlan;
 use n8nclone::file_node::FileOperationResult;
 use n8nclone::file_node::FileSystem;
+use n8nclone::file_node::LocalFs;
 use n8nclone::file_node::MemoryFileSystem;
 use n8nclone::file_node::validate_path_allowed;
 use n8nclone::workflow_validation::WorkflowDiagnosticCode;
@@ -28,6 +29,9 @@ const INITIAL_CONTENT: &str = "initial";
 const WRITE_CONTENT: &str = "written";
 const APPEND_CONTENT: &str = " appended";
 const LOCAL_FILE_NAME: &str = "local-data.txt";
+const NESTED_DIRECTORY_NAME: &str = "nested";
+const OUTSIDE_DIRECTORY_NAME: &str = "outside";
+const OUTSIDE_CONTENT: &str = "outside";
 const CONTENT_INPUT_INDEX: usize = 0;
 const CONTENT_OUTPUT_INDEX: usize = 0;
 const BYTES_OUTPUT_INDEX: usize = 2;
@@ -208,9 +212,11 @@ async fn default_executor_reads_local_file_within_allowed_root() {
 #[test]
 fn local_filesystem_writes_and_appends_within_allowed_root() {
     let directory = tempfile::tempdir().expect("temporary directory");
-    let path = directory.path().join(LOCAL_FILE_NAME).to_string_lossy().into_owned();
+    let nested_directory = directory.path().join(NESTED_DIRECTORY_NAME);
+    std::fs::create_dir(&nested_directory).expect("create nested directory");
+    let path = nested_directory.join(LOCAL_FILE_NAME).to_string_lossy().into_owned();
     let allowed_roots = vec![directory.path().to_string_lossy().into_owned()];
-    let file_system = n8nclone::file_node::LocalFs;
+    let file_system = LocalFs;
     let write = FileOperationPlan {
         kind: FileOperationKind::Write,
         path: path.clone(),
@@ -252,23 +258,74 @@ fn path_prefix_sibling_is_not_inside_allowed_root() {
     );
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.missing-root]
+#[test]
+fn local_filesystem_rejects_missing_allowed_root_before_creation() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join(LOCAL_FILE_NAME).to_string_lossy().into_owned();
+    let plan = FileOperationPlan {
+        kind: FileOperationKind::Write,
+        path: path.clone(),
+        content: Some(WRITE_CONTENT.to_string()),
+        overwrite: false,
+        allowed_roots: Vec::new(),
+    };
+
+    assert_eq!(LocalFs.execute(&plan), Err(FileError::UnsafePath(path.clone())));
+    assert!(!std::path::Path::new(&path).exists());
+}
+
+// r[verify n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.traversal]
+#[test]
+fn local_filesystem_rejects_parent_traversal_before_write() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let allowed = directory.path().join("allowed");
+    let outside = directory.path().join(OUTSIDE_DIRECTORY_NAME);
+    std::fs::create_dir(&allowed).expect("create allowed directory");
+    std::fs::create_dir(&outside).expect("create outside directory");
+    let outside_path = outside.join(LOCAL_FILE_NAME);
+    std::fs::write(&outside_path, OUTSIDE_CONTENT).expect("write outside fixture");
+    let traversal_path = allowed.join("..").join(OUTSIDE_DIRECTORY_NAME).join(LOCAL_FILE_NAME);
+    let path = traversal_path.to_string_lossy().into_owned();
+    let plan = FileOperationPlan {
+        kind: FileOperationKind::Write,
+        path: path.clone(),
+        content: Some(WRITE_CONTENT.to_string()),
+        overwrite: true,
+        allowed_roots: vec![allowed.to_string_lossy().into_owned()],
+    };
+
+    assert_eq!(LocalFs.execute(&plan), Err(FileError::UnsafePath(path)));
+    assert_eq!(std::fs::read_to_string(outside_path).expect("read outside fixture"), OUTSIDE_CONTENT);
+}
+
 // r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+// r[verify n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.symlink-escape]
 #[cfg(unix)]
 #[test]
 fn local_filesystem_rejects_symlink_escape() {
     let allowed = tempfile::tempdir().expect("allowed temporary directory");
     let outside = tempfile::tempdir().expect("outside temporary directory");
     let outside_path = outside.path().join(LOCAL_FILE_NAME);
-    std::fs::write(&outside_path, INITIAL_CONTENT).expect("write outside fixture");
+    std::fs::write(&outside_path, OUTSIDE_CONTENT).expect("write outside fixture");
     let link_path = allowed.path().join(LOCAL_FILE_NAME);
     std::os::unix::fs::symlink(&outside_path, &link_path).expect("create escaping symlink");
-    let plan = FileOperationPlan {
-        kind: FileOperationKind::Read,
-        path: link_path.to_string_lossy().into_owned(),
-        content: None,
-        overwrite: false,
-        allowed_roots: vec![allowed.path().to_string_lossy().into_owned()],
-    };
 
-    assert!(matches!(n8nclone::file_node::LocalFs.execute(&plan), Err(FileError::UnsafePath(_))));
+    for kind in [
+        FileOperationKind::Read,
+        FileOperationKind::Write,
+        FileOperationKind::Append,
+    ] {
+        let plan = FileOperationPlan {
+            kind,
+            path: link_path.to_string_lossy().into_owned(),
+            content: Some(WRITE_CONTENT.to_string()),
+            overwrite: true,
+            allowed_roots: vec![allowed.path().to_string_lossy().into_owned()],
+        };
+        let result = LocalFs.execute(&plan);
+
+        assert!(matches!(result, Err(FileError::PermissionDenied(_))), "result: {result:?}");
+        assert_eq!(std::fs::read_to_string(&outside_path).expect("read outside fixture"), OUTSIDE_CONTENT);
+    }
 }

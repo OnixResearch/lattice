@@ -35,6 +35,10 @@ n8nclone --config examples/config/openai-compatible-agent.ncl import examples/wo
 n8nclone --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
 ```
 
+## Local file capabilities
+
+Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured root paths are trusted authority grants; `LocalFs` does not turn untrusted workflow definitions into a host sandbox.
+
 ## Verification
 
 ```bash
@@ -49,3 +53,4 @@ verus verus/example_spec.rs
 - [Seaglass](https://github.com/brittonr/seaglass): owner of the vendored dependency-light execution-graph core used for deterministic admission, readiness, lifecycle, critical-path, and bottleneck decisions.
 - [Callee](https://github.com/baldaworks/callee): Markdown-defined provider-backed roles and bounded `Sequential`/`Loop` composition used as an authoring and orchestration reference.
 - [FarmTable](https://github.com/scion-frontiers/farmtable): graph-native ready-task, dependency, critical-path, bottleneck, and lifecycle separation used as an execution-graph architecture reference.
+- [cap-std](https://github.com/bytecodealliance/cap-std): portable capability-directory implementation used to keep local file effects descriptor-relative and reject traversal or symlink escapes.
