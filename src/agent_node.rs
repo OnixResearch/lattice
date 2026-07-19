@@ -14,6 +14,7 @@ use crate::engine::value::ImageValue;
 use crate::engine::value::Value;
 use crate::engine::value::ValueData;
 use crate::image_node;
+use crate::openai::Transport;
 
 const DEFAULT_PI_RUNTIME_KEY: &str = "pi";
 const DEFAULT_CLANKERS_RUNTIME_KEY: &str = "clankers";
@@ -75,6 +76,8 @@ pub struct AgentNodeSettings {
 pub struct AgentRuntimeConfig {
     #[serde(default = "default_agent_runtimes")]
     pub runtimes: BTreeMap<String, AgentCommandRuntimeConfig>,
+    #[serde(default = "empty_openai_runtimes")]
+    pub openai_compatible: BTreeMap<String, crate::openai::RuntimeConfig>,
     #[serde(default = "default_agent_output_max_bytes")]
     pub max_output_bytes: usize,
 }
@@ -90,6 +93,7 @@ impl Default for AgentRuntimeConfig {
     fn default() -> Self {
         Self {
             runtimes: default_agent_runtimes(),
+            openai_compatible: BTreeMap::new(),
             max_output_bytes: default_agent_output_max_bytes(),
         }
     }
@@ -114,6 +118,31 @@ pub struct AgentRequest {
 pub struct AgentResponse {
     pub output: AgentOutput,
     pub metadata: serde_json::Value,
+}
+
+/// Execution-only secrets for an agent adapter call.
+#[derive(Default)]
+pub struct ExecutionContext {
+    secret_env: BTreeMap<String, String>,
+    secret_values: Vec<String>,
+}
+
+impl ExecutionContext {
+    pub fn new(secret_env: std::collections::HashMap<String, String>) -> Self {
+        let secret_values = secret_env.values().filter(|value| !value.is_empty()).cloned().collect();
+        Self {
+            secret_env: secret_env.into_iter().collect(),
+            secret_values,
+        }
+    }
+
+    pub fn secret(&self, binding: &str) -> Option<&str> {
+        self.secret_env.get(binding).map(String::as_str)
+    }
+
+    pub fn redact(&self, value: &str) -> String {
+        crate::credentials::redact_text(value, &self.secret_values)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -157,14 +186,14 @@ impl std::fmt::Display for AgentError {
 impl std::error::Error for AgentError {}
 
 pub trait AgentAdapter: Send + Sync {
-    fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError>;
+    fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError>;
 }
 
 #[derive(Debug, Default)]
 pub struct NoopAgentAdapter;
 
 impl AgentAdapter for NoopAgentAdapter {
-    fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, request: &AgentRequest, _context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
         Err(AgentError::UnsupportedTarget(agent_target_label(request.target).to_string()))
     }
 }
@@ -280,22 +309,78 @@ struct ResolvedHandoffPath {
     label: String,
 }
 
-#[derive(Debug, Clone, Default)]
+enum RuntimeRoute<'a> {
+    Command,
+    OpenAi(&'a crate::openai::RuntimeConfig),
+}
+
+// r[impl n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.route]
+fn runtime_route_for_target(config: &AgentRuntimeConfig, target: AgentTarget) -> Result<RuntimeRoute<'_>, AgentError> {
+    let target_label = agent_target_label(target);
+    match (config.runtimes.contains_key(target_label), config.openai_compatible.get(target_label)) {
+        (true, None) => Ok(RuntimeRoute::Command),
+        (false, Some(runtime)) => Ok(RuntimeRoute::OpenAi(runtime)),
+        (false, None) => {
+            Err(AgentError::PreflightRejected(format!("missing {target_label} agent runtime configuration")))
+        }
+        (true, Some(_)) => {
+            Err(AgentError::PreflightRejected(format!("ambiguous {target_label} agent runtime configuration")))
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ProductionAgentAdapter {
     config: AgentRuntimeConfig,
+    openai_transport: std::sync::Arc<dyn Transport>,
 }
 
 impl ProductionAgentAdapter {
     pub fn new(config: AgentRuntimeConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            openai_transport: crate::openai::default_transport(),
+        }
+    }
+
+    pub fn new_with_openai_transport(
+        config: AgentRuntimeConfig,
+        openai_transport: std::sync::Arc<dyn Transport>,
+    ) -> Self {
+        Self {
+            config,
+            openai_transport,
+        }
+    }
+}
+
+impl Default for ProductionAgentAdapter {
+    fn default() -> Self {
+        Self::new(AgentRuntimeConfig::default())
     }
 }
 
 impl AgentAdapter for ProductionAgentAdapter {
-    fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError> {
-        let plan = plan_agent_command(&self.config, request)?;
-        let output = run_agent_command(&plan)?;
-        decode_agent_command_output(&plan, &output)
+    fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
+        match runtime_route_for_target(&self.config, request.target)? {
+            RuntimeRoute::Command => {
+                let plan = plan_agent_command(&self.config, request)?;
+                let output = run_agent_command(&plan)?;
+                decode_agent_command_output(&plan, &output)
+            }
+            RuntimeRoute::OpenAi(runtime) => {
+                let global_output_max_bytes = u64::try_from(self.config.max_output_bytes).map_err(|_| {
+                    AgentError::PreflightRejected("global agent output bound is unsupported".to_string())
+                })?;
+                crate::openai::execute(
+                    runtime,
+                    request,
+                    context,
+                    global_output_max_bytes,
+                    self.openai_transport.as_ref(),
+                )
+            }
+        }
     }
 }
 
@@ -318,6 +403,10 @@ fn default_agent_runtimes() -> BTreeMap<String, AgentCommandRuntimeConfig> {
             args: vec![PRINT_MODE_FLAG.to_string(), PROMPT_PLACEHOLDER.to_string()],
         }),
     ])
+}
+
+fn empty_openai_runtimes() -> BTreeMap<String, crate::openai::RuntimeConfig> {
+    BTreeMap::new()
 }
 
 fn default_agent_output_max_bytes() -> usize {

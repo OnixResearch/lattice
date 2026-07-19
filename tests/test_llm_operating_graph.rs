@@ -11,6 +11,7 @@ use n8nclone::agent_node::AgentOutput;
 use n8nclone::agent_node::AgentOutputMode;
 use n8nclone::agent_node::AgentRequest;
 use n8nclone::agent_node::AgentResponse;
+use n8nclone::agent_node::ExecutionContext as AgentExecutionContext;
 use n8nclone::credentials::EmptyCredentialProvider;
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
@@ -65,7 +66,7 @@ impl RecordingAgentAdapter {
 }
 
 impl AgentAdapter for RecordingAgentAdapter {
-    fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         self.requests.lock().expect("request log lock succeeds").push(request.clone());
         let role = request_role(request);
         if self.failing_role == Some(role.as_str()) {

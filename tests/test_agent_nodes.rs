@@ -18,6 +18,7 @@ use n8nclone::agent_node::AgentRequest;
 use n8nclone::agent_node::AgentResponse;
 use n8nclone::agent_node::AgentRuntimeConfig;
 use n8nclone::agent_node::AgentTarget;
+use n8nclone::agent_node::ExecutionContext as AgentExecutionContext;
 use n8nclone::agent_node::FakeProcessRunner;
 use n8nclone::agent_node::ProcessError;
 use n8nclone::agent_node::ProcessOutput;
@@ -108,7 +109,7 @@ impl StaticAgentAdapter {
 }
 
 impl AgentAdapter for StaticAgentAdapter {
-    fn execute(&self, request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         self.requests.lock().push(request.clone());
         Ok(self.response.clone())
     }
@@ -134,7 +135,7 @@ impl ErrorAgentAdapter {
 }
 
 impl AgentAdapter for ErrorAgentAdapter {
-    fn execute(&self, _request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, _request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         *self.calls.lock() += 1;
         Err(self.error.clone())
     }
@@ -170,6 +171,7 @@ fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: 
     }
     AgentRuntimeConfig {
         runtimes,
+        openai_compatible: BTreeMap::new(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
     }
 }
@@ -195,6 +197,7 @@ fn runtime_config_for_script(
     }
     AgentRuntimeConfig {
         runtimes,
+        openai_compatible: BTreeMap::new(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
     }
 }
@@ -340,7 +343,7 @@ fn production_pi_text_adapter_executes_command() {
     let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
     let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
 
-    let response = adapter.execute(&request).expect("production pi adapter runs");
+    let response = adapter.execute(&request, &AgentExecutionContext::default()).expect("production pi adapter runs");
 
     assert_eq!(response.output, AgentOutput::Text(RUNTIME_TEXT_OUTPUT.to_string()));
     assert_eq!(response.metadata["adapter"], "pi");
@@ -356,7 +359,9 @@ fn production_clankers_json_adapter_executes_command() {
     let adapter = ProductionAgentAdapter::new(runtime_config_for_script(None, Some(command)));
     let request = agent_request(AgentTarget::Clankers, AgentOutputMode::Json);
 
-    let response = adapter.execute(&request).expect("production clankers adapter runs");
+    let response = adapter
+        .execute(&request, &AgentExecutionContext::default())
+        .expect("production clankers adapter runs");
 
     assert_eq!(response.output, AgentOutput::Json(serde_json::json!({"ok": true})));
     assert_eq!(response.metadata["adapter"], "clankers");
@@ -399,7 +404,7 @@ fn production_image_handoff_loads_typed_image() {
     let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Image);
     request.cwd = Some(temp_dir.path().display().to_string());
 
-    let response = adapter.execute(&request).expect("production image handoff runs");
+    let response = adapter.execute(&request, &AgentExecutionContext::default()).expect("production image handoff runs");
 
     match response.output {
         AgentOutput::Image(image) => {
@@ -424,7 +429,9 @@ fn production_artifact_handoff_loads_bytes() {
     let mut request = agent_request(AgentTarget::Clankers, AgentOutputMode::Artifact);
     request.cwd = Some(temp_dir.path().display().to_string());
 
-    let response = adapter.execute(&request).expect("production artifact handoff runs");
+    let response = adapter
+        .execute(&request, &AgentExecutionContext::default())
+        .expect("production artifact handoff runs");
 
     assert_eq!(response.output, AgentOutput::Artifact(HANDOFF_ARTIFACT_BYTES.to_vec()));
     assert_eq!(response.metadata["file_handoff"]["bytes"], HANDOFF_ARTIFACT_BYTES.len());

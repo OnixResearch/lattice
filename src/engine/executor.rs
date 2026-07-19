@@ -1012,9 +1012,18 @@ impl Executor {
 
     // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.config]
     pub fn new_with_agent_runtime_config(agent_runtime: AgentRuntimeConfig) -> Self {
+        let credential_env_keys: Vec<String> = agent_runtime
+            .openai_compatible
+            .values()
+            .filter_map(|runtime| runtime.api_key_env.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let credential_provider =
+            crate::credentials::EnvironmentCredentialProvider::from_current_env(&credential_env_keys);
         Self {
             next_run_id: 0,
-            credential_provider: Box::<EmptyCredentialProvider>::default(),
+            credential_provider: Box::new(credential_provider),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
@@ -1462,7 +1471,7 @@ impl Executor {
                 }
             }
             NodeConfig::Agent(settings) => {
-                let _secret_env = match credentials::resolve_secret_env(
+                let secret_env = match credentials::resolve_secret_env(
                     node_credentials.unwrap_or(&NodeCredentialRefs::default()),
                     self.credential_provider.as_ref(),
                 ) {
@@ -1558,7 +1567,8 @@ impl Executor {
                     resolved_session,
                     inputs,
                 );
-                match self.agent_adapter.execute(&request) {
+                let agent_context = crate::agent_node::ExecutionContext::new(secret_env.env);
+                match self.agent_adapter.execute(&request, &agent_context) {
                     Ok(response) => match agent_node::validate_agent_response_mode(&response, settings.output_mode) {
                         Ok(()) => completed_step_result(
                             node_id,

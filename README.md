@@ -24,6 +24,17 @@ n8nclone --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
 n8nclone --config ./demo/config.ncl run daily-digest --output json
 ```
 
+## Native OpenAI-compatible agents
+
+[`examples/config/openai-compatible-agent.ncl`](examples/config/openai-compatible-agent.ncl) routes the existing adapter-neutral Pi and Clankers target labels directly to a bounded chat-completions endpoint. Set `agent_runtime.runtimes = {}` when using those native routes so transport selection remains unambiguous, then replace the example endpoint and model.
+
+The native adapter supports strict text and JSON outputs, disables redirects, bounds request/response bytes and time, and never falls back from missing content to hidden reasoning. Local HTTP endpoints are supported only without bearer credentials. For an authenticated HTTPS endpoint, set `api_key_env` to a binding name and provide that binding through each agent node's `secret_env` credential reference; do not put the key in Nickel.
+
+```bash
+n8nclone --config examples/config/openai-compatible-agent.ncl import examples/workflows/llm-operating-graph.ncl
+n8nclone --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
+```
+
 ## Verification
 
 ```bash

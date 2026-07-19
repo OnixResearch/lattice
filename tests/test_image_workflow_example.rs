@@ -7,6 +7,7 @@ use n8nclone::agent_node::AgentAdapter;
 use n8nclone::agent_node::AgentError;
 use n8nclone::agent_node::AgentOutput;
 use n8nclone::agent_node::AgentResponse;
+use n8nclone::agent_node::ExecutionContext as AgentExecutionContext;
 use n8nclone::credentials::EmptyCredentialProvider;
 use n8nclone::engine::executor::Executor;
 use n8nclone::engine::executor::NodeStatus;
@@ -33,7 +34,11 @@ const EXPECTED_COMPLETED_NODE_COUNT: usize = 4;
 struct ExampleAgentAdapter;
 
 impl AgentAdapter for ExampleAgentAdapter {
-    fn execute(&self, request: &n8nclone::agent_node::AgentRequest) -> Result<AgentResponse, AgentError> {
+    fn execute(
+        &self,
+        request: &n8nclone::agent_node::AgentRequest,
+        _context: &AgentExecutionContext,
+    ) -> Result<AgentResponse, AgentError> {
         assert_eq!(request.image_inputs.len(), EXPECTED_IMAGE_INPUT_COUNT);
         Ok(AgentResponse {
             output: AgentOutput::Image(ImageValue::new(

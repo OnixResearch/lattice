@@ -31,7 +31,7 @@ pub struct AppConfig {
     pub shell: String,
     /// Max parallel node executions.
     pub max_parallelism: usize,
-    /// Production agent runtime command configuration.
+    /// Production command and OpenAI-compatible agent runtime configuration.
     #[serde(default)]
     pub agent_runtime: AgentRuntimeConfig,
 }
@@ -440,6 +440,7 @@ pub fn default_config_ncl() -> &'static str {
         args = ["-p", "{prompt}"],
       },
     },
+    openai_compatible = {},
   },
 }
 "#

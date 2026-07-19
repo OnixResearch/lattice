@@ -2329,6 +2329,7 @@ mod tests {
     use crate::agent_node::AgentError;
     use crate::agent_node::AgentRequest;
     use crate::agent_node::AgentResponse;
+    use crate::agent_node::ExecutionContext as AgentExecutionContext;
     use crate::config::PortTemplate;
     use crate::config::TemplateParameter;
     use crate::config::TemplateParameterDefault;
@@ -2377,7 +2378,11 @@ mod tests {
     }
 
     impl AgentAdapter for TuiErrorAgentAdapter {
-        fn execute(&self, _request: &AgentRequest) -> Result<AgentResponse, AgentError> {
+        fn execute(
+            &self,
+            _request: &AgentRequest,
+            _context: &AgentExecutionContext,
+        ) -> Result<AgentResponse, AgentError> {
             Err(self.error.clone())
         }
     }
