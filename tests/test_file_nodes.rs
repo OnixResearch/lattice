@@ -7,8 +7,13 @@ use n8nclone::engine::executor::NodeStatus;
 use n8nclone::engine::value::Value;
 use n8nclone::engine::workflow::NodeConfig;
 use n8nclone::engine::workflow::Workflow;
+use n8nclone::file_node::FileError;
 use n8nclone::file_node::FileOperationKind;
+use n8nclone::file_node::FileOperationPlan;
+use n8nclone::file_node::FileOperationResult;
+use n8nclone::file_node::FileSystem;
 use n8nclone::file_node::MemoryFileSystem;
+use n8nclone::file_node::validate_path_allowed;
 use n8nclone::workflow_validation::WorkflowDiagnosticCode;
 use n8nclone::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
@@ -22,6 +27,7 @@ const ROOT_ALLOWED: &str = "/allowed";
 const INITIAL_CONTENT: &str = "initial";
 const WRITE_CONTENT: &str = "written";
 const APPEND_CONTENT: &str = " appended";
+const LOCAL_FILE_NAME: &str = "local-data.txt";
 const CONTENT_INPUT_INDEX: usize = 0;
 const CONTENT_OUTPUT_INDEX: usize = 0;
 const BYTES_OUTPUT_INDEX: usize = 2;
@@ -172,4 +178,97 @@ async fn write_without_overwrite_fails_without_modifying_existing_file() {
         other => panic!("expected failed file node, got {other:?}"),
     }
     assert_eq!(fs.read_text(PATH_ALLOWED).as_deref(), Some(INITIAL_CONTENT));
+}
+
+// r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+#[tokio::test]
+async fn default_executor_reads_local_file_within_allowed_root() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join(LOCAL_FILE_NAME);
+    std::fs::write(&path, INITIAL_CONTENT).expect("write local fixture");
+    let path = path.to_string_lossy().into_owned();
+    let allowed_root = directory.path().to_string_lossy().into_owned();
+    let mut workflow = Workflow::new("local-read");
+    let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, &path);
+    workflow.set_node_config(node_id, NodeConfig::File {
+        operation: FileOperationKind::Read,
+        path,
+        content: None,
+        overwrite: false,
+        allowed_roots: vec![allowed_root],
+    });
+    let executor = Executor::new();
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    assert!(matches!(result.status, NodeStatus::Completed { .. }));
+}
+
+// r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+#[test]
+fn local_filesystem_writes_and_appends_within_allowed_root() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join(LOCAL_FILE_NAME).to_string_lossy().into_owned();
+    let allowed_roots = vec![directory.path().to_string_lossy().into_owned()];
+    let file_system = n8nclone::file_node::LocalFs;
+    let write = FileOperationPlan {
+        kind: FileOperationKind::Write,
+        path: path.clone(),
+        content: Some(WRITE_CONTENT.to_string()),
+        overwrite: false,
+        allowed_roots: allowed_roots.clone(),
+    };
+    let append = FileOperationPlan {
+        kind: FileOperationKind::Append,
+        path: path.clone(),
+        content: Some(APPEND_CONTENT.to_string()),
+        overwrite: false,
+        allowed_roots,
+    };
+
+    assert_eq!(
+        file_system.execute(&write),
+        Ok(FileOperationResult::Written {
+            bytes: WRITE_CONTENT.len()
+        })
+    );
+    assert_eq!(
+        file_system.execute(&append),
+        Ok(FileOperationResult::Written {
+            bytes: APPEND_CONTENT.len()
+        })
+    );
+    assert_eq!(std::fs::read_to_string(path).expect("read local result"), "written appended");
+}
+
+// r[verify n8nclone.workflow_execution.file_nodes.safety]
+#[test]
+fn path_prefix_sibling_is_not_inside_allowed_root() {
+    let roots = vec![ROOT_ALLOWED.to_string()];
+
+    assert_eq!(
+        validate_path_allowed("/allowed-other/data.txt", &roots),
+        Err(FileError::UnsafePath("/allowed-other/data.txt".to_string()))
+    );
+}
+
+// r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+#[cfg(unix)]
+#[test]
+fn local_filesystem_rejects_symlink_escape() {
+    let allowed = tempfile::tempdir().expect("allowed temporary directory");
+    let outside = tempfile::tempdir().expect("outside temporary directory");
+    let outside_path = outside.path().join(LOCAL_FILE_NAME);
+    std::fs::write(&outside_path, INITIAL_CONTENT).expect("write outside fixture");
+    let link_path = allowed.path().join(LOCAL_FILE_NAME);
+    std::os::unix::fs::symlink(&outside_path, &link_path).expect("create escaping symlink");
+    let plan = FileOperationPlan {
+        kind: FileOperationKind::Read,
+        path: link_path.to_string_lossy().into_owned(),
+        content: None,
+        overwrite: false,
+        allowed_roots: vec![allowed.path().to_string_lossy().into_owned()],
+    };
+
+    assert!(matches!(n8nclone::file_node::LocalFs.execute(&plan), Err(FileError::UnsafePath(_))));
 }

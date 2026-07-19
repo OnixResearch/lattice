@@ -1,4 +1,65 @@
 {
+  "agent_completion_policy": {
+    "forbidden_diagnostic_fields": [
+      "raw_prompt",
+      "model_output",
+      "credentials",
+      "environment",
+      "stdout",
+      "stderr",
+      "pty_bytes"
+    ],
+    "legacy_classification": "legacy_unscoped",
+    "max_diagnostic_summary_bytes": 512,
+    "max_input_file_bytes": 65536,
+    "max_reproduction_args": 32,
+    "non_passing_statuses": [
+      "failed",
+      "blocked",
+      "skipped",
+      "deferred",
+      "timed_out",
+      "cancelled",
+      "dry_run",
+      "cleanup_failed",
+      "infrastructure_error",
+      "not_selected",
+      "unknown"
+    ],
+    "passing_status": "passed",
+    "required_non_claims": [
+      "completion validation does not prove check-oracle soundness",
+      "completion validation does not prove honest command execution beyond supplied evidence",
+      "completion validation does not prove model correctness",
+      "completion validation does not prove whole-product correctness",
+      "completion validation does not prove release eligibility outside the selected contract"
+    ],
+    "schema": "cairn.agent-completion.v2"
+  },
+  "authenticated_evidence_policy": {
+    "accepted_canonicalization_profiles": [
+      "valence.preserves-integrity.corrected.v1"
+    ],
+    "accepted_valence_integrity_receipt_hash": "a1c63619b0f72140c6e350b61ed18d3d552310067406ba0b819ace462d1f1e48",
+    "accepted_valence_integrity_receipt_path": "cairn-policy/evidence/valence-preserves-integrity-archive-receipt.json",
+    "policy_exports": [
+      {
+        "digest_blake3": "93993e99e87206d232b64efcc8631611aad3b5b0c4b81855e7e1a0cdcc391cff",
+        "evidence_kind": "stack-provenance",
+        "path": "cairn-policy/generated/stack-provenance-authentication-profile.json",
+        "signature_purpose": "onix.stack-provenance.release-evidence.v1"
+      },
+      {
+        "digest_blake3": "62c88a0263720dea4c37a48ef46921c46e5dd3e4924fff096b84a65d5738a412",
+        "evidence_kind": "function-address",
+        "path": "cairn-policy/generated/function-address-authentication-profile.json",
+        "signature_purpose": "onix.function-address.release-evidence.v1"
+      }
+    ],
+    "release_profile": "diagnostic",
+    "schema_version": "cairn.authenticated-evidence.v1",
+    "trusted_producers": []
+  },
   "change_metadata_policy": {
     "allowed_groups": [
       "current",
@@ -12,6 +73,39 @@
       "planned",
       "blocked",
       "deferred"
+    ]
+  },
+  "cross_repo_dependency_policy": {
+    "max_evidence_file_bytes": 65536,
+    "max_evidence_files": 64,
+    "non_passing_statuses": [
+      "failed",
+      "blocked",
+      "skipped",
+      "deferred",
+      "timed_out",
+      "dry_run",
+      "cancelled",
+      "infrastructure_failed",
+      "malformed",
+      "unsupported",
+      "unknown",
+      "stale"
+    ],
+    "passing_status": "pass",
+    "required_non_claims": [
+      "dependency satisfaction proves presented receipt linkage only",
+      "dependency satisfaction does not prove upstream correctness or remote trust",
+      "dependency satisfaction does not prove downstream integration correctness or release eligibility"
+    ],
+    "schema": "cairn.cross-repo-dependency.v1",
+    "supported_receipt_kinds": [
+      "proposal_gate",
+      "design_gate",
+      "tasks_gate",
+      "validation_receipt",
+      "sync_receipt",
+      "archive_receipt"
     ]
   },
   "determinism_replay_policy": {
@@ -34,6 +128,7 @@
         "hash_fields": [
           "agent_receipt_preserves_hash",
           "input_hash",
+          "preserves_content_hash",
           "receipt_hash"
         ],
         "id": "agent_receipt_preserves_hash",
@@ -61,6 +156,39 @@
           "agent_receipt_hash"
         ],
         "id": "agent_receipt_validate",
+        "normalization_rules": [
+          "portable_root_paths",
+          "canonical_json"
+        ]
+      },
+      {
+        "args": [
+          "agent-receipt",
+          "complete",
+          "--contract",
+          "fixtures/agent-completion/contract.json",
+          "--results",
+          "fixtures/agent-completion/results.json",
+          "--subject-hash",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "command_kind": "agent_completion_validate",
+        "comparison_modes": [
+          "repeated",
+          "cross_root"
+        ],
+        "display_only_paths": [
+          "contract_path",
+          "results_path"
+        ],
+        "expected_mutability": "read_only_or_dry_run",
+        "fixture_root": "<root>",
+        "hash_fields": [
+          "completion_receipt_hash",
+          "current_policy_hash",
+          "current_subject_hash"
+        ],
+        "id": "agent_completion_validate",
         "normalization_rules": [
           "portable_root_paths",
           "canonical_json"
@@ -295,14 +423,18 @@
         "expected_mutability": "read_only_or_dry_run",
         "fixture_root": ".",
         "hash_fields": [
+          "preserves_content_hash",
           "receipt_hash",
           "cairn_validation_hash",
-          "tracey_coverage_hash",
+          "traceability_coverage_hash",
           "mcp_smoke_receipt_hash",
           "coverage_audit_receipt_hash",
           "release_evidence_index_check_hash",
           "preserves_corpus_freshness_hash",
-          "semantic_review_ledger_hash"
+          "semantic_review_ledger_hash",
+          "stack_provenance_hash",
+          "function_address_hash",
+          "workspace_contract_matrix_hash"
         ],
         "id": "release_readiness",
         "normalization_rules": [
@@ -385,6 +517,118 @@
           "receipt_hash"
         ],
         "id": "validate",
+        "normalization_rules": [
+          "portable_root_paths",
+          "canonical_json"
+        ]
+      },
+      {
+        "args": [
+          "view",
+          "graph",
+          "--root",
+          "<root>"
+        ],
+        "command_kind": "view",
+        "comparison_modes": [
+          "repeated",
+          "cross_root"
+        ],
+        "display_only_paths": [
+          "root"
+        ],
+        "expected_mutability": "read_only_or_dry_run",
+        "fixture_root": "fixtures/lifecycle-views/positive",
+        "hash_fields": [
+          "input_hash",
+          "receipt_hash"
+        ],
+        "id": "view_graph",
+        "normalization_rules": [
+          "portable_root_paths",
+          "canonical_json"
+        ]
+      },
+      {
+        "args": [
+          "view",
+          "kanban",
+          "--root",
+          "<root>"
+        ],
+        "command_kind": "view",
+        "comparison_modes": [
+          "repeated",
+          "cross_root"
+        ],
+        "display_only_paths": [
+          "root"
+        ],
+        "expected_mutability": "read_only_or_dry_run",
+        "fixture_root": "fixtures/lifecycle-views/positive",
+        "hash_fields": [
+          "input_hash",
+          "receipt_hash"
+        ],
+        "id": "view_kanban",
+        "normalization_rules": [
+          "portable_root_paths",
+          "canonical_json"
+        ]
+      },
+      {
+        "args": [
+          "view",
+          "mindmap",
+          "--root",
+          "<root>"
+        ],
+        "command_kind": "view",
+        "comparison_modes": [
+          "repeated",
+          "cross_root"
+        ],
+        "display_only_paths": [
+          "root"
+        ],
+        "expected_mutability": "read_only_or_dry_run",
+        "fixture_root": "fixtures/lifecycle-views/positive",
+        "hash_fields": [
+          "input_hash",
+          "receipt_hash"
+        ],
+        "id": "view_mindmap",
+        "normalization_rules": [
+          "portable_root_paths",
+          "canonical_json"
+        ]
+      },
+      {
+        "args": [
+          "receipt-preserves-diff",
+          "--baseline",
+          "fixtures/receipt-preserves-diff/baseline.json",
+          "--candidate",
+          "fixtures/receipt-preserves-diff/candidate.json"
+        ],
+        "command_kind": "receipt_preserves_diff",
+        "comparison_modes": [
+          "repeated"
+        ],
+        "display_only_paths": [
+          "baseline_path",
+          "candidate_path"
+        ],
+        "expected_mutability": "read_only_or_dry_run",
+        "fixture_root": ".",
+        "hash_fields": [
+          "baseline_json_hash",
+          "candidate_json_hash",
+          "baseline_preserves_hash",
+          "candidate_preserves_hash",
+          "receipt_hash"
+        ],
+        "id": "receipt_preserves_diff",
         "normalization_rules": [
           "portable_root_paths",
           "canonical_json"
@@ -502,6 +746,7 @@
     "groups": [
       {
         "cases": [
+          "agent_completion_validate",
           "agent_receipt_validate",
           "mcp_describe",
           "status",
@@ -512,6 +757,7 @@
       },
       {
         "cases": [
+          "agent_completion_validate",
           "agent_receipt_preserves_hash",
           "agent_receipt_validate",
           "archive_dry_run",
@@ -522,16 +768,21 @@
           "mcp_describe",
           "mcp_status",
           "migrate_dry_run",
+          "receipt_preserves_diff",
           "release_readiness",
           "status",
           "sync_dry_run",
-          "validate"
+          "validate",
+          "view_graph",
+          "view_kanban",
+          "view_mindmap"
         ],
         "description": "All policy-owned replay cases",
         "id": "full"
       },
       {
         "cases": [
+          "agent_completion_validate",
           "agent_receipt_validate",
           "mcp_describe",
           "release_readiness",
@@ -552,6 +803,21 @@
     ]
   },
   "determinism_surface_inventory": [
+    {
+      "command": "agent-receipt complete --contract fixtures/agent-completion/contract.json --results fixtures/agent-completion/results.json --subject-hash <hash>",
+      "determinism_claim": "authoritative_agent_completion_stability",
+      "id": "agent_completion_validate",
+      "receipt_command": "agent-receipt complete",
+      "required_replay_cases": [
+        "agent_completion_validate"
+      ],
+      "required_replay_groups": [
+        "agent",
+        "full",
+        "release"
+      ],
+      "surface_kind": "cli"
+    },
     {
       "command": "agent-receipt preserves-hash fixtures/agent-receipts/positive.json",
       "determinism_claim": "agent_receipt_preserves_hash_stability",
@@ -814,6 +1080,19 @@
       "surface_kind": "cli"
     },
     {
+      "command": "receipt-preserves-diff --baseline fixtures/receipt-preserves-diff/baseline.json --candidate fixtures/receipt-preserves-diff/candidate.json",
+      "determinism_claim": "receipt_preserves_diff_stability",
+      "id": "receipt_preserves_diff",
+      "receipt_command": "receipt-preserves-diff",
+      "required_replay_cases": [
+        "receipt_preserves_diff"
+      ],
+      "required_replay_groups": [
+        "full"
+      ],
+      "surface_kind": "cli"
+    },
+    {
       "command": "validate --root <root>",
       "determinism_claim": "validation_receipt_stability",
       "id": "validate",
@@ -826,6 +1105,45 @@
         "full",
         "release",
         "smoke"
+      ],
+      "surface_kind": "cli"
+    },
+    {
+      "command": "view graph --root <root>",
+      "determinism_claim": "lifecycle_view_graph_stability",
+      "id": "view_graph",
+      "receipt_command": "view graph",
+      "required_replay_cases": [
+        "view_graph"
+      ],
+      "required_replay_groups": [
+        "full"
+      ],
+      "surface_kind": "cli"
+    },
+    {
+      "command": "view kanban --root <root>",
+      "determinism_claim": "lifecycle_view_kanban_stability",
+      "id": "view_kanban",
+      "receipt_command": "view kanban",
+      "required_replay_cases": [
+        "view_kanban"
+      ],
+      "required_replay_groups": [
+        "full"
+      ],
+      "surface_kind": "cli"
+    },
+    {
+      "command": "view mindmap --root <root>",
+      "determinism_claim": "lifecycle_view_mindmap_stability",
+      "id": "view_mindmap",
+      "receipt_command": "view mindmap",
+      "required_replay_cases": [
+        "view_mindmap"
+      ],
+      "required_replay_groups": [
+        "full"
       ],
       "surface_kind": "cli"
     }
@@ -851,6 +1169,26 @@
     "scope": "tasks",
     "severity": "high"
   },
+  "function_address_gate": {
+    "accepted_valence_policy_hashes": [
+      "62c88a0263720dea4c37a48ef46921c46e5dd3e4924fff096b84a65d5738a412"
+    ],
+    "allowed_claim_scopes": [
+      "function_address.v1.lifecycle_policy_conformance"
+    ],
+    "mode": "optional",
+    "required_boundary": "Cairn consumed Valence, Mantle, and Kamacite function-address evidence for lifecycle/release policy conformance only; it did not prove Rust semantic correctness, compiler correctness, whole-program safety, verifier soundness, or release eligibility",
+    "required_roles": [
+      "function-address-evidence-sidecar",
+      "valence-function-address-evidence-profile",
+      "kamacite-function-address-receipt"
+    ],
+    "required_schemas": [
+      "valence.function-address-evidence.v1",
+      "function-address-evidence-v1",
+      "kamacite.function-address-receipt.v1"
+    ]
+  },
   "gate_policy": {
     "finding": {
       "class": "omission",
@@ -864,6 +1202,226 @@
       "proposal",
       "design",
       "tasks"
+    ],
+    "substance": {
+      "dependency_marker_id": "depends",
+      "dependency_target_class": "lifecycle-id",
+      "design_minimum_substantive_lines": 1,
+      "minimum_requirement_blocks": 1,
+      "minimum_substantive_tasks": 1,
+      "normative_tokens": [
+        "MUST",
+        "SHALL",
+        "SHOULD",
+        "MAY"
+      ],
+      "placeholder_tokens": [
+        "cairn_placeholder",
+        "tbd",
+        "describe why",
+        "describe the user-visible",
+        "describe the current state",
+        "implement the change",
+        "verify and archive the change"
+      ],
+      "proposal_minimum_substantive_lines": 1
+    }
+  },
+  "global_registry_policy": {
+    "adapters": [
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "cairn.canonical-records.v1",
+        "kind": "ingest",
+        "record_families": [
+          "canonical-records"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "cairn.evidence-index.v1",
+        "kind": "ingest",
+        "record_families": [
+          "evidence-index",
+          "evidence-labels"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "cairn.requirement-registry.v1",
+        "kind": "ingest",
+        "record_families": [
+          "requirement-registry"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "cairn.change-graph.v1",
+        "kind": "ingest",
+        "record_families": [
+          "change-graph"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "cairn.cross-repo-dependencies.v1",
+        "kind": "ingest",
+        "record_families": [
+          "cross-repo-dependencies"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "read"
+        ],
+        "id": "valence.evidence-ir.v1",
+        "kind": "ingest",
+        "record_families": [
+          "valence-evidence-ir"
+        ],
+        "schema": "cairn.registry-adapter.v1"
+      },
+      {
+        "capabilities": [
+          "load",
+          "commit",
+          "export"
+        ],
+        "id": "memory.v1",
+        "kind": "storage",
+        "record_families": [
+          "canonical-snapshot"
+        ],
+        "schema": "cairn.global-registry-storage.v1"
+      },
+      {
+        "capabilities": [
+          "load",
+          "commit",
+          "export"
+        ],
+        "id": "portable-json.v1",
+        "kind": "storage",
+        "record_families": [
+          "canonical-snapshot"
+        ],
+        "schema": "cairn.global-registry-storage.v1"
+      },
+      {
+        "capabilities": [
+          "load",
+          "commit",
+          "export",
+          "migrate"
+        ],
+        "id": "redb.v1",
+        "kind": "storage",
+        "record_families": [
+          "canonical-snapshot",
+          "node-index",
+          "tag-index",
+          "forward-adjacency",
+          "reverse-adjacency",
+          "source-index"
+        ],
+        "schema": "cairn.global-registry-storage.v1"
+      }
+    ],
+    "allowed_vocabulary_owners": [
+      "cairn",
+      "valence"
+    ],
+    "graph_profiles": [
+      {
+        "allowed_edge_kinds": [
+          "change_dependency",
+          "cross_repo_dependency"
+        ],
+        "allowed_node_kinds": [
+          "change"
+        ],
+        "id": "change-dependencies",
+        "require_dag": true
+      },
+      {
+        "allowed_edge_kinds": [
+          "requirement_dependency",
+          "supersedes"
+        ],
+        "allowed_node_kinds": [
+          "requirement"
+        ],
+        "id": "requirement-dependencies",
+        "require_dag": true
+      },
+      {
+        "allowed_edge_kinds": [
+          "derived_from",
+          "contains"
+        ],
+        "allowed_node_kinds": [
+          "evidence",
+          "artifact"
+        ],
+        "id": "evidence-derivations",
+        "require_dag": true
+      },
+      {
+        "allowed_edge_kinds": [
+          "reference",
+          "alias",
+          "related_to"
+        ],
+        "allowed_node_kinds": [
+          "change",
+          "requirement",
+          "evidence",
+          "artifact"
+        ],
+        "id": "references",
+        "require_dag": false
+      }
+    ],
+    "max_artifact_bytes": 4194304,
+    "required_non_claims": [
+      "registry membership proves cataloged identity only",
+      "registry tags and graph reachability prove declared metadata and bounded linkage only",
+      "registry storage and query success do not prove evidence truth, requirement satisfaction, implementation correctness, verifier soundness, social trust, runtime authority, lifecycle readiness, or release eligibility"
+    ],
+    "schema": "cairn.global-registry-snapshot.v1",
+    "storage_schema": "cairn.global-registry-storage.v1",
+    "tag_namespaces": [
+      {
+        "authority": "annotation-only",
+        "id": "operator"
+      },
+      {
+        "authority": "source-preserving",
+        "id": "evidence"
+      },
+      {
+        "authority": "reserved-policy",
+        "id": "cairn.policy"
+      },
+      {
+        "authority": "reserved-system",
+        "id": "cairn.system"
+      }
     ]
   },
   "lifecycle_stages": [
@@ -885,6 +1443,12 @@
     }
   },
   "name": "cairn-default",
+  "policy_schema_compatibility": {
+    "field_set_digest": "cdbe3adf5778872343f8576e0304e3748dcaf7fb58f59c489599ea9dbac425ef",
+    "producer": "cairn policy export",
+    "refresh_command": "nix run path:$CAIRN_SOURCE#cairn -- policy export --output cairn-policy/generated/cairn-policy.json",
+    "schema_version": "cairn.policy-schema.v1"
+  },
   "probe_policy": {
     "command_profiles": [
       {
@@ -900,6 +1464,7 @@
           "policy",
           "sync",
           "test-harness",
+          "traceability",
           "tracey",
           "validate"
         ],
@@ -1145,6 +1710,8 @@
       ],
       "top_level_keys": [
         "agent_receipt_hash",
+        "authoritative_completion",
+        "classification",
         "command",
         "current_replay_policy_hash",
         "input_hash",
@@ -1165,6 +1732,170 @@
       "action_keys": [],
       "artifact_keys": [],
       "case_keys": [],
+      "command": "agent-receipt complete",
+      "hash_fields": [
+        "completion_receipt_hash",
+        "current_policy_hash",
+        "current_subject_hash",
+        "receipt_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "checks_executed",
+        "classification",
+        "command",
+        "completion",
+        "completion_receipt_hash",
+        "contract_path",
+        "current_policy_hash",
+        "current_subject_hash",
+        "input_kind",
+        "max_content_bytes",
+        "receipt_hash",
+        "results_path",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "registry import",
+      "hash_fields": [
+        "expected_snapshot_hash",
+        "input_hash",
+        "observed_snapshot_hash",
+        "receipt_hash"
+      ],
+      "issue_keys": [
+        "actual",
+        "code",
+        "expected",
+        "field",
+        "message",
+        "record_kind",
+        "stable_id"
+      ],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "adapter",
+        "blocked",
+        "candidate_snapshot",
+        "command",
+        "dry_run",
+        "expected_snapshot_hash",
+        "ingest_adapter",
+        "input_hash",
+        "issues",
+        "mutated",
+        "observed_snapshot_hash",
+        "receipt_hash",
+        "scope_id",
+        "store",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "registry query",
+      "hash_fields": [
+        "receipt_hash",
+        "snapshot_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "adapter",
+        "command",
+        "query",
+        "receipt_hash",
+        "registry",
+        "snapshot_hash",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "registry graph",
+      "hash_fields": [
+        "receipt_hash",
+        "snapshot_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "adapter",
+        "command",
+        "graph",
+        "receipt_hash",
+        "registry",
+        "snapshot_hash",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "registry export",
+      "hash_fields": [
+        "receipt_hash",
+        "snapshot_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "adapter",
+        "command",
+        "dry_run",
+        "mutated",
+        "output",
+        "receipt_hash",
+        "registry",
+        "snapshot_hash",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "registry verify",
+      "hash_fields": [
+        "receipt_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "command",
+        "max_artifact_bytes",
+        "receipt_hash",
+        "registry",
+        "report",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
       "command": "gate",
       "hash_fields": [
         "input_hash",
@@ -1172,6 +1903,7 @@
         "receipt_hash"
       ],
       "issue_keys": [
+        "code",
         "message",
         "promoted",
         "scope"
@@ -1186,8 +1918,10 @@
         "layout",
         "policy",
         "policy_hash",
+        "probe_evidence",
         "receipt_hash",
         "stage",
+        "substance",
         "valid",
         "verdict"
       ]
@@ -1214,10 +1948,13 @@
         "actions",
         "blocked",
         "change",
+        "cross_repo_dependencies",
+        "cross_repo_evidence_issues",
         "delta_specs",
         "dry_run",
         "input_hash",
         "layout",
+        "merge_preflight",
         "mutated",
         "mutation_manifest",
         "plan_hash",
@@ -1249,6 +1986,8 @@
         "actions",
         "blocked",
         "change",
+        "cross_repo_dependencies",
+        "cross_repo_evidence_issues",
         "dry_run",
         "input_hash",
         "layout",
@@ -1336,6 +2075,37 @@
     {
       "action_keys": [],
       "artifact_keys": [],
+      "case_keys": [],
+      "command": "traceability coverage",
+      "hash_fields": [
+        "input_hash",
+        "policy_hash",
+        "receipt_hash"
+      ],
+      "issue_keys": [],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "command",
+        "dangling",
+        "input_hash",
+        "missing",
+        "policy",
+        "policy_hash",
+        "profile",
+        "profile_id",
+        "receipt_hash",
+        "referenced",
+        "requirements",
+        "root",
+        "source_summary",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
       "case_keys": [
         "args",
         "command_kind",
@@ -1351,6 +2121,7 @@
       ],
       "command": "determinism replay",
       "hash_fields": [
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [],
@@ -1377,6 +2148,7 @@
         "mutability_observations",
         "nondeterminism_failures",
         "normalization_rules",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "selected_cases",
@@ -1395,6 +2167,7 @@
       "hash_fields": [
         "current_replay_policy_hash",
         "environment_attestation_hash",
+        "preserves_content_hash",
         "receipt_hash",
         "replay_policy_hash",
         "replay_receipt_hash",
@@ -1414,6 +2187,7 @@
         "environment_attestation_hash",
         "issues",
         "path",
+        "preserves_content_hash",
         "receipt_hash",
         "replay_policy_hash",
         "replay_receipt_hash",
@@ -1435,10 +2209,12 @@
         "coverage_audit_receipt_hash",
         "current_replay_policy_hash",
         "environment_attestation_hash",
+        "preserves_content_hash",
         "receipt_hash",
         "release_readiness_receipt_hash",
         "replay_receipt_hash",
-        "replay_verification_receipt_hash"
+        "replay_verification_receipt_hash",
+        "runtime_evidence_receipt_hash"
       ],
       "issue_keys": [
         "actual",
@@ -1455,12 +2231,55 @@
         "current_replay_policy_hash",
         "environment_attestation_hash",
         "issues",
+        "preserves_content_hash",
         "receipt_hash",
         "release_readiness_receipt_hash",
         "replay_receipt_hash",
         "replay_verification_receipt_hash",
         "required_replay_group",
         "root",
+        "runtime_evidence_receipt_hash",
+        "valid",
+        "verdict"
+      ]
+    },
+    {
+      "action_keys": [],
+      "artifact_keys": [],
+      "case_keys": [],
+      "command": "runtime-evidence verify",
+      "hash_fields": [
+        "chain_root_hash",
+        "checkpoint_hash",
+        "head_hash",
+        "preserves_content_hash",
+        "receipt_hash"
+      ],
+      "issue_keys": [
+        "actual",
+        "code",
+        "expected",
+        "field_path"
+      ],
+      "mismatch_keys": [],
+      "replay_evidence_keys": [],
+      "top_level_keys": [
+        "boundary",
+        "capture_origin_summary",
+        "chain",
+        "chain_root_hash",
+        "checkpoint",
+        "checkpoint_hash",
+        "command",
+        "completeness",
+        "head_hash",
+        "issues",
+        "preserves_content_hash",
+        "receipt_hash",
+        "record_count",
+        "root",
+        "schema_version",
+        "subject",
         "valid",
         "verdict"
       ]
@@ -1508,6 +2327,7 @@
         "coverage_audit_receipt_hash",
         "manifest_hash",
         "receipt_hash",
+        "runtime_evidence_receipt_hash",
         "signer_metadata_hash"
       ],
       "issue_keys": [
@@ -1527,6 +2347,7 @@
         "manifest_hash",
         "receipt_hash",
         "root",
+        "runtime_evidence_receipt_hash",
         "signer_metadata_hash",
         "valid",
         "verdict"
@@ -1545,6 +2366,7 @@
       "hash_fields": [
         "manifest_hash",
         "manifest_verification_receipt_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1562,6 +2384,7 @@
         "manifest_hash",
         "manifest_verification_receipt_hash",
         "output",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "valid",
@@ -1574,7 +2397,8 @@
         "hash",
         "path",
         "required",
-        "role"
+        "role",
+        "verification_role"
       ],
       "case_keys": [],
       "command": "evidence verify",
@@ -1582,7 +2406,9 @@
         "export_receipt_hash",
         "manifest_hash",
         "manifest_verification_receipt_hash",
-        "receipt_hash"
+        "preserves_content_hash",
+        "receipt_hash",
+        "stack_provenance_hash"
       ],
       "issue_keys": [
         "actual",
@@ -1600,9 +2426,13 @@
         "issues",
         "manifest_hash",
         "manifest_verification_receipt_hash",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
+        "stack_provenance",
+        "stack_provenance_hash",
         "valid",
+        "verification_role_summary",
         "verdict"
       ]
     },
@@ -1616,6 +2446,7 @@
       "case_keys": [],
       "command": "evidence import",
       "hash_fields": [
+        "preserves_content_hash",
         "receipt_hash",
         "verification_receipt_hash"
       ],
@@ -1633,6 +2464,7 @@
         "command",
         "into",
         "issues",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "valid",
@@ -1651,6 +2483,7 @@
       "command": "evidence republish",
       "hash_fields": [
         "import_receipt_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1668,6 +2501,7 @@
         "imported",
         "issues",
         "out",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "valid",
@@ -1685,6 +2519,7 @@
       "command": "evidence index",
       "hash_fields": [
         "bundle_receipt_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1706,6 +2541,7 @@
         "issues",
         "out",
         "policy_hash",
+        "preserves_content_hash",
         "receipt_chain",
         "receipt_hash",
         "root",
@@ -1725,6 +2561,7 @@
       "hash_fields": [
         "bundle_receipt_hash",
         "index_receipt_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1743,6 +2580,7 @@
         "index",
         "index_receipt_hash",
         "issues",
+        "preserves_content_hash",
         "receipt_chain",
         "receipt_hash",
         "root",
@@ -1761,6 +2599,7 @@
       "case_keys": [],
       "command": "release-evidence index",
       "hash_fields": [
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1778,6 +2617,7 @@
         "git",
         "issues",
         "out",
+        "preserves_content_hash",
         "receipt_hash",
         "receipt_hashes",
         "root",
@@ -1791,6 +2631,7 @@
       "case_keys": [],
       "command": "release-evidence check-index",
       "hash_fields": [
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1812,6 +2653,7 @@
         "payload_ancestor_of_head",
         "payload_commit",
         "payload_exists",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "schema",
@@ -1831,6 +2673,7 @@
       "command": "release-evidence publish",
       "hash_fields": [
         "manifest_hash",
+        "preserves_content_hash",
         "receipt_hash",
         "source_index_hash",
         "source_index_receipt_hash",
@@ -1853,6 +2696,7 @@
         "manifest_hash",
         "materialized",
         "materialized_count",
+        "preserves_content_hash",
         "publish_dir",
         "receipt_hash",
         "root",
@@ -1878,6 +2722,7 @@
       "command": "release-evidence retention-plan",
       "hash_fields": [
         "plan_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1895,6 +2740,7 @@
         "issues",
         "out",
         "plan_hash",
+        "preserves_content_hash",
         "publish_root",
         "receipt_hash",
         "root",
@@ -1914,6 +2760,7 @@
       "command": "release-evidence rotate",
       "hash_fields": [
         "plan_hash",
+        "preserves_content_hash",
         "receipt_hash"
       ],
       "issue_keys": [
@@ -1932,6 +2779,7 @@
         "mutation_manifest",
         "plan",
         "plan_hash",
+        "preserves_content_hash",
         "receipt_hash",
         "root",
         "valid",
@@ -2166,6 +3014,24 @@
       "FAIL"
     ]
   },
+  "runtime_evidence_policy": {
+    "aggregation_profiles": [],
+    "allowed_capture_origins": [
+      "boundary_captured",
+      "ingested_telemetry",
+      "wrapper_asserted",
+      "unknown"
+    ],
+    "allowed_hash_algorithms": [
+      "BLAKE3"
+    ],
+    "forbidden_summary_fragments": [
+      "SECRET=",
+      "token=",
+      "/home/"
+    ],
+    "max_summary_bytes": 256
+  },
   "schemas": [
     {
       "artifacts": [
@@ -2201,6 +3067,16 @@
       "id": "spec-driven"
     }
   ],
+  "stack_provenance_gate": {
+    "accepted_valence_policy_hashes": [
+      "93993e99e87206d232b64efcc8631611aad3b5b0c4b81855e7e1a0cdcc391cff"
+    ],
+    "allowed_claim_scopes": [
+      "stack_provenance.v1.lifecycle_policy_conformance"
+    ],
+    "mode": "optional",
+    "required_boundary": "Cairn consumed Valence and Mantle stack provenance receipts for lifecycle/release policy conformance only; it did not prove source-code correctness, Valence verifier soundness, Mantle build correctness, or Trellis/Octet proof validity"
+  },
   "steel_orchestration_policy": {
     "enabled": false,
     "profiles": [
@@ -2220,6 +3096,9 @@
         ]
       }
     ]
+  },
+  "structured_lifecycle": {
+    "preserves_receipt_source_map": {}
   },
   "sync_archive_policy": {
     "archive_date_prefix": true,
@@ -2251,5 +3130,91 @@
     ],
     "strictness": "strict"
   },
-  "version": 1
+  "traceability_policy": {
+    "default_profile": "cairn-default",
+    "profiles": [
+      {
+        "evidence_sources": [
+          {
+            "extensions": [
+              "rs"
+            ],
+            "root": "crates",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "ncl"
+            ],
+            "root": "crates",
+            "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "rs",
+              "ncl"
+            ],
+            "root": "tools",
+            "source_kind": "tool_source"
+          }
+        ],
+        "id": "cairn-default",
+        "marker_verbs": [
+          "impl",
+          "verify",
+          "depends",
+          "related"
+        ],
+        "requirement_sources": [
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "cairn/specs",
+            "source_kind": "accepted_specs"
+          }
+        ]
+      },
+      {
+        "evidence_sources": [
+          {
+            "extensions": [
+              "rs"
+            ],
+            "root": "src",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "rs"
+            ],
+            "root": "tests",
+            "source_kind": "rust_source"
+          }
+        ],
+        "id": "trellis-rust",
+        "marker_verbs": [
+          "impl",
+          "verify",
+          "depends",
+          "related"
+        ],
+        "requirement_sources": [
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/requirements.md",
+            "source_kind": "requirements_doc"
+          }
+        ]
+      }
+    ]
+  },
+  "version": 1,
+  "workspace_contract_matrix_gate": {
+    "accepted_matrix_hashes": [],
+    "mode": "disabled",
+    "required_boundary": "workspace contract matrix validation proves declared edge health only; it does not prove provider correctness, does not prove consumer behavioral correctness, does not prove verifier soundness, or does not prove release eligibility"
+  }
 }

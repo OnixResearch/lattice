@@ -40,7 +40,6 @@ use crate::file_node::FileOperationKind;
 use crate::file_node::FileOperationPlan;
 use crate::file_node::FileOperationResult;
 use crate::file_node::FileSystem;
-use crate::file_node::NoopFileSystem;
 use crate::http;
 use crate::http::HttpClient;
 use crate::http::HttpRequestPlan;
@@ -977,6 +976,12 @@ fn default_image_io() -> Box<dyn ImageIo> {
     Box::<LocalImageIo>::default()
 }
 
+// r[impl n8nclone.workflow_execution.file_nodes.interface]
+// r[impl n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+fn default_file_system() -> Box<dyn FileSystem> {
+    Box::new(crate::file_node::LocalFs)
+}
+
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
 fn default_agent_adapter() -> Box<dyn AgentAdapter> {
     Box::<ProductionAgentAdapter>::default()
@@ -988,7 +993,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
         }
@@ -999,7 +1004,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider,
             http_client: Box::<NoopHttpClient>::default(),
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
         }
@@ -1011,7 +1016,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
         }
@@ -1022,7 +1027,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client,
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
         }
@@ -1044,7 +1049,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io,
             agent_adapter: default_agent_adapter(),
         }
@@ -1055,7 +1060,7 @@ impl Executor {
             next_run_id: 0,
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
-            file_system: Box::<NoopFileSystem>::default(),
+            file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter,
         }
@@ -1663,11 +1668,17 @@ impl Executor {
 
         info!(run = %run_id, nodes = topo.len(), "starting workflow execution");
 
-        let mut results = Vec::new();
+        let maximum_step_count = topo.len();
+        let mut results = Vec::with_capacity(maximum_step_count);
         let mut port_values: HashMap<PortId, Value> = HashMap::new();
         let mut runner_states = BTreeMap::new();
 
         for node_id in topo {
+            assert!(
+                runner_states.len() < maximum_step_count,
+                "runner state count must remain bounded by admitted nodes"
+            );
+
             // Gather inputs from upstream edges.
             let inputs = gather_inputs(workflow, node_id, &port_values);
 

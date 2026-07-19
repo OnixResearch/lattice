@@ -30,6 +30,12 @@ r[n8nclone.workflow_execution.llm_operating_graph.scenario.feedback-boundary]
 - WHEN the operating graph reorganizes
 - THEN the change MUST be represented as explicit next-run state or graph input and MUST NOT bypass cycle admission, authority policy, or durable event recording
 
+#### Scenario: Production file boundaries execute explicitly
+r[n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
+- GIVEN a role graph reads shared state and writes its final report through file nodes with explicit allowed roots
+- WHEN the graph runs through the default headless production shell
+- THEN local file operations MUST execute through the filesystem interface, MUST reject paths outside canonical allowed roots, and MUST leave downstream roles and effects blocked after a failed dependency
+
 ### Requirement: Rats dependency readiness
 r[n8nclone.workflow_execution.rats_dependency] The system MUST consume the newest Rats source that is complete and passes the focused consumer compile checks.
 

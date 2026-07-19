@@ -4,11 +4,11 @@ mod common;
 
 use std::collections::BTreeMap;
 
+use n8nclone::engine::runner::Bottleneck;
 use n8nclone::engine::runner::CapturingRunnerEventSink;
 use n8nclone::engine::runner::DurableRunnerDecision;
 use n8nclone::engine::runner::NodeRuntime;
 use n8nclone::engine::runner::RunnerAdmission;
-use n8nclone::engine::runner::RunnerBottleneck;
 use n8nclone::engine::runner::RunnerDiagnosticCode;
 use n8nclone::engine::runner::RunnerEventKind;
 use n8nclone::engine::runner::RunnerEventSink;
@@ -171,19 +171,19 @@ fn shared_graph_core_reports_critical_path_and_bottlenecks() {
 
     assert_eq!(critical_path(&plan).expect("critical path exists"), vec![source.0, left.0, sink.0]);
     assert_eq!(bottlenecks(&plan).expect("bottlenecks exist"), vec![
-        RunnerBottleneck {
+        Bottleneck {
             node_id: source.0,
             dependent_count: SOURCE_TRANSITIVE_DEPENDENT_COUNT,
         },
-        RunnerBottleneck {
+        Bottleneck {
             node_id: left.0,
             dependent_count: SINGLE_DEPENDENT_COUNT,
         },
-        RunnerBottleneck {
+        Bottleneck {
             node_id: right.0,
             dependent_count: NO_DEPENDENTS,
         },
-        RunnerBottleneck {
+        Bottleneck {
             node_id: sink.0,
             dependent_count: NO_DEPENDENTS,
         },

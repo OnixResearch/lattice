@@ -61,7 +61,7 @@ pub enum AgentOutputMode {
 pub struct AgentNodeSettings {
     pub target: AgentTarget,
     pub prompt: String,
-    #[serde(default)]
+    #[serde(default = "absent_prompt_file")]
     pub prompt_file: Option<String>,
     pub output_mode: AgentOutputMode,
     pub model_hint: Option<String>,
@@ -297,6 +297,10 @@ impl AgentAdapter for ProductionAgentAdapter {
         let output = run_agent_command(&plan)?;
         decode_agent_command_output(&plan, &output)
     }
+}
+
+fn absent_prompt_file() -> Option<String> {
+    None
 }
 
 fn default_agent_runtimes() -> BTreeMap<String, AgentCommandRuntimeConfig> {

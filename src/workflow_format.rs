@@ -5,9 +5,7 @@
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs::File;
 use std::io::Read;
-use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -170,7 +168,7 @@ pub struct PortableNodeConfig {
     pub agent_target: String,
     #[serde(default)]
     pub agent_prompt: String,
-    #[serde(default)]
+    #[serde(default = "empty_prompt_files")]
     pub agent_prompt_file: Vec<String>,
     #[serde(default)]
     pub agent_output_mode: String,
@@ -1239,14 +1237,20 @@ fn invalid_trigger(config: &PortableTrigger, message: &str) -> WorkflowFormatErr
 
 // r[impl n8nclone.workflow_format.nickel.import]
 pub fn portable_to_workflow(portable: PortableWorkflow) -> Result<Workflow, WorkflowFormatError> {
-    portable_to_workflow_with_agent_prompts(portable, &HashMap::new())
+    portable_to_runtime_with_agent_prompts(portable, &HashMap::new())
 }
 
-fn portable_to_workflow_with_agent_prompts(
+fn portable_to_runtime_with_agent_prompts(
     portable: PortableWorkflow,
     resolved_agent_prompts: &HashMap<u64, String>,
 ) -> Result<Workflow, WorkflowFormatError> {
     validate_portable_identity(&portable)?;
+    debug_assert!(resolved_agent_prompts.len() <= portable.configs.len());
+    debug_assert!(
+        resolved_agent_prompts
+            .keys()
+            .all(|node_id| portable.configs.iter().any(|config| config.node_id == *node_id && config.kind == "agent"))
+    );
 
     let created = parse_timestamp(&portable.meta.created)?;
     let modified = parse_timestamp(&portable.meta.modified)?;
@@ -1460,6 +1464,9 @@ fn portable_agent_config_to_node_config(
             count: config.agent_session.len(),
         });
     }
+    debug_assert!(config.agent_model_hint.len() <= MAX_OPTIONAL_AGENT_VALUES);
+    debug_assert!(config.agent_cwd.len() <= MAX_OPTIONAL_AGENT_VALUES);
+    debug_assert!(config.agent_session.len() <= MAX_OPTIONAL_AGENT_VALUES);
 
     let (prompt, prompt_file) = portable_agent_prompt(config, resolved_agent_prompt)?;
     Ok(NodeConfig::Agent(AgentNodeSettings {
@@ -1489,6 +1496,8 @@ fn portable_agent_prompt(
     let has_inline_prompt = !config.agent_prompt.trim().is_empty();
     let Some(prompt_file) = config.agent_prompt_file.first() else {
         if has_inline_prompt {
+            debug_assert!(config.agent_prompt_file.is_empty());
+            debug_assert!(resolved_agent_prompt.is_none());
             return Ok((config.agent_prompt.clone(), None));
         }
         return Err(invalid_agent_prompt_source(
@@ -1512,6 +1521,8 @@ fn portable_agent_prompt(
     if resolved_prompt.trim().is_empty() {
         return Err(invalid_agent_prompt_source(config.node_id, "resolved Markdown prompt is empty".to_string()));
     }
+    debug_assert!(!resolved_prompt.trim().is_empty());
+    debug_assert!(!prompt_file.trim().is_empty());
     Ok((resolved_prompt.to_string(), Some(prompt_file.clone())))
 }
 
@@ -1958,7 +1969,11 @@ pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormat
     let portable = serde_json::from_value(json).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
     let resolved_agent_prompts = load_markdown_agent_prompts(path, &portable)?;
-    portable_to_workflow_with_agent_prompts(portable, &resolved_agent_prompts)
+    portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
+}
+
+fn empty_prompt_files() -> Vec<String> {
+    Vec::new()
 }
 
 fn load_markdown_agent_prompts(
@@ -1966,7 +1981,7 @@ fn load_markdown_agent_prompts(
     portable: &PortableWorkflow,
 ) -> Result<HashMap<u64, String>, WorkflowFormatError> {
     let workflow_root = workflow_path.parent().unwrap_or_else(|| Path::new("."));
-    let mut prompts = HashMap::new();
+    let mut prompts = HashMap::with_capacity(portable.configs.len());
 
     for config in &portable.configs {
         if config.kind != "agent" {
@@ -1986,6 +2001,12 @@ fn load_markdown_agent_prompts(
         let prompt = read_markdown_agent_prompt(config.node_id, prompt_file, &canonical_root, &relative_path)?;
         prompts.insert(config.node_id, prompt);
     }
+    debug_assert!(prompts.len() <= portable.configs.len());
+    debug_assert!(
+        prompts
+            .keys()
+            .all(|node_id| portable.configs.iter().any(|config| config.node_id == *node_id && config.kind == "agent"))
+    );
     Ok(prompts)
 }
 
@@ -2022,12 +2043,14 @@ fn validate_markdown_prompt_path(node_id: u64, prompt_file: &str) -> Result<Path
     if path.extension().and_then(|extension| extension.to_str()) != Some(MARKDOWN_EXTENSION) {
         return Err(invalid_agent_prompt_source(node_id, "prompt file must use the .md extension".to_string()));
     }
-    if path.components().any(|component| !matches!(component, Component::Normal(_))) {
+    if path.components().any(|component| !matches!(component, std::path::Component::Normal(_))) {
         return Err(invalid_agent_prompt_source(
             node_id,
             "prompt file path must not contain traversal or platform root components".to_string(),
         ));
     }
+    debug_assert!(!path.is_absolute());
+    debug_assert!(path.components().all(|component| matches!(component, std::path::Component::Normal(_))));
     Ok(path.to_path_buf())
 }
 
@@ -2048,8 +2071,9 @@ fn read_markdown_agent_prompt(
             "resolved path escapes the workflow root".to_string(),
         ));
     }
+    debug_assert!(canonical_candidate.starts_with(canonical_root));
 
-    let file = File::open(&canonical_candidate)
+    let file = std::fs::File::open(&canonical_candidate)
         .map_err(|error| agent_prompt_file_error(node_id, prompt_file, format!("file could not be opened: {error}")))?;
     let mut bytes = Vec::new();
     file.take(MARKDOWN_AGENT_PROMPT_READ_LIMIT_U64)
@@ -2067,6 +2091,7 @@ fn read_markdown_agent_prompt(
     if prompt.trim().is_empty() {
         return Err(agent_prompt_file_error(node_id, prompt_file, "file is empty".to_string()));
     }
+    debug_assert!(prompt.len() <= MAX_MARKDOWN_AGENT_PROMPT_BYTES);
     Ok(prompt)
 }
 

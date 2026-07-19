@@ -21,7 +21,7 @@ const FLAG_NAME: &str = "--name";
 const FLAG_PATH: &str = "--path";
 const FLAG_STRIP_PREFIX: &str = "--strip-prefix";
 const SELF_TEST_FLAG: &str = "--self-test";
-const VENDOR_ROOT: &str = "vendor";
+const VENDOR_ROOT: &str = "vendor-cargo-deps";
 const PROVENANCE_FILE_NAME: &str = "SOURCE";
 const ARCHIVE_FILE_NAME: &str = "source.tar";
 const STAGING_DIRECTORY_NAME: &str = "staging";
@@ -69,14 +69,14 @@ fn run_self_tests() -> Result<String, String> {
         FLAG_REVISION,
         "abc123",
         FLAG_DESTINATION,
-        "vendor/core",
+        "vendor-cargo-deps/core",
         FLAG_NAME,
         "core",
         FLAG_PATH,
         "core",
     ]);
     let request = parse_request(&valid)?;
-    if request.destination != PathBuf::from("vendor/core") {
+    if request.destination != PathBuf::from("vendor-cargo-deps/core") {
         return Err("positive self-test parsed the wrong destination".to_string());
     }
 
@@ -180,10 +180,10 @@ fn validate_request(request: &SyncRequest) -> Result<(), String> {
 fn validate_vendor_destination(path: &Path) -> Result<(), String> {
     let components = normal_components(path)?;
     if components.len() < MIN_DESTINATION_COMPONENT_COUNT {
-        return Err("destination must name a child below vendor/".to_string());
+        return Err("destination must name a child below vendor-cargo-deps/".to_string());
     }
     if components.first().is_none_or(|component| component != VENDOR_ROOT) {
-        return Err("destination must remain below vendor/".to_string());
+        return Err("destination must remain below vendor-cargo-deps/".to_string());
     }
     Ok(())
 }
@@ -384,7 +384,7 @@ mod tests {
             FLAG_REVISION,
             "abc123",
             FLAG_DESTINATION,
-            "vendor/core",
+            "vendor-cargo-deps/core",
             FLAG_NAME,
             "core",
             FLAG_PATH,
@@ -394,7 +394,7 @@ mod tests {
         ]))
         .expect("valid request should parse");
 
-        assert_eq!(request.destination, PathBuf::from("vendor/core"));
+        assert_eq!(request.destination, PathBuf::from("vendor-cargo-deps/core"));
         assert_eq!(request.paths, vec![PathBuf::from("core")]);
         assert_eq!(request.strip_prefix, Some(PathBuf::from("core")));
     }
@@ -442,7 +442,7 @@ mod tests {
             FLAG_REVISION,
             "abc123",
             FLAG_DESTINATION,
-            "vendor/core",
+            "vendor-cargo-deps/core",
             FLAG_NAME,
             "core",
             FLAG_PATH,
@@ -459,7 +459,7 @@ mod tests {
             source: PathBuf::from("/private/local/source"),
             source_url: "https://example.invalid/source".to_string(),
             revision: "abc123".to_string(),
-            destination: PathBuf::from("vendor/core"),
+            destination: PathBuf::from("vendor-cargo-deps/core"),
             name: "core".to_string(),
             paths: vec![PathBuf::from("core")],
             strip_prefix: None,

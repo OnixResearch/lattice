@@ -10,13 +10,17 @@ use std::collections::BTreeSet;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortDirection;
 use rat_nodegraph::model::PortId;
-use seaglass_execution_graph as execution_graph;
-pub type DurableRunnerDecision = execution_graph::ResumeDecision;
-pub type RunnerStepAction = execution_graph::StepAction;
-pub type RunnerStepState = execution_graph::StepState;
-pub type RunnerTransitionError = execution_graph::StepTransitionError;
 use serde::Deserialize;
 use serde::Serialize;
+
+/// Decision returned when durable execution considers resuming a node.
+pub type DurableRunnerDecision = seaglass_execution_graph::ResumeDecision;
+/// Requested transition for a runner step lifecycle.
+pub type RunnerStepAction = seaglass_execution_graph::StepAction;
+/// Durable lifecycle state of one runner step.
+pub type RunnerStepState = seaglass_execution_graph::StepState;
+/// Error returned when a runner step lifecycle transition is invalid.
+pub type RunnerTransitionError = seaglass_execution_graph::StepTransitionError;
 
 use crate::agent_node;
 use crate::engine::value::Value;
@@ -232,9 +236,12 @@ pub struct ArtifactReference {
     pub summary: String,
 }
 
+/// Node ranked by the number of transitive dependents it can block.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RunnerBottleneck {
+pub struct Bottleneck {
+    /// Runner node identifier.
     pub node_id: RunnerNodeId,
+    /// Number of transitive dependents blocked by this node.
     pub dependent_count: u32,
 }
 
@@ -279,6 +286,9 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
             ));
         }
     }
+
+    debug_assert!(nodes.len() <= workflow.configs.len());
+    debug_assert!(nodes.iter().all(|node| workflow.graph.node(NodeId(node.id)).is_some()));
 
     let edges = runner_edges_from_workflow(workflow, &mut diagnostics);
     if diagnostics.is_empty() {
@@ -452,7 +462,7 @@ pub fn admit_runner_plan(plan: &RunnerWorkflow) -> RunnerAdmission {
 // r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn topological_order(plan: &RunnerWorkflow) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
     let shared_plan = admitted_execution_plan(plan)?;
-    runner_node_ids(&shared_plan.topological_order)
+    parse_node_ids(&shared_plan.topological_order)
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.trellis_graph_admission]
@@ -462,26 +472,28 @@ pub fn ready_nodes(plan: &RunnerWorkflow, states: &BTreeMap<RunnerNodeId, Runner
         return Vec::new();
     };
     let shared_states = shared_step_states(states);
-    execution_graph::ready_nodes(&shared_plan, &shared_states)
+    seaglass_execution_graph::ready_nodes(&shared_plan, &shared_states)
         .iter()
         .filter_map(|node_id| node_id.parse::<RunnerNodeId>().ok())
         .collect()
 }
 
+/// Return one deterministic longest dependency path through an admitted workflow.
 // r[impl n8nclone.workflow_execution.seaglass_graph_core]
 pub fn critical_path(plan: &RunnerWorkflow) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
     let shared_plan = admitted_execution_plan(plan)?;
-    runner_node_ids(&shared_plan.critical_path())
+    parse_node_ids(&shared_plan.critical_path())
 }
 
+/// Rank admitted workflow nodes by their transitive dependent counts.
 // r[impl n8nclone.workflow_execution.seaglass_graph_core]
-pub fn bottlenecks(plan: &RunnerWorkflow) -> Result<Vec<RunnerBottleneck>, RunnerDiagnostic> {
+pub fn bottlenecks(plan: &RunnerWorkflow) -> Result<Vec<Bottleneck>, RunnerDiagnostic> {
     let shared_plan = admitted_execution_plan(plan)?;
     shared_plan
         .bottlenecks()
         .into_iter()
         .map(|bottleneck| {
-            parse_runner_node_id(&bottleneck.node_id).map(|node_id| RunnerBottleneck {
+            parse_node_id(&bottleneck.node_id).map(|node_id| Bottleneck {
                 node_id,
                 dependent_count: bottleneck.dependent_count,
             })
@@ -491,67 +503,74 @@ pub fn bottlenecks(plan: &RunnerWorkflow) -> Result<Vec<RunnerBottleneck>, Runne
 
 // r[impl n8nclone.workflow_execution.runner_core.lifecycle]
 // r[impl n8nclone.workflow_execution.seaglass_graph_core]
+/// Apply one deterministic runner lifecycle transition.
 pub fn transition_step_state(
     from: RunnerStepState,
     action: RunnerStepAction,
 ) -> Result<RunnerStepState, RunnerTransitionError> {
-    execution_graph::transition_step_state(from, action)
+    seaglass_execution_graph::transition_step_state(from, action)
 }
 
+/// Return whether a runner step state forbids further execution transitions.
 pub fn is_terminal_step_state(state: RunnerStepState) -> bool {
-    execution_graph::is_terminal_state(state)
+    seaglass_execution_graph::is_terminal_state(state)
 }
 
-fn admitted_execution_plan(plan: &RunnerWorkflow) -> Result<execution_graph::ExecutionPlan, RunnerDiagnostic> {
-    execution_graph::admit_graph(&execution_graph_from_runner(plan)).map_err(|diagnostics| {
+fn admitted_execution_plan(plan: &RunnerWorkflow) -> Result<seaglass_execution_graph::ExecutionPlan, RunnerDiagnostic> {
+    seaglass_execution_graph::admit_graph(&shared_execution_graph(plan)).map_err(|diagnostics| {
         diagnostics.first().map_or_else(invalid_shared_graph_diagnostic, shared_graph_diagnostic)
     })
 }
 
-fn execution_graph_from_runner(plan: &RunnerWorkflow) -> execution_graph::ExecutionGraph {
-    let nodes = plan.nodes.iter().map(|node| execution_graph::ExecutionNode::new(node.id.to_string())).collect();
+fn shared_execution_graph(plan: &RunnerWorkflow) -> seaglass_execution_graph::ExecutionGraph {
+    let nodes = plan
+        .nodes
+        .iter()
+        .map(|node| seaglass_execution_graph::ExecutionNode::new(node.id.to_string()))
+        .collect();
     let edges = plan
         .edges
         .iter()
         .map(|edge| (edge.source_node, edge.target_node))
         .collect::<BTreeSet<_>>()
         .into_iter()
-        .map(|(source, target)| execution_graph::ExecutionEdge::new(source.to_string(), target.to_string()))
+        .map(|(source, target)| seaglass_execution_graph::ExecutionEdge::new(source.to_string(), target.to_string()))
         .collect();
-    execution_graph::ExecutionGraph::new(nodes, edges)
+    seaglass_execution_graph::ExecutionGraph::new(nodes, edges)
 }
 
 fn shared_step_states(
     states: &BTreeMap<RunnerNodeId, RunnerStepState>,
-) -> BTreeMap<String, execution_graph::StepState> {
+) -> BTreeMap<String, seaglass_execution_graph::StepState> {
     states.iter().map(|(node_id, state)| (node_id.to_string(), *state)).collect()
 }
 
-fn runner_node_ids(node_ids: &[String]) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
-    node_ids.iter().map(|node_id| parse_runner_node_id(node_id)).collect()
+fn parse_node_ids(node_ids: &[String]) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
+    node_ids.iter().map(|node_id| parse_node_id(node_id)).collect()
 }
 
-fn parse_runner_node_id(node_id: &str) -> Result<RunnerNodeId, RunnerDiagnostic> {
-    node_id.parse::<RunnerNodeId>().map_err(|_| {
-        runner_diagnostic(
+fn parse_node_id(node_id: &str) -> Result<RunnerNodeId, RunnerDiagnostic> {
+    match node_id.parse::<RunnerNodeId>() {
+        Ok(parsed_node_id) => Ok(parsed_node_id),
+        Err(_) => Err(runner_diagnostic(
             RunnerDiagnosticCode::RuntimeFailure,
             None,
             None,
             format!("shared graph core returned non-numeric runner node id '{node_id}'"),
-        )
-    })
+        )),
+    }
 }
 
-fn shared_graph_diagnostic(diagnostic: &execution_graph::GraphDiagnostic) -> RunnerDiagnostic {
+fn shared_graph_diagnostic(diagnostic: &seaglass_execution_graph::GraphDiagnostic) -> RunnerDiagnostic {
     let code = match diagnostic.code {
-        execution_graph::GraphDiagnosticCode::CycleDetected => RunnerDiagnosticCode::CycleDetected,
-        execution_graph::GraphDiagnosticCode::SelfLoop => RunnerDiagnosticCode::EdgeSelfLoop,
-        execution_graph::GraphDiagnosticCode::EmptyNodeId
-        | execution_graph::GraphDiagnosticCode::DuplicateNodeId
-        | execution_graph::GraphDiagnosticCode::DuplicateEdge
-        | execution_graph::GraphDiagnosticCode::MissingSourceNode
-        | execution_graph::GraphDiagnosticCode::MissingTargetNode
-        | execution_graph::GraphDiagnosticCode::GraphTooLarge => RunnerDiagnosticCode::RuntimeFailure,
+        seaglass_execution_graph::GraphDiagnosticCode::CycleDetected => RunnerDiagnosticCode::CycleDetected,
+        seaglass_execution_graph::GraphDiagnosticCode::SelfLoop => RunnerDiagnosticCode::EdgeSelfLoop,
+        seaglass_execution_graph::GraphDiagnosticCode::EmptyNodeId
+        | seaglass_execution_graph::GraphDiagnosticCode::DuplicateNodeId
+        | seaglass_execution_graph::GraphDiagnosticCode::DuplicateEdge
+        | seaglass_execution_graph::GraphDiagnosticCode::MissingSourceNode
+        | seaglass_execution_graph::GraphDiagnosticCode::MissingTargetNode
+        | seaglass_execution_graph::GraphDiagnosticCode::GraphTooLarge => RunnerDiagnosticCode::RuntimeFailure,
     };
     let node_id = diagnostic.node_id.as_deref().and_then(|node_id| node_id.parse::<RunnerNodeId>().ok()).map(NodeId);
     runner_diagnostic(code, node_id, None, diagnostic.to_string())
@@ -740,7 +759,7 @@ pub fn durable_runner_decision(
     let Ok(shared_plan) = admitted_execution_plan(plan) else {
         return DurableRunnerDecision::RejectTerminalMutation;
     };
-    execution_graph::resume_decision(&shared_plan, &shared_step_states(states), &node_id.to_string())
+    seaglass_execution_graph::resume_decision(&shared_plan, &shared_step_states(states), &node_id.to_string())
 }
 
 fn runner_diagnostic(
