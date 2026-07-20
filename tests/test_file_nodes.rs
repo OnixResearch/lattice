@@ -2,21 +2,21 @@
 
 use std::collections::HashMap;
 
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::file_node::FileError;
-use n8nclone::file_node::FileOperationKind;
-use n8nclone::file_node::FileOperationPlan;
-use n8nclone::file_node::FileOperationResult;
-use n8nclone::file_node::FileSystem;
-use n8nclone::file_node::LocalFs;
-use n8nclone::file_node::MemoryFileSystem;
-use n8nclone::file_node::validate_path_allowed;
-use n8nclone::workflow_validation::WorkflowDiagnosticCode;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::file_node::FileError;
+use lattice::file_node::FileOperationKind;
+use lattice::file_node::FileOperationPlan;
+use lattice::file_node::FileOperationResult;
+use lattice::file_node::FileSystem;
+use lattice::file_node::LocalFs;
+use lattice::file_node::MemoryFileSystem;
+use lattice::file_node::validate_path_allowed;
+use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const READ_NODE_LABEL: &str = "read-file";

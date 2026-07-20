@@ -17,12 +17,12 @@ const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
-const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "n8nclone"];
+const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const TEST_ARGS: &[&str] = &["test"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
     "--package",
-    "n8nclone",
+    "lattice",
     "--all-targets",
     "--no-deps",
     "--",

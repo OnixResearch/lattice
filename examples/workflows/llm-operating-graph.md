@@ -22,6 +22,6 @@ cargo run --example generate_llm_operating_graph
 Run it with configured Pi and Clankers adapters:
 
 ```bash
-n8nclone --config ./demo/config.ncl import examples/workflows/llm-operating-graph.ncl
-n8nclone --config ./demo/config.ncl run llm-operating-graph --output json
+lattice --config ./demo/config.ncl import examples/workflows/llm-operating-graph.ncl
+lattice --config ./demo/config.ncl run llm-operating-graph --output json
 ```

@@ -2,34 +2,34 @@
 
 use std::collections::HashMap;
 
-use n8nclone::control_flow::ConditionBranch;
-use n8nclone::control_flow::ConditionNodeConfig;
-use n8nclone::control_flow::ConditionPredicate;
-use n8nclone::control_flow::ControlFlowError;
-use n8nclone::control_flow::MergeInputValue;
-use n8nclone::control_flow::MergeNodeConfig;
-use n8nclone::control_flow::MergePolicy;
-use n8nclone::control_flow::SubworkflowInputMapping;
-use n8nclone::control_flow::SubworkflowNodeConfig;
-use n8nclone::control_flow::SubworkflowOutputMapping;
-use n8nclone::control_flow::evaluate_condition;
-use n8nclone::control_flow::merge_decision;
-use n8nclone::control_flow::parse_condition_predicate;
-use n8nclone::control_flow::validate_merge_config;
-use n8nclone::control_flow::validate_subworkflow_reference;
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::node_kind_provider::property_lines_for_config;
-use n8nclone::tui::App;
-use n8nclone::tui::app::PropertyEditField;
-use n8nclone::workflow_format::portable_to_workflow;
-use n8nclone::workflow_format::workflow_to_portable;
-use n8nclone::workflow_validation::WorkflowDiagnosticCode;
-use n8nclone::workflow_validation::has_fatal_diagnostics;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::control_flow::ConditionBranch;
+use lattice::control_flow::ConditionNodeConfig;
+use lattice::control_flow::ConditionPredicate;
+use lattice::control_flow::ControlFlowError;
+use lattice::control_flow::MergeInputValue;
+use lattice::control_flow::MergeNodeConfig;
+use lattice::control_flow::MergePolicy;
+use lattice::control_flow::SubworkflowInputMapping;
+use lattice::control_flow::SubworkflowNodeConfig;
+use lattice::control_flow::SubworkflowOutputMapping;
+use lattice::control_flow::evaluate_condition;
+use lattice::control_flow::merge_decision;
+use lattice::control_flow::parse_condition_predicate;
+use lattice::control_flow::validate_merge_config;
+use lattice::control_flow::validate_subworkflow_reference;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::node_kind_provider::property_lines_for_config;
+use lattice::tui::App;
+use lattice::tui::app::PropertyEditField;
+use lattice::workflow_format::portable_to_workflow;
+use lattice::workflow_format::workflow_to_portable;
+use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::has_fatal_diagnostics;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const READY_TEXT: &str = "ready";
@@ -76,9 +76,9 @@ fn merge_config(policy: MergePolicy) -> MergeNodeConfig {
 
 fn test_app() -> App {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    App::new(n8nclone::config::AppConfig {
+    App::new(lattice::config::AppConfig {
         data_dir: temp_dir.path().join("data"),
-        ..n8nclone::config::AppConfig::default()
+        ..lattice::config::AppConfig::default()
     })
 }
 

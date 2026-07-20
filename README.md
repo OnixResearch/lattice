@@ -1,4 +1,4 @@
-# n8nclone
+# Lattice
 
 ## Development
 
@@ -19,9 +19,9 @@ The Octet hook runs the lib target profile, keeps every configured Octet lint at
 Complex templates and runnable Nickel workflow examples live under `examples/`, including daily digest, CSV cleanup, log triage, webhook trigger cookbook, and the Markdown-backed [`llm-operating-graph`](examples/workflows/llm-operating-graph.md). The LLM example models roles and sequences inside an admitted DAG; feedback and reorganization become explicit inputs to a later acyclic run rather than hidden runtime cycles.
 
 ```bash
-n8nclone --config ./demo/config.ncl --init
-n8nclone --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
-n8nclone --config ./demo/config.ncl run daily-digest --output json
+lattice --config ./demo/config.ncl --init
+lattice --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
+lattice --config ./demo/config.ncl run daily-digest --output json
 ```
 
 ## Native OpenAI-compatible agents
@@ -31,8 +31,8 @@ n8nclone --config ./demo/config.ncl run daily-digest --output json
 The native adapter supports strict text and JSON outputs, disables redirects, bounds request/response bytes and time, and never falls back from missing content to hidden reasoning. Local HTTP endpoints are supported only without bearer credentials. For an authenticated HTTPS endpoint, set `api_key_env` to a binding name and provide that binding through each agent node's `secret_env` credential reference; do not put the key in Nickel.
 
 ```bash
-n8nclone --config examples/config/openai-compatible-agent.ncl import examples/workflows/llm-operating-graph.ncl
-n8nclone --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
+lattice --config examples/config/openai-compatible-agent.ncl import examples/workflows/llm-operating-graph.ncl
+lattice --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
 ```
 
 ## Local file capabilities

@@ -8,30 +8,30 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
-use n8nclone::agent_node::AgentCommandRuntimeConfig;
-use n8nclone::agent_node::AgentOutputMode;
-use n8nclone::agent_node::AgentRuntimeConfig;
-use n8nclone::agent_node::AgentTarget;
-use n8nclone::config::DEFAULT_NODE_TEMPLATE_FILES;
-use n8nclone::config::NodeTemplate;
-use n8nclone::config::load_node_templates_with_diagnostics;
-use n8nclone::config::render_template_command;
-use n8nclone::engine::executor::RunId;
-use n8nclone::engine::executor::node_execution_cache_key;
-use n8nclone::engine::runner::RunnerEventKind;
-use n8nclone::engine::value::TypeTag;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::value::ValueData;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::headless::HeadlessProcessResult;
-use n8nclone::headless::HeadlessRunError;
-use n8nclone::headless::HeadlessRunStatus;
-use n8nclone::headless::process_result_for_summary;
-use n8nclone::headless::render_run_summary_text;
-use n8nclone::headless::run_saved_workflow;
-use n8nclone::headless::run_saved_workflow_with_agent_runtime_config;
-use n8nclone::store::Store;
+use lattice::agent_node::AgentCommandRuntimeConfig;
+use lattice::agent_node::AgentOutputMode;
+use lattice::agent_node::AgentRuntimeConfig;
+use lattice::agent_node::AgentTarget;
+use lattice::config::DEFAULT_NODE_TEMPLATE_FILES;
+use lattice::config::NodeTemplate;
+use lattice::config::load_node_templates_with_diagnostics;
+use lattice::config::render_template_command;
+use lattice::engine::executor::RunId;
+use lattice::engine::executor::node_execution_cache_key;
+use lattice::engine::runner::RunnerEventKind;
+use lattice::engine::value::TypeTag;
+use lattice::engine::value::Value;
+use lattice::engine::value::ValueData;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::headless::HeadlessProcessResult;
+use lattice::headless::HeadlessRunError;
+use lattice::headless::HeadlessRunStatus;
+use lattice::headless::process_result_for_summary;
+use lattice::headless::render_run_summary_text;
+use lattice::headless::run_saved_workflow;
+use lattice::headless::run_saved_workflow_with_agent_runtime_config;
+use lattice::store::Store;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use rat_nodegraph::model::PortSpec;
@@ -52,7 +52,7 @@ const IMAGE_OUTPUT_PORT_LABEL: &str = "image";
 const AGENT_TEXT_OUTPUT_PORT_LABEL: &str = "text";
 const HEADLESS_IMAGE_FILE_NAME: &str = "headless-selfie.png";
 const HEADLESS_AGENT_IMAGE_FILE_NAME: &str = "headless-agent-output.png";
-const MISSING_CWD: &str = "/definitely/missing/n8nclone/headless-test";
+const MISSING_CWD: &str = "/definitely/missing/lattice/headless-test";
 const SUCCESS_RUN_ID: u64 = 7;
 const MISSING_RUN_ID: u64 = 11;
 const FAILED_RUN_ID: u64 = 13;
@@ -67,7 +67,7 @@ const ONE_FAILURE: usize = 1;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
 const CONFIG_FILE_NAME: &str = "config.ncl";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const STORE_FILE_NAME: &str = "lattice.redb";
 const TEMPLATES_DIR_NAME: &str = "templates";
 const TEMPLATE_WORKFLOW_NAME_PREFIX: &str = "headless-template-";
 const TEMPLATE_SOURCE_NODE_LABEL: &str = "template stdin";
@@ -269,7 +269,7 @@ fn output_port_id(workflow: &Workflow, node_id: NodeId, label: &str) -> PortId {
         .expect("output port exists")
 }
 
-fn template_input_cache_key(workflow: &Workflow, node_id: NodeId, stdin_port: PortId) -> n8nclone::engine::ContentHash {
+fn template_input_cache_key(workflow: &Workflow, node_id: NodeId, stdin_port: PortId) -> lattice::engine::ContentHash {
     let inputs = HashMap::from([(stdin_port, Value::from_string(TEMPLATE_STDIN_TEXT.to_string()))]);
     node_execution_cache_key(node_id, workflow.node_config(node_id).expect("template config exists"), &inputs)
 }
@@ -348,7 +348,7 @@ async fn headless_run_loads_local_image_with_default_executor() {
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: image_path_label,
         allowed_roots: vec![temp_dir.path().to_string_lossy().into_owned()],
-        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+        max_bytes: lattice::image_node::DEFAULT_MAX_IMAGE_BYTES,
     });
     let image_port = output_port_id(&workflow, node_id, IMAGE_OUTPUT_PORT_LABEL);
     let input_hash = node_execution_cache_key(
@@ -499,7 +499,7 @@ fn cli_run_saved_workflow_emits_json_summary() {
     store.save_workflow(&workflow).expect("workflow saves");
     drop(store);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("run")
@@ -510,7 +510,7 @@ fn cli_run_saved_workflow_emits_json_summary() {
         .expect("cli run executes");
 
     assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
-    let summary: n8nclone::headless::HeadlessRunSummary =
+    let summary: lattice::headless::HeadlessRunSummary =
         serde_json::from_slice(&output.stdout).expect("json summary parses");
     assert_eq!(summary.workflow_name, SUCCESS_WORKFLOW_NAME);
     assert_eq!(summary.status, HeadlessRunStatus::Succeeded);

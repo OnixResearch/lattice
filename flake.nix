@@ -1,5 +1,5 @@
 {
-  description = "n8nclone — Rust project built with Crane";
+  description = "Lattice — graph-native workflow automation built with Rust";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -167,7 +167,7 @@
             '';
 
         # Build the actual package
-        n8nclone = craneLib.buildPackage {
+        lattice = craneLib.buildPackage {
           inherit
             src
             cargoArtifacts
@@ -178,12 +178,12 @@
       in
       {
         packages = {
-          default = n8nclone;
-          n8nclone = n8nclone;
+          default = lattice;
+          lattice = lattice;
         };
 
         checks = {
-          inherit n8nclone;
+          inherit lattice;
 
           # Run tests with nextest
           nextest = craneLib.cargoNextest {
@@ -205,13 +205,13 @@
               nativeBuildInputs
               buildInputs
               ;
-            cargoClippyExtraArgs = "--package n8nclone --all-targets --no-deps -- -D warnings";
+            cargoClippyExtraArgs = "--package lattice --all-targets --no-deps -- -D warnings";
           };
 
           # Format check
           fmt = craneLib.cargoFmt {
             inherit src;
-            cargoExtraArgs = "--package n8nclone";
+            cargoExtraArgs = "--package lattice";
           };
 
           # Octet Tiger Style lints
@@ -234,7 +234,7 @@
             ];
 
           # Ensure the nightly toolchain is available
-          inputsFrom = [ n8nclone ];
+          inputsFrom = [ lattice ];
         };
       }
     );

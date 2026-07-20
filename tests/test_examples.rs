@@ -4,19 +4,19 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 
-use n8nclone::config::NodeTemplate;
-use n8nclone::config::TemplateParameterDefault;
-use n8nclone::config::load_node_templates_with_diagnostics;
-use n8nclone::engine::executor::RunId;
-use n8nclone::engine::executor::node_execution_cache_key;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::value::ValueData;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::headless::HeadlessRunStatus;
-use n8nclone::headless::run_saved_workflow;
-use n8nclone::store::Store;
-use n8nclone::workflow_format::load_workflow_nickel_file;
+use lattice::config::NodeTemplate;
+use lattice::config::TemplateParameterDefault;
+use lattice::config::load_node_templates_with_diagnostics;
+use lattice::engine::executor::RunId;
+use lattice::engine::executor::node_execution_cache_key;
+use lattice::engine::value::Value;
+use lattice::engine::value::ValueData;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::headless::HeadlessRunStatus;
+use lattice::headless::run_saved_workflow;
+use lattice::store::Store;
+use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -348,7 +348,7 @@ fn template_workflow(
         .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
         .collect::<Vec<_>>();
     let template_id = workflow.graph.add_node(template.name.clone(), &input_specs, &output_specs);
-    let command = n8nclone::config::render_template_command(template, &raw_template_values(case))
+    let command = lattice::config::render_template_command(template, &raw_template_values(case))
         .expect("template command renders");
     workflow.set_node_config(template_id, NodeConfig::shell(command));
 
@@ -385,7 +385,7 @@ fn output_port_id(workflow: &Workflow, node_id: NodeId, label: &str) -> PortId {
         .expect("output port exists")
 }
 
-fn template_input_cache_key(workflow: &Workflow, node_id: NodeId, stdin_port: PortId) -> n8nclone::engine::ContentHash {
+fn template_input_cache_key(workflow: &Workflow, node_id: NodeId, stdin_port: PortId) -> lattice::engine::ContentHash {
     workflow_input_cache_key(workflow, node_id, stdin_port, TEMPLATE_STDIN_TEXT)
 }
 
@@ -394,7 +394,7 @@ fn workflow_input_cache_key(
     node_id: NodeId,
     stdin_port: PortId,
     stdin_text: &str,
-) -> n8nclone::engine::ContentHash {
+) -> lattice::engine::ContentHash {
     let inputs = HashMap::from([(stdin_port, Value::from_string(stdin_text.to_string()))]);
     node_execution_cache_key(node_id, workflow.node_config(node_id).expect("node config exists"), &inputs)
 }

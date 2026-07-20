@@ -3,20 +3,20 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use n8nclone::agent_node::AgentAdapter;
-use n8nclone::agent_node::AgentError;
-use n8nclone::agent_node::AgentOutput;
-use n8nclone::agent_node::AgentResponse;
-use n8nclone::agent_node::ExecutionContext as AgentExecutionContext;
-use n8nclone::credentials::EmptyCredentialProvider;
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::value::ImageMetadata;
-use n8nclone::engine::value::ImageValue;
-use n8nclone::file_node::NoopFileSystem;
-use n8nclone::http::NoopHttpClient;
-use n8nclone::image_node::MemoryImageIo;
-use n8nclone::workflow_format::load_workflow_nickel_file;
+use lattice::agent_node::AgentAdapter;
+use lattice::agent_node::AgentError;
+use lattice::agent_node::AgentOutput;
+use lattice::agent_node::AgentResponse;
+use lattice::agent_node::ExecutionContext as AgentExecutionContext;
+use lattice::credentials::EmptyCredentialProvider;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::value::ImageMetadata;
+use lattice::engine::value::ImageValue;
+use lattice::file_node::NoopFileSystem;
+use lattice::http::NoopHttpClient;
+use lattice::image_node::MemoryImageIo;
+use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
 
 const SELFIE_TO_FINE_ART_EXAMPLE: &str = "examples/workflows/selfie-to-fine-art.ncl";
@@ -36,7 +36,7 @@ struct ExampleAgentAdapter;
 impl AgentAdapter for ExampleAgentAdapter {
     fn execute(
         &self,
-        request: &n8nclone::agent_node::AgentRequest,
+        request: &lattice::agent_node::AgentRequest,
         _context: &AgentExecutionContext,
     ) -> Result<AgentResponse, AgentError> {
         assert_eq!(request.image_inputs.len(), EXPECTED_IMAGE_INPUT_COUNT);

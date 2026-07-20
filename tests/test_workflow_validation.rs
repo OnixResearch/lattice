@@ -2,18 +2,18 @@
 
 mod common;
 
-use n8nclone::config::AppConfig;
-use n8nclone::engine::executor::RunId;
-use n8nclone::engine::workflow::NodeRunnerSettings;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::headless::HeadlessRunError;
-use n8nclone::headless::run_saved_workflow;
-use n8nclone::store::Store;
-use n8nclone::tui::App;
-use n8nclone::workflow_validation::DiagnosticSeverity;
-use n8nclone::workflow_validation::WorkflowDiagnosticCode;
-use n8nclone::workflow_validation::has_fatal_diagnostics;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::config::AppConfig;
+use lattice::engine::executor::RunId;
+use lattice::engine::workflow::NodeRunnerSettings;
+use lattice::engine::workflow::Workflow;
+use lattice::headless::HeadlessRunError;
+use lattice::headless::run_saved_workflow;
+use lattice::store::Store;
+use lattice::tui::App;
+use lattice::workflow_validation::DiagnosticSeverity;
+use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::has_fatal_diagnostics;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::PortSpec;
 use serde_json::json;

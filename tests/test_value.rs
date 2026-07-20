@@ -2,12 +2,12 @@
 
 mod common;
 
-use n8nclone::engine::value::ContentHash;
-use n8nclone::engine::value::ImageMetadata;
-use n8nclone::engine::value::ImageValue;
-use n8nclone::engine::value::TypeTag;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::value::ValueData;
+use lattice::engine::value::ContentHash;
+use lattice::engine::value::ImageMetadata;
+use lattice::engine::value::ImageValue;
+use lattice::engine::value::TypeTag;
+use lattice::engine::value::Value;
+use lattice::engine::value::ValueData;
 
 const PNG_MEDIA_TYPE: &str = "image/png";
 const JPEG_MEDIA_TYPE: &str = "image/jpeg";

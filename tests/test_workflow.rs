@@ -2,11 +2,11 @@
 
 mod common;
 
-use n8nclone::agent_node::AgentOutputMode;
-use n8nclone::agent_node::AgentTarget;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::engine::workflow::WorkflowMeta;
+use lattice::agent_node::AgentOutputMode;
+use lattice::agent_node::AgentTarget;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::engine::workflow::WorkflowMeta;
 use pretty_assertions::assert_eq;
 
 const AGENT_PROMPT: &str = "summarize this";
@@ -114,7 +114,7 @@ fn http_config_defaults() {
 
 #[test]
 fn file_config_defaults() {
-    let cfg = NodeConfig::file(n8nclone::file_node::FileOperationKind::Read, "/tmp/example");
+    let cfg = NodeConfig::file(lattice::file_node::FileOperationKind::Read, "/tmp/example");
     match cfg {
         NodeConfig::File {
             operation,
@@ -123,7 +123,7 @@ fn file_config_defaults() {
             overwrite,
             allowed_roots,
         } => {
-            assert_eq!(operation, n8nclone::file_node::FileOperationKind::Read);
+            assert_eq!(operation, lattice::file_node::FileOperationKind::Read);
             assert_eq!(path, "/tmp/example");
             assert!(content.is_none());
             assert!(!overwrite);
@@ -144,7 +144,7 @@ fn image_input_config_defaults() {
         } => {
             assert_eq!(path, "/tmp/selfie.png");
             assert!(allowed_roots.is_empty());
-            assert_eq!(max_bytes, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+            assert_eq!(max_bytes, lattice::image_node::DEFAULT_MAX_IMAGE_BYTES);
         }
         _ => panic!("expected image input config"),
     }

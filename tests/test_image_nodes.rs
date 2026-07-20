@@ -2,18 +2,18 @@
 
 use std::collections::HashMap;
 
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::value::TypeTag;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::image_node::ImageError;
-use n8nclone::image_node::ImageIo;
-use n8nclone::image_node::LocalImageIo;
-use n8nclone::image_node::MemoryImageIo;
-use n8nclone::image_node::image_input_plan;
-use n8nclone::workflow_validation::WorkflowDiagnosticCode;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::value::TypeTag;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::image_node::ImageError;
+use lattice::image_node::ImageIo;
+use lattice::image_node::LocalImageIo;
+use lattice::image_node::MemoryImageIo;
+use lattice::image_node::image_input_plan;
+use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const IMAGE_NODE_LABEL: &str = "selfie";
@@ -63,7 +63,7 @@ fn local_image_workflow(path: &str) -> (Workflow, rat_nodegraph::model::NodeId) 
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: path.to_string(),
         allowed_roots: vec![allowed_root],
-        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+        max_bytes: lattice::image_node::DEFAULT_MAX_IMAGE_BYTES,
     });
     (workflow, node_id)
 }
@@ -135,10 +135,10 @@ fn local_image_io_loads_png_and_jpeg_files() {
     let allowed_roots = vec![temp_dir.path().to_string_lossy().into_owned()];
 
     let png = image_io
-        .load(&image_input_plan(&png_path, &allowed_roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
+        .load(&image_input_plan(&png_path, &allowed_roots, lattice::image_node::DEFAULT_MAX_IMAGE_BYTES))
         .expect("local PNG loads");
     let jpeg = image_io
-        .load(&image_input_plan(&jpeg_path, &allowed_roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES))
+        .load(&image_input_plan(&jpeg_path, &allowed_roots, lattice::image_node::DEFAULT_MAX_IMAGE_BYTES))
         .expect("local JPEG loads");
 
     assert_eq!(png.media_type, "image/png");
@@ -151,7 +151,7 @@ fn local_image_io_loads_png_and_jpeg_files() {
 fn local_image_io_rejects_missing_allowed_root() {
     let temp_dir = tempfile::tempdir().expect("temporary image directory");
     let png_path = write_local_fixture(&temp_dir, LOCAL_PNG_FILE_NAME, PNG_FIXTURE);
-    let plan = image_input_plan(&png_path, &[], n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+    let plan = image_input_plan(&png_path, &[], lattice::image_node::DEFAULT_MAX_IMAGE_BYTES);
 
     let result = LocalImageIo.load(&plan);
 
@@ -292,7 +292,7 @@ async fn default_executor_reports_local_image_outside_allowed_roots() {
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: png_path,
         allowed_roots: vec![LOCAL_ROOT_OTHER.to_string()],
-        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+        max_bytes: lattice::image_node::DEFAULT_MAX_IMAGE_BYTES,
     });
     let executor = Executor::new();
 
@@ -316,7 +316,7 @@ fn local_image_io_rejects_symlink_escape() {
     std::os::unix::fs::symlink(&outside_path, &link_path).expect("create escaping image symlink");
     let path = link_path.to_string_lossy().into_owned();
     let roots = vec![allowed.path().to_string_lossy().into_owned()];
-    let plan = image_input_plan(&path, &roots, n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES);
+    let plan = image_input_plan(&path, &roots, lattice::image_node::DEFAULT_MAX_IMAGE_BYTES);
 
     let result = LocalImageIo.load(&plan);
 
@@ -357,7 +357,7 @@ fn path_outside_allowed_roots_is_validation_diagnostic() {
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: PATH_OTHER.to_string(),
         allowed_roots: vec![ROOT_ALLOWED.to_string()],
-        max_bytes: n8nclone::image_node::DEFAULT_MAX_IMAGE_BYTES,
+        max_bytes: lattice::image_node::DEFAULT_MAX_IMAGE_BYTES,
     });
 
     let diagnostics = validate_workflow(&workflow);

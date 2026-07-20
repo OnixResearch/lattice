@@ -2,17 +2,17 @@
 
 use std::collections::HashMap;
 
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::executor::node_execution_cache_key;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::http::HttpError;
-use n8nclone::http::HttpResponse;
-use n8nclone::http::StaticHttpClient;
-use n8nclone::http::StaticHttpResult;
-use n8nclone::workflow_validation::WorkflowDiagnosticCode;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::executor::node_execution_cache_key;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::http::HttpError;
+use lattice::http::HttpResponse;
+use lattice::http::StaticHttpClient;
+use lattice::http::StaticHttpResult;
+use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const HTTP_NODE_LABEL: &str = "fetch";

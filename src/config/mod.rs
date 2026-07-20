@@ -20,6 +20,8 @@ use serde::Serialize;
 
 use crate::agent_node::AgentRuntimeConfig;
 
+pub mod identity;
+
 /// Application-level configuration loaded from Nickel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -38,7 +40,7 @@ pub struct AppConfig {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let data_dir = default_data_dir().unwrap_or_else(|| PathBuf::from(".n8nclone"));
+        let data_dir = default_data_dir().unwrap_or_else(|| PathBuf::from(identity::CANONICAL_DATA_DIR_NAME));
         Self {
             data_dir,
             default_timeout_secs: 60,
@@ -49,12 +51,32 @@ impl Default for AppConfig {
     }
 }
 
-/// Default data directory.
+/// Imperative shell: collect environment and filesystem facts for the default data directory.
 fn default_data_dir() -> Option<PathBuf> {
-    std::env::var("N8NCLONE_DATA_DIR")
-        .ok()
-        .map(PathBuf::from)
-        .or_else(|| home::home_dir().map(|h| h.join(".n8nclone")))
+    let home_dir = home::home_dir();
+    let has_legacy_default = home_dir.as_ref().is_some_and(|home| home.join(identity::LEGACY_DATA_DIR_NAME).exists());
+    identity::select_data_dir(identity::DataDirFacts {
+        canonical_override: read_data_dir_env(identity::CANONICAL_DATA_DIR_ENV),
+        legacy_override: read_data_dir_env(identity::LEGACY_DATA_DIR_ENV),
+        home_dir,
+        has_legacy_default,
+    })
+}
+
+fn read_data_dir_env(name: &str) -> Option<PathBuf> {
+    std::env::var(name).ok().map(PathBuf::from)
+}
+
+/// Imperative shell: collect filesystem facts for the configured store directory.
+pub fn store_path(data_dir: &Path) -> PathBuf {
+    let canonical_path = data_dir.join(identity::CANONICAL_STORE_FILE_NAME);
+    let legacy_path = data_dir.join(identity::LEGACY_STORE_FILE_NAME);
+    identity::select_store_path(identity::StorePathFacts {
+        has_canonical_store: canonical_path.exists(),
+        has_legacy_store: legacy_path.exists(),
+        canonical_path,
+        legacy_path,
+    })
 }
 
 /// A node template defined in Nickel.
@@ -424,7 +446,7 @@ pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, Stri
 /// Generate a default config.ncl file.
 pub fn default_config_ncl() -> &'static str {
     r#"{
-  data_dir = "~/.n8nclone",
+  data_dir = "~/.lattice",
   default_timeout_secs = 60,
   shell = "sh",
   max_parallelism = 4,

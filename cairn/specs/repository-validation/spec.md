@@ -46,7 +46,7 @@ r[n8nclone.repository_validation.format_scope] The flake format check MUST valid
 r[n8nclone.repository_validation.format_scope.scenario.vendor-format]
 - GIVEN a vendored path dependency uses formatting that differs from the current project toolchain
 - WHEN the flake format check runs
-- THEN the check MUST format-check `n8nclone` and MUST NOT fail solely because vendored source would be reformatted
+- THEN the check MUST format-check `lattice` and MUST NOT fail solely because vendored source would be reformatted
 
 ### Requirement: Clippy ownership boundary
 r[n8nclone.repository_validation.clippy_scope] The flake Clippy check MUST deny warnings for repository-owned targets without applying repository lint policy to vendored dependencies.
@@ -55,4 +55,4 @@ r[n8nclone.repository_validation.clippy_scope] The flake Clippy check MUST deny 
 r[n8nclone.repository_validation.clippy_scope.scenario.vendor-lints]
 - GIVEN a vendored path dependency triggers Clippy lints under the consumer's warning policy
 - WHEN the flake Clippy check runs
-- THEN the check MUST lint `n8nclone` with dependencies excluded from lint admission
+- THEN the check MUST lint `lattice` with dependencies excluded from lint admission

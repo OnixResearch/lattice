@@ -56,7 +56,7 @@ r[n8nclone.operator_diagnostics.doctor_checks] The system MUST collect doctor fa
 
 #### Scenario: Config and store checks
 r[n8nclone.operator_diagnostics.doctor_checks.config_store]
-- GIVEN a configured n8nclone environment
+- GIVEN a configured Lattice environment
 - WHEN doctor fact collection runs
 - THEN config discovery, Nickel evaluation, store opening, schema compatibility, and workflow validation facts are collected without modifying the store
 

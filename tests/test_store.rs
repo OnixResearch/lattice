@@ -4,14 +4,14 @@ mod common;
 
 use std::collections::HashMap;
 
-use n8nclone::engine::executor::RunId;
-use n8nclone::engine::value::ContentHash;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::store::ExecutionCache;
-use n8nclone::store::RunRecord;
-use n8nclone::store::Store;
-use n8nclone::store::WorkflowRepository;
+use lattice::engine::executor::RunId;
+use lattice::engine::value::ContentHash;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::Workflow;
+use lattice::store::ExecutionCache;
+use lattice::store::RunRecord;
+use lattice::store::Store;
+use lattice::store::WorkflowRepository;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::PortId;
 
@@ -374,11 +374,11 @@ async fn executor_output_round_trips_through_store() {
     let (store, _dir) = common::temp_store();
     let (wf, node_id) = common::standalone_node("echo", "echo stored");
 
-    let executor = n8nclone::engine::executor::Executor::new();
+    let executor = lattice::engine::executor::Executor::new();
     let result = executor.execute_node(&wf, node_id, &HashMap::new()).await;
 
     match &result.status {
-        n8nclone::engine::executor::NodeStatus::Completed { outputs, .. } => {
+        lattice::engine::executor::NodeStatus::Completed { outputs, .. } => {
             // Store each output value.
             for val in outputs.values() {
                 store.put_value(val).unwrap();

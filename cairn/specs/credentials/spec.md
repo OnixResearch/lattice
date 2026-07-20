@@ -86,7 +86,7 @@ r[n8nclone.credentials.n8n_json.placeholders.plaintext]
 
 #### Scenario: Export keeps credential references opaque
 r[n8nclone.credentials.n8n_json.placeholders.export]
-- GIVEN a n8nclone workflow with credential references is exported to n8n JSON
+- GIVEN a Lattice workflow with credential references is exported to n8n JSON
 - WHEN export succeeds for supported nodes
 - THEN the system writes only opaque credential reference identities and omits plaintext secret material
 

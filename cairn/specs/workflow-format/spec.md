@@ -169,13 +169,13 @@ r[n8nclone.workflow_format.node_kind_provider.handlers]
 - THEN the system MUST reject the workflow with deterministic diagnostics and preserve existing saved workflows
 
 ### Requirement: n8n JSON import
-r[n8nclone.workflow_format.n8n_json.import] The system MUST import a documented subset of n8n workflow JSON into typed n8nclone workflows with deterministic mapping reports.
+r[n8nclone.workflow_format.n8n_json.import] The system MUST import a documented subset of n8n workflow JSON into typed Lattice workflows with deterministic mapping reports.
 
 #### Scenario: Import supported n8n workflow
 r[n8nclone.workflow_format.n8n_json.import.supported]
 - GIVEN an n8n JSON workflow uses only supported node kinds and connection shapes
 - WHEN the operator imports it
-- THEN the system creates an equivalent n8nclone workflow and writes a mapping report for every source node
+- THEN the system creates an equivalent Lattice workflow and writes a mapping report for every source node
 
 #### Scenario: Import malformed n8n JSON fails
 r[n8nclone.workflow_format.n8n_json.import.malformed]
@@ -199,7 +199,7 @@ r[n8nclone.workflow_format.n8n_json.fixtures] The system MUST keep positive and 
 r[n8nclone.workflow_format.n8n_json.fixtures.supported]
 - GIVEN supported n8n JSON fixtures exist for shell and HTTP workflows
 - WHEN the fixture tests run
-- THEN each fixture imports into an equivalent typed n8nclone workflow
+- THEN each fixture imports into an equivalent typed Lattice workflow
 
 #### Scenario: Unsupported fixtures fail predictably
 r[n8nclone.workflow_format.n8n_json.fixtures.unsupported]
@@ -208,17 +208,17 @@ r[n8nclone.workflow_format.n8n_json.fixtures.unsupported]
 - THEN each fixture reports the expected deterministic diagnostic
 
 ### Requirement: n8n JSON export
-r[n8nclone.workflow_format.n8n_json.export] The system MAY export supported n8nclone workflow subsets as deterministic n8n JSON.
+r[n8nclone.workflow_format.n8n_json.export] The system MAY export supported Lattice workflow subsets as deterministic n8n JSON.
 
 #### Scenario: Export supported subset
 r[n8nclone.workflow_format.n8n_json.export.supported]
-- GIVEN an n8nclone workflow contains only node kinds and settings with known n8n mappings
+- GIVEN an Lattice workflow contains only node kinds and settings with known n8n mappings
 - WHEN the operator exports it as n8n JSON
 - THEN the system writes deterministic n8n JSON and a mapping report describing exported semantics
 
 #### Scenario: Export unsupported subset is blocked
 r[n8nclone.workflow_format.n8n_json.export.unsupported]
-- GIVEN an n8nclone workflow contains nodes or settings without known n8n mappings
+- GIVEN an Lattice workflow contains nodes or settings without known n8n mappings
 - WHEN the operator exports it as n8n JSON
 - THEN the system reports unsupported features and does not write misleading workflow JSON unless explicit best-effort export is requested
 

@@ -844,18 +844,18 @@ r[n8nclone.scheduling.triggers.history.persist]
 - THEN the system stores trigger id, workflow name, run id, idempotency key, status, and redaction-safe payload summary
 
 ### Requirement: Seaglass execution graph core adoption
-r[n8nclone.workflow_execution.seaglass_graph_core] The system MUST use the provenance-recorded Seaglass execution-graph core for reusable DAG admission and lifecycle decisions while retaining `n8nclone` runtime, value, policy, event, and artifact ownership.
+r[n8nclone.workflow_execution.seaglass_graph_core] The system MUST use the provenance-recorded Seaglass execution-graph core for reusable DAG admission and lifecycle decisions while retaining `lattice` runtime, value, policy, event, and artifact ownership.
 
 #### Scenario: Existing runtime behavior remains compatible
 r[n8nclone.workflow_execution.seaglass_graph_core.scenario.compatibility]
 - GIVEN an existing valid workflow contains shell, HTTP, file, image, condition, merge, subworkflow, Pi, or Clankers nodes
 - WHEN runner admission and execution use the shared graph core
-- THEN deterministic order and readiness MUST remain compatible and typed runtime dispatch MUST stay in the `n8nclone` shell
+- THEN deterministic order and readiness MUST remain compatible and typed runtime dispatch MUST stay in the `lattice` shell
 
 #### Scenario: Vendored core records exact provenance
 r[n8nclone.workflow_execution.seaglass_graph_core.scenario.provenance]
 - GIVEN the Seaglass owner revision is not available through an authorized remote push
-- WHEN the core snapshot is synchronized into `n8nclone`
+- WHEN the core snapshot is synchronized into `lattice`
 - THEN a repo-owned import tool MUST record the exact source revision and product builds MUST NOT depend on a durable sibling path
 
 ### Requirement: LLM operating graph
@@ -885,7 +885,7 @@ r[n8nclone.workflow_execution.rats_dependency] The system MUST consume the newes
 #### Scenario: Source-distribution defect fails visibly
 r[n8nclone.workflow_execution.rats_dependency.scenario.source-completeness]
 - GIVEN the newest Rats revision references a source file omitted by ignore or archive rules
-- WHEN `n8nclone` compiles against that revision
+- WHEN `lattice` compiles against that revision
 - THEN the update MUST remain blocked until the Rats owner source includes the file and the focused consumer check passes
 
 ### Requirement: Native OpenAI-compatible agent runtime

@@ -2,17 +2,17 @@
 
 mod common;
 
-use n8nclone::config::AppConfig;
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::RunId;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::store::RunDetailRecord;
-use n8nclone::store::RunNodeDetail;
-use n8nclone::store::RunNodeDetailStatus;
-use n8nclone::store::RunOutputDetail;
-use n8nclone::store::RunRecord;
-use n8nclone::tui::App;
-use n8nclone::tui::app::run_detail_record_from_results;
+use lattice::config::AppConfig;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::RunId;
+use lattice::engine::workflow::Workflow;
+use lattice::store::RunDetailRecord;
+use lattice::store::RunNodeDetail;
+use lattice::store::RunNodeDetailStatus;
+use lattice::store::RunOutputDetail;
+use lattice::store::RunRecord;
+use lattice::tui::App;
+use lattice::tui::app::run_detail_record_from_results;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;

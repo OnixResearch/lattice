@@ -2,25 +2,25 @@
 
 use std::collections::BTreeSet;
 
-use n8nclone::engine::RunId;
-use n8nclone::engine::Value;
-use n8nclone::engine::runner::RunnerEventKind;
-use n8nclone::replay::ReplayArtifactPayloadState;
-use n8nclone::replay::ReplayArtifactReference;
-use n8nclone::replay::ReplayBundleError;
-use n8nclone::replay::ReplayDiagnosticCode;
-use n8nclone::replay::ReplayEventRecord;
-use n8nclone::replay::ReplayNodeState;
-use n8nclone::replay::artifact_view;
-use n8nclone::replay::build_replay_timeline;
-use n8nclone::replay::export_replay_bundle;
-use n8nclone::replay::import_replay_bundle_json;
-use n8nclone::replay::move_replay_cursor;
-use n8nclone::replay::replay_bundle_to_pretty_json;
-use n8nclone::replay::replay_cursor;
-use n8nclone::replay::summarize_value;
-use n8nclone::replay::validate_replay_events;
-use n8nclone::store::Store;
+use lattice::engine::RunId;
+use lattice::engine::Value;
+use lattice::engine::runner::RunnerEventKind;
+use lattice::replay::ReplayArtifactPayloadState;
+use lattice::replay::ReplayArtifactReference;
+use lattice::replay::ReplayBundleError;
+use lattice::replay::ReplayDiagnosticCode;
+use lattice::replay::ReplayEventRecord;
+use lattice::replay::ReplayNodeState;
+use lattice::replay::artifact_view;
+use lattice::replay::build_replay_timeline;
+use lattice::replay::export_replay_bundle;
+use lattice::replay::import_replay_bundle_json;
+use lattice::replay::move_replay_cursor;
+use lattice::replay::replay_bundle_to_pretty_json;
+use lattice::replay::replay_cursor;
+use lattice::replay::summarize_value;
+use lattice::replay::validate_replay_events;
+use lattice::store::Store;
 use pretty_assertions::assert_eq;
 
 const RUN_ID: RunId = RunId(7);

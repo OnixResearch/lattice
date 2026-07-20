@@ -7,32 +7,30 @@ use std::process::ExitCode;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
-use n8nclone::config;
-use n8nclone::credentials::CredentialProviderCapabilities;
-use n8nclone::credentials::CredentialProviderMetadata;
-use n8nclone::credentials::CredentialProviderRegistry;
-use n8nclone::credentials::EnvironmentCredentialProvider;
-use n8nclone::headless;
-use n8nclone::headless::HeadlessProcessResult;
-use n8nclone::n8n_json;
-use n8nclone::scheduler;
-use n8nclone::scheduler::ScheduleDaemonOutcome;
-use n8nclone::scheduler::ScheduleSkipReason;
-use n8nclone::store::Store;
-use n8nclone::triggers::TriggerDefinition;
-use n8nclone::triggers::TriggerRunRecord;
-use n8nclone::tui::App;
-use n8nclone::webhooks;
-use n8nclone::workflow_format;
-use n8nclone::workflow_validation;
+use lattice::config;
+use lattice::credentials::CredentialProviderCapabilities;
+use lattice::credentials::CredentialProviderMetadata;
+use lattice::credentials::CredentialProviderRegistry;
+use lattice::credentials::EnvironmentCredentialProvider;
+use lattice::headless;
+use lattice::headless::HeadlessProcessResult;
+use lattice::n8n_json;
+use lattice::scheduler;
+use lattice::scheduler::ScheduleDaemonOutcome;
+use lattice::scheduler::ScheduleSkipReason;
+use lattice::store::Store;
+use lattice::triggers::TriggerDefinition;
+use lattice::triggers::TriggerRunRecord;
+use lattice::tui::App;
+use lattice::webhooks;
+use lattice::workflow_format;
+use lattice::workflow_validation;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tracing::info;
 
-const DEFAULT_CONFIG_PATH: &str = "~/.n8nclone/config.ncl";
-const LOG_FILE_PATH: &str = "/tmp/n8nclone.log";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const LOG_FILE_PATH: &str = "/tmp/lattice.log";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
@@ -215,16 +213,17 @@ mod doctor {
     }
 }
 
+// r[impl lattice.project_identity.canonical]
 #[derive(Parser, Debug)]
-#[command(name = "n8nclone", about = "TUI workflow automation — like n8n, in your terminal")]
+#[command(name = "lattice", about = "Graph-native workflow automation in your terminal")]
 struct Args {
     /// Enable verbose logging
     #[arg(short, long)]
     verbose: bool,
 
     /// Config file path (Nickel .ncl)
-    #[arg(short, long, default_value = DEFAULT_CONFIG_PATH)]
-    config: String,
+    #[arg(short, long)]
+    config: Option<String>,
 
     /// Initialize config directory with defaults
     #[arg(long)]
@@ -374,11 +373,11 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
+async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     let args = Args::parse();
     setup_logging(args.verbose);
 
-    let config_path = shellexpand(&args.config);
+    let config_path = resolve_config_path(args.config.as_deref(), args.init);
 
     if args.init {
         init_config(&config_path)?;
@@ -396,7 +395,7 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
         tracing::warn!(error = %e, "failed to create data dir");
     }
 
-    info!(config = ?config_path, data_dir = ?app_config.data_dir, "starting n8nclone");
+    info!(config = ?config_path, data_dir = ?app_config.data_dir, "starting lattice");
 
     match args.command {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
@@ -424,7 +423,7 @@ async fn run_main() -> Result<ExitCode, n8nclone::error::Error> {
                     diagnostic.message
                 ));
             }
-            app.run_tui().await.map_err(|e| n8nclone::error::Error::Io { source: e })?;
+            app.run_tui().await.map_err(|e| lattice::error::Error::Io { source: e })?;
             Ok(ExitCode::SUCCESS)
         }
     }
@@ -498,13 +497,13 @@ fn collect_doctor_facts(config_path: &Path) -> doctor::Facts {
         Err(error) => {
             checks.push(
                 doctor::Fact::fatal(doctor::CHECK_CONFIG, error)
-                    .with_remediation("run `n8nclone --init --config <path>` or fix the Nickel config"),
+                    .with_remediation("run `lattice --init --config <path>` or fix the Nickel config"),
             );
             return doctor::Facts::new(checks);
         }
     };
 
-    let store_path = app_config.data_dir.join(STORE_FILE_NAME);
+    let store_path = config::store_path(&app_config.data_dir);
     if !store_path.exists() {
         checks.push(
             doctor::Fact::fatal(doctor::CHECK_STORE, format!("store database not found: {}", store_path.display()))
@@ -710,7 +709,7 @@ fn print_headless_run_error(error: &headless::HeadlessRunError) {
 async fn run_scheduler_daemon_once(
     app_config: &config::AppConfig,
     args: &SchedulerDaemonArgs,
-) -> Result<ExitCode, n8nclone::error::Error> {
+) -> Result<ExitCode, lattice::error::Error> {
     let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => {
@@ -1092,7 +1091,7 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
     }
 }
 
-fn save_workflow_with_import_triggers(store: &Store, workflow: &n8nclone::engine::Workflow) -> Result<(), String> {
+fn save_workflow_with_import_triggers(store: &Store, workflow: &lattice::engine::Workflow) -> Result<(), String> {
     store.save_workflow(workflow).map_err(|error| error.to_string())?;
     for trigger in &workflow.triggers {
         store.save_trigger(trigger).map_err(|error| error.to_string())?;
@@ -1190,7 +1189,7 @@ fn write_output_file(path: &PathBuf, contents: String) -> Result<(), String> {
 }
 
 fn open_store(app_config: &config::AppConfig) -> Result<Store, String> {
-    Store::new(app_config.data_dir.join(STORE_FILE_NAME)).map_err(|error| error.to_string())
+    Store::new(config::store_path(&app_config.data_dir)).map_err(|error| error.to_string())
 }
 
 fn process_result_to_exit_code(result: HeadlessProcessResult) -> ExitCode {
@@ -1213,18 +1212,32 @@ fn shellexpand(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
-fn init_config(config_path: &PathBuf) -> Result<(), n8nclone::error::Error> {
+fn resolve_config_path(requested: Option<&str>, initializes_config: bool) -> PathBuf {
+    let uses_canonical_default = requested.is_none();
+    let requested_path = shellexpand(requested.unwrap_or(config::identity::DEFAULT_CONFIG_PATH));
+    let legacy_path = shellexpand(config::identity::LEGACY_CONFIG_PATH);
+    config::identity::select_startup_path(config::identity::StartupPathFacts {
+        has_canonical_config: requested_path.exists(),
+        has_legacy_config: legacy_path.exists(),
+        requested_path,
+        legacy_path,
+        uses_canonical_default,
+        initializes_config,
+    })
+}
+
+fn init_config(config_path: &PathBuf) -> Result<(), lattice::error::Error> {
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| n8nclone::error::Error::Io { source: e })?;
+        std::fs::create_dir_all(parent).map_err(|e| lattice::error::Error::Io { source: e })?;
     }
 
-    std::fs::write(config_path, config::default_config_ncl()).map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    std::fs::write(config_path, config::default_config_ncl()).map_err(|e| lattice::error::Error::Io { source: e })?;
 
     let templates_dir = config_path.parent().unwrap_or(&PathBuf::from(".")).join("templates");
-    std::fs::create_dir_all(&templates_dir).map_err(|e| n8nclone::error::Error::Io { source: e })?;
+    std::fs::create_dir_all(&templates_dir).map_err(|e| lattice::error::Error::Io { source: e })?;
     for template_file in config::DEFAULT_NODE_TEMPLATE_FILES {
         std::fs::write(templates_dir.join(template_file.file_name), template_file.contents)
-            .map_err(|e| n8nclone::error::Error::Io { source: e })?;
+            .map_err(|e| lattice::error::Error::Io { source: e })?;
     }
 
     Ok(())

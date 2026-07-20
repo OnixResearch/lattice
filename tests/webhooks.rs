@@ -3,24 +3,24 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 
-use n8nclone::credentials::MapCredentialProvider;
-use n8nclone::credentials::SecretRef;
-use n8nclone::engine::RunId;
-use n8nclone::headless::HeadlessRunStatus;
-use n8nclone::headless::run_admitted_trigger_plan;
-use n8nclone::scheduler::OverlapPolicy;
-use n8nclone::store::Store;
-use n8nclone::triggers::IdempotencyPolicy;
-use n8nclone::triggers::TriggerDefinition;
-use n8nclone::triggers::TriggerInputBinding;
-use n8nclone::triggers::TriggerKind;
-use n8nclone::triggers::TriggerRunRecord;
-use n8nclone::triggers::TriggerRunStatus;
-use n8nclone::triggers::WebhookAuthPolicy;
-use n8nclone::triggers::WebhookTrigger;
-use n8nclone::webhooks;
-use n8nclone::workflow_format::load_workflow_nickel_file;
-use n8nclone::workflow_validation;
+use lattice::credentials::MapCredentialProvider;
+use lattice::credentials::SecretRef;
+use lattice::engine::RunId;
+use lattice::headless::HeadlessRunStatus;
+use lattice::headless::run_admitted_trigger_plan;
+use lattice::scheduler::OverlapPolicy;
+use lattice::store::Store;
+use lattice::triggers::IdempotencyPolicy;
+use lattice::triggers::TriggerDefinition;
+use lattice::triggers::TriggerInputBinding;
+use lattice::triggers::TriggerKind;
+use lattice::triggers::TriggerRunRecord;
+use lattice::triggers::TriggerRunStatus;
+use lattice::triggers::WebhookAuthPolicy;
+use lattice::triggers::WebhookTrigger;
+use lattice::webhooks;
+use lattice::workflow_format::load_workflow_nickel_file;
+use lattice::workflow_validation;
 use pretty_assertions::assert_eq;
 
 const TRIGGER_ID: &str = "new-lead";
@@ -53,12 +53,12 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
 const CLI_CONFIG_FILE_NAME: &str = "config.ncl";
 const CLI_DATA_DIR_NAME: &str = "data";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const STORE_FILE_NAME: &str = "lattice.redb";
 const COOKBOOK_WORKFLOW_PATH: &str = "examples/workflows/webhook-cookbook.ncl";
 const COOKBOOK_WORKFLOW_NAME: &str = "webhook-cookbook";
 const COOKBOOK_TRIGGER_ID: &str = "cookbook-lead";
 const COOKBOOK_WEBHOOK_PATH: &str = "/hooks/cookbook-lead";
-const COOKBOOK_SECRET_KEY: &str = "N8NCLONE_WEBHOOK_TOKEN";
+const COOKBOOK_SECRET_KEY: &str = "LATTICE_WEBHOOK_TOKEN";
 
 fn limits() -> webhooks::RequestLimits {
     webhooks::RequestLimits {
@@ -102,14 +102,14 @@ fn write_cli_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::p
     (config_path, data_dir)
 }
 
-fn save_workflow_with_triggers(store: &Store, workflow: &n8nclone::engine::Workflow) {
+fn save_workflow_with_triggers(store: &Store, workflow: &lattice::engine::Workflow) {
     store.save_workflow(workflow).expect("workflow saves");
     for trigger in &workflow.triggers {
         store.save_trigger(trigger).expect("trigger saves");
     }
 }
 
-fn save_loaded_cookbook(store: &Store) -> n8nclone::engine::Workflow {
+fn save_loaded_cookbook(store: &Store) -> lattice::engine::Workflow {
     let workflow = load_workflow_nickel_file(Path::new(COOKBOOK_WORKFLOW_PATH)).expect("cookbook workflow imports");
     save_workflow_with_triggers(store, &workflow);
     workflow
@@ -171,7 +171,7 @@ fn bearer(token: &str) -> String {
     format!("Bearer {token}")
 }
 
-fn empty_context() -> n8nclone::triggers::TriggerAdmissionContext {
+fn empty_context() -> lattice::triggers::TriggerAdmissionContext {
     webhooks::admission_context(&[], CURRENT_EPOCH_MS)
 }
 
@@ -377,7 +377,7 @@ fn dry_run_reports_safe_status_and_redacted_credential_diagnostics() {
 fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
-    let status = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let status = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("import")

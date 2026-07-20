@@ -1,14 +1,14 @@
 //! Tests for built-in node-kind provider metadata and validation.
 
-use n8nclone::config::AppConfig;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::node_kind_provider::NodeKindValidationCode;
-use n8nclone::node_kind_provider::property_lines_for_config;
-use n8nclone::node_kind_provider::provider_for_config;
-use n8nclone::node_kind_provider::provider_for_portable_kind;
-use n8nclone::node_kind_provider::validate_config_for_kind;
-use n8nclone::tui::App;
-use n8nclone::tui::app::PropertyEditField;
+use lattice::config::AppConfig;
+use lattice::engine::workflow::NodeConfig;
+use lattice::node_kind_provider::NodeKindValidationCode;
+use lattice::node_kind_provider::property_lines_for_config;
+use lattice::node_kind_provider::provider_for_config;
+use lattice::node_kind_provider::provider_for_portable_kind;
+use lattice::node_kind_provider::validate_config_for_kind;
+use lattice::tui::App;
+use lattice::tui::app::PropertyEditField;
 
 const NODE_LABEL: &str = "node";
 const SHELL_KIND: &str = "shell";

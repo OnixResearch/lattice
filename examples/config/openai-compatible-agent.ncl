@@ -50,7 +50,7 @@ let local_runtime = {
 } in
 (
 {
-  data_dir = "~/.n8nclone",
+  data_dir = "~/.lattice",
   default_timeout_secs = shell_timeout_secs,
   shell = "sh",
   max_parallelism = workflow_parallelism,

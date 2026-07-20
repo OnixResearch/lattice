@@ -3,10 +3,10 @@
 
 use std::collections::HashMap;
 
-use n8nclone::engine::value::ContentHash;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::store::Store;
+use lattice::engine::value::ContentHash;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::Workflow;
+use lattice::store::Store;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use tempfile::TempDir;

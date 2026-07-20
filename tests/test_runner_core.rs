@@ -4,36 +4,36 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use n8nclone::engine::runner::Bottleneck;
-use n8nclone::engine::runner::CapturingRunnerEventSink;
-use n8nclone::engine::runner::DurableRunnerDecision;
-use n8nclone::engine::runner::NodeRuntime;
-use n8nclone::engine::runner::RunnerAdmission;
-use n8nclone::engine::runner::RunnerDiagnosticCode;
-use n8nclone::engine::runner::RunnerEventKind;
-use n8nclone::engine::runner::RunnerEventSink;
-use n8nclone::engine::runner::RunnerStepAction;
-use n8nclone::engine::runner::RunnerStepState;
-use n8nclone::engine::runner::RuntimeBinding;
-use n8nclone::engine::runner::RuntimeInvocation;
-use n8nclone::engine::runner::RuntimeOutputShape;
-use n8nclone::engine::runner::RuntimeRegistry;
-use n8nclone::engine::runner::RuntimeResult;
-use n8nclone::engine::runner::admit_runner_plan;
-use n8nclone::engine::runner::admit_runtime_outputs;
-use n8nclone::engine::runner::artifact_reference_for_value;
-use n8nclone::engine::runner::bottlenecks;
-use n8nclone::engine::runner::build_runner_plan;
-use n8nclone::engine::runner::builtin_runtime_registry;
-use n8nclone::engine::runner::critical_path;
-use n8nclone::engine::runner::durable_runner_decision;
-use n8nclone::engine::runner::ready_nodes;
-use n8nclone::engine::runner::runner_event;
-use n8nclone::engine::runner::transition_step_state;
-use n8nclone::engine::runner::validate_runtime_bindings;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::NodeRunnerSettings;
-use n8nclone::engine::workflow::Workflow;
+use lattice::engine::runner::Bottleneck;
+use lattice::engine::runner::CapturingRunnerEventSink;
+use lattice::engine::runner::DurableRunnerDecision;
+use lattice::engine::runner::NodeRuntime;
+use lattice::engine::runner::RunnerAdmission;
+use lattice::engine::runner::RunnerDiagnosticCode;
+use lattice::engine::runner::RunnerEventKind;
+use lattice::engine::runner::RunnerEventSink;
+use lattice::engine::runner::RunnerStepAction;
+use lattice::engine::runner::RunnerStepState;
+use lattice::engine::runner::RuntimeBinding;
+use lattice::engine::runner::RuntimeInvocation;
+use lattice::engine::runner::RuntimeOutputShape;
+use lattice::engine::runner::RuntimeRegistry;
+use lattice::engine::runner::RuntimeResult;
+use lattice::engine::runner::admit_runner_plan;
+use lattice::engine::runner::admit_runtime_outputs;
+use lattice::engine::runner::artifact_reference_for_value;
+use lattice::engine::runner::bottlenecks;
+use lattice::engine::runner::build_runner_plan;
+use lattice::engine::runner::builtin_runtime_registry;
+use lattice::engine::runner::critical_path;
+use lattice::engine::runner::durable_runner_decision;
+use lattice::engine::runner::ready_nodes;
+use lattice::engine::runner::runner_event;
+use lattice::engine::runner::transition_step_state;
+use lattice::engine::runner::validate_runtime_bindings;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeRunnerSettings;
+use lattice::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -87,10 +87,7 @@ impl NodeRuntime for FakeRuntime {
         self.binding.clone()
     }
 
-    fn validate(
-        &self,
-        _node: &n8nclone::engine::runner::RunnerNode,
-    ) -> Vec<n8nclone::engine::runner::RunnerDiagnostic> {
+    fn validate(&self, _node: &lattice::engine::runner::RunnerNode) -> Vec<lattice::engine::runner::RunnerDiagnostic> {
         Vec::new()
     }
 

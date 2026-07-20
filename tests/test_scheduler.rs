@@ -2,23 +2,23 @@
 
 use std::collections::HashSet;
 
-use n8nclone::engine::RunId;
-use n8nclone::engine::Workflow;
-use n8nclone::headless::HeadlessRunStatus;
-use n8nclone::headless::HeadlessRunSummary;
-use n8nclone::scheduler::DueRunPlan;
-use n8nclone::scheduler::MissedRunPolicy;
-use n8nclone::scheduler::OverlapPolicy;
-use n8nclone::scheduler::RecurrenceRule;
-use n8nclone::scheduler::ScheduleDaemonOutcome;
-use n8nclone::scheduler::ScheduleDefinition;
-use n8nclone::scheduler::ScheduleDiagnosticCode;
-use n8nclone::scheduler::ScheduleSkipReason;
-use n8nclone::scheduler::ScheduledWorkflowRunner;
-use n8nclone::scheduler::evaluate_due_runs;
-use n8nclone::scheduler::run_due_plans;
-use n8nclone::scheduler::validate_schedule;
-use n8nclone::store::Store;
+use lattice::engine::RunId;
+use lattice::engine::Workflow;
+use lattice::headless::HeadlessRunStatus;
+use lattice::headless::HeadlessRunSummary;
+use lattice::scheduler::DueRunPlan;
+use lattice::scheduler::MissedRunPolicy;
+use lattice::scheduler::OverlapPolicy;
+use lattice::scheduler::RecurrenceRule;
+use lattice::scheduler::ScheduleDaemonOutcome;
+use lattice::scheduler::ScheduleDefinition;
+use lattice::scheduler::ScheduleDiagnosticCode;
+use lattice::scheduler::ScheduleSkipReason;
+use lattice::scheduler::ScheduledWorkflowRunner;
+use lattice::scheduler::evaluate_due_runs;
+use lattice::scheduler::run_due_plans;
+use lattice::scheduler::validate_schedule;
+use lattice::store::Store;
 use pretty_assertions::assert_eq;
 
 const SCHEDULE_ID: &str = "nightly";

@@ -4,25 +4,25 @@ mod common;
 
 use std::process::Command;
 
-use n8nclone::agent_node::AgentOutputMode;
-use n8nclone::agent_node::AgentTarget;
-use n8nclone::engine::runner::build_runner_plan;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::NodeRunnerSettings;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::store::Store;
-use n8nclone::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
-use n8nclone::workflow_format::PortableEdge;
-use n8nclone::workflow_format::WorkflowFormatError;
-use n8nclone::workflow_format::load_workflow_nickel_file;
-use n8nclone::workflow_format::portable_to_workflow;
-use n8nclone::workflow_format::workflow_to_nickel;
-use n8nclone::workflow_format::workflow_to_portable;
-use n8nclone::workflow_validation::validate_workflow;
+use lattice::agent_node::AgentOutputMode;
+use lattice::agent_node::AgentTarget;
+use lattice::engine::runner::build_runner_plan;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeRunnerSettings;
+use lattice::engine::workflow::Workflow;
+use lattice::store::Store;
+use lattice::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
+use lattice::workflow_format::PortableEdge;
+use lattice::workflow_format::WorkflowFormatError;
+use lattice::workflow_format::load_workflow_nickel_file;
+use lattice::workflow_format::portable_to_workflow;
+use lattice::workflow_format::workflow_to_nickel;
+use lattice::workflow_format::workflow_to_portable;
+use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
 
 const CONFIG_FILE_NAME: &str = "config.ncl";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const STORE_FILE_NAME: &str = "lattice.redb";
 const EXPORTED_WORKFLOW_FILE_NAME: &str = "workflow.ncl";
 const IMPORTED_WORKFLOW_FILE_NAME: &str = "imported.ncl";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
@@ -171,7 +171,7 @@ fn cli_export_then_import_saves_workflow() {
     drop(store);
 
     let export_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);
-    let export_output = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let export_output = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("export")
@@ -183,7 +183,7 @@ fn cli_export_then_import_saves_workflow() {
 
     let import_path = temp_dir.path().join(IMPORTED_WORKFLOW_FILE_NAME);
     std::fs::copy(&export_path, &import_path).expect("copy exported workflow");
-    let import_output = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let import_output = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("import")
@@ -204,7 +204,7 @@ fn cli_export_missing_workflow_writes_no_file() {
     let (config_path, _data_dir) = write_test_config(&temp_dir);
     let export_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("export")

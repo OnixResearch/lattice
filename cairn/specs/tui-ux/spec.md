@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the accepted user-experience contract for n8nclone's terminal workflow editor.
+Define the accepted user-experience contract for Lattice's terminal workflow editor.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ r[n8nclone.tui_ux.workspace] The system MUST provide a terminal workflow workspa
 #### Scenario: Workspace starts
 r[n8nclone.tui_ux.workspace.starts]
 - GIVEN a valid terminal environment
-- WHEN the user starts n8nclone
+- WHEN the user starts Lattice
 - THEN the system displays the workflow canvas, properties panel, output panel, and status bar
 
 ### Requirement: Keyboard-first operation

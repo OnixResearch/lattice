@@ -1,5 +1,5 @@
 [package]
-name = "n8nclone"
+name = "lattice"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
@@ -24,11 +24,11 @@ unicode-width = "0.2"
 unsafe_code = "forbid"
 
 [workspace.metadata.octet]
-default_scope = ["-p", "n8nclone"]
+default_scope = ["-p", "lattice"]
 cargo_check_args = ["--lib"]
 
 [[bin]]
-name = "n8nclone"
+name = "lattice"
 path = "src/main.rs"
 
 [dependencies]

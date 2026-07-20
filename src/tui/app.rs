@@ -895,7 +895,7 @@ impl App {
         let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
         let agent_runtime = config.agent_runtime.clone();
 
-        let store = match Store::new(config.data_dir.join("n8nclone.redb")) {
+        let store = match Store::new(crate::config::store_path(&config.data_dir)) {
             Ok(s) => Some(s),
             Err(e) => {
                 error!(error = %e, "failed to open database, running without persistence");

@@ -4,16 +4,16 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
-use n8nclone::config::DEFAULT_NODE_TEMPLATE_FILES;
-use n8nclone::config::NodeTemplate;
-use n8nclone::config::PortTemplate;
-use n8nclone::config::TemplateParameter;
-use n8nclone::config::TemplateParameterDefault;
-use n8nclone::config::TemplateParameterType;
-use n8nclone::config::TemplateRenderError;
-use n8nclone::config::load_node_templates_with_diagnostics;
-use n8nclone::config::render_template_command;
-use n8nclone::config::validate_template_parameters;
+use lattice::config::DEFAULT_NODE_TEMPLATE_FILES;
+use lattice::config::NodeTemplate;
+use lattice::config::PortTemplate;
+use lattice::config::TemplateParameter;
+use lattice::config::TemplateParameterDefault;
+use lattice::config::TemplateParameterType;
+use lattice::config::TemplateRenderError;
+use lattice::config::load_node_templates_with_diagnostics;
+use lattice::config::render_template_command;
+use lattice::config::validate_template_parameters;
 use pretty_assertions::assert_eq;
 
 const TEMPLATE_NAME: &str = "grep";
@@ -181,7 +181,7 @@ fn cli_init_writes_default_template_catalog() {
     let config_path = temp_dir.path().join(CONFIG_FILE_NAME);
     let templates_dir = temp_dir.path().join(TEMPLATES_DIR_NAME);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("--init")

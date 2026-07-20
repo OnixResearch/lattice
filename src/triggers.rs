@@ -23,6 +23,7 @@ const TYPE_TAG_JSON: &str = "json";
 const TYPE_TAG_ANY: &str = "any";
 const AUTH_HEADER_BEARER_PREFIX: &str = "Bearer ";
 const REDACTED_PAYLOAD_SUMMARY: &str = "[payload redacted]";
+// r[impl lattice.project_identity.stable-identities.scenario.webhook-domain]
 const TRIGGER_SIGNATURE_DOMAIN: &[u8] = b"n8nclone-webhook-signature:v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

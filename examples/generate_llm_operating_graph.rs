@@ -3,12 +3,12 @@
 use std::fs;
 use std::io;
 
-use n8nclone::agent_node::AgentOutputMode;
-use n8nclone::agent_node::AgentTarget;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::file_node::FileOperationKind;
-use n8nclone::workflow_format::workflow_to_nickel;
+use lattice::agent_node::AgentOutputMode;
+use lattice::agent_node::AgentTarget;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::file_node::FileOperationKind;
+use lattice::workflow_format::workflow_to_nickel;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 

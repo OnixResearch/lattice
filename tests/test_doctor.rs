@@ -3,18 +3,18 @@
 use std::path::Path;
 use std::process::Command;
 
-use n8nclone::credentials::SecretRef;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::scheduler::OverlapPolicy;
-use n8nclone::store::Store;
-use n8nclone::triggers::IdempotencyPolicy;
-use n8nclone::triggers::TriggerDefinition;
-use n8nclone::triggers::TriggerKind;
-use n8nclone::triggers::WebhookAuthPolicy;
-use n8nclone::triggers::WebhookTrigger;
+use lattice::credentials::SecretRef;
+use lattice::engine::workflow::Workflow;
+use lattice::scheduler::OverlapPolicy;
+use lattice::store::Store;
+use lattice::triggers::IdempotencyPolicy;
+use lattice::triggers::TriggerDefinition;
+use lattice::triggers::TriggerKind;
+use lattice::triggers::WebhookAuthPolicy;
+use lattice::triggers::WebhookTrigger;
 
 const CONFIG_FILE_NAME: &str = "config.ncl";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const STORE_FILE_NAME: &str = "lattice.redb";
 const DATA_DIR_NAME: &str = "data";
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
@@ -24,7 +24,7 @@ const DOCTOR_WEBHOOK_PATH: &str = "/hooks/doctor";
 const DOCTOR_WEBHOOK_METHOD: &str = "POST";
 const DOCTOR_CONTENT_TYPE: &str = "application/json";
 const DOCTOR_SECRET_PROVIDER: &str = "env";
-const MISSING_DOCTOR_SECRET_KEY: &str = "N8NCLONE_DOCTOR_TEST_TOKEN_SHOULD_NOT_EXIST";
+const MISSING_DOCTOR_SECRET_KEY: &str = "LATTICE_DOCTOR_TEST_TOKEN_SHOULD_NOT_EXIST";
 const SECRET_SENTINEL: &str = "super-secret-doctor-token";
 
 fn write_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
@@ -44,7 +44,7 @@ fn write_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path:
 }
 
 fn run_doctor(config_path: &Path, output: &str) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(config_path)
         .arg("doctor")

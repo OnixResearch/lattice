@@ -16,6 +16,7 @@ const SECRET_FIELD_SEPARATOR: &str = ".";
 const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 5;
 const DEFAULT_PROVIDER_OUTPUT_LIMIT_BYTES: usize = 4096;
 const SUCCESS_STATUS_CODE: i32 = 0;
+// r[impl lattice.project_identity.stable-identities]
 const VAULT_STREAM_HASH_TAG: &[u8] = b"n8nclone-local-vault-stream-v1";
 const VAULT_INTEGRITY_HASH_TAG: &[u8] = b"n8nclone-local-vault-integrity-v1";
 

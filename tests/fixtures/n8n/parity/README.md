@@ -4,11 +4,11 @@ This pack documents the tested n8n JSON compatibility subset.
 
 ## Supported fixtures
 
-- `supported/command-pipeline.json` maps Execute Command nodes and a main connection into a n8nclone shell pipeline.
+- `supported/command-pipeline.json` maps Execute Command nodes and a main connection into a Lattice shell pipeline.
 - `supported/http-credential-chain.json` maps an HTTP Request node with an opaque credential placeholder and a downstream Execute Command node.
 - `supported/default-http-method.json` maps an HTTP Request node that relies on the default GET method.
 
-Supported fixtures must import successfully, validate as n8nclone workflows, and produce deterministic mapping reports.
+Supported fixtures must import successfully, validate as Lattice workflows, and produce deterministic mapping reports.
 
 ## Unsupported fixtures
 

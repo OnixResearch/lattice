@@ -3,7 +3,7 @@ use std::io::Read;
 const RESPONSE_BUFFER_INITIAL_BYTES: u64 = 8_192;
 const CONTENT_TYPE_HEADER: &str = "content-type";
 const JSON_CONTENT_TYPE: &str = "application/json";
-const TRANSPORT_WORKER_NAME: &str = "n8nclone-openai-http";
+const TRANSPORT_WORKER_NAME: &str = "lattice-openai-http";
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ReqwestClient;

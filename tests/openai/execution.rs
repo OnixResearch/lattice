@@ -28,30 +28,30 @@ async fn executor_passes_resolved_node_credential_to_native_adapter() {
     credential_runtime.api_key_env = Some(API_KEY_BINDING.to_string());
     let transport = StaticTransport::new(Ok(response(Some(TEXT_CONTENT))));
     let adapter = adapter_with_transport(credential_runtime, transport.clone());
-    let provider = n8nclone::credentials::EnvironmentCredentialProvider::from_map(HashMap::from([(
+    let provider = lattice::credentials::EnvironmentCredentialProvider::from_map(HashMap::from([(
         API_KEY_REFERENCE.to_string(),
         API_KEY_VALUE.to_string(),
     )]));
-    let mut workflow = n8nclone::engine::workflow::Workflow::new("native-openai-credential");
+    let mut workflow = lattice::engine::workflow::Workflow::new("native-openai-credential");
     let node_id = workflow.add_agent_node("native-openai", AgentTarget::Pi, PROMPT, AgentOutputMode::Text);
-    workflow.set_node_credentials(node_id, n8nclone::credentials::NodeCredentialRefs {
+    workflow.set_node_credentials(node_id, lattice::credentials::NodeCredentialRefs {
         env: HashMap::from([(
             API_KEY_BINDING.to_string(),
-            n8nclone::credentials::SecretRef::new("env", API_KEY_REFERENCE, None),
+            lattice::credentials::SecretRef::new("env", API_KEY_REFERENCE, None),
         )]),
     });
-    let executor = n8nclone::engine::executor::Executor::new_with_runtime_clients(
+    let executor = lattice::engine::executor::Executor::new_with_runtime_clients(
         Box::new(provider),
-        Box::new(n8nclone::http::NoopHttpClient),
-        Box::new(n8nclone::file_node::NoopFileSystem),
-        Box::new(n8nclone::image_node::NoopImageIo),
+        Box::new(lattice::http::NoopHttpClient),
+        Box::new(lattice::file_node::NoopFileSystem),
+        Box::new(lattice::image_node::NoopImageIo),
         Box::new(adapter),
     );
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
     let calls = transport.calls();
 
-    assert!(matches!(result.status, n8nclone::engine::executor::NodeStatus::Completed { .. }));
+    assert!(matches!(result.status, lattice::engine::executor::NodeStatus::Completed { .. }));
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].bearer_token.as_deref(), Some(API_KEY_VALUE));
 }

@@ -4,12 +4,12 @@ mod common;
 
 use std::collections::HashMap;
 
-use n8nclone::engine::executor::Executor;
-use n8nclone::engine::executor::NodeStatus;
-use n8nclone::engine::executor::node_execution_cache_key;
-use n8nclone::engine::value::Value;
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
+use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
+use lattice::engine::executor::node_execution_cache_key;
+use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -188,7 +188,7 @@ fn add_custom_multi_input_shell_node(workflow: &mut Workflow, label: &str, comma
     node_id
 }
 
-fn step_status(results: &[n8nclone::engine::executor::StepResult], node_id: NodeId) -> &NodeStatus {
+fn step_status(results: &[lattice::engine::executor::StepResult], node_id: NodeId) -> &NodeStatus {
     &results.iter().find(|step| step.node_id == node_id).expect("step result missing").status
 }
 
@@ -316,7 +316,7 @@ async fn execute_timeout() {
     let mut wf = Workflow::new("timeout");
     let id = wf.add_shell_node("slow", "sleep 60");
     // Override timeout to 1 second.
-    wf.set_node_config(id, n8nclone::engine::workflow::NodeConfig::Shell {
+    wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
         command: "sleep 60".into(),
         cwd: None,
         env: HashMap::new(),
@@ -746,7 +746,7 @@ async fn input_hash_is_stable_across_runs() {
 async fn execute_with_env_vars() {
     let mut wf = Workflow::new("env-test");
     let id = wf.add_shell_node("env", "echo $MY_VAR");
-    wf.set_node_config(id, n8nclone::engine::workflow::NodeConfig::Shell {
+    wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
         command: "echo $MY_VAR".into(),
         cwd: None,
         env: [("MY_VAR".into(), "injected".into())].into(),
@@ -775,7 +775,7 @@ async fn execute_with_env_vars() {
 async fn execute_with_cwd() {
     let mut wf = Workflow::new("cwd-test");
     let id = wf.add_shell_node("pwd", "pwd");
-    wf.set_node_config(id, n8nclone::engine::workflow::NodeConfig::Shell {
+    wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
         command: "pwd".into(),
         cwd: Some("/tmp".into()),
         env: HashMap::new(),

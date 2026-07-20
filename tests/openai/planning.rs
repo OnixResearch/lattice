@@ -105,7 +105,7 @@ fn production_adapter_rejects_missing_or_ambiguous_routes_before_transport() {
     let mut ambiguous_config = runtime_registry(runtime());
     ambiguous_config
         .runtimes
-        .insert(PI_RUNTIME_KEY.to_string(), n8nclone::agent_node::AgentCommandRuntimeConfig {
+        .insert(PI_RUNTIME_KEY.to_string(), lattice::agent_node::AgentCommandRuntimeConfig {
             command: "pi".to_string(),
             args: Vec::new(),
         });

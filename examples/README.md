@@ -25,20 +25,20 @@ They are useful for demos, import/export validation, and headless regression tes
 Import and run one with a temporary config/store:
 
 ```bash
-n8nclone --config ./demo/config.ncl --init
-n8nclone --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
-n8nclone --config ./demo/config.ncl run daily-digest --output json
+lattice --config ./demo/config.ncl --init
+lattice --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
+lattice --config ./demo/config.ncl run daily-digest --output json
 ```
 
 ## Webhook cookbook
 
-`webhook-cookbook.ncl` demonstrates the webhook listener path without storing plaintext secret material in the workflow. The workflow references `env:N8NCLONE_WEBHOOK_TOKEN`; set that environment variable from your secret manager before dry-run or listener startup.
+`webhook-cookbook.ncl` demonstrates the webhook listener path without storing plaintext secret material in the workflow. The workflow references `env:LATTICE_WEBHOOK_TOKEN`; set that environment variable from your secret manager before dry-run or listener startup.
 
 ```bash
-n8nclone --config ./demo/config.ncl --init
-n8nclone --config ./demo/config.ncl import examples/workflows/webhook-cookbook.ncl
-N8NCLONE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" n8nclone --config ./demo/config.ncl webhook-listen --dry-run --bind 127.0.0.1:8787
-N8NCLONE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" n8nclone --config ./demo/config.ncl webhook-listen --bind 127.0.0.1:8787
+lattice --config ./demo/config.ncl --init
+lattice --config ./demo/config.ncl import examples/workflows/webhook-cookbook.ncl
+LATTICE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" lattice --config ./demo/config.ncl webhook-listen --dry-run --bind 127.0.0.1:8787
+LATTICE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" lattice --config ./demo/config.ncl webhook-listen --bind 127.0.0.1:8787
 ```
 
 Send an accepted request from another terminal by passing the same environment-backed token at runtime rather than writing it into the workflow:
@@ -64,6 +64,6 @@ curl -sS -X POST http://127.0.0.1:8787/hooks/missing \
 Inspect trigger state and safe history after requests:
 
 ```bash
-n8nclone --config ./demo/config.ncl triggers list
-n8nclone --config ./demo/config.ncl triggers history
+lattice --config ./demo/config.ncl triggers list
+lattice --config ./demo/config.ncl triggers history
 ```

@@ -2,15 +2,15 @@
 
 use std::process::Command;
 
-use n8nclone::engine::workflow::NodeConfig;
-use n8nclone::engine::workflow::Workflow;
-use n8nclone::file_node::FileOperationKind;
-use n8nclone::n8n_json::N8nDiagnosticCode;
-use n8nclone::n8n_json::export_workflow_to_n8n_json;
-use n8nclone::n8n_json::import_n8n_json_str;
-use n8nclone::n8n_json::report_to_pretty_json;
-use n8nclone::store::Store;
-use n8nclone::workflow_validation;
+use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::Workflow;
+use lattice::file_node::FileOperationKind;
+use lattice::n8n_json::N8nDiagnosticCode;
+use lattice::n8n_json::export_workflow_to_n8n_json;
+use lattice::n8n_json::import_n8n_json_str;
+use lattice::n8n_json::report_to_pretty_json;
+use lattice::store::Store;
+use lattice::workflow_validation;
 use pretty_assertions::assert_eq;
 
 const SHELL_FIXTURE: &str = include_str!("fixtures/n8n/shell.json");
@@ -37,7 +37,7 @@ const PARITY_PLAINTEXT_CREDENTIAL_FIXTURE: &str =
 const PARITY_MALFORMED_CONNECTION_FIXTURE: &str =
     include_str!("fixtures/n8n/parity/unsupported/malformed-connection.json");
 const CONFIG_FILE_NAME: &str = "config.ncl";
-const STORE_FILE_NAME: &str = "n8nclone.redb";
+const STORE_FILE_NAME: &str = "lattice.redb";
 const REPORT_FILE_NAME: &str = "n8n-report.json";
 const IMPORT_FILE_NAME: &str = "workflow.json";
 const EXPORT_FILE_NAME: &str = "exported.json";
@@ -143,11 +143,11 @@ const UNSUPPORTED_PARITY_FIXTURES: &[UnsupportedParityFixture] = &[
     },
 ];
 
-fn diagnostic_codes(result: &n8nclone::n8n_json::N8nImportResult) -> Vec<N8nDiagnosticCode> {
+fn diagnostic_codes(result: &lattice::n8n_json::N8nImportResult) -> Vec<N8nDiagnosticCode> {
     result.report.diagnostics.iter().map(|diagnostic| diagnostic.code).collect()
 }
 
-fn assert_report_matches_golden(actual: &n8nclone::n8n_json::N8nMappingReport, golden: &str) {
+fn assert_report_matches_golden(actual: &lattice::n8n_json::N8nMappingReport, golden: &str) {
     assert_eq!(report_to_pretty_json(actual), golden.trim_end());
 }
 
@@ -329,7 +329,7 @@ fn import_n8n_cli_persists_workflow_and_report() {
     let report_path = temp_dir.path().join(REPORT_FILE_NAME);
     std::fs::write(&import_path, SHELL_FIXTURE).expect("fixture written");
 
-    let status = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let status = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("import-n8n")
@@ -363,7 +363,7 @@ fn export_n8n_cli_writes_workflow_and_report() {
     let output_path = temp_dir.path().join(EXPORT_FILE_NAME);
     let report_path = temp_dir.path().join(REPORT_FILE_NAME);
 
-    let status = Command::new(env!("CARGO_BIN_EXE_n8nclone"))
+    let status = Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
         .arg(&config_path)
         .arg("export-n8n")
