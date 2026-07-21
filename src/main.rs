@@ -749,10 +749,7 @@ fn collect_webhook_listener_doctor_facts(triggers: &[TriggerDefinition], checks:
 }
 
 // r[impl lattice.agent_orchestration.cli]
-async fn run_orchestration_command(
-    app_config: &config::AppConfig,
-    args: &OrchestrationCommandArgs,
-) -> ExitCode {
+async fn run_orchestration_command(app_config: &config::AppConfig, args: &OrchestrationCommandArgs) -> ExitCode {
     let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => return orchestration_failure(&error),
@@ -775,23 +772,12 @@ async fn run_orchestration_command(
                 Err(error) => orchestration_failure(&error.to_string()),
             }
         }
-        OrchestrationCliCommand::Start {
-            path,
-            actor,
-            output,
-        } => {
+        OrchestrationCliCommand::Start { path, actor, output } => {
             let definition = match orchestration::load_definition_nickel_file(path) {
                 Ok(definition) => definition,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::start(
-                &store,
-                definition,
-                actor,
-                app_config.agent_runtime.clone(),
-            )
-            .await
-            {
+            match orchestration::start(&store, definition, actor, app_config.agent_runtime.clone()).await {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -834,15 +820,7 @@ async fn run_orchestration_command(
                 Ok(proposal) => proposal,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::approve(
-                &store,
-                instance,
-                proposal,
-                actor,
-                app_config.agent_runtime.clone(),
-            )
-            .await
-            {
+            match orchestration::approve(&store, instance, proposal, actor, app_config.agent_runtime.clone()).await {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -869,9 +847,7 @@ async fn run_orchestration_command(
         OrchestrationCliCommand::Recover { instance, output } => {
             match orchestration::recover_pending(&store, instance) {
                 Ok(outcome) => match output {
-                    OrchestrationOutputFormat::Text => {
-                        render_orchestration_output(&format!("{outcome:?}\n"))
-                    }
+                    OrchestrationOutputFormat::Text => render_orchestration_output(&format!("{outcome:?}\n")),
                     OrchestrationOutputFormat::Json => render_orchestration_json(&outcome),
                 },
                 Err(error) => orchestration_failure(&error.to_string()),

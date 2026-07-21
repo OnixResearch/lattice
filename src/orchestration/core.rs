@@ -30,6 +30,7 @@ const EVENT_SEQUENCE_INCREMENT: u64 = 1;
 const INSTANCE_VERSION_INCREMENT: u64 = 1;
 const EPOCH_INCREMENT: u64 = 1;
 const ROUND_INCREMENT: u64 = 1;
+const MAX_REPLAY_DIAGNOSTICS: usize = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -389,8 +390,8 @@ pub fn current_schema_version() -> u32 {
 
 // r[impl lattice.agent_orchestration.model]
 pub fn workflow_revision(workflow: &Workflow) -> Result<WorkflowRevisionRef, OrchestrationDiagnostic> {
-    let portable = crate::workflow_format::workflow_to_portable(workflow);
-    let content_hash = hash_serializable(WORKFLOW_HASH_LABEL, &portable)?;
+    let portable_workflow = crate::workflow_format::workflow_to_portable(workflow);
+    let content_hash = hash_serializable(WORKFLOW_HASH_LABEL, &portable_workflow)?;
     Ok(WorkflowRevisionRef {
         workflow_name: workflow.meta.name.clone(),
         content_hash,
@@ -448,10 +449,8 @@ pub fn validate_definition(
         ));
     }
     if definition.objective.trim().is_empty() {
-        diagnostics.push(diagnostic(
-            OrchestrationDiagnosticCode::EmptyObjective,
-            "orchestration objective cannot be empty",
-        ));
+        diagnostics
+            .push(diagnostic(OrchestrationDiagnosticCode::EmptyObjective, "orchestration objective cannot be empty"));
     }
     validate_workflow_ref(&definition.workflow, &mut diagnostics);
     validate_actual_workflow_revision(definition, actual_workflow_revision, &mut diagnostics);
@@ -463,10 +462,8 @@ pub fn validate_definition(
 
 fn validate_workflow_ref(reference: &WorkflowRevisionRef, diagnostics: &mut Vec<OrchestrationDiagnostic>) {
     if reference.workflow_name.trim().is_empty() {
-        diagnostics.push(diagnostic(
-            OrchestrationDiagnosticCode::EmptyWorkflowName,
-            "workflow revision name cannot be empty",
-        ));
+        diagnostics
+            .push(diagnostic(OrchestrationDiagnosticCode::EmptyWorkflowName, "workflow revision name cannot be empty"));
     }
     if !is_blake3_hex(&reference.content_hash) {
         diagnostics.push(diagnostic(
@@ -511,10 +508,7 @@ fn validate_authority_policy(policy: &AuthorityPolicy, diagnostics: &mut Vec<Orc
     }
 }
 
-fn validate_trigger_bindings(
-    bindings: &[OrchestrationTriggerBinding],
-    diagnostics: &mut Vec<OrchestrationDiagnostic>,
-) {
+fn validate_trigger_bindings(bindings: &[OrchestrationTriggerBinding], diagnostics: &mut Vec<OrchestrationDiagnostic>) {
     let mut ids = BTreeSet::new();
     for binding in bindings {
         if binding.trigger_id.trim().is_empty() {
@@ -638,16 +632,13 @@ pub fn transition(
         });
     }
     if fact.id.trim().is_empty() {
-        return Err(diagnostic(
-            OrchestrationDiagnosticCode::InvalidIdentity,
-            "orchestration fact id cannot be empty",
-        ));
+        return Err(diagnostic(OrchestrationDiagnosticCode::InvalidIdentity, "orchestration fact id cannot be empty"));
     }
     reject_terminal_mutation(instance)?;
     let mut next = instance.clone();
     let kind = apply_action(&mut next, &fact.action)?;
-    let inserted = next.accepted_fact_ids.insert(fact.id.clone());
-    debug_assert!(inserted);
+    let is_inserted = next.accepted_fact_ids.insert(fact.id.clone());
+    debug_assert!(is_inserted);
     next.version = next.version.saturating_add(INSTANCE_VERSION_INCREMENT);
     let event = build_event(instance, &next, kind, fact)?;
     next.last_event_sequence = Some(event.sequence);
@@ -674,10 +665,7 @@ fn apply_action(
     action: &OrchestrationAction,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     match action {
-        OrchestrationAction::StartRound {
-            intent,
-            planned_charge,
-        } => start_round(instance, intent, *planned_charge),
+        OrchestrationAction::StartRound { intent, planned_charge } => start_round(instance, intent, *planned_charge),
         OrchestrationAction::DispatchAcknowledged { dispatch_id } => acknowledge_dispatch(instance, dispatch_id),
         OrchestrationAction::RunFinished {
             dispatch_id,
@@ -752,11 +740,7 @@ fn finish_run(
     let settlement = settle_budget(&mut instance.budgets, dispatch_id, observed_usage)?;
     instance.active_run_id = None;
     instance.pending_dispatch = None;
-    instance.terminal_summary = instance
-        .definition
-        .redaction
-        .retain_safe_summaries
-        .then(|| safe_summary.to_string());
+    instance.terminal_summary = instance.definition.redaction.retain_safe_summaries.then(|| safe_summary.to_string());
     let kind = if succeeded {
         OrchestrationEventKind::RoundCompleted
     } else {
@@ -808,10 +792,7 @@ fn decide_proposal(
         return Err(invalid_transition("proposal decisions require waiting-for-approval state"));
     }
     let proposal = instance.pending_proposal.clone().ok_or_else(|| {
-        diagnostic(
-            OrchestrationDiagnosticCode::ProposalMismatch,
-            "no proposal is pending for approval",
-        )
+        diagnostic(OrchestrationDiagnosticCode::ProposalMismatch, "no proposal is pending for approval")
     })?;
     validate_approval(instance, &proposal, approval)?;
     if !approval.approved {
@@ -841,10 +822,7 @@ fn reject_proposal(
         return Err(invalid_transition("proposal rejection requires waiting-for-approval state"));
     }
     let proposal = instance.pending_proposal.as_ref().ok_or_else(|| {
-        diagnostic(
-            OrchestrationDiagnosticCode::ProposalMismatch,
-            "no proposal is pending for rejection",
-        )
+        diagnostic(OrchestrationDiagnosticCode::ProposalMismatch, "no proposal is pending for rejection")
     })?;
     if proposal.id != proposal_id {
         return Err(diagnostic(
@@ -856,10 +834,7 @@ fn reject_proposal(
     Ok(OrchestrationEventKind::ProposalRejected)
 }
 
-fn pause(
-    instance: &mut OrchestrationInstance,
-    actor: &str,
-) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
+fn pause(instance: &mut OrchestrationInstance, actor: &str) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     authorize_actor(instance, actor)?;
     if instance.pause_requested || instance.status == OrchestrationStatus::Paused {
         return Err(invalid_transition("orchestration instance is already paused"));
@@ -910,9 +885,7 @@ fn observe_cancellation(
     cancelled: bool,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     if !instance.cancellation_requested || instance.active_run_id != Some(run_id) {
-        return Err(invalid_transition(
-            "cancellation observation does not match an active cancellation request",
-        ));
+        return Err(invalid_transition("cancellation observation does not match an active cancellation request"));
     }
     if cancelled {
         instance.status = OrchestrationStatus::Cancelled;
@@ -930,11 +903,7 @@ fn exhaust_budget(
         return Err(invalid_transition("budget exhaustion cannot erase an active runner observation"));
     }
     instance.status = OrchestrationStatus::Exhausted;
-    instance.terminal_summary = instance
-        .definition
-        .redaction
-        .retain_safe_summaries
-        .then(|| safe_reason.to_string());
+    instance.terminal_summary = instance.definition.redaction.retain_safe_summaries.then(|| safe_reason.to_string());
     Ok(OrchestrationEventKind::BudgetExhausted)
 }
 
@@ -1034,16 +1003,12 @@ fn matching_dispatch_mut<'a>(
     instance: &'a mut OrchestrationInstance,
     dispatch_id: &str,
 ) -> Result<&'a mut DispatchIntent, OrchestrationDiagnostic> {
-    instance
-        .pending_dispatch
-        .as_mut()
-        .filter(|intent| intent.id == dispatch_id)
-        .ok_or_else(|| {
-            diagnostic(
-                OrchestrationDiagnosticCode::DispatchMismatch,
-                "dispatch identity does not match the pending orchestration dispatch",
-            )
-        })
+    instance.pending_dispatch.as_mut().filter(|intent| intent.id == dispatch_id).ok_or_else(|| {
+        diagnostic(
+            OrchestrationDiagnosticCode::DispatchMismatch,
+            "dispatch identity does not match the pending orchestration dispatch",
+        )
+    })
 }
 
 // r[impl lattice.agent_orchestration.budgets]
@@ -1063,13 +1028,10 @@ pub fn reserve_budget(
     let committed = checked_add_charge(ledger.consumed, reserved)?;
     let requested = checked_add_charge(committed, charge)?;
     ensure_within_limits(&ledger.policy, requested)?;
-    ledger.reservations.insert(
-        reservation_id.to_string(),
-        BudgetReservation {
-            reservation_id: reservation_id.to_string(),
-            charge,
-        },
-    );
+    ledger.reservations.insert(reservation_id.to_string(), BudgetReservation {
+        reservation_id: reservation_id.to_string(),
+        charge,
+    });
     Ok(charge)
 }
 
@@ -1089,9 +1051,9 @@ pub fn settle_budget(
             "budget settlement does not match a pending reservation",
         )
     })?;
-    let breached = charge_exceeds(observed, reservation.charge);
+    let is_breached = charge_exceeds(observed, reservation.charge);
     ledger.consumed = checked_add_charge(ledger.consumed, observed)?;
-    if breached || ensure_within_limits(&ledger.policy, ledger.consumed).is_err() {
+    if is_breached || ensure_within_limits(&ledger.policy, ledger.consumed).is_err() {
         ledger.breached = true;
     }
     Ok(BudgetSettlement {
@@ -1099,10 +1061,7 @@ pub fn settle_budget(
     })
 }
 
-fn admitted_charge(
-    policy: &BudgetPolicy,
-    plan: BudgetChargePlan,
-) -> Result<BudgetCharge, OrchestrationDiagnostic> {
+fn admitted_charge(policy: &BudgetPolicy, plan: BudgetChargePlan) -> Result<BudgetCharge, OrchestrationDiagnostic> {
     Ok(BudgetCharge {
         rounds: admitted_dimension(policy.enforced.rounds, plan.rounds, "rounds")?,
         agent_invocations: admitted_dimension(
@@ -1124,11 +1083,7 @@ fn admitted_charge(
     })
 }
 
-fn admitted_dimension(
-    enforced: bool,
-    planned: Option<u64>,
-    label: &str,
-) -> Result<u64, OrchestrationDiagnostic> {
+fn admitted_dimension(enforced: bool, planned: Option<u64>, label: &str) -> Result<u64, OrchestrationDiagnostic> {
     if enforced {
         planned.ok_or_else(|| {
             diagnostic(
@@ -1141,18 +1096,13 @@ fn admitted_dimension(
     }
 }
 
-fn total_reserved(
-    reservations: &BTreeMap<String, BudgetReservation>,
-) -> Result<BudgetCharge, OrchestrationDiagnostic> {
+fn total_reserved(reservations: &BTreeMap<String, BudgetReservation>) -> Result<BudgetCharge, OrchestrationDiagnostic> {
     reservations
         .values()
         .try_fold(BudgetCharge::default(), |total, reservation| checked_add_charge(total, reservation.charge))
 }
 
-fn checked_add_charge(
-    left: BudgetCharge,
-    right: BudgetCharge,
-) -> Result<BudgetCharge, OrchestrationDiagnostic> {
+fn checked_add_charge(left: BudgetCharge, right: BudgetCharge) -> Result<BudgetCharge, OrchestrationDiagnostic> {
     Ok(BudgetCharge {
         rounds: checked_add_dimension(left.rounds, right.rounds, "rounds")?,
         agent_invocations: checked_add_dimension(left.agent_invocations, right.agent_invocations, "agent invocations")?,
@@ -1168,10 +1118,7 @@ fn checked_add_charge(
 
 fn checked_add_dimension(left: u64, right: u64, label: &str) -> Result<u64, OrchestrationDiagnostic> {
     left.checked_add(right).ok_or_else(|| {
-        diagnostic(
-            OrchestrationDiagnosticCode::BudgetOverflow,
-            format!("{label} budget accounting overflowed"),
-        )
+        diagnostic(OrchestrationDiagnosticCode::BudgetOverflow, format!("{label} budget accounting overflowed"))
     })
 }
 
@@ -1200,10 +1147,7 @@ fn ensure_within_limits(policy: &BudgetPolicy, charge: BudgetCharge) -> Result<(
 
 fn ensure_dimension(enforced: bool, value: u64, limit: u64, label: &str) -> Result<(), OrchestrationDiagnostic> {
     if enforced && value > limit {
-        Err(diagnostic(
-            OrchestrationDiagnosticCode::BudgetExceeded,
-            format!("{label} budget is exhausted"),
-        ))
+        Err(diagnostic(OrchestrationDiagnosticCode::BudgetExceeded, format!("{label} budget is exhausted")))
     } else {
         Ok(())
     }
@@ -1261,7 +1205,7 @@ pub fn replay_events(
     expected_head: Option<&str>,
 ) -> ReplayReport {
     let mut instance = initial.clone();
-    let mut diagnostics = Vec::new();
+    let mut diagnostics = Vec::with_capacity(MAX_REPLAY_DIAGNOSTICS);
     for recorded in events {
         match transition(&instance, recorded.fact.clone()) {
             Ok(transition) => {
@@ -1275,7 +1219,10 @@ pub fn replay_events(
                 if generated != *recorded {
                     diagnostics.push(diagnostic(
                         OrchestrationDiagnosticCode::ReplayMismatch,
-                        format!("orchestration event sequence {} does not match deterministic replay", recorded.sequence),
+                        format!(
+                            "orchestration event sequence {} does not match deterministic replay",
+                            recorded.sequence
+                        ),
                     ));
                     break;
                 }
@@ -1290,7 +1237,7 @@ pub fn replay_events(
             }
         }
     }
-    if diagnostics.is_empty() && instance.event_head.as_deref() != expected_head {
+    if replay_head_mismatch(&diagnostics, instance.event_head.as_deref(), expected_head) {
         diagnostics.push(diagnostic(
             OrchestrationDiagnosticCode::ReplayHeadMismatch,
             "orchestration event chain does not match the supplied current head or checkpoint",
@@ -1329,15 +1276,24 @@ pub fn admit_trigger_start(
             instance_id: instance_id.clone(),
         });
     }
-    let instance_id = hash_serializable(
-        INSTANCE_HASH_LABEL,
-        &(definition_revision, next_sequence, Some(scoped_key.as_str())),
-    )?;
+    let instance_id =
+        hash_serializable(INSTANCE_HASH_LABEL, &(definition_revision, next_sequence, Some(scoped_key.as_str())))?;
     Ok(OrchestrationTriggerAdmission::Accepted(OrchestrationTriggerPlan {
         scoped_key,
         instance_id,
         definition_revision: definition_revision.to_string(),
     }))
+}
+
+fn replay_head_mismatch(
+    diagnostics: &[OrchestrationDiagnostic],
+    actual_head: Option<&str>,
+    expected_head: Option<&str>,
+) -> bool {
+    if !diagnostics.is_empty() {
+        return false;
+    }
+    actual_head != expected_head
 }
 
 pub fn scoped_trigger_key(
@@ -1386,10 +1342,7 @@ pub fn make_approval(
     Ok(approval)
 }
 
-pub fn dispatch_identity(
-    instance: &OrchestrationInstance,
-    run_id: RunId,
-) -> Result<String, OrchestrationDiagnostic> {
+pub fn dispatch_identity(instance: &OrchestrationInstance, run_id: RunId) -> Result<String, OrchestrationDiagnostic> {
     hash_serializable(
         INSTANCE_HASH_LABEL,
         &(
@@ -1442,10 +1395,7 @@ fn next_action(instance: &OrchestrationInstance) -> &'static str {
     }
 }
 
-fn hash_serializable<T: Serialize + ?Sized>(
-    label: &[u8],
-    value: &T,
-) -> Result<String, OrchestrationDiagnostic> {
+fn hash_serializable<T: Serialize + ?Sized>(label: &[u8], value: &T) -> Result<String, OrchestrationDiagnostic> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         diagnostic(
             OrchestrationDiagnosticCode::SerializationFailure,
@@ -1460,7 +1410,10 @@ fn hash_serializable<T: Serialize + ?Sized>(
 }
 
 fn is_blake3_hex(value: &str) -> bool {
-    value.len() == blake3::OUT_LEN * HEX_CHARS_PER_BYTE && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    let Some(expected_length) = blake3::OUT_LEN.checked_mul(HEX_CHARS_PER_BYTE) else {
+        return false;
+    };
+    value.len() == expected_length && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn invalid_transition(message: impl Into<String>) -> OrchestrationDiagnostic {

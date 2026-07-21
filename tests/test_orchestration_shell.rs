@@ -103,14 +103,10 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     let workflow = workflow(FIRST_WORKFLOW_NAME);
     store.save_workflow(&workflow).expect("workflow must persist");
 
-    let instance = start(
-        &store,
-        definition(&workflow, CompletionPolicy::RunSucceeded),
-        ACTOR,
-        AgentRuntimeConfig::default(),
-    )
-    .await
-    .expect("orchestration must run");
+    let instance =
+        start(&store, definition(&workflow, CompletionPolicy::RunSucceeded), ACTOR, AgentRuntimeConfig::default())
+            .await
+            .expect("orchestration must run");
 
     assert_eq!(instance.status, OrchestrationStatus::Completed);
     assert_eq!(instance.round, FIRST_SEQUENCE);
@@ -145,14 +141,10 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
     let second = workflow(SECOND_WORKFLOW_NAME);
     store.save_workflow(&first).expect("first workflow must persist");
     store.save_workflow(&second).expect("second workflow must persist");
-    let waiting = start(
-        &store,
-        definition(&first, CompletionPolicy::AwaitProposal),
-        ACTOR,
-        AgentRuntimeConfig::default(),
-    )
-    .await
-    .expect("first round must run");
+    let waiting =
+        start(&store, definition(&first, CompletionPolicy::AwaitProposal), ACTOR, AgentRuntimeConfig::default())
+            .await
+            .expect("first round must run");
     assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
 
     let proposal = make_proposal(
@@ -161,15 +153,9 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
         "operator-reviewed successor",
     )
     .expect("proposal must hash");
-    let advanced = approve(
-        &store,
-        &waiting.id,
-        proposal,
-        ACTOR,
-        AgentRuntimeConfig::default(),
-    )
-    .await
-    .expect("approved successor must run");
+    let advanced = approve(&store, &waiting.id, proposal, ACTOR, AgentRuntimeConfig::default())
+        .await
+        .expect("approved successor must run");
 
     assert_eq!(advanced.status, OrchestrationStatus::WaitingForApproval);
     assert_eq!(advanced.round, ROUND_LIMIT);
@@ -184,9 +170,7 @@ async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     let workflow = workflow(FIRST_WORKFLOW_NAME);
     let definition = definition(&workflow, CompletionPolicy::RunSucceeded);
     store.save_workflow(&workflow).expect("workflow must persist");
-    store
-        .save_orchestration_definition(&definition)
-        .expect("definition must persist");
+    store.save_orchestration_definition(&definition).expect("definition must persist");
 
     let first = start_from_trigger(
         &store,
@@ -239,13 +223,10 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
             duration_millis: Some(0),
         },
     };
-    let started = transition(
-        &base,
-        OrchestrationFact {
-            id: fact_identity(&base.id, base.version, &action).expect("fact must hash"),
-            action,
-        },
-    )
+    let started = transition(&base, OrchestrationFact {
+        id: fact_identity(&base.id, base.version, &action).expect("fact must hash"),
+        action,
+    })
     .expect("start must apply");
     store
         .create_orchestration(
@@ -280,9 +261,7 @@ async fn unbound_trigger_fails_without_instance_or_run() {
     let workflow = workflow(FIRST_WORKFLOW_NAME);
     let definition = definition(&workflow, CompletionPolicy::RunSucceeded);
     store.save_workflow(&workflow).expect("workflow must persist");
-    store
-        .save_orchestration_definition(&definition)
-        .expect("definition must persist");
+    store.save_orchestration_definition(&definition).expect("definition must persist");
 
     let error = start_from_trigger(
         &store,

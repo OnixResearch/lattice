@@ -78,11 +78,8 @@ fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathB
         },
     };
     let definition_path = directory.path().join(DEFINITION_FILE_NAME);
-    std::fs::write(
-        &definition_path,
-        definition_to_nickel(&definition).expect("definition must render"),
-    )
-    .expect("definition must write");
+    std::fs::write(&definition_path, definition_to_nickel(&definition).expect("definition must render"))
+        .expect("definition must write");
     (directory, config_path, definition_path, store)
 }
 
@@ -105,11 +102,7 @@ fn cli_validates_starts_and_reports_json_status() {
         .arg("json")
         .output()
         .expect("validate command must execute");
-    assert!(
-        validation.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&validation.stderr)
-    );
+    assert!(validation.status.success(), "stderr: {}", String::from_utf8_lossy(&validation.stderr));
 
     let start = command(&config_path)
         .arg("start")
@@ -210,14 +203,8 @@ fn unauthorized_start_fails_without_persisting_an_instance() {
 
     assert!(!output.status.success());
     assert!(!String::from_utf8_lossy(&output.stderr).contains("plaintext"));
-    let reopened = Store::new(
-        config_path
-            .parent()
-            .expect("config has parent")
-            .join("data")
-            .join(STORE_FILE_NAME),
-    )
-    .expect("store must reopen");
+    let reopened = Store::new(config_path.parent().expect("config has parent").join("data").join(STORE_FILE_NAME))
+        .expect("store must reopen");
     assert!(reopened.list_orchestrations().expect("instances must list").is_empty());
 }
 

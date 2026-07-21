@@ -25,4 +25,13 @@
 ## Phase 5: Compatibility and verification
 
 - [x] [serial] Add a runnable positive multi-round agent example and negative fixtures for hidden cycles, stale approvals, authority escalation, revision drift, budget exhaustion, duplicate triggers, crash recovery, and replay tampering. r[lattice.agent_orchestration.rounds] r[lattice.agent_orchestration.authority] r[lattice.agent_orchestration.budgets] r[lattice.agent_orchestration.durability] r[lattice.agent_orchestration.events]
-- [ ] [serial] Verify existing workflows, n8n parity fixtures, schedules, webhooks, replay, and the LLM operating graph remain compatible; run `scripts/check.rs`, Octet, Cairn gates/validation, and bounded Nix checks before sync/archive. r[lattice.agent_orchestration.format] r[lattice.agent_orchestration.triggers] r[lattice.agent_orchestration.cli]
+- [x] [serial] Verify existing workflows, n8n parity fixtures, schedules, webhooks, replay, and the LLM operating graph remain compatible; run `scripts/check.rs`, Octet, Cairn gates/validation, and bounded Nix checks before sync/archive. r[lattice.agent_orchestration.format] r[lattice.agent_orchestration.triggers] r[lattice.agent_orchestration.cli]
+
+## Verification evidence
+
+- `scripts/check.rs` passed formatting, the full default-member test suite, Clippy with warnings denied, and Cairn spec-reference checks.
+- Focused orchestration core, format, store, shell, CLI, trigger, recovery, replay, and LLM operating-graph tests passed with positive and negative paths.
+- `octet-precommit-check` passed with 922 accepted findings, 922 current accepted findings, zero new findings, zero stale findings, and baseline hash `b3:8014a22a28888a4c6eb6b221b95ca99058adb479ad6c93b61c8c045f3d9cddbe`.
+- The Octet baseline review retained repository-wide accepted lint classes for the new orchestration surface while concrete raw-arithmetic, ambiguous-boolean, compound replay-condition, and replay-allocation findings were corrected. Baseline acceptance records reviewed source-shape debt; it does not prove semantic correctness or release eligibility.
+- Cairn lifecycle validation and the proposal, design, and tasks gates passed using the canonical sibling Cairn CLI.
+- `nix flake check -L --option secret-key-files ''` passed all bounded repository checks on `x86_64-linux`; incompatible systems were not evaluated.

@@ -72,11 +72,8 @@ fn typed_nickel_definition_round_trip_preserves_meaning() {
     let directory = tempdir().expect("temporary directory must exist");
     let path = directory.path().join("orchestration.ncl");
     let expected = definition();
-    std::fs::write(
-        &path,
-        definition_to_nickel(&expected).expect("definition must render"),
-    )
-    .expect("definition must write");
+    std::fs::write(&path, definition_to_nickel(&expected).expect("definition must render"))
+        .expect("definition must write");
 
     let loaded = load_definition_nickel_file(&path).expect("rendered Nickel must load");
 
@@ -91,8 +88,7 @@ fn proposal_nickel_round_trip_preserves_hash_bound_identity() {
     let instance = new_instance(definition(), FIRST_SEQUENCE, None).expect("instance must hash");
     let successor = workflow_revision(&Workflow::new(SUCCESSOR_NAME)).expect("successor must hash");
     let expected = make_proposal(&instance, successor, "bounded successor").expect("proposal must hash");
-    std::fs::write(&path, proposal_to_nickel(&expected).expect("proposal must render"))
-        .expect("proposal must write");
+    std::fs::write(&path, proposal_to_nickel(&expected).expect("proposal must render")).expect("proposal must write");
 
     let loaded = load_proposal_nickel_file(&path).expect("proposal must load");
 

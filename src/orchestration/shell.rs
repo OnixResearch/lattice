@@ -91,11 +91,9 @@ impl fmt::Display for OrchestrationShellError {
             Self::MissingInstance(id) => write!(formatter, "orchestration instance not found: {id}"),
             Self::MissingProposal(id) => write!(formatter, "orchestration proposal not found: {id}"),
             Self::InvalidProposal(message) => write!(formatter, "orchestration proposal is invalid: {message}"),
-            Self::ReplayInvalid(report) => write!(
-                formatter,
-                "orchestration replay is invalid: {} diagnostics",
-                report.diagnostics.len()
-            ),
+            Self::ReplayInvalid(report) => {
+                write!(formatter, "orchestration replay is invalid: {} diagnostics", report.diagnostics.len())
+            }
         }
     }
 }
@@ -130,10 +128,7 @@ pub fn validate_definition_in_store(
     Ok(validation_report(definition, workflow.as_ref()))
 }
 
-fn validation_report(
-    definition: &OrchestrationDefinition,
-    workflow: Option<&Workflow>,
-) -> DefinitionValidationReport {
+fn validation_report(definition: &OrchestrationDefinition, workflow: Option<&Workflow>) -> DefinitionValidationReport {
     let workflow_revision = workflow.and_then(|workflow| core::workflow_revision(workflow).ok());
     let orchestration_diagnostics = core::validate_definition(definition, workflow_revision.as_ref());
     let workflow_diagnostics = workflow.map_or_else(Vec::new, workflow_validation::validate_workflow);
@@ -182,10 +177,7 @@ pub async fn start_from_trigger(
         return Err(OrchestrationShellError::DefinitionInvalid(Box::new(report)));
     }
     let definition_revision = core::definition_revision(&definition)?;
-    let accepted = store
-        .list_orchestration_trigger_admissions()?
-        .into_iter()
-        .collect::<BTreeMap<_, _>>();
+    let accepted = store.list_orchestration_trigger_admissions()?.into_iter().collect::<BTreeMap<_, _>>();
     let sequence = store.next_orchestration_sequence()?;
     let admission = core::admit_trigger_start(
         &definition,
@@ -236,51 +228,31 @@ async fn execute_ready_round(
                 OrchestrationDiagnosticCode::BudgetExceeded | OrchestrationDiagnosticCode::MissingBudgetBound
             ) =>
         {
-            return apply_and_commit(
-                store,
-                &instance,
-                OrchestrationAction::BudgetExhausted {
-                    safe_reason: error.message,
-                },
-            );
+            return apply_and_commit(store, &instance, OrchestrationAction::BudgetExhausted {
+                safe_reason: error.message,
+            });
         }
         Err(error) => return Err(error),
     };
-    let acknowledged = apply_and_commit(
-        store,
-        &started,
-        OrchestrationAction::DispatchAcknowledged {
-            dispatch_id: intent.id.clone(),
-        },
-    )?;
+    let acknowledged = apply_and_commit(store, &started, OrchestrationAction::DispatchAcknowledged {
+        dispatch_id: intent.id.clone(),
+    })?;
 
-    let result = headless::run_saved_workflow_with_agent_runtime_config(
-        store,
-        &workflow.meta.name,
-        run_id,
-        agent_runtime,
-    )
-    .await;
+    let result =
+        headless::run_saved_workflow_with_agent_runtime_config(store, &workflow.meta.name, run_id, agent_runtime).await;
     let current = load_instance(store, &acknowledged.id)?;
     let (succeeded, summary) = match result {
-        Ok(summary) => (
-            summary.status == HeadlessRunStatus::Succeeded,
-            safe_run_summary(&summary),
-        ),
+        Ok(summary) => (summary.status == HeadlessRunStatus::Succeeded, safe_run_summary(&summary)),
         Err(error) => (false, format!("round execution failed: {error}")),
     };
     let observed_usage = observed_usage(&current, &intent.id).unwrap_or_default();
-    apply_and_commit(
-        store,
-        &current,
-        OrchestrationAction::RunFinished {
-            dispatch_id: intent.id,
-            run_id,
-            succeeded,
-            observed_usage,
-            safe_summary: summary,
-        },
-    )
+    apply_and_commit(store, &current, OrchestrationAction::RunFinished {
+        dispatch_id: intent.id,
+        run_id,
+        succeeded,
+        observed_usage,
+        safe_summary: summary,
+    })
 }
 
 fn load_validated_workflow(
@@ -299,14 +271,12 @@ fn load_validated_workflow(
     }
     let diagnostics = workflow_validation::validate_workflow(&workflow);
     if workflow_validation::has_fatal_diagnostics(&diagnostics) {
-        return Err(OrchestrationShellError::DefinitionInvalid(Box::new(
-            DefinitionValidationReport {
-                definition_revision: None,
-                workflow_revision: Some(actual),
-                orchestration_diagnostics: Vec::new(),
-                workflow_diagnostics: diagnostics,
-            },
-        )));
+        return Err(OrchestrationShellError::DefinitionInvalid(Box::new(DefinitionValidationReport {
+            definition_revision: None,
+            workflow_revision: Some(actual),
+            orchestration_diagnostics: Vec::new(),
+            workflow_diagnostics: diagnostics,
+        })));
     }
     let build = runner::build_runner_plan(&workflow);
     let Some(plan) = build.plan else {
@@ -326,11 +296,7 @@ fn planned_charge(
     definition: &OrchestrationDefinition,
     workflow: &Workflow,
 ) -> Result<BudgetChargePlan, OrchestrationShellError> {
-    let agent_count = workflow
-        .configs
-        .values()
-        .filter(|config| matches!(config, NodeConfig::Agent(_)))
-        .count();
+    let agent_count = workflow.configs.values().filter(|config| matches!(config, NodeConfig::Agent(_))).count();
     let agent_invocations = u64::try_from(agent_count).map_err(|_| {
         OrchestrationShellError::Core(OrchestrationDiagnostic {
             code: OrchestrationDiagnosticCode::BudgetOverflow,
@@ -348,22 +314,13 @@ fn planned_charge(
 }
 
 fn observed_usage(instance: &OrchestrationInstance, dispatch_id: &str) -> Option<BudgetCharge> {
-    instance
-        .budgets
-        .reservations
-        .get(dispatch_id)
-        .map(|reservation| reservation.charge)
+    instance.budgets.reservations.get(dispatch_id).map(|reservation| reservation.charge)
 }
 
 fn safe_run_summary(summary: &headless::HeadlessRunSummary) -> String {
     format!(
         "workflow {} run {} status {:?}: {} nodes, {} failures, {} cache hits",
-        summary.workflow_name,
-        summary.run_id,
-        summary.status,
-        summary.node_count,
-        summary.failures,
-        summary.cache_hits
+        summary.workflow_name, summary.run_id, summary.status, summary.node_count, summary.failures, summary.cache_hits
     )
 }
 
@@ -388,51 +345,27 @@ fn apply_and_commit(
 }
 
 // r[impl lattice.agent_orchestration.controls]
-pub fn pause(
-    store: &Store,
-    instance_id: &str,
-    actor: &str,
-) -> Result<OrchestrationInstance, OrchestrationShellError> {
+pub fn pause(store: &Store, instance_id: &str, actor: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
-    apply_and_commit(
-        store,
-        &instance,
-        OrchestrationAction::PauseRequested {
-            actor: actor.to_string(),
-        },
-    )
+    apply_and_commit(store, &instance, OrchestrationAction::PauseRequested {
+        actor: actor.to_string(),
+    })
 }
 
 // r[impl lattice.agent_orchestration.controls]
-pub fn resume(
-    store: &Store,
-    instance_id: &str,
-    actor: &str,
-) -> Result<OrchestrationInstance, OrchestrationShellError> {
+pub fn resume(store: &Store, instance_id: &str, actor: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
-    apply_and_commit(
-        store,
-        &instance,
-        OrchestrationAction::ResumeRequested {
-            actor: actor.to_string(),
-        },
-    )
+    apply_and_commit(store, &instance, OrchestrationAction::ResumeRequested {
+        actor: actor.to_string(),
+    })
 }
 
 // r[impl lattice.agent_orchestration.controls]
-pub fn cancel(
-    store: &Store,
-    instance_id: &str,
-    actor: &str,
-) -> Result<OrchestrationInstance, OrchestrationShellError> {
+pub fn cancel(store: &Store, instance_id: &str, actor: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
-    apply_and_commit(
-        store,
-        &instance,
-        OrchestrationAction::CancelRequested {
-            actor: actor.to_string(),
-        },
-    )
+    apply_and_commit(store, &instance, OrchestrationAction::CancelRequested {
+        actor: actor.to_string(),
+    })
 }
 
 // r[impl lattice.agent_orchestration.authority]
@@ -446,13 +379,9 @@ pub async fn approve(
     let mut instance = load_instance(store, instance_id)?;
     match &instance.pending_proposal {
         None => {
-            instance = apply_and_commit(
-                store,
-                &instance,
-                OrchestrationAction::SubmitProposal {
-                    proposal: proposal.clone(),
-                },
-            )?;
+            instance = apply_and_commit(store, &instance, OrchestrationAction::SubmitProposal {
+                proposal: proposal.clone(),
+            })?;
         }
         Some(pending) if pending.id == proposal.id => {}
         Some(_) => {
@@ -463,14 +392,10 @@ pub async fn approve(
     }
     let successor_validated = load_validated_workflow(store, &proposal.successor).is_ok();
     let approval: ApprovalDecision = core::make_approval(&instance, &proposal, actor, true)?;
-    let approved = apply_and_commit(
-        store,
-        &instance,
-        OrchestrationAction::DecideProposal {
-            approval,
-            successor_validated,
-        },
-    )?;
+    let approved = apply_and_commit(store, &instance, OrchestrationAction::DecideProposal {
+        approval,
+        successor_validated,
+    })?;
     if approved.status == OrchestrationStatus::Ready {
         execute_ready_round(store, approved, agent_runtime).await
     } else {
@@ -486,24 +411,17 @@ pub fn reject(
     actor: &str,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
-    apply_and_commit(
-        store,
-        &instance,
-        OrchestrationAction::RejectProposal {
-            actor: actor.to_string(),
-            proposal_id: proposal_id.to_string(),
-        },
-    )
+    apply_and_commit(store, &instance, OrchestrationAction::RejectProposal {
+        actor: actor.to_string(),
+        proposal_id: proposal_id.to_string(),
+    })
 }
 
 // r[impl lattice.agent_orchestration.events]
 pub fn replay(store: &Store, instance_id: &str) -> Result<ReplayReport, OrchestrationShellError> {
     let current = load_instance(store, instance_id)?;
-    let initial = core::new_instance(
-        current.definition.clone(),
-        current.sequence,
-        current.trigger_idempotency_key.clone(),
-    )?;
+    let initial =
+        core::new_instance(current.definition.clone(), current.sequence, current.trigger_idempotency_key.clone())?;
     let events = store.load_orchestration_events(instance_id)?;
     let report = core::replay_events(&initial, &events, current.event_head.as_deref());
     if !report.valid || report.instance != current {
@@ -513,18 +431,13 @@ pub fn replay(store: &Store, instance_id: &str) -> Result<ReplayReport, Orchestr
 }
 
 // r[impl lattice.agent_orchestration.durability]
-pub fn recover_pending(
-    store: &Store,
-    instance_id: &str,
-) -> Result<RecoveryOutcome, OrchestrationShellError> {
+pub fn recover_pending(store: &Store, instance_id: &str) -> Result<RecoveryOutcome, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
     let Some(intent) = instance.pending_dispatch.clone() else {
         return Ok(RecoveryOutcome::NothingPending);
     };
     let Some(record) = store.load_run(intent.run_id)? else {
-        return Ok(RecoveryOutcome::PendingUnobserved {
-            run_id: intent.run_id,
-        });
+        return Ok(RecoveryOutcome::PendingUnobserved { run_id: intent.run_id });
     };
     let reconciled = reconcile_run_record(store, &instance, &intent, &record)?;
     Ok(RecoveryOutcome::Reconciled(Box::new(reconciled)))
@@ -537,26 +450,19 @@ fn reconcile_run_record(
     record: &RunRecord,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let observed_usage = observed_usage(instance, &intent.id).unwrap_or_default();
-    apply_and_commit(
-        store,
-        instance,
-        OrchestrationAction::RunFinished {
-            dispatch_id: intent.id.clone(),
-            run_id: intent.run_id,
-            succeeded: record.failures == 0,
-            observed_usage,
-            safe_summary: format!(
-                "recovered workflow {} run {} with {} failures",
-                record.workflow_name, record.run_id, record.failures
-            ),
-        },
-    )
+    apply_and_commit(store, instance, OrchestrationAction::RunFinished {
+        dispatch_id: intent.id.clone(),
+        run_id: intent.run_id,
+        succeeded: record.failures == 0,
+        observed_usage,
+        safe_summary: format!(
+            "recovered workflow {} run {} with {} failures",
+            record.workflow_name, record.run_id, record.failures
+        ),
+    })
 }
 
-pub fn load_instance(
-    store: &Store,
-    instance_id: &str,
-) -> Result<OrchestrationInstance, OrchestrationShellError> {
+pub fn load_instance(store: &Store, instance_id: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
     store
         .load_orchestration(instance_id)?
         .ok_or_else(|| OrchestrationShellError::MissingInstance(instance_id.to_string()))

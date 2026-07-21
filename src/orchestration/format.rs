@@ -42,15 +42,8 @@ pub fn load_definition_nickel_file(path: &Path) -> Result<OrchestrationDefinitio
 }
 
 // r[impl lattice.agent_orchestration.format]
-pub fn definition_to_nickel(
-    definition: &OrchestrationDefinition,
-) -> Result<String, OrchestrationFormatError> {
-    render_with_contract(
-        DEFINITION_HEADER,
-        DEFINITION_CONTRACT,
-        "OrchestrationDefinition",
-        definition,
-    )
+pub fn definition_to_nickel(definition: &OrchestrationDefinition) -> Result<String, OrchestrationFormatError> {
+    render_with_contract(DEFINITION_HEADER, DEFINITION_CONTRACT, "OrchestrationDefinition", definition)
 }
 
 pub fn load_proposal_nickel_file(path: &Path) -> Result<RevisionProposal, OrchestrationFormatError> {
@@ -82,10 +75,7 @@ fn render_with_contract<T: Serialize>(
     Ok(format!("{header}{contract}({body}) | {contract_name}\n"))
 }
 
-fn render_nickel_value(
-    value: &serde_json::Value,
-    indent: usize,
-) -> Result<String, OrchestrationFormatError> {
+fn render_nickel_value(value: &serde_json::Value, indent: usize) -> Result<String, OrchestrationFormatError> {
     match value {
         serde_json::Value::Null => Ok("null".to_string()),
         serde_json::Value::Bool(value) => Ok(value.to_string()),
@@ -98,10 +88,7 @@ fn render_nickel_value(
     }
 }
 
-fn render_array(
-    values: &[serde_json::Value],
-    indent: usize,
-) -> Result<String, OrchestrationFormatError> {
+fn render_array(values: &[serde_json::Value], indent: usize) -> Result<String, OrchestrationFormatError> {
     if values.is_empty() {
         return Ok("[]".to_string());
     }

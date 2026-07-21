@@ -71,9 +71,7 @@ fn store() -> (tempfile::TempDir, Store) {
     (directory, store)
 }
 
-fn start(
-    base: &lattice::orchestration::OrchestrationInstance,
-) -> lattice::orchestration::OrchestrationTransition {
+fn start(base: &lattice::orchestration::OrchestrationInstance) -> lattice::orchestration::OrchestrationTransition {
     let run_id = RunId(RUN_ID);
     let intent = DispatchIntent {
         id: dispatch_identity(base, run_id).expect("dispatch must hash"),
@@ -114,16 +112,9 @@ fn store_persists_instance_and_event_atomically() {
         store.load_orchestration(&started.instance.id).expect("load must work"),
         Some(started.instance.clone())
     );
+    assert_eq!(store.load_orchestration_events(&started.instance.id).expect("event load must work"), vec![event]);
     assert_eq!(
-        store
-            .load_orchestration_events(&started.instance.id)
-            .expect("event load must work"),
-        vec![event]
-    );
-    assert_eq!(
-        store
-            .load_orchestration_definition(DEFINITION_ID)
-            .expect("definition load must work"),
+        store.load_orchestration_definition(DEFINITION_ID).expect("definition load must work"),
         Some(definition)
     );
 }
@@ -141,22 +132,12 @@ fn stale_concurrent_transition_cannot_overwrite_newer_state() {
         .expect("started instance must persist");
 
     let acknowledge_action = OrchestrationAction::DispatchAcknowledged {
-        dispatch_id: started
-            .instance
-            .pending_dispatch
-            .as_ref()
-            .expect("dispatch exists")
-            .id
-            .clone(),
+        dispatch_id: started.instance.pending_dispatch.as_ref().expect("dispatch exists").id.clone(),
     };
-    let acknowledge = transition(
-        &started.instance,
-        OrchestrationFact {
-            id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
-                .expect("fact must hash"),
-            action: acknowledge_action,
-        },
-    )
+    let acknowledge = transition(&started.instance, OrchestrationFact {
+        id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action).expect("fact must hash"),
+        action: acknowledge_action,
+    })
     .expect("acknowledgement must apply");
     store
         .commit_orchestration_transition(
@@ -169,14 +150,10 @@ fn stale_concurrent_transition_cannot_overwrite_newer_state() {
     let cancel_action = OrchestrationAction::CancelRequested {
         actor: ACTOR.to_string(),
     };
-    let stale = transition(
-        &started.instance,
-        OrchestrationFact {
-            id: fact_identity(&started.instance.id, started.instance.version, &cancel_action)
-                .expect("fact must hash"),
-            action: cancel_action,
-        },
-    )
+    let stale = transition(&started.instance, OrchestrationFact {
+        id: fact_identity(&started.instance.id, started.instance.version, &cancel_action).expect("fact must hash"),
+        action: cancel_action,
+    })
     .expect("stale core decision is locally valid");
     let error = store
         .commit_orchestration_transition(
@@ -200,12 +177,9 @@ fn trigger_admission_insert_is_atomic_and_duplicate_safe() {
         .expect("duplicate trigger write must return prior result");
 
     assert_eq!(first, TriggerAdmissionWrite::Inserted);
-    assert_eq!(
-        duplicate,
-        TriggerAdmissionWrite::Duplicate {
-            instance_id: "instance-one".to_string()
-        }
-    );
+    assert_eq!(duplicate, TriggerAdmissionWrite::Duplicate {
+        instance_id: "instance-one".to_string()
+    });
     assert_eq!(
         store
             .list_orchestration_trigger_admissions()
@@ -220,14 +194,8 @@ fn trigger_admission_insert_is_atomic_and_duplicate_safe() {
 fn orchestration_sequence_is_monotonic() {
     let (_directory, store) = store();
 
-    assert_eq!(
-        store.next_orchestration_sequence().expect("first sequence must allocate"),
-        FIRST_SEQUENCE
-    );
-    assert_eq!(
-        store.next_orchestration_sequence().expect("second sequence must allocate"),
-        SECOND_SEQUENCE
-    );
+    assert_eq!(store.next_orchestration_sequence().expect("first sequence must allocate"), FIRST_SEQUENCE);
+    assert_eq!(store.next_orchestration_sequence().expect("second sequence must allocate"), SECOND_SEQUENCE);
 }
 
 // r[verify lattice.agent_orchestration.events]
@@ -244,8 +212,5 @@ fn mismatched_creation_event_batch_is_rejected_without_partial_state() {
         .expect_err("mismatched event batch must fail");
 
     assert!(matches!(error, StoreError::Conflict(_)));
-    assert_eq!(
-        store.load_orchestration(&started.instance.id).expect("load must work"),
-        None
-    );
+    assert_eq!(store.load_orchestration(&started.instance.id).expect("load must work"), None);
 }

@@ -204,12 +204,9 @@ fn successful_terminal_round_completes_and_cannot_reopen() {
     assert_eq!(completed.round, FIRST_INSTANCE_SEQUENCE);
     assert_eq!(completed.budgets.consumed, charge());
 
-    let pause = fact(
-        &completed,
-        OrchestrationAction::PauseRequested {
-            actor: ACTOR.to_string(),
-        },
-    );
+    let pause = fact(&completed, OrchestrationAction::PauseRequested {
+        actor: ACTOR.to_string(),
+    });
     let error = transition(&completed, pause).expect_err("terminal state must reject mutation");
     assert_eq!(error.code, OrchestrationDiagnosticCode::TerminalStateMutation);
 }
@@ -226,12 +223,9 @@ fn proposal_requires_current_authority_and_successor_validation() {
     let proposal = make_proposal(&waiting, successor, "revise the report workflow").expect("proposal must hash");
     let submit = transition(
         &waiting,
-        fact(
-            &waiting,
-            OrchestrationAction::SubmitProposal {
-                proposal: proposal.clone(),
-            },
-        ),
+        fact(&waiting, OrchestrationAction::SubmitProposal {
+            proposal: proposal.clone(),
+        }),
     )
     .expect("proposal must be accepted")
     .instance;
@@ -239,13 +233,10 @@ fn proposal_requires_current_authority_and_successor_validation() {
     let unauthorized = make_approval(&submit, &proposal, OTHER_ACTOR, true).expect("approval identity must hash");
     let unauthorized_error = transition(
         &submit,
-        fact(
-            &submit,
-            OrchestrationAction::DecideProposal {
-                approval: unauthorized,
-                successor_validated: true,
-            },
-        ),
+        fact(&submit, OrchestrationAction::DecideProposal {
+            approval: unauthorized,
+            successor_validated: true,
+        }),
     )
     .expect_err("unauthorized actor must fail");
     assert_eq!(unauthorized_error.code, OrchestrationDiagnosticCode::UnauthorizedActor);
@@ -253,29 +244,20 @@ fn proposal_requires_current_authority_and_successor_validation() {
     let approval = make_approval(&submit, &proposal, ACTOR, true).expect("approval must hash");
     let invalid_successor_error = transition(
         &submit,
-        fact(
-            &submit,
-            OrchestrationAction::DecideProposal {
-                approval: approval.clone(),
-                successor_validated: false,
-            },
-        ),
+        fact(&submit, OrchestrationAction::DecideProposal {
+            approval: approval.clone(),
+            successor_validated: false,
+        }),
     )
     .expect_err("approval must not bypass validation");
-    assert_eq!(
-        invalid_successor_error.code,
-        OrchestrationDiagnosticCode::SuccessorValidationFailed
-    );
+    assert_eq!(invalid_successor_error.code, OrchestrationDiagnosticCode::SuccessorValidationFailed);
 
     let approved = transition(
         &submit,
-        fact(
-            &submit,
-            OrchestrationAction::DecideProposal {
-                approval,
-                successor_validated: true,
-            },
-        ),
+        fact(&submit, OrchestrationAction::DecideProposal {
+            approval,
+            successor_validated: true,
+        }),
     )
     .expect("validated approval must advance")
     .instance;
@@ -297,13 +279,10 @@ fn stale_approval_is_rejected() {
 
     let error = transition(
         &instance,
-        fact(
-            &instance,
-            OrchestrationAction::DecideProposal {
-                approval: stale,
-                successor_validated: true,
-            },
-        ),
+        fact(&instance, OrchestrationAction::DecideProposal {
+            approval: stale,
+            successor_validated: true,
+        }),
     )
     .expect_err("stale approval must fail");
 
@@ -328,7 +307,8 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
         ..BudgetLedger::default()
     };
     reserve_budget(&mut ledger, "first", charge_plan()).expect("first reservation fits");
-    let oversubscribed = reserve_budget(&mut ledger, "second", charge_plan()).expect_err("second reservation exceeds limit");
+    let oversubscribed =
+        reserve_budget(&mut ledger, "second", charge_plan()).expect_err("second reservation exceeds limit");
     assert_eq!(oversubscribed.code, OrchestrationDiagnosticCode::BudgetExceeded);
     assert_eq!(ledger.reservations.len(), FIRST_INSTANCE_SEQUENCE as usize);
 }
@@ -428,12 +408,9 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
         &duplicate_context,
     )
     .expect("duplicate trigger returns prior result");
-    assert_eq!(
-        duplicate,
-        OrchestrationTriggerAdmission::Duplicate {
-            instance_id: plan.instance_id
-        }
-    );
+    assert_eq!(duplicate, OrchestrationTriggerAdmission::Duplicate {
+        instance_id: plan.instance_id
+    });
 
     let error = admit_trigger_start(
         &definition,
@@ -454,12 +431,9 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
     let paused = transition(
         &base,
-        fact(
-            &base,
-            OrchestrationAction::PauseRequested {
-                actor: ACTOR.to_string(),
-            },
-        ),
+        fact(&base, OrchestrationAction::PauseRequested {
+            actor: ACTOR.to_string(),
+        }),
     )
     .expect("authorized pause must apply")
     .instance;
@@ -467,12 +441,9 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
 
     let resumed = transition(
         &paused,
-        fact(
-            &paused,
-            OrchestrationAction::ResumeRequested {
-                actor: ACTOR.to_string(),
-            },
-        ),
+        fact(&paused, OrchestrationAction::ResumeRequested {
+            actor: ACTOR.to_string(),
+        }),
     )
     .expect("authorized resume must apply")
     .instance;
@@ -481,12 +452,9 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
     let running = start_transition(&resumed).instance;
     let cancel_requested = transition(
         &running,
-        fact(
-            &running,
-            OrchestrationAction::CancelRequested {
-                actor: ACTOR.to_string(),
-            },
-        ),
+        fact(&running, OrchestrationAction::CancelRequested {
+            actor: ACTOR.to_string(),
+        }),
     )
     .expect("cancel request must be recorded")
     .instance;

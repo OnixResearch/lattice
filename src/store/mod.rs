@@ -207,21 +207,11 @@ impl Store {
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn
-                .open_table(ORCHESTRATION_DEFINITIONS)
-                .map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn
-                .open_table(ORCHESTRATION_INSTANCES)
-                .map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn
-                .open_table(ORCHESTRATION_EVENTS)
-                .map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn
-                .open_table(ORCHESTRATION_TRIGGER_ADMISSIONS)
-                .map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn
-                .open_table(ORCHESTRATION_COUNTERS)
-                .map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(ORCHESTRATION_INSTANCES).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(ORCHESTRATION_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(ORCHESTRATION_TRIGGER_ADMISSIONS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(ORCHESTRATION_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -595,16 +585,12 @@ impl Store {
     // -- durable orchestration ---------------------------------------------
 
     // r[impl lattice.agent_orchestration.durability]
-    pub fn save_orchestration_definition(
-        &self,
-        definition: &OrchestrationDefinition,
-    ) -> Result<(), StoreError> {
+    pub fn save_orchestration_definition(&self, definition: &OrchestrationDefinition) -> Result<(), StoreError> {
         let data = serialize(definition)?;
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         {
-            let mut table = txn
-                .open_table(ORCHESTRATION_DEFINITIONS)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut table =
+                txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|error| StoreError::Table(error.to_string()))?;
             table
                 .insert(definition.id.as_str(), data.as_slice())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
@@ -613,30 +599,24 @@ impl Store {
         Ok(())
     }
 
-    pub fn load_orchestration_definition(
-        &self,
-        id: &str,
-    ) -> Result<Option<OrchestrationDefinition>, StoreError> {
+    pub fn load_orchestration_definition(&self, id: &str) -> Result<Option<OrchestrationDefinition>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let table = txn
-            .open_table(ORCHESTRATION_DEFINITIONS)
-            .map_err(|error| StoreError::Table(error.to_string()))?;
+        let table = txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|error| StoreError::Table(error.to_string()))?;
         deserialize_optional(table.get(id).map_err(|error| StoreError::Db(error.to_string()))?)
     }
 
     pub fn next_orchestration_sequence(&self) -> Result<u64, StoreError> {
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         let next = {
-            let mut table = txn
-                .open_table(ORCHESTRATION_COUNTERS)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut table =
+                txn.open_table(ORCHESTRATION_COUNTERS).map_err(|error| StoreError::Table(error.to_string()))?;
             let current = table
                 .get(ORCHESTRATION_INSTANCE_COUNTER_KEY)
                 .map_err(|error| StoreError::Db(error.to_string()))?
                 .map_or(INITIAL_ORCHESTRATION_SEQUENCE, |value| value.value());
-            let next = current.checked_add(NEXT_ORCHESTRATION_SEQUENCE_INCREMENT).ok_or_else(|| {
-                StoreError::Conflict("orchestration instance sequence exhausted".to_string())
-            })?;
+            let next = current
+                .checked_add(NEXT_ORCHESTRATION_SEQUENCE_INCREMENT)
+                .ok_or_else(|| StoreError::Conflict("orchestration instance sequence exhausted".to_string()))?;
             table
                 .insert(ORCHESTRATION_INSTANCE_COUNTER_KEY, next)
                 .map_err(|error| StoreError::Db(error.to_string()))?;
@@ -657,25 +637,16 @@ impl Store {
         let event_data = serialize(events)?;
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         {
-            let mut instances = txn
-                .open_table(ORCHESTRATION_INSTANCES)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
-            if instances
-                .get(instance.id.as_str())
-                .map_err(|error| StoreError::Db(error.to_string()))?
-                .is_some()
-            {
-                return Err(StoreError::Conflict(format!(
-                    "orchestration instance '{}' already exists",
-                    instance.id
-                )));
+            let mut instances =
+                txn.open_table(ORCHESTRATION_INSTANCES).map_err(|error| StoreError::Table(error.to_string()))?;
+            if instances.get(instance.id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?.is_some() {
+                return Err(StoreError::Conflict(format!("orchestration instance '{}' already exists", instance.id)));
             }
             instances
                 .insert(instance.id.as_str(), instance_data.as_slice())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
-            let mut event_table = txn
-                .open_table(ORCHESTRATION_EVENTS)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut event_table =
+                txn.open_table(ORCHESTRATION_EVENTS).map_err(|error| StoreError::Table(error.to_string()))?;
             event_table
                 .insert(instance.id.as_str(), event_data.as_slice())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
@@ -710,10 +681,7 @@ impl Store {
                     let mut instances = txn
                         .open_table(ORCHESTRATION_INSTANCES)
                         .map_err(|error| StoreError::Table(error.to_string()))?;
-                    if instances
-                        .get(instance.id.as_str())
-                        .map_err(|error| StoreError::Db(error.to_string()))?
-                        .is_some()
+                    if instances.get(instance.id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?.is_some()
                     {
                         return Err(StoreError::Conflict(format!(
                             "orchestration instance '{}' already exists",
@@ -723,9 +691,8 @@ impl Store {
                     instances
                         .insert(instance.id.as_str(), instance_data.as_slice())
                         .map_err(|error| StoreError::Db(error.to_string()))?;
-                    let mut events = txn
-                        .open_table(ORCHESTRATION_EVENTS)
-                        .map_err(|error| StoreError::Table(error.to_string()))?;
+                    let mut events =
+                        txn.open_table(ORCHESTRATION_EVENTS).map_err(|error| StoreError::Table(error.to_string()))?;
                     events
                         .insert(instance.id.as_str(), empty_events.as_slice())
                         .map_err(|error| StoreError::Db(error.to_string()))?;
@@ -755,9 +722,8 @@ impl Store {
         let instance_data = serialize(instance)?;
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         {
-            let mut instances = txn
-                .open_table(ORCHESTRATION_INSTANCES)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut instances =
+                txn.open_table(ORCHESTRATION_INSTANCES).map_err(|error| StoreError::Table(error.to_string()))?;
             let current = instances
                 .get(instance.id.as_str())
                 .map_err(|error| StoreError::Db(error.to_string()))?
@@ -771,16 +737,13 @@ impl Store {
                     instance.id
                 )));
             }
-            let mut event_table = txn
-                .open_table(ORCHESTRATION_EVENTS)
-                .map_err(|error| StoreError::Table(error.to_string()))?;
-            let mut events = match event_table
-                .get(instance.id.as_str())
-                .map_err(|error| StoreError::Db(error.to_string()))?
-            {
-                Some(data) => deserialize::<Vec<OrchestrationEvent>>(data.value())?,
-                None => Vec::new(),
-            };
+            let mut event_table =
+                txn.open_table(ORCHESTRATION_EVENTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut events =
+                match event_table.get(instance.id.as_str()).map_err(|error| StoreError::Db(error.to_string()))? {
+                    Some(data) => deserialize::<Vec<OrchestrationEvent>>(data.value())?,
+                    None => Vec::new(),
+                };
             validate_next_event(&current_instance, &events, event)?;
             events.push(event.clone());
             let event_data = serialize(&events)?;
@@ -798,17 +761,13 @@ impl Store {
 
     pub fn load_orchestration(&self, id: &str) -> Result<Option<OrchestrationInstance>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let table = txn
-            .open_table(ORCHESTRATION_INSTANCES)
-            .map_err(|error| StoreError::Table(error.to_string()))?;
+        let table = txn.open_table(ORCHESTRATION_INSTANCES).map_err(|error| StoreError::Table(error.to_string()))?;
         deserialize_optional(table.get(id).map_err(|error| StoreError::Db(error.to_string()))?)
     }
 
     pub fn load_orchestration_events(&self, id: &str) -> Result<Vec<OrchestrationEvent>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let table = txn
-            .open_table(ORCHESTRATION_EVENTS)
-            .map_err(|error| StoreError::Table(error.to_string()))?;
+        let table = txn.open_table(ORCHESTRATION_EVENTS).map_err(|error| StoreError::Table(error.to_string()))?;
         match table.get(id).map_err(|error| StoreError::Db(error.to_string()))? {
             Some(data) => deserialize(data.value()),
             None => Ok(Vec::new()),
@@ -817,9 +776,7 @@ impl Store {
 
     pub fn list_orchestrations(&self) -> Result<Vec<OrchestrationInstance>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let table = txn
-            .open_table(ORCHESTRATION_INSTANCES)
-            .map_err(|error| StoreError::Table(error.to_string()))?;
+        let table = txn.open_table(ORCHESTRATION_INSTANCES).map_err(|error| StoreError::Table(error.to_string()))?;
         let mut instances = Vec::new();
         let iter = table.iter().map_err(|error| StoreError::Db(error.to_string()))?;
         for entry in iter {
@@ -850,9 +807,7 @@ impl Store {
                     instance_id: existing_instance_id,
                 },
                 None => {
-                    table
-                        .insert(scoped_key, instance_id)
-                        .map_err(|error| StoreError::Db(error.to_string()))?;
+                    table.insert(scoped_key, instance_id).map_err(|error| StoreError::Db(error.to_string()))?;
                     TriggerAdmissionWrite::Inserted
                 }
             }
@@ -890,10 +845,7 @@ fn deserialize_optional<T: DeserializeOwned>(
     data.map(|guard| deserialize(guard.value())).transpose()
 }
 
-fn validate_event_batch(
-    instance: &OrchestrationInstance,
-    events: &[OrchestrationEvent],
-) -> Result<(), StoreError> {
+fn validate_event_batch(instance: &OrchestrationInstance, events: &[OrchestrationEvent]) -> Result<(), StoreError> {
     let mut prior_hash: Option<&str> = None;
     let mut prior_sequence: Option<u64> = None;
     for event in events {
@@ -905,9 +857,7 @@ fn validate_event_batch(
         if let Some(sequence) = prior_sequence
             && event.sequence != sequence.saturating_add(ORCHESTRATION_EVENT_SEQUENCE_INCREMENT)
         {
-            return Err(StoreError::Conflict(
-                "orchestration creation events are not contiguous".to_string(),
-            ));
+            return Err(StoreError::Conflict("orchestration creation events are not contiguous".to_string()));
         }
         prior_hash = Some(event.event_hash.as_str());
         prior_sequence = Some(event.sequence);
@@ -926,18 +876,14 @@ fn validate_next_event(
     event: &OrchestrationEvent,
 ) -> Result<(), StoreError> {
     if event.instance_id != current.id || event.prior_hash != current.event_head {
-        return Err(StoreError::Conflict(
-            "orchestration event does not extend the current event head".to_string(),
-        ));
+        return Err(StoreError::Conflict("orchestration event does not extend the current event head".to_string()));
     }
     let expected_sequence = current
         .last_event_sequence
         .map(|sequence| sequence.saturating_add(ORCHESTRATION_EVENT_SEQUENCE_INCREMENT))
         .unwrap_or_default();
     if event.sequence != expected_sequence || events.len() != expected_sequence as usize {
-        return Err(StoreError::Conflict(
-            "orchestration event sequence is not contiguous".to_string(),
-        ));
+        return Err(StoreError::Conflict("orchestration event sequence is not contiguous".to_string()));
     }
     Ok(())
 }

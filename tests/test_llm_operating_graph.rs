@@ -173,24 +173,14 @@ async fn llm_operating_graph_executes_roles_fanout_aggregation_and_effects() {
 #[test]
 fn durable_llm_orchestration_binds_the_checked_in_agent_graph() {
     let workflow = load_workflow_nickel_file(Path::new(FIXTURE_PATH)).expect("operating graph fixture loads");
-    let definition = load_definition_nickel_file(Path::new(ORCHESTRATION_FIXTURE_PATH))
-        .expect("orchestration fixture loads");
+    let definition =
+        load_definition_nickel_file(Path::new(ORCHESTRATION_FIXTURE_PATH)).expect("orchestration fixture loads");
     let actual_revision = workflow_revision(&workflow).expect("workflow revision hashes");
 
     assert!(validate_definition(&definition, Some(&actual_revision)).is_empty());
     assert_eq!(definition.completion, CompletionPolicy::AwaitProposal);
-    assert!(
-        definition
-            .triggers
-            .iter()
-            .any(|binding| binding.kind == OrchestrationTriggerKind::Schedule)
-    );
-    assert!(
-        definition
-            .triggers
-            .iter()
-            .any(|binding| binding.kind == OrchestrationTriggerKind::Webhook)
-    );
+    assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Schedule));
+    assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Webhook));
 }
 
 // r[verify n8nclone.workflow_execution.llm_operating_graph]
