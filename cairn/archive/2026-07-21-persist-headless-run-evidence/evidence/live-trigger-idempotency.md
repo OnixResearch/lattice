@@ -21,7 +21,7 @@ Machine-readable evidence is retained in `live-trigger-idempotency-before.json`.
 
 ## First post-persistence rerun
 
-The next fresh-store run persisted one node detail record, but the probe intentionally failed its safe-detail assertion. The provider ignored `enable_thinking = false` and placed a leading `<think>...</think>` block in `message.content`; that block repeated the raw user prompt and planning text before the final answer. This falsified the assumption that request hints or the separate `reasoning_content` field alone keep hidden reasoning out of typed output. Raw captured detail text remains only under `/tmp/lattice-animus-idempotency/details-debug.json` for local diagnosis and is not checked into the repository.
+The next fresh-store run persisted one node detail record, but the probe intentionally failed its safe-detail assertion. The provider ignored `enable_thinking = false` and placed a leading `<think>...</think>` block in `message.content`; that block repeated the raw user prompt and planning text before the final answer. This falsified the assumption that request hints or the separate `reasoning_content` field alone keep hidden reasoning out of typed output. Raw captured detail text was retained only under `/tmp/lattice-animus-idempotency/details-debug.json` during diagnosis, was never checked into the repository, and was deleted with the ephemeral dogfood stores after bounded evidence was recorded.
 
 ## Final post-fix validation
 
