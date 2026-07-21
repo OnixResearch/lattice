@@ -15,7 +15,17 @@
 
 ## Phase 3: Verification and lifecycle
 
-- [ ] [serial] Run focused post-change tests, repository checks, Octet comparison, Cairn gates/validation, and Nix checks; sync the accepted spec and archive the change with evidence. r[lattice.workflow_execution.safe_run_inspection]
+- [x] [serial] Run focused post-change tests, repository checks, Octet comparison, Cairn gates/validation, and Nix checks; sync the accepted spec and archive the change with evidence. r[lattice.workflow_execution.safe_run_inspection]
+
+## Verification evidence
+
+- The focused safe-inspection suite passed 11 positive and negative cases covering unscoped and orchestration-owned CLI output, settled and conservatively abandoned budgets, exact and foreign owner tuples, duplicate dispatch admission, malformed owner identity omission, replay/detail identity mismatch, legacy absence, not-found behavior, invalid-evidence exits, and missing-store non-creation.
+- The selected post-change run-history, orchestration CLI, store, and safe-inspection suites passed. `scripts/check.rs` passed the repository test suite, strict project Clippy, and accepted-spec references.
+- `octet-precommit-check` passed with 916 accepted/current findings, zero new, zero stale, 1,166 total findings, and baseline hash `b3:1aeb6f42e5bbb4bf92fbb1b16fbc2a05fe03e997ac30a3b7ba2b00b63ffab8f0`; no rebaseline was needed.
+- `nix flake check -L --option secret-key-files ''` passed all bounded `x86_64-linux` checks. Cairn validation plus proposal, design, and tasks gates passed through the canonical sibling Cairn CLI.
+- Adversarial review rejected direct store serialization, TUI renderer reuse, and loose orchestration joining. It additionally verified that malformed owner strings are replaced with `[invalid]`, missing stores do not create data directories or databases, and every serialized string is either a validated BLAKE3 identity or a fixed enum/marker.
+- The broad host-style `cargo clippy -p lattice --all-targets -- -D warnings` remains unsuitable because it traverses vendored Rats wildcard-import debt; the repository-owned strict Clippy rail passed through `scripts/check.rs` and Nix.
+- No raw output/error recovery, unobserved-dispatch run synthesis, provider truth, billing/token truth, remote exactly-once effect, externally anchored completeness, or production-readiness claim is made.
 
 ## Baseline evidence
 

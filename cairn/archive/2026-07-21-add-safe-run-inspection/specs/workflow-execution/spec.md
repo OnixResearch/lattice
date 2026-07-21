@@ -1,4 +1,4 @@
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Safe persisted-run inspection
 r[lattice.workflow_execution.safe_run_inspection] Lattice MUST provide a read-only operator command that inspects one persisted run through a content-omitting report, validates every present evidence binding, and distinguishes absent historical evidence from invalid evidence.
