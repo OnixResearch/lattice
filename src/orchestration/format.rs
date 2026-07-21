@@ -36,7 +36,8 @@ impl std::error::Error for OrchestrationFormatError {}
 
 // r[impl lattice.agent_orchestration.format]
 pub fn load_definition_nickel_file(path: &Path) -> Result<OrchestrationDefinition, OrchestrationFormatError> {
-    let json = config::load_nickel_as_json(path).map_err(OrchestrationFormatError::Nickel)?;
+    let json = config::load_nickel_as_json(path)
+        .map_err(|_| OrchestrationFormatError::Nickel("definition evaluation failed".to_string()))?;
     serde_json::from_value(json).map_err(|error| OrchestrationFormatError::Json(error.to_string()))
 }
 
@@ -53,12 +54,21 @@ pub fn definition_to_nickel(
 }
 
 pub fn load_proposal_nickel_file(path: &Path) -> Result<RevisionProposal, OrchestrationFormatError> {
-    let json = config::load_nickel_as_json(path).map_err(OrchestrationFormatError::Nickel)?;
+    let json = config::load_nickel_as_json(path)
+        .map_err(|_| OrchestrationFormatError::Nickel("proposal evaluation failed".to_string()))?;
     serde_json::from_value(json).map_err(|error| OrchestrationFormatError::Json(error.to_string()))
 }
 
 pub fn proposal_to_nickel(proposal: &RevisionProposal) -> Result<String, OrchestrationFormatError> {
     render_with_contract(PROPOSAL_HEADER, PROPOSAL_CONTRACT, "RevisionProposal", proposal)
+}
+
+// r[impl lattice.agent_orchestration.format]
+pub fn reject_default_n8n_orchestration_export() -> Result<(), OrchestrationFormatError> {
+    Err(OrchestrationFormatError::Render(
+        "n8n export has no exact mapping for Lattice objectives, approvals, budgets, revisions, or multi-round state"
+            .to_string(),
+    ))
 }
 
 fn render_with_contract<T: Serialize>(

@@ -110,6 +110,7 @@ pub trait WorkflowRepository {
 // r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
 pub trait RunHistoryStore {
     fn save_run(&self, record: &RunRecord) -> Result<(), StoreError>;
+    fn load_run(&self, run_id: RunId) -> Result<Option<RunRecord>, StoreError>;
     fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError>;
     fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError>;
     fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError>;
@@ -162,6 +163,11 @@ pub trait OrchestrationStore {
         instance: &OrchestrationInstance,
         events: &[OrchestrationEvent],
     ) -> Result<(), StoreError>;
+    fn create_triggered_orchestration(
+        &self,
+        scoped_key: &str,
+        instance: &OrchestrationInstance,
+    ) -> Result<TriggerAdmissionWrite, StoreError>;
     fn commit_orchestration_transition(
         &self,
         expected_version: u64,
@@ -492,6 +498,16 @@ impl Store {
         Ok(())
     }
 
+    /// Load one run record by identity.
+    pub fn load_run(&self, run_id: RunId) -> Result<Option<RunRecord>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
+        match table.get(run_id.0).map_err(|error| StoreError::Db(error.to_string()))? {
+            Some(data) => deserialize(data.value()).map(Some),
+            None => Ok(None),
+        }
+    }
+
     /// Store detailed per-node records for a run.
     pub fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError> {
         let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
@@ -666,6 +682,62 @@ impl Store {
         }
         txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
         Ok(())
+    }
+
+    // r[impl lattice.agent_orchestration.triggers]
+    pub fn create_triggered_orchestration(
+        &self,
+        scoped_key: &str,
+        instance: &OrchestrationInstance,
+    ) -> Result<TriggerAdmissionWrite, StoreError> {
+        validate_event_batch(instance, &[])?;
+        let instance_data = serialize(instance)?;
+        let empty_events = serialize(&Vec::<OrchestrationEvent>::new())?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        let outcome = {
+            let mut admissions = txn
+                .open_table(ORCHESTRATION_TRIGGER_ADMISSIONS)
+                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let existing_instance_id = admissions
+                .get(scoped_key)
+                .map_err(|error| StoreError::Db(error.to_string()))?
+                .map(|existing| existing.value().to_string());
+            match existing_instance_id {
+                Some(existing_instance_id) => TriggerAdmissionWrite::Duplicate {
+                    instance_id: existing_instance_id,
+                },
+                None => {
+                    let mut instances = txn
+                        .open_table(ORCHESTRATION_INSTANCES)
+                        .map_err(|error| StoreError::Table(error.to_string()))?;
+                    if instances
+                        .get(instance.id.as_str())
+                        .map_err(|error| StoreError::Db(error.to_string()))?
+                        .is_some()
+                    {
+                        return Err(StoreError::Conflict(format!(
+                            "orchestration instance '{}' already exists",
+                            instance.id
+                        )));
+                    }
+                    instances
+                        .insert(instance.id.as_str(), instance_data.as_slice())
+                        .map_err(|error| StoreError::Db(error.to_string()))?;
+                    let mut events = txn
+                        .open_table(ORCHESTRATION_EVENTS)
+                        .map_err(|error| StoreError::Table(error.to_string()))?;
+                    events
+                        .insert(instance.id.as_str(), empty_events.as_slice())
+                        .map_err(|error| StoreError::Db(error.to_string()))?;
+                    admissions
+                        .insert(scoped_key, instance.id.as_str())
+                        .map_err(|error| StoreError::Db(error.to_string()))?;
+                    TriggerAdmissionWrite::Inserted
+                }
+            }
+        };
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(outcome)
     }
 
     // r[impl lattice.agent_orchestration.durability]
@@ -930,6 +1002,10 @@ impl RunHistoryStore for Store {
         Store::save_run(self, record)
     }
 
+    fn load_run(&self, run_id: RunId) -> Result<Option<RunRecord>, StoreError> {
+        Store::load_run(self, run_id)
+    }
+
     fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError> {
         Store::save_run_details(self, record)
     }
@@ -1041,6 +1117,14 @@ impl OrchestrationStore for Store {
         events: &[OrchestrationEvent],
     ) -> Result<(), StoreError> {
         Store::create_orchestration(self, instance, events)
+    }
+
+    fn create_triggered_orchestration(
+        &self,
+        scoped_key: &str,
+        instance: &OrchestrationInstance,
+    ) -> Result<TriggerAdmissionWrite, StoreError> {
+        Store::create_triggered_orchestration(self, scoped_key, instance)
     }
 
     fn commit_orchestration_transition(

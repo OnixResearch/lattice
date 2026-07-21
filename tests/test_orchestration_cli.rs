@@ -1,0 +1,237 @@
+use std::collections::BTreeSet;
+use std::process::Command;
+
+use lattice::engine::Workflow;
+use lattice::orchestration::AuthorityPolicy;
+use lattice::orchestration::BudgetCharge;
+use lattice::orchestration::BudgetDimensions;
+use lattice::orchestration::BudgetLimits;
+use lattice::orchestration::BudgetPolicy;
+use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::OrchestrationDefinition;
+use lattice::orchestration::OrchestrationInstance;
+use lattice::orchestration::OrchestrationStatus;
+use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::current_schema_version;
+use lattice::orchestration::definition_to_nickel;
+use lattice::orchestration::workflow_revision;
+use lattice::store::Store;
+use tempfile::tempdir;
+
+const CONFIG_FILE_NAME: &str = "config.ncl";
+const STORE_FILE_NAME: &str = "lattice.redb";
+const DEFINITION_FILE_NAME: &str = "orchestration.ncl";
+const WORKFLOW_NAME: &str = "cli-workflow";
+const DEFINITION_ID: &str = "cli-orchestration";
+const OBJECTIVE: &str = "Exercise deterministic orchestration CLI";
+const ACTOR: &str = "operator:cli";
+const UNAUTHORIZED_ACTOR: &str = "agent:cli";
+const SHELL_COMMAND: &str = "printf cli";
+const DEFAULT_TIMEOUT_SECS: u64 = 60;
+const MAX_PARALLELISM: usize = 1;
+const ROUND_LIMIT: u64 = 2;
+const ROUND_CHARGE: u64 = 1;
+
+fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
+    let directory = tempdir().expect("temporary directory must exist");
+    let data_dir = directory.path().join("data");
+    std::fs::create_dir_all(&data_dir).expect("data directory must exist");
+    let config_path = directory.path().join(CONFIG_FILE_NAME);
+    std::fs::write(
+        &config_path,
+        format!(
+            "{{\n  data_dir = {:?},\n  default_timeout_secs = {DEFAULT_TIMEOUT_SECS},\n  shell = \"sh\",\n  max_parallelism = {MAX_PARALLELISM},\n}}\n",
+            data_dir.display().to_string()
+        ),
+    )
+    .expect("config must write");
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store must open");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node("cli", SHELL_COMMAND);
+    store.save_workflow(&workflow).expect("workflow must persist");
+    let definition = OrchestrationDefinition {
+        schema_version: current_schema_version(),
+        id: DEFINITION_ID.to_string(),
+        objective: OBJECTIVE.to_string(),
+        workflow: workflow_revision(&workflow).expect("workflow must hash"),
+        completion,
+        budgets: BudgetPolicy {
+            enforced: BudgetDimensions {
+                rounds: true,
+                ..BudgetDimensions::default()
+            },
+            limits: BudgetLimits {
+                rounds: ROUND_LIMIT,
+                ..BudgetLimits::default()
+            },
+            per_round_upper_bound: BudgetCharge {
+                rounds: ROUND_CHARGE,
+                ..BudgetCharge::default()
+            },
+        },
+        authority: AuthorityPolicy {
+            approvers: BTreeSet::from([ACTOR.to_string()]),
+        },
+        triggers: Vec::new(),
+        redaction: RedactionPolicy {
+            retain_safe_summaries: true,
+        },
+    };
+    let definition_path = directory.path().join(DEFINITION_FILE_NAME);
+    std::fs::write(
+        &definition_path,
+        definition_to_nickel(&definition).expect("definition must render"),
+    )
+    .expect("definition must write");
+    (directory, config_path, definition_path, store)
+}
+
+fn command(config_path: &std::path::Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lattice"));
+    command.arg("--config").arg(config_path).arg("orchestration");
+    command
+}
+
+// r[verify lattice.agent_orchestration.cli]
+#[test]
+fn cli_validates_starts_and_reports_json_status() {
+    let (_directory, config_path, definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    drop(store);
+
+    let validation = command(&config_path)
+        .arg("validate")
+        .arg(&definition_path)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("validate command must execute");
+    assert!(
+        validation.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&validation.stderr)
+    );
+
+    let start = command(&config_path)
+        .arg("start")
+        .arg(&definition_path)
+        .arg("--actor")
+        .arg(ACTOR)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("start command must execute");
+    assert!(start.status.success(), "stderr: {}", String::from_utf8_lossy(&start.stderr));
+    let instance: OrchestrationInstance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
+    assert_eq!(instance.status, OrchestrationStatus::Completed);
+
+    let status = command(&config_path)
+        .arg("status")
+        .arg(&instance.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("status command must execute");
+    assert!(status.status.success(), "stderr: {}", String::from_utf8_lossy(&status.stderr));
+    let loaded: OrchestrationInstance = serde_json::from_slice(&status.stdout).expect("status JSON must parse");
+    assert_eq!(loaded, instance);
+}
+
+// r[verify lattice.agent_orchestration.controls]
+// r[verify lattice.agent_orchestration.cli]
+#[test]
+fn cli_pause_resume_and_replay_share_persisted_state_machine() {
+    let (_directory, config_path, definition_path, store) = fixture(CompletionPolicy::AwaitProposal);
+    drop(store);
+    let start = command(&config_path)
+        .arg("start")
+        .arg(&definition_path)
+        .arg("--actor")
+        .arg(ACTOR)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("start command must execute");
+    let waiting: OrchestrationInstance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
+    assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
+
+    let pause = command(&config_path)
+        .arg("pause")
+        .arg(&waiting.id)
+        .arg("--actor")
+        .arg(ACTOR)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("pause command must execute");
+    assert!(pause.status.success(), "stderr: {}", String::from_utf8_lossy(&pause.stderr));
+    let paused: OrchestrationInstance = serde_json::from_slice(&pause.stdout).expect("pause JSON must parse");
+    assert_eq!(paused.status, OrchestrationStatus::Paused);
+
+    let resume = command(&config_path)
+        .arg("resume")
+        .arg(&paused.id)
+        .arg("--actor")
+        .arg(ACTOR)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("resume command must execute");
+    assert!(resume.status.success(), "stderr: {}", String::from_utf8_lossy(&resume.stderr));
+    let resumed: OrchestrationInstance = serde_json::from_slice(&resume.stdout).expect("resume JSON must parse");
+    assert_eq!(resumed.status, OrchestrationStatus::WaitingForApproval);
+
+    let replay = command(&config_path)
+        .arg("replay")
+        .arg(&resumed.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("replay command must execute");
+    assert!(replay.status.success(), "stderr: {}", String::from_utf8_lossy(&replay.stderr));
+    let report: lattice::orchestration::ReplayReport =
+        serde_json::from_slice(&replay.stdout).expect("replay JSON must parse");
+    assert!(report.valid);
+    assert_eq!(report.instance, resumed);
+}
+
+// r[verify lattice.agent_orchestration.cli]
+#[test]
+fn unauthorized_start_fails_without_persisting_an_instance() {
+    let (_directory, config_path, definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    drop(store);
+
+    let output = command(&config_path)
+        .arg("start")
+        .arg(&definition_path)
+        .arg("--actor")
+        .arg(UNAUTHORIZED_ACTOR)
+        .output()
+        .expect("start command must execute");
+
+    assert!(!output.status.success());
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("plaintext"));
+    let reopened = Store::new(
+        config_path
+            .parent()
+            .expect("config has parent")
+            .join("data")
+            .join(STORE_FILE_NAME),
+    )
+    .expect("store must reopen");
+    assert!(reopened.list_orchestrations().expect("instances must list").is_empty());
+}
+
+// r[verify lattice.agent_orchestration.cli]
+#[test]
+fn missing_instance_command_fails_without_creating_state() {
+    let (_directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    drop(store);
+
+    let output = command(&config_path)
+        .arg("status")
+        .arg("missing-instance")
+        .output()
+        .expect("status command must execute");
+
+    assert!(!output.status.success());
+}

@@ -350,7 +350,7 @@ pub struct OrchestrationDiagnostic {
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplayReport {
     pub valid: bool,
     pub instance: OrchestrationInstance,
@@ -381,7 +381,8 @@ pub fn current_schema_version() -> u32 {
 
 // r[impl lattice.agent_orchestration.model]
 pub fn workflow_revision(workflow: &Workflow) -> Result<WorkflowRevisionRef, OrchestrationDiagnostic> {
-    let content_hash = hash_serializable(WORKFLOW_HASH_LABEL, workflow)?;
+    let portable = crate::workflow_format::workflow_to_portable(workflow);
+    let content_hash = hash_serializable(WORKFLOW_HASH_LABEL, &portable)?;
     Ok(WorkflowRevisionRef {
         workflow_name: workflow.meta.name.clone(),
         content_hash,
@@ -984,6 +985,20 @@ fn validate_approval(
     Ok(())
 }
 
+pub fn authorize_definition_actor(
+    definition: &OrchestrationDefinition,
+    actor: &str,
+) -> Result<(), OrchestrationDiagnostic> {
+    if definition.authority.approvers.contains(actor) {
+        Ok(())
+    } else {
+        Err(diagnostic(
+            OrchestrationDiagnosticCode::UnauthorizedActor,
+            format!("actor '{actor}' is not authorized for this orchestration"),
+        ))
+    }
+}
+
 fn authorize_actor(instance: &OrchestrationInstance, actor: &str) -> Result<(), OrchestrationDiagnostic> {
     if instance.definition.authority.approvers.contains(actor) {
         Ok(())
@@ -1285,11 +1300,16 @@ pub fn admit_trigger_start(
     definition: &OrchestrationDefinition,
     definition_revision: &str,
     trigger_id: &str,
+    trigger_kind: OrchestrationTriggerKind,
     idempotency_key: &str,
     next_sequence: u64,
     context: &OrchestrationTriggerContext,
 ) -> Result<OrchestrationTriggerAdmission, OrchestrationDiagnostic> {
-    if !definition.triggers.iter().any(|binding| binding.trigger_id == trigger_id) {
+    if !definition
+        .triggers
+        .iter()
+        .any(|binding| binding.trigger_id == trigger_id && binding.kind == trigger_kind)
+    {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::TriggerNotBound,
             format!("trigger '{trigger_id}' is not bound to orchestration '{}'", definition.id),

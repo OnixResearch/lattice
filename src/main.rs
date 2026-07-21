@@ -15,6 +15,7 @@ use lattice::credentials::EnvironmentCredentialProvider;
 use lattice::headless;
 use lattice::headless::HeadlessProcessResult;
 use lattice::n8n_json;
+use lattice::orchestration;
 use lattice::scheduler;
 use lattice::scheduler::ScheduleDaemonOutcome;
 use lattice::scheduler::ScheduleSkipReason;
@@ -253,6 +254,8 @@ enum CliCommand {
     WebhookListen(WebhookListenArgs),
     /// Diagnose local operator configuration and readiness
     Doctor(DoctorCommandArgs),
+    /// Manage durable multi-run agent orchestrations
+    Orchestration(OrchestrationCommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -332,6 +335,90 @@ struct WebhookListenArgs {
 }
 
 #[derive(clap::Args, Debug)]
+struct OrchestrationCommandArgs {
+    #[command(subcommand)]
+    command: OrchestrationCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum OrchestrationCliCommand {
+    /// Validate a typed Nickel orchestration definition
+    Validate {
+        path: PathBuf,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Start a validated orchestration and execute its first round
+    Start {
+        path: PathBuf,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Inspect one persisted orchestration instance
+    Status {
+        instance: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Pause new orchestration dispatch
+    Pause {
+        instance: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Resume a paused orchestration
+    Resume {
+        instance: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Request orchestration cancellation
+    Cancel {
+        instance: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Approve a hash-bound Nickel proposal and execute its successor round
+    Approve {
+        instance: String,
+        proposal: PathBuf,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Reject a pending proposal
+    Reject {
+        instance: String,
+        proposal_id: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Replay persisted orchestration events without executing effects
+    Replay {
+        instance: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+    /// Reconcile a pending dispatch against persisted run history
+    Recover {
+        instance: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
+}
+
+#[derive(clap::Args, Debug)]
 struct DoctorCommandArgs {
     /// Output format for the doctor report
     #[arg(long, value_enum, default_value_t = DoctorOutputFormat::Text)]
@@ -358,6 +445,12 @@ enum RunOutputFormat {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum DoctorOutputFormat {
+    Text,
+    Json,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+enum OrchestrationOutputFormat {
     Text,
     Json,
 }
@@ -411,6 +504,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
             Ok(run_webhook_listener_command(&app_config, &webhook_args).await)
         }
         Some(CliCommand::Doctor(_)) => unreachable!("doctor command returns before app config side effects"),
+        Some(CliCommand::Orchestration(orchestration_args)) => {
+            Ok(run_orchestration_command(&app_config, &orchestration_args).await)
+        }
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -650,6 +746,186 @@ fn collect_webhook_listener_doctor_facts(triggers: &[TriggerDefinition], checks:
             format!("{enabled_webhook_count} enabled webhook triggers are ready for listener dry-run"),
         ));
     }
+}
+
+// r[impl lattice.agent_orchestration.cli]
+async fn run_orchestration_command(
+    app_config: &config::AppConfig,
+    args: &OrchestrationCommandArgs,
+) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => return orchestration_failure(&error),
+    };
+    match &args.command {
+        OrchestrationCliCommand::Validate { path, output } => {
+            let definition = match orchestration::load_definition_nickel_file(path) {
+                Ok(definition) => definition,
+                Err(error) => return orchestration_failure(&error.to_string()),
+            };
+            match orchestration::validate_definition_in_store(&store, &definition) {
+                Ok(report) => {
+                    let valid = report.valid();
+                    if render_orchestration_validation(&report, *output).is_err() || !valid {
+                        ExitCode::FAILURE
+                    } else {
+                        ExitCode::SUCCESS
+                    }
+                }
+                Err(error) => orchestration_failure(&error.to_string()),
+            }
+        }
+        OrchestrationCliCommand::Start {
+            path,
+            actor,
+            output,
+        } => {
+            let definition = match orchestration::load_definition_nickel_file(path) {
+                Ok(definition) => definition,
+                Err(error) => return orchestration_failure(&error.to_string()),
+            };
+            match orchestration::start(
+                &store,
+                definition,
+                actor,
+                app_config.agent_runtime.clone(),
+            )
+            .await
+            {
+                Ok(instance) => render_orchestration_instance(&instance, *output),
+                Err(error) => orchestration_failure(&error.to_string()),
+            }
+        }
+        OrchestrationCliCommand::Status { instance, output } => match orchestration::load_instance(&store, instance) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Pause {
+            instance,
+            actor,
+            output,
+        } => match orchestration::pause(&store, instance, actor) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Resume {
+            instance,
+            actor,
+            output,
+        } => match orchestration::resume(&store, instance, actor) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Cancel {
+            instance,
+            actor,
+            output,
+        } => match orchestration::cancel(&store, instance, actor) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Approve {
+            instance,
+            proposal,
+            actor,
+            output,
+        } => {
+            let proposal = match orchestration::load_proposal_nickel_file(proposal) {
+                Ok(proposal) => proposal,
+                Err(error) => return orchestration_failure(&error.to_string()),
+            };
+            match orchestration::approve(
+                &store,
+                instance,
+                proposal,
+                actor,
+                app_config.agent_runtime.clone(),
+            )
+            .await
+            {
+                Ok(instance) => render_orchestration_instance(&instance, *output),
+                Err(error) => orchestration_failure(&error.to_string()),
+            }
+        }
+        OrchestrationCliCommand::Reject {
+            instance,
+            proposal_id,
+            actor,
+            output,
+        } => match orchestration::reject(&store, instance, proposal_id, actor) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Replay { instance, output } => match orchestration::replay(&store, instance) {
+            Ok(report) => match output {
+                OrchestrationOutputFormat::Text => {
+                    let rendered = format!("replay valid\n{}\n", orchestration::render_status_text(&report.instance));
+                    render_orchestration_output(&rendered)
+                }
+                OrchestrationOutputFormat::Json => render_orchestration_json(&report),
+            },
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
+        OrchestrationCliCommand::Recover { instance, output } => {
+            match orchestration::recover_pending(&store, instance) {
+                Ok(outcome) => match output {
+                    OrchestrationOutputFormat::Text => {
+                        render_orchestration_output(&format!("{outcome:?}\n"))
+                    }
+                    OrchestrationOutputFormat::Json => render_orchestration_json(&outcome),
+                },
+                Err(error) => orchestration_failure(&error.to_string()),
+            }
+        }
+    }
+}
+
+fn render_orchestration_validation(
+    report: &orchestration::DefinitionValidationReport,
+    output: OrchestrationOutputFormat,
+) -> Result<(), std::io::Error> {
+    let rendered = match output {
+        OrchestrationOutputFormat::Json => serde_json::to_string_pretty(report)
+            .unwrap_or_else(|_| "{\"valid\":false,\"error\":\"render failed\"}".to_string()),
+        OrchestrationOutputFormat::Text => format!(
+            "orchestration definition {}: {} orchestration diagnostics, {} workflow diagnostics\n",
+            if report.valid() { "valid" } else { "invalid" },
+            report.orchestration_diagnostics.len(),
+            report.workflow_diagnostics.len()
+        ),
+    };
+    write_stdout_and_flush(&rendered)
+}
+
+fn render_orchestration_instance(
+    instance: &orchestration::OrchestrationInstance,
+    output: OrchestrationOutputFormat,
+) -> ExitCode {
+    match output {
+        OrchestrationOutputFormat::Text => {
+            render_orchestration_output(&format!("{}\n", orchestration::render_status_text(instance)))
+        }
+        OrchestrationOutputFormat::Json => render_orchestration_json(instance),
+    }
+}
+
+fn render_orchestration_json(value: &impl serde::Serialize) -> ExitCode {
+    match serde_json::to_string_pretty(value) {
+        Ok(rendered) => render_orchestration_output(&format!("{rendered}\n")),
+        Err(error) => orchestration_failure(&format!("JSON render failed: {error}")),
+    }
+}
+
+fn render_orchestration_output(output: &str) -> ExitCode {
+    match write_stdout_and_flush(output) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => orchestration_failure(&format!("output failed: {error}")),
+    }
+}
+
+fn orchestration_failure(message: &str) -> ExitCode {
+    eprintln!("Orchestration failed: {message}");
+    ExitCode::FAILURE
 }
 
 async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandArgs) -> ExitCode {
