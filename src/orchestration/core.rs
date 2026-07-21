@@ -31,6 +31,10 @@ const INSTANCE_VERSION_INCREMENT: u64 = 1;
 const EPOCH_INCREMENT: u64 = 1;
 const ROUND_INCREMENT: u64 = 1;
 const MAX_REPLAY_DIAGNOSTICS: usize = 1;
+pub const ABANDONED_ACKNOWLEDGED_SUMMARY: &str =
+    "local dispatch abandoned after acknowledgement; remote outcome unknown";
+pub const ABANDONED_PENDING_SUMMARY: &str =
+    "local dispatch abandoned before acknowledgement; workflow shell was not invoked";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -272,6 +276,11 @@ pub enum OrchestrationAction {
         run_id: RunId,
         cancelled: bool,
     },
+    AbandonPendingDispatch {
+        actor: String,
+        dispatch_id: String,
+        run_id: RunId,
+    },
     BudgetExhausted {
         safe_reason: String,
     },
@@ -291,6 +300,7 @@ pub enum OrchestrationEventKind {
     Resumed,
     CancellationRequested,
     CancellationObserved,
+    DispatchAbandoned,
     BudgetExhausted,
 }
 
@@ -336,6 +346,7 @@ pub enum OrchestrationDiagnosticCode {
     ProposalMismatch,
     StaleApproval,
     UnauthorizedActor,
+    CancellationRequired,
     SuccessorValidationFailed,
     InvalidIdentity,
     ReplayMismatch,
@@ -369,6 +380,17 @@ pub struct ReplayReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrchestrationTriggerContext {
     pub accepted: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TriggerStartRequest<'a> {
+    pub definition: &'a OrchestrationDefinition,
+    pub definition_revision: &'a str,
+    pub trigger_id: &'a str,
+    pub trigger_kind: OrchestrationTriggerKind,
+    pub idempotency_key: &'a str,
+    pub next_sequence: u64,
+    pub context: &'a OrchestrationTriggerContext,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -686,6 +708,11 @@ fn apply_action(
         OrchestrationAction::CancellationObserved { run_id, cancelled } => {
             observe_cancellation(instance, *run_id, *cancelled)
         }
+        OrchestrationAction::AbandonPendingDispatch {
+            actor,
+            dispatch_id,
+            run_id,
+        } => abandon_pending_dispatch(instance, actor, dispatch_id, *run_id),
         OrchestrationAction::BudgetExhausted { safe_reason } => exhaust_budget(instance, safe_reason),
     }
 }
@@ -893,6 +920,62 @@ fn observe_cancellation(
         instance.pending_dispatch = None;
     }
     Ok(OrchestrationEventKind::CancellationObserved)
+}
+
+// r[impl lattice.agent_orchestration.unobserved_abandon]
+fn abandon_pending_dispatch(
+    instance: &mut OrchestrationInstance,
+    actor: &str,
+    dispatch_id: &str,
+    run_id: RunId,
+) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
+    authorize_actor(instance, actor)?;
+    if !instance.cancellation_requested {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::CancellationRequired,
+            "pending dispatch abandonment requires a prior cancellation request",
+        ));
+    }
+    let dispatch = matching_dispatch(instance, dispatch_id)?;
+    if dispatch.run_id != run_id || instance.active_run_id != Some(run_id) {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::DispatchMismatch,
+            "abandonment does not match the active dispatch and run identities",
+        ));
+    }
+    let dispatch_status = dispatch.status;
+    let observed_usage = match dispatch_status {
+        DispatchStatus::Pending => BudgetCharge::default(),
+        DispatchStatus::Acknowledged => {
+            instance
+                .budgets
+                .reservations
+                .get(dispatch_id)
+                .ok_or_else(|| {
+                    diagnostic(
+                        OrchestrationDiagnosticCode::MissingReservation,
+                        "acknowledged abandonment is missing its conservative budget reservation",
+                    )
+                })?
+                .charge
+        }
+    };
+    let settlement = settle_budget(&mut instance.budgets, dispatch_id, observed_usage)?;
+    let safe_summary = match dispatch_status {
+        DispatchStatus::Pending => ABANDONED_PENDING_SUMMARY,
+        DispatchStatus::Acknowledged => ABANDONED_ACKNOWLEDGED_SUMMARY,
+    };
+    instance.active_run_id = None;
+    instance.pending_dispatch = None;
+    instance.pause_requested = false;
+    instance.paused_status = None;
+    instance.cancellation_requested = false;
+    instance.status = OrchestrationStatus::Failed;
+    instance.terminal_summary = instance.definition.redaction.retain_safe_summaries.then(|| safe_summary.to_string());
+    debug_assert!(!settlement.breached);
+    debug_assert!(instance.active_run_id.is_none());
+    debug_assert!(instance.pending_dispatch.is_none());
+    Ok(OrchestrationEventKind::DispatchAbandoned)
 }
 
 fn exhaust_budget(
@@ -1252,36 +1335,41 @@ pub fn replay_events(
 
 // r[impl lattice.agent_orchestration.triggers]
 pub fn admit_trigger_start(
-    definition: &OrchestrationDefinition,
-    definition_revision: &str,
-    trigger_id: &str,
-    trigger_kind: OrchestrationTriggerKind,
-    idempotency_key: &str,
-    next_sequence: u64,
-    context: &OrchestrationTriggerContext,
+    request: TriggerStartRequest<'_>,
 ) -> Result<OrchestrationTriggerAdmission, OrchestrationDiagnostic> {
-    if !definition
+    if !request
+        .definition
         .triggers
         .iter()
-        .any(|binding| binding.trigger_id == trigger_id && binding.kind == trigger_kind)
+        .any(|binding| binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
     {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::TriggerNotBound,
-            format!("trigger '{trigger_id}' is not bound to orchestration '{}'", definition.id),
+            format!("trigger '{}' is not bound to orchestration '{}'", request.trigger_id, request.definition.id),
         ));
     }
-    let scoped_key = scoped_trigger_key(definition_revision, trigger_id, idempotency_key)?;
-    if let Some(instance_id) = context.accepted.get(&scoped_key) {
+    debug_assert!(
+        request
+            .definition
+            .triggers
+            .iter()
+            .any(|binding| binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
+    );
+    let scoped_key = scoped_trigger_key(request.definition_revision, request.trigger_id, request.idempotency_key)?;
+    debug_assert!(!scoped_key.is_empty());
+    if let Some(instance_id) = request.context.accepted.get(&scoped_key) {
         return Ok(OrchestrationTriggerAdmission::Duplicate {
             instance_id: instance_id.clone(),
         });
     }
-    let instance_id =
-        hash_serializable(INSTANCE_HASH_LABEL, &(definition_revision, next_sequence, Some(scoped_key.as_str())))?;
+    let instance_id = hash_serializable(
+        INSTANCE_HASH_LABEL,
+        &(request.definition_revision, request.next_sequence, Some(scoped_key.as_str())),
+    )?;
     Ok(OrchestrationTriggerAdmission::Accepted(OrchestrationTriggerPlan {
         scoped_key,
         instance_id,
-        definition_revision: definition_revision.to_string(),
+        definition_revision: request.definition_revision.to_string(),
     }))
 }
 

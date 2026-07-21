@@ -62,6 +62,12 @@ pub enum RecoveryOutcome {
     Reconciled(Box<OrchestrationInstance>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AbandonPendingRequest<'a> {
+    pub instance_id: &'a str,
+    pub actor: &'a str,
+}
+
 #[derive(Debug)]
 pub enum OrchestrationShellError {
     Store(StoreError),
@@ -72,6 +78,8 @@ pub enum OrchestrationShellError {
     MissingInstance(String),
     MissingProposal(String),
     InvalidProposal(String),
+    NoPendingDispatch(String),
+    ObservedRunRequiresRecovery { run_id: RunId },
     ReplayInvalid(Box<ReplayReport>),
 }
 
@@ -91,6 +99,10 @@ impl fmt::Display for OrchestrationShellError {
             Self::MissingInstance(id) => write!(formatter, "orchestration instance not found: {id}"),
             Self::MissingProposal(id) => write!(formatter, "orchestration proposal not found: {id}"),
             Self::InvalidProposal(message) => write!(formatter, "orchestration proposal is invalid: {message}"),
+            Self::NoPendingDispatch(id) => write!(formatter, "orchestration instance has no pending dispatch: {id}"),
+            Self::ObservedRunRequiresRecovery { run_id } => {
+                write!(formatter, "run {run_id} is already persisted; use orchestration recover instead of abandon")
+            }
             Self::ReplayInvalid(report) => {
                 write!(formatter, "orchestration replay is invalid: {} diagnostics", report.diagnostics.len())
             }
@@ -179,15 +191,16 @@ pub async fn start_from_trigger(
     let definition_revision = core::definition_revision(&definition)?;
     let accepted = store.list_orchestration_trigger_admissions()?.into_iter().collect::<BTreeMap<_, _>>();
     let sequence = store.next_orchestration_sequence()?;
-    let admission = core::admit_trigger_start(
-        &definition,
-        &definition_revision,
+    let context = OrchestrationTriggerContext { accepted };
+    let admission = core::admit_trigger_start(core::TriggerStartRequest {
+        definition: &definition,
+        definition_revision: &definition_revision,
         trigger_id,
         trigger_kind,
         idempotency_key,
-        sequence,
-        &OrchestrationTriggerContext { accepted },
-    )?;
+        next_sequence: sequence,
+        context: &context,
+    })?;
     match admission {
         OrchestrationTriggerAdmission::Duplicate { instance_id } => load_instance(store, &instance_id),
         OrchestrationTriggerAdmission::Accepted(plan) => {
@@ -441,6 +454,26 @@ pub fn recover_pending(store: &Store, instance_id: &str) -> Result<RecoveryOutco
     };
     let reconciled = reconcile_run_record(store, &instance, &intent, &record)?;
     Ok(RecoveryOutcome::Reconciled(Box::new(reconciled)))
+}
+
+// r[impl lattice.agent_orchestration.unobserved_abandon]
+pub fn abandon_pending(
+    store: &Store,
+    request: AbandonPendingRequest<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let instance = load_instance(store, request.instance_id)?;
+    let intent = instance
+        .pending_dispatch
+        .clone()
+        .ok_or_else(|| OrchestrationShellError::NoPendingDispatch(request.instance_id.to_string()))?;
+    if store.load_run(intent.run_id)?.is_some() {
+        return Err(OrchestrationShellError::ObservedRunRequiresRecovery { run_id: intent.run_id });
+    }
+    apply_and_commit(store, &instance, OrchestrationAction::AbandonPendingDispatch {
+        actor: request.actor.to_string(),
+        dispatch_id: intent.id,
+        run_id: intent.run_id,
+    })
 }
 
 fn reconcile_run_record(

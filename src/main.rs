@@ -416,6 +416,14 @@ enum OrchestrationCliCommand {
         #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
         output: OrchestrationOutputFormat,
     },
+    /// Fail a cancelled, locally unobserved dispatch without retrying its effect
+    Abandon {
+        instance: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -853,6 +861,17 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Err(error) => orchestration_failure(&error.to_string()),
             }
         }
+        OrchestrationCliCommand::Abandon {
+            instance,
+            actor,
+            output,
+        } => match orchestration::abandon_pending(&store, orchestration::AbandonPendingRequest {
+            instance_id: instance,
+            actor,
+        }) {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
     }
 }
 

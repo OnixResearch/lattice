@@ -3,6 +3,8 @@ use std::collections::BTreeSet;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
+use lattice::orchestration::ABANDONED_ACKNOWLEDGED_SUMMARY;
+use lattice::orchestration::ABANDONED_PENDING_SUMMARY;
 use lattice::orchestration::ApprovalDecision;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
@@ -17,6 +19,7 @@ use lattice::orchestration::DispatchStatus;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationDiagnosticCode;
+use lattice::orchestration::OrchestrationEventKind;
 use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::OrchestrationStatus;
 use lattice::orchestration::OrchestrationTriggerAdmission;
@@ -25,6 +28,7 @@ use lattice::orchestration::OrchestrationTriggerContext;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RevisionProposal;
+use lattice::orchestration::TriggerStartRequest;
 use lattice::orchestration::admit_trigger_start;
 use lattice::orchestration::authority_policy_hash;
 use lattice::orchestration::current_schema_version;
@@ -382,15 +386,15 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
     let empty = OrchestrationTriggerContext {
         accepted: BTreeMap::new(),
     };
-    let admitted = admit_trigger_start(
-        &definition,
-        &revision,
-        TRIGGER_ID,
-        OrchestrationTriggerKind::Webhook,
-        IDEMPOTENCY_KEY,
-        FIRST_INSTANCE_SEQUENCE,
-        &empty,
-    )
+    let admitted = admit_trigger_start(TriggerStartRequest {
+        definition: &definition,
+        definition_revision: &revision,
+        trigger_id: TRIGGER_ID,
+        trigger_kind: OrchestrationTriggerKind::Webhook,
+        idempotency_key: IDEMPOTENCY_KEY,
+        next_sequence: FIRST_INSTANCE_SEQUENCE,
+        context: &empty,
+    })
     .expect("bound trigger must admit");
     let OrchestrationTriggerAdmission::Accepted(plan) = admitted else {
         panic!("first trigger must be accepted");
@@ -398,29 +402,29 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
     let duplicate_context = OrchestrationTriggerContext {
         accepted: BTreeMap::from([(plan.scoped_key.clone(), plan.instance_id.clone())]),
     };
-    let duplicate = admit_trigger_start(
-        &definition,
-        &revision,
-        TRIGGER_ID,
-        OrchestrationTriggerKind::Webhook,
-        IDEMPOTENCY_KEY,
-        FIRST_INSTANCE_SEQUENCE,
-        &duplicate_context,
-    )
+    let duplicate = admit_trigger_start(TriggerStartRequest {
+        definition: &definition,
+        definition_revision: &revision,
+        trigger_id: TRIGGER_ID,
+        trigger_kind: OrchestrationTriggerKind::Webhook,
+        idempotency_key: IDEMPOTENCY_KEY,
+        next_sequence: FIRST_INSTANCE_SEQUENCE,
+        context: &duplicate_context,
+    })
     .expect("duplicate trigger returns prior result");
     assert_eq!(duplicate, OrchestrationTriggerAdmission::Duplicate {
         instance_id: plan.instance_id
     });
 
-    let error = admit_trigger_start(
-        &definition,
-        &revision,
-        "missing-trigger",
-        OrchestrationTriggerKind::Webhook,
-        IDEMPOTENCY_KEY,
-        FIRST_INSTANCE_SEQUENCE,
-        &empty,
-    )
+    let error = admit_trigger_start(TriggerStartRequest {
+        definition: &definition,
+        definition_revision: &revision,
+        trigger_id: "missing-trigger",
+        trigger_kind: OrchestrationTriggerKind::Webhook,
+        idempotency_key: IDEMPOTENCY_KEY,
+        next_sequence: FIRST_INSTANCE_SEQUENCE,
+        context: &empty,
+    })
     .expect_err("unbound trigger must fail");
     assert_eq!(error.code, OrchestrationDiagnosticCode::TriggerNotBound);
 }
@@ -460,6 +464,129 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
     .instance;
     assert_eq!(cancel_requested.status, OrchestrationStatus::Running);
     assert!(cancel_requested.cancellation_requested);
+}
+
+// r[verify lattice.agent_orchestration.unobserved_abandon]
+#[test]
+fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_claim() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base);
+    let dispatch = started.instance.pending_dispatch.as_ref().expect("dispatch must be pending");
+    let acknowledged_action = OrchestrationAction::DispatchAcknowledged {
+        dispatch_id: dispatch.id.clone(),
+    };
+    let acknowledged = transition(&started.instance, fact(&started.instance, acknowledged_action))
+        .expect("dispatch acknowledgement must apply");
+    let cancel_action = OrchestrationAction::CancelRequested {
+        actor: ACTOR.to_string(),
+    };
+    let cancelled = transition(&acknowledged.instance, fact(&acknowledged.instance, cancel_action))
+        .expect("cancellation request must apply");
+    let active = cancelled.instance.pending_dispatch.as_ref().expect("dispatch remains pending");
+    let abandon_action = OrchestrationAction::AbandonPendingDispatch {
+        actor: ACTOR.to_string(),
+        dispatch_id: active.id.clone(),
+        run_id: active.run_id,
+    };
+    let abandon_fact = fact(&cancelled.instance, abandon_action.clone());
+    let abandoned = transition(&cancelled.instance, abandon_fact.clone()).expect("abandonment must apply");
+
+    assert_eq!(abandoned.instance.status, OrchestrationStatus::Failed);
+    assert_eq!(abandoned.instance.budgets.consumed, charge());
+    assert!(abandoned.instance.budgets.reservations.is_empty());
+    assert!(abandoned.instance.active_run_id.is_none());
+    assert!(abandoned.instance.pending_dispatch.is_none());
+    assert!(!abandoned.instance.cancellation_requested);
+    assert_eq!(abandoned.instance.terminal_summary.as_deref(), Some(ABANDONED_ACKNOWLEDGED_SUMMARY));
+    assert_eq!(abandoned.event.as_ref().expect("event must exist").kind, OrchestrationEventKind::DispatchAbandoned);
+
+    let events = vec![
+        started.event.expect("start event exists"),
+        acknowledged.event.expect("acknowledgement event exists"),
+        cancelled.event.expect("cancellation event exists"),
+        abandoned.event.clone().expect("abandonment event exists"),
+    ];
+    let replay = replay_events(&base, &events, abandoned.instance.event_head.as_deref());
+    assert!(replay.valid);
+    assert_eq!(replay.instance, abandoned.instance);
+
+    let duplicate = transition(&abandoned.instance, abandon_fact).expect("same fact must be idempotent");
+    assert!(duplicate.duplicate);
+    assert!(duplicate.event.is_none());
+    let terminal_error = transition(&abandoned.instance, fact(&abandoned.instance, abandon_action))
+        .expect_err("new abandonment fact cannot mutate terminal state");
+    assert_eq!(terminal_error.code, OrchestrationDiagnosticCode::TerminalStateMutation);
+}
+
+// r[verify lattice.agent_orchestration.unobserved_abandon]
+#[test]
+fn planned_abandonment_releases_reservation_without_consumption() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base);
+    let cancel_action = OrchestrationAction::CancelRequested {
+        actor: ACTOR.to_string(),
+    };
+    let cancelled = transition(&started.instance, fact(&started.instance, cancel_action))
+        .expect("cancellation request must apply")
+        .instance;
+    let dispatch = cancelled.pending_dispatch.as_ref().expect("dispatch remains pending");
+    let abandon_action = OrchestrationAction::AbandonPendingDispatch {
+        actor: ACTOR.to_string(),
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+    };
+
+    let abandoned = transition(&cancelled, fact(&cancelled, abandon_action))
+        .expect("planned abandonment must apply")
+        .instance;
+
+    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
+    assert_eq!(abandoned.budgets.consumed, BudgetCharge::default());
+    assert!(abandoned.budgets.reservations.is_empty());
+    assert_eq!(abandoned.terminal_summary.as_deref(), Some(ABANDONED_PENDING_SUMMARY));
+}
+
+// r[verify lattice.agent_orchestration.unobserved_abandon]
+#[test]
+fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let running = start_transition(&base).instance;
+    let dispatch = running.pending_dispatch.as_ref().expect("dispatch must be pending");
+    let action = OrchestrationAction::AbandonPendingDispatch {
+        actor: ACTOR.to_string(),
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+    };
+    let missing_cancellation =
+        transition(&running, fact(&running, action)).expect_err("abandonment requires cancellation");
+    assert_eq!(missing_cancellation.code, OrchestrationDiagnosticCode::CancellationRequired);
+
+    let cancel_action = OrchestrationAction::CancelRequested {
+        actor: ACTOR.to_string(),
+    };
+    let cancelled = transition(&running, fact(&running, cancel_action))
+        .expect("cancellation request must apply")
+        .instance;
+    let dispatch = cancelled.pending_dispatch.as_ref().expect("dispatch remains pending");
+    let unauthorized_action = OrchestrationAction::AbandonPendingDispatch {
+        actor: OTHER_ACTOR.to_string(),
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+    };
+    let unauthorized =
+        transition(&cancelled, fact(&cancelled, unauthorized_action)).expect_err("unauthorized abandonment must fail");
+    assert_eq!(unauthorized.code, OrchestrationDiagnosticCode::UnauthorizedActor);
+
+    let mismatched_action = OrchestrationAction::AbandonPendingDispatch {
+        actor: ACTOR.to_string(),
+        dispatch_id: DISPATCH_ID.to_string(),
+        run_id: dispatch.run_id,
+    };
+    let mismatched =
+        transition(&cancelled, fact(&cancelled, mismatched_action)).expect_err("mismatched abandonment must fail");
+    assert_eq!(mismatched.code, OrchestrationDiagnosticCode::DispatchMismatch);
+    assert_eq!(cancelled.budgets.consumed, BudgetCharge::default());
+    assert_eq!(cancelled.budgets.reservations.len(), FIRST_INSTANCE_SEQUENCE as usize);
 }
 
 // r[verify lattice.agent_orchestration.authority]

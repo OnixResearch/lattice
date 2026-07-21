@@ -63,6 +63,17 @@ lattice --config ./demo/config.ncl orchestration status <instance-id>
 lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
 ```
 
+If the original executor has stopped and recovery reports `PendingUnobserved`, close the uncertain local dispatch explicitly rather than retrying it:
+
+```bash
+lattice --config ./demo/config.ncl orchestration recover <instance-id> --output json
+lattice --config ./demo/config.ncl orchestration cancel <instance-id> --actor operator:local --output json
+lattice --config ./demo/config.ncl orchestration abandon <instance-id> --actor operator:local --output json
+lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
+```
+
+Abandonment requires a prior authorized cancellation request and refuses to override a persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
+
 A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
 
 ## Local file capabilities

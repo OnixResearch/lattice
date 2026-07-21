@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use lattice::agent_node::AgentRuntimeConfig;
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
+use lattice::orchestration::AbandonPendingRequest;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -14,12 +15,15 @@ use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
+use lattice::orchestration::OrchestrationEvent;
 use lattice::orchestration::OrchestrationFact;
+use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::OrchestrationStatus;
 use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RecoveryOutcome;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::abandon_pending;
 use lattice::orchestration::approve;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::dispatch_identity;
@@ -43,6 +47,7 @@ const FIRST_WORKFLOW_NAME: &str = "shell-round-one";
 const SECOND_WORKFLOW_NAME: &str = "shell-round-two";
 const SHELL_COMMAND: &str = "printf bounded";
 const ACTOR: &str = "operator:shell";
+const UNAUTHORIZED_ACTOR: &str = "agent:shell";
 const TRIGGER_ID: &str = "shell-webhook";
 const IDEMPOTENCY_KEY: &str = "request-one";
 const FIRST_SEQUENCE: u64 = 1;
@@ -93,6 +98,56 @@ fn store() -> (tempfile::TempDir, Store) {
     let directory = tempdir().expect("temporary directory must exist");
     let store = Store::new(directory.path().join("shell.redb")).expect("store must open");
     (directory, store)
+}
+
+fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstance, Vec<OrchestrationEvent>) {
+    let base = new_instance(definition(workflow, CompletionPolicy::RunSucceeded), FIRST_SEQUENCE, None)
+        .expect("instance must hash");
+    let run_id = RunId(RECOVERY_RUN_ID);
+    let intent = DispatchIntent {
+        id: dispatch_identity(&base, run_id).expect("dispatch must hash"),
+        run_id,
+        workflow_revision: base.workflow_revision.clone(),
+        status: DispatchStatus::Pending,
+    };
+    let start_action = OrchestrationAction::StartRound {
+        intent,
+        planned_charge: BudgetChargePlan {
+            rounds: Some(FIRST_SEQUENCE),
+            agent_invocations: Some(0),
+            tokens: Some(0),
+            monetary_microunits: Some(0),
+            duration_millis: Some(0),
+        },
+    };
+    let started = transition(&base, OrchestrationFact {
+        id: fact_identity(&base.id, base.version, &start_action).expect("start fact must hash"),
+        action: start_action,
+    })
+    .expect("start must apply");
+    let dispatch_id = started.instance.pending_dispatch.as_ref().expect("dispatch must be pending").id.clone();
+    let acknowledge_action = OrchestrationAction::DispatchAcknowledged { dispatch_id };
+    let acknowledged = transition(&started.instance, OrchestrationFact {
+        id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
+            .expect("acknowledgement fact must hash"),
+        action: acknowledge_action,
+    })
+    .expect("acknowledgement must apply");
+    let cancel_action = OrchestrationAction::CancelRequested {
+        actor: ACTOR.to_string(),
+    };
+    let cancelled = transition(&acknowledged.instance, OrchestrationFact {
+        id: fact_identity(&acknowledged.instance.id, acknowledged.instance.version, &cancel_action)
+            .expect("cancellation fact must hash"),
+        action: cancel_action,
+    })
+    .expect("cancellation must apply");
+    let events = vec![
+        started.event.expect("start event must exist"),
+        acknowledged.event.expect("acknowledgement event must exist"),
+        cancelled.event.expect("cancellation event must exist"),
+    ];
+    (cancelled.instance, events)
 }
 
 // r[verify lattice.agent_orchestration.rounds]
@@ -251,6 +306,86 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
         panic!("existing run must reconcile");
     };
     assert_eq!(reconciled.status, OrchestrationStatus::Completed);
+    assert!(reconciled.pending_dispatch.is_none());
+}
+
+// r[verify lattice.agent_orchestration.unobserved_abandon]
+#[test]
+fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry() {
+    let (_directory, store) = store();
+    let workflow = workflow(FIRST_WORKFLOW_NAME);
+    store.save_workflow(&workflow).expect("workflow must persist");
+    let (instance, events) = cancelled_acknowledged_instance(&workflow);
+    store.create_orchestration(&instance, &events).expect("pending instance must persist");
+
+    let outcome = recover_pending(&store, &instance.id).expect("recovery must inspect pending run");
+    assert_eq!(outcome, RecoveryOutcome::PendingUnobserved {
+        run_id: RunId(RECOVERY_RUN_ID),
+    });
+    let unauthorized = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &instance.id,
+        actor: UNAUTHORIZED_ACTOR,
+    })
+    .expect_err("unauthorized abandonment must fail");
+    assert!(unauthorized.to_string().contains("not authorized"));
+    assert_eq!(store.load_orchestration(&instance.id).expect("instance must load"), Some(instance.clone()));
+
+    let abandoned = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &instance.id,
+        actor: ACTOR,
+    })
+    .expect("authorized abandonment must apply");
+    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
+    assert!(abandoned.pending_dispatch.is_none());
+    assert!(abandoned.active_run_id.is_none());
+    assert!(abandoned.budgets.reservations.is_empty());
+    assert_eq!(abandoned.budgets.consumed.rounds, FIRST_SEQUENCE);
+    let report = replay(&store, &instance.id).expect("abandonment replay must validate");
+    assert!(report.valid);
+    assert_eq!(report.instance, abandoned);
+
+    let repeated = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &instance.id,
+        actor: ACTOR,
+    })
+    .expect_err("terminal abandonment cannot repeat");
+    assert!(repeated.to_string().contains("no pending dispatch"));
+    assert!(store.load_run(RunId(RECOVERY_RUN_ID)).expect("run lookup must succeed").is_none());
+}
+
+// r[verify lattice.agent_orchestration.unobserved_abandon]
+#[test]
+fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
+    let (_directory, store) = store();
+    let workflow = workflow(FIRST_WORKFLOW_NAME);
+    store.save_workflow(&workflow).expect("workflow must persist");
+    let (instance, events) = cancelled_acknowledged_instance(&workflow);
+    store.create_orchestration(&instance, &events).expect("pending instance must persist");
+    store
+        .save_run(&RunRecord {
+            run_id: RunId(RECOVERY_RUN_ID),
+            workflow_name: FIRST_WORKFLOW_NAME.to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
+            node_count: FIRST_SEQUENCE as usize,
+            cache_hits: 0,
+            failures: 0,
+        })
+        .expect("observed run must persist");
+
+    let rejected = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &instance.id,
+        actor: ACTOR,
+    })
+    .expect_err("observed run cannot be abandoned");
+    assert!(rejected.to_string().contains("use orchestration recover"));
+    assert_eq!(store.load_orchestration(&instance.id).expect("instance must load"), Some(instance.clone()));
+
+    let outcome = recover_pending(&store, &instance.id).expect("ordinary recovery must reconcile");
+    let RecoveryOutcome::Reconciled(reconciled) = outcome else {
+        panic!("observed run must reconcile");
+    };
+    assert_eq!(reconciled.status, OrchestrationStatus::Cancelled);
     assert!(reconciled.pending_dispatch.is_none());
 }
 
