@@ -540,7 +540,7 @@ fn cli_missing_store_does_not_create_data_directory_or_database() {
 
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("run evidence store read failed"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("run evidence store is unavailable"));
     assert!(!data_dir.exists());
 }
 

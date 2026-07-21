@@ -9,9 +9,23 @@ const ORCHESTRATION_INSTANCES: redb::TableDefinition<&str, &[u8]> =
     redb::TableDefinition::new("orchestration_instances");
 const ORCHESTRATION_EVENTS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("orchestration_events");
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenFailure {
+    ActiveOwner,
+    RecoveryRequired,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepairOutcome {
+    Repaired,
+    AlreadyClean,
+}
+
 #[derive(Debug)]
 pub enum Error {
     NotFound(crate::engine::RunId),
+    Open(OpenFailure),
     Store(crate::store::StoreError),
 }
 
@@ -19,7 +33,15 @@ impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotFound(run_id) => write!(formatter, "run {} not found", run_id.0),
-            Self::Store(_) => write!(formatter, "run evidence store read failed"),
+            Self::Open(OpenFailure::ActiveOwner) => {
+                write!(formatter, "run evidence store is owned by another process; retry after it exits")
+            }
+            Self::Open(OpenFailure::RecoveryRequired) => write!(
+                formatter,
+                "run evidence store requires recovery; run `runs repair` with the same configuration, then retry"
+            ),
+            Self::Open(OpenFailure::Unavailable) => write!(formatter, "run evidence store is unavailable"),
+            Self::Store(_) => write!(formatter, "run evidence store contents could not be read safely"),
         }
     }
 }
@@ -32,14 +54,22 @@ impl From<crate::store::StoreError> for Error {
     }
 }
 
+fn classify_open_failure(error: &redb::DatabaseError) -> OpenFailure {
+    match error {
+        redb::DatabaseError::DatabaseAlreadyOpen => OpenFailure::ActiveOwner,
+        redb::DatabaseError::RepairAborted => OpenFailure::RecoveryRequired,
+        _ => OpenFailure::Unavailable,
+    }
+}
+
 struct ReadOnlyStore {
     database: redb::ReadOnlyDatabase,
 }
 
 impl ReadOnlyStore {
-    fn open(path: &std::path::Path) -> Result<Self, crate::store::StoreError> {
+    fn open(path: &std::path::Path) -> Result<Self, Error> {
         let database =
-            redb::ReadOnlyDatabase::open(path).map_err(|error| crate::store::StoreError::Db(error.to_string()))?;
+            redb::ReadOnlyDatabase::open(path).map_err(|error| Error::Open(classify_open_failure(&error)))?;
         Ok(Self { database })
     }
 
@@ -114,6 +144,24 @@ fn store_db_error(error: impl std::fmt::Display) -> crate::store::StoreError {
 
 fn store_table_error(error: impl std::fmt::Display) -> crate::store::StoreError {
     crate::store::StoreError::Table(error.to_string())
+}
+
+// r[impl lattice.workflow_execution.run_store_recovery]
+pub fn repair_path(store_path: &std::path::Path) -> Result<RepairOutcome, Error> {
+    let repair_observed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let callback_observed = repair_observed.clone();
+    let mut builder = redb::Builder::new();
+    builder.set_repair_callback(move |_| {
+        callback_observed.store(true, std::sync::atomic::Ordering::Relaxed);
+    });
+    let database = builder.open(store_path).map_err(|error| Error::Open(classify_open_failure(&error)))?;
+    drop(database);
+    debug_assert!(store_path.exists());
+    if repair_observed.load(std::sync::atomic::Ordering::Relaxed) {
+        Ok(RepairOutcome::Repaired)
+    } else {
+        Ok(RepairOutcome::AlreadyClean)
+    }
 }
 
 // r[impl lattice.workflow_execution.safe_run_inspection]

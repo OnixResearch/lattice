@@ -286,6 +286,8 @@ enum RunsCliCommand {
         #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
         output: RunOutputFormat,
     },
+    /// Explicitly repair an existing redb store after an unclean writer exit
+    Repair,
 }
 
 #[derive(clap::Args, Debug)]
@@ -948,11 +950,15 @@ fn orchestration_failure(message: &str) -> ExitCode {
     ExitCode::FAILURE
 }
 
-// r[impl lattice.workflow_execution.safe_run_inspection]
 fn run_runs_command(app_config: &config::AppConfig, args: &RunsCommandArgs) -> ExitCode {
-    let (run_id, output) = match &args.command {
-        RunsCliCommand::Show { run_id, output } => (*run_id, *output),
-    };
+    match &args.command {
+        RunsCliCommand::Show { run_id, output } => run_show_command(app_config, *run_id, *output),
+        RunsCliCommand::Repair => run_repair_command(app_config),
+    }
+}
+
+// r[impl lattice.workflow_execution.safe_run_inspection]
+fn run_show_command(app_config: &config::AppConfig, run_id: u64, output: RunOutputFormat) -> ExitCode {
     let store_path = config::store_path(&app_config.data_dir);
     let result = match lattice::run::shell::inspect_path(&store_path, lattice::engine::RunId(run_id)) {
         Ok(result) => result,
@@ -980,6 +986,27 @@ fn run_runs_command(app_config: &config::AppConfig, args: &RunsCommandArgs) -> E
     } else {
         ExitCode::FAILURE
     }
+}
+
+// r[impl lattice.workflow_execution.run_store_recovery]
+fn run_repair_command(app_config: &config::AppConfig) -> ExitCode {
+    let store_path = config::store_path(&app_config.data_dir);
+    let outcome = match lattice::run::shell::repair_path(&store_path) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            eprintln!("Run store repair failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let receipt = match outcome {
+        lattice::run::shell::RepairOutcome::Repaired => "Run evidence store recovery completed.\n",
+        lattice::run::shell::RepairOutcome::AlreadyClean => "Run evidence store is already clean.\n",
+    };
+    if let Err(error) = write_stdout_and_flush(receipt) {
+        eprintln!("Run store repair failed: output failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
 }
 
 async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandArgs) -> ExitCode {

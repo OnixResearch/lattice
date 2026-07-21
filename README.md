@@ -89,7 +89,16 @@ lattice --config ./demo/config.ncl runs show 1 --output json
 
 The report includes the numeric run identity, a domain-separated BLAKE3 workflow-name fingerprint, lifecycle counts, node IDs/statuses/counts, exact orchestration owner and dispatch identities, dispatch/recovery/abandonment state, bounded budget facts, and run/orchestration replay state. It structurally omits workflow names, node and port labels, output and error text, replay summaries, orchestration objectives and summaries, actors, and trigger keys. The fingerprint is an identity aid, not a confidentiality claim for guessable workflow names.
 
-Historical missing details or replay are reported as `not_recorded`; contradictory present evidence renders a report with `valid: false` and exits unsuccessfully. A missing run fails without creating a data directory or database. Pending-unobserved and abandoned dispatches with no `RunRecord` remain on `orchestration status|recover|replay` because synthesizing a run would falsely claim local observation. The read-only redb handle may be unavailable while another process owns the database lock.
+Historical missing details or replay are reported as `not_recorded`; contradictory present evidence renders a report with `valid: false` and exits unsuccessfully. A missing run fails without creating a data directory or database. Pending-unobserved and abandoned dispatches with no `RunRecord` remain on `orchestration status|recover|replay` because synthesizing a run would falsely claim local observation.
+
+`runs show` remains strictly read-only. It distinguishes a store currently owned by another process from a store that redb cannot open read-only after an unclean writer exit. Retry after an active owner exits. If recovery is required, invoke the explicit mutating command with the same configuration, then retry inspection:
+
+```bash
+lattice --config ./demo/config.ncl runs repair
+lattice --config ./demo/config.ncl runs show 1 --output json
+```
+
+`runs repair` opens only an existing store through redb's write-mode recovery and creates no Lattice application records. It refuses missing, actively owned, unsupported, or unavailable stores and emits fixed diagnostics rather than backend/path details. Recovery may change redb storage metadata; success proves only that redb reopened the file, not semantic correctness, complete history, external anchoring, provider truth, remote exactly-once effects, or production readiness.
 
 ## Local file capabilities
 
