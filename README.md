@@ -35,6 +35,22 @@ lattice --config examples/config/openai-compatible-agent.ncl import examples/wor
 lattice --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
 ```
 
+## Durable agent orchestration
+
+Lattice can coordinate immutable workflow revisions across explicit rounds with operator authority, budget reservations, crash recovery, and side-effect-free replay. Each round remains an acyclic workflow admitted through the Seaglass-backed runner. Agent output may propose a successor revision, but it cannot mutate graphs, credentials, triggers, runtime abilities, or budgets without an authorized hash-bound approval.
+
+The checked-in [`llm-review-loop`](examples/orchestrations/llm-review-loop.ncl) definition wraps the Markdown-backed LLM operating graph with bounded rounds, agent invocations, tokens, duration, schedule/webhook trigger identities, and `operator:local` approval authority.
+
+```bash
+cargo run --example generate_llm_orchestration
+lattice --config ./demo/config.ncl orchestration validate examples/orchestrations/llm-review-loop.ncl
+lattice --config ./demo/config.ncl orchestration start examples/orchestrations/llm-review-loop.ncl --actor operator:local --output json
+lattice --config ./demo/config.ncl orchestration status <instance-id>
+lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
+```
+
+A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
+
 ## Local file capabilities
 
 Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. The same capability core confines production image inputs, Markdown prompt hydration, and generic-agent image/artifact handoffs while preserving their byte, UTF-8, and media checks. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured roots, workflow directories, and agent working directories are trusted authority grants; these readers do not turn untrusted workflow definitions into a host sandbox.

@@ -24,5 +24,5 @@
 
 ## Phase 5: Compatibility and verification
 
-- [ ] [serial] Add a runnable positive multi-round agent example and negative fixtures for hidden cycles, stale approvals, authority escalation, revision drift, budget exhaustion, duplicate triggers, crash recovery, and replay tampering. r[lattice.agent_orchestration.rounds] r[lattice.agent_orchestration.authority] r[lattice.agent_orchestration.budgets] r[lattice.agent_orchestration.durability] r[lattice.agent_orchestration.events]
+- [x] [serial] Add a runnable positive multi-round agent example and negative fixtures for hidden cycles, stale approvals, authority escalation, revision drift, budget exhaustion, duplicate triggers, crash recovery, and replay tampering. r[lattice.agent_orchestration.rounds] r[lattice.agent_orchestration.authority] r[lattice.agent_orchestration.budgets] r[lattice.agent_orchestration.durability] r[lattice.agent_orchestration.events]
 - [ ] [serial] Verify existing workflows, n8n parity fixtures, schedules, webhooks, replay, and the LLM operating graph remain compatible; run `scripts/check.rs`, Octet, Cairn gates/validation, and bounded Nix checks before sync/archive. r[lattice.agent_orchestration.format] r[lattice.agent_orchestration.triggers] r[lattice.agent_orchestration.cli]

@@ -18,11 +18,17 @@ use lattice::engine::executor::NodeStatus;
 use lattice::file_node::MemoryFileSystem;
 use lattice::http::NoopHttpClient;
 use lattice::image_node::NoopImageIo;
+use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::OrchestrationTriggerKind;
+use lattice::orchestration::load_definition_nickel_file;
+use lattice::orchestration::validate_definition;
+use lattice::orchestration::workflow_revision;
 use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
 const FIXTURE_PATH: &str = "examples/workflows/llm-operating-graph.ncl";
+const ORCHESTRATION_FIXTURE_PATH: &str = "examples/orchestrations/llm-review-loop.ncl";
 const BRIEF_PATH: &str = "examples/workflows/state/llm-operating-graph-brief.md";
 const REPORT_PATH: &str = "examples/workflows/state/llm-operating-graph-report.md";
 const BRIEF_TEXT: &str = "Evidence-backed operating graph brief";
@@ -159,6 +165,32 @@ async fn llm_operating_graph_executes_roles_fanout_aggregation_and_effects() {
     assert_eq!(reviewer.json_inputs, vec![builder_output()]);
     assert_eq!(publisher.text_inputs, vec![REVIEW_RESULT.to_string()]);
     assert_eq!(file_system.read_text(REPORT_PATH).as_deref(), Some(PUBLISHED_REPORT));
+}
+
+// r[verify lattice.agent_orchestration.model]
+// r[verify lattice.agent_orchestration.rounds]
+// r[verify lattice.agent_orchestration.format]
+#[test]
+fn durable_llm_orchestration_binds_the_checked_in_agent_graph() {
+    let workflow = load_workflow_nickel_file(Path::new(FIXTURE_PATH)).expect("operating graph fixture loads");
+    let definition = load_definition_nickel_file(Path::new(ORCHESTRATION_FIXTURE_PATH))
+        .expect("orchestration fixture loads");
+    let actual_revision = workflow_revision(&workflow).expect("workflow revision hashes");
+
+    assert!(validate_definition(&definition, Some(&actual_revision)).is_empty());
+    assert_eq!(definition.completion, CompletionPolicy::AwaitProposal);
+    assert!(
+        definition
+            .triggers
+            .iter()
+            .any(|binding| binding.kind == OrchestrationTriggerKind::Schedule)
+    );
+    assert!(
+        definition
+            .triggers
+            .iter()
+            .any(|binding| binding.kind == OrchestrationTriggerKind::Webhook)
+    );
 }
 
 // r[verify n8nclone.workflow_execution.llm_operating_graph]

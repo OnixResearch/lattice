@@ -22,6 +22,23 @@ They are useful for demos, import/export validation, and headless regression tes
 - `selfie-to-fine-art.ncl` — routes a selfie plus inspiration images through a generic Clankers agent node.
 - `webhook-cookbook.ncl` — imports a credential-reference authenticated webhook trigger for local listener demos.
 
+## Orchestrations
+
+`examples/orchestrations/llm-review-loop.ncl` wraps the Markdown-backed LLM operating graph in durable multi-round policy: immutable workflow identity, operator approval, bounded rounds/agent calls/tokens/duration, trigger identities, and replay-safe event history.
+
+Regenerate it after changing the referenced workflow topology or portable configuration:
+
+```bash
+cargo run --example generate_llm_orchestration
+```
+
+Validate and start it after importing `llm-operating-graph.ncl` into the selected store:
+
+```bash
+lattice --config ./demo/config.ncl orchestration validate examples/orchestrations/llm-review-loop.ncl
+lattice --config ./demo/config.ncl orchestration start examples/orchestrations/llm-review-loop.ncl --actor operator:local
+```
+
 Import and run one with a temporary config/store:
 
 ```bash

@@ -350,6 +350,14 @@ pub struct OrchestrationDiagnostic {
     pub message: String,
 }
 
+impl std::fmt::Display for OrchestrationDiagnostic {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:?}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for OrchestrationDiagnostic {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplayReport {
     pub valid: bool,
