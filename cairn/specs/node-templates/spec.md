@@ -96,6 +96,12 @@ r[n8nclone.node_templates.parameters.invalid.type]
 - WHEN the user enters a value that cannot be parsed as that type
 - THEN the system rejects the value and keeps the add-node flow recoverable
 
+#### Scenario: Numeric parameter exceeds its maximum
+r[n8nclone.node_templates.parameters.invalid.bounds]
+- GIVEN a numeric template parameter declares a maximum value
+- WHEN the supplied value exceeds that maximum
+- THEN the system MUST reject rendering with a maximum-specific error before producing a command
+
 ### Requirement: Non-destructive configuration initialization
 r[lattice.config.init_no_clobber] Lattice MUST create a requested configuration target without replacing an existing path and MUST fail visibly before modifying the existing config or its template catalog when the target config already exists.
 

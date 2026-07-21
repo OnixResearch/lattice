@@ -203,7 +203,6 @@ fn payload_binding_supports_json_query_header_and_raw_body_failures() {
     );
 }
 
-// r[verify n8nclone.scheduling.triggers.admission.enabled]
 // r[verify n8nclone.scheduling.triggers.admission.idempotency]
 // r[verify n8nclone.scheduling.triggers.admission.overlap]
 #[test]
@@ -225,9 +224,7 @@ fn admission_accepts_valid_event_and_rejects_idempotent_or_overlapping_events() 
     assert!(overlapping.iter().any(|diagnostic| diagnostic.code == TriggerDiagnosticCode::OverlapPrevented));
 }
 
-// r[verify n8nclone.scheduling.triggers.webhook.method]
-// r[verify n8nclone.scheduling.triggers.webhook.content_type]
-// r[verify n8nclone.credentials.webhook_auth.redacted]
+// r[verify n8nclone.credentials.webhook_auth]
 #[test]
 fn webhook_admission_checks_method_content_type_and_redacted_auth() {
     let trigger = webhook_trigger(WebhookAuthPolicy::Blake3Signature {
@@ -253,7 +250,7 @@ fn webhook_admission_checks_method_content_type_and_redacted_auth() {
     assert!(!debug.contains(SECRET_VALUE));
 }
 
-// r[verify n8nclone.credentials.webhook_auth.provider]
+// r[verify n8nclone.credentials.webhook_auth]
 // r[verify n8nclone.credentials.webhook_auth.missing]
 #[test]
 fn webhook_auth_resolves_secrets_through_credential_provider() {
@@ -315,7 +312,7 @@ fn workflow_format_round_trips_triggers_through_portable_and_nickel() {
     assert_eq!(loaded.triggers[0].id, TRIGGER_ID);
 }
 
-// r[verify n8nclone.scheduling.triggers.model.persist]
+// r[verify n8nclone.scheduling.triggers.model.save]
 // r[verify n8nclone.scheduling.triggers.history]
 #[test]
 fn store_persists_triggers_and_trigger_history() {
@@ -330,12 +327,11 @@ fn store_persists_triggers_and_trigger_history() {
     let loaded = store.load_trigger(TRIGGER_ID).expect("load trigger").expect("trigger exists");
     let history = store.list_trigger_runs(1).expect("list trigger history");
 
-    assert_eq!(loaded.id, TRIGGER_ID);
+    assert_eq!(loaded, trigger);
     assert_eq!(history[0].status, TriggerRunStatus::Started);
     assert_eq!(history[0].run_id, Some(RunId(STARTED_RUN_ID)));
 }
 
-// r[verify n8nclone.scheduling.triggers.webhook.headless_run]
 // r[verify n8nclone.scheduling.triggers.history]
 #[tokio::test]
 async fn admitted_trigger_plan_starts_headless_run_and_records_history() {

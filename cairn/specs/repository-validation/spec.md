@@ -77,3 +77,9 @@ r[lattice.repository_validation.traceability_sources.scenario.unsafe-root]
 - GIVEN a policy fixture configures an absolute, parent-traversing, or otherwise unsafe traceability root
 - WHEN Cairn validates the Nickel policy export
 - THEN export MUST fail before the root can contribute requirement evidence
+
+#### Scenario: Stale marker identifiers are reconciled without false coverage
+r[lattice.repository_validation.traceability_sources.scenario.marker-reconciliation]
+- GIVEN a discovered marker names no accepted requirement
+- WHEN the marker is reconciled against its observed implementation or test behavior
+- THEN Lattice MUST add an exact accepted requirement, bind only to an already accepted requirement the evidence supports, or remove the unsupported marker while preserving unrelated missing findings

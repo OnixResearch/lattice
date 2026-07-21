@@ -192,7 +192,7 @@ pub async fn run_saved_workflow(
     .await
 }
 
-// r[impl n8nclone.scheduling.triggers.webhook.headless_run]
+// r[impl n8nclone.scheduling.webhook_listener.admission.valid]
 // r[impl n8nclone.scheduling.triggers.history]
 pub async fn run_admitted_trigger_plan(
     store: &Store,
