@@ -11,6 +11,7 @@ use lattice::config::TemplateParameter;
 use lattice::config::TemplateParameterDefault;
 use lattice::config::TemplateParameterType;
 use lattice::config::TemplateRenderError;
+use lattice::config::default_config_ncl;
 use lattice::config::load_node_templates_with_diagnostics;
 use lattice::config::render_template_command;
 use lattice::config::validate_template_parameters;
@@ -42,6 +43,8 @@ const CONFIG_FILE_NAME: &str = "config.ncl";
 const TEMPLATES_DIR_NAME: &str = "templates";
 const BAD_TEMPLATE_FILE_NAME: &str = "bad.ncl";
 const MISMATCHED_DEFAULT_FILE_NAME: &str = "mismatched-default.ncl";
+const OPERATOR_CONFIG_CONTENTS: &str = "# operator-authored config\n{ data_dir = \"/srv/lattice\" }\n";
+const OPERATOR_TEMPLATE_CONTENTS: &str = "# operator-authored template\n{ name = \"custom\" }\n";
 const SINGLE_DIAGNOSTIC_COUNT: usize = 1;
 const DEFAULT_TEMPLATE_NAMES: &[&str] = &[
     TEMPLATE_NAME,
@@ -175,6 +178,8 @@ fn default_template_catalog_renders_default_and_required_values() {
 
 // r[verify n8nclone.node_templates.catalog]
 // r[verify n8nclone.node_templates.catalog.init]
+// r[verify lattice.config.init_no_clobber]
+// r[verify lattice.config.init_no_clobber.scenario.fresh]
 #[test]
 fn cli_init_writes_default_template_catalog() {
     let temp_dir = tempfile::tempdir().expect("temporary cli config directory");
@@ -189,12 +194,47 @@ fn cli_init_writes_default_template_catalog() {
         .expect("run init command");
 
     assert!(output.status.success());
+    assert_eq!(std::fs::read_to_string(&config_path).expect("config must be readable"), default_config_ncl());
     for template_file in DEFAULT_NODE_TEMPLATE_FILES {
         assert!(templates_dir.join(template_file.file_name).exists());
     }
     let result = load_node_templates_with_diagnostics(&templates_dir);
     assert!(result.diagnostics.is_empty());
     assert_eq!(sorted_template_names(&result.templates), DEFAULT_TEMPLATE_NAMES);
+}
+
+// r[verify lattice.config.init_no_clobber]
+// r[verify lattice.config.init_no_clobber.scenario.existing]
+// r[verify lattice.config.init_no_clobber.scenario.race]
+#[test]
+fn cli_init_refuses_to_overwrite_existing_config_or_templates() {
+    let temp_dir = tempfile::tempdir().expect("temporary cli config directory");
+    let config_path = temp_dir.path().join(CONFIG_FILE_NAME);
+    let templates_dir = temp_dir.path().join(TEMPLATES_DIR_NAME);
+    let operator_template_path = templates_dir.join(DEFAULT_NODE_TEMPLATE_FILES[0].file_name);
+    std::fs::create_dir_all(&templates_dir).expect("template directory must exist");
+    std::fs::write(&config_path, OPERATOR_CONFIG_CONTENTS).expect("operator config must write");
+    std::fs::write(&operator_template_path, OPERATOR_TEMPLATE_CONTENTS).expect("operator template must write");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
+        .arg("--config")
+        .arg(&config_path)
+        .arg("--init")
+        .output()
+        .expect("run repeated init command");
+
+    assert!(!output.status.success());
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("Initialized config"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("refusing to overwrite"));
+    assert_eq!(
+        std::fs::read_to_string(&config_path).expect("config must remain readable"),
+        OPERATOR_CONFIG_CONTENTS
+    );
+    assert_eq!(
+        std::fs::read_to_string(&operator_template_path).expect("template must remain readable"),
+        OPERATOR_TEMPLATE_CONTENTS
+    );
+    assert_eq!(std::fs::read_dir(&templates_dir).expect("template directory must remain readable").count(), 1);
 }
 
 // r[verify n8nclone.node_templates.parameters.render.missing]

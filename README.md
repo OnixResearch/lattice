@@ -24,6 +24,8 @@ lattice --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
 lattice --config ./demo/config.ncl run daily-digest --output json
 ```
 
+`--init` is create-only: it exits unsuccessfully if the requested config path already exists and does not rewrite that config or its templates. Edit an existing Nickel config directly, or choose a fresh path for another initialized environment.
+
 ## Native OpenAI-compatible agents
 
 [`examples/config/openai-compatible-agent.ncl`](examples/config/openai-compatible-agent.ncl) routes the existing adapter-neutral Pi and Clankers target labels directly to a bounded chat-completions endpoint. Set `agent_runtime.runtimes = {}` when using those native routes so transport selection remains unambiguous, then replace the example endpoint and model.

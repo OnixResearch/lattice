@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::fs::OpenOptions;
+use std::io::ErrorKind;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -1497,19 +1499,33 @@ fn resolve_config_path(requested: Option<&str>, initializes_config: bool) -> Pat
     })
 }
 
-fn init_config(config_path: &PathBuf) -> Result<(), lattice::error::Error> {
+// r[impl lattice.config.init_no_clobber]
+fn init_config(config_path: &Path) -> Result<(), lattice::error::Error> {
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| lattice::error::Error::Io { source: e })?;
+        std::fs::create_dir_all(parent).map_err(|source| lattice::error::Error::Io { source })?;
     }
 
-    std::fs::write(config_path, config::default_config_ncl()).map_err(|e| lattice::error::Error::Io { source: e })?;
+    let mut config_file = OpenOptions::new().write(true).create_new(true).open(config_path).map_err(|source| {
+        if source.kind() == ErrorKind::AlreadyExists {
+            lattice::error::Error::Config {
+                message: format!("config already exists at {}; refusing to overwrite", config_path.display()),
+            }
+        } else {
+            lattice::error::Error::Io { source }
+        }
+    })?;
+    config_file
+        .write_all(config::default_config_ncl().as_bytes())
+        .map_err(|source| lattice::error::Error::Io { source })?;
 
-    let templates_dir = config_path.parent().unwrap_or(&PathBuf::from(".")).join("templates");
-    std::fs::create_dir_all(&templates_dir).map_err(|e| lattice::error::Error::Io { source: e })?;
+    let templates_dir = config_path.parent().unwrap_or(Path::new(".")).join("templates");
+    std::fs::create_dir_all(&templates_dir).map_err(|source| lattice::error::Error::Io { source })?;
     for template_file in config::DEFAULT_NODE_TEMPLATE_FILES {
         std::fs::write(templates_dir.join(template_file.file_name), template_file.contents)
-            .map_err(|e| lattice::error::Error::Io { source: e })?;
+            .map_err(|source| lattice::error::Error::Io { source })?;
     }
 
+    debug_assert!(config_path.exists());
+    debug_assert!(templates_dir.exists());
     Ok(())
 }
