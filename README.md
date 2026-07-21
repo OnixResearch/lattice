@@ -78,6 +78,19 @@ Run IDs are reserved atomically before effects, and orchestration records are bo
 
 A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
 
+## Safe run inspection
+
+Inspect one persisted run without opening redb through an unrestricted renderer:
+
+```bash
+lattice --config ./demo/config.ncl runs show 1
+lattice --config ./demo/config.ncl runs show 1 --output json
+```
+
+The report includes the numeric run identity, a domain-separated BLAKE3 workflow-name fingerprint, lifecycle counts, node IDs/statuses/counts, exact orchestration owner and dispatch identities, dispatch/recovery/abandonment state, bounded budget facts, and run/orchestration replay state. It structurally omits workflow names, node and port labels, output and error text, replay summaries, orchestration objectives and summaries, actors, and trigger keys. The fingerprint is an identity aid, not a confidentiality claim for guessable workflow names.
+
+Historical missing details or replay are reported as `not_recorded`; contradictory present evidence renders a report with `valid: false` and exits unsuccessfully. A missing run fails without creating a data directory or database. Pending-unobserved and abandoned dispatches with no `RunRecord` remain on `orchestration status|recover|replay` because synthesizing a run would falsely claim local observation. The read-only redb handle may be unavailable while another process owns the database lock.
+
 ## Local file capabilities
 
 Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. The same capability core confines production image inputs, Markdown prompt hydration, and generic-agent image/artifact handoffs while preserving their byte, UTF-8, and media checks. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured roots, workflow directories, and agent working directories are trusted authority grants; these readers do not turn untrusted workflow definitions into a host sandbox.

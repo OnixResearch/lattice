@@ -240,6 +240,8 @@ struct Args {
 enum CliCommand {
     /// Run a saved workflow without starting the TUI
     Run(RunCommandArgs),
+    /// Inspect persisted run evidence without emitting arbitrary content
+    Runs(RunsCommandArgs),
     /// Export a saved workflow to a typed Nickel file
     Export(ExportWorkflowArgs),
     /// Import a typed Nickel workflow file into the store
@@ -268,6 +270,22 @@ struct RunCommandArgs {
     /// Output format for the run summary
     #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
     output: RunOutputFormat,
+}
+
+#[derive(clap::Args, Debug)]
+struct RunsCommandArgs {
+    #[command(subcommand)]
+    command: RunsCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum RunsCliCommand {
+    /// Show one persisted run through a content-omitting evidence report
+    Show {
+        run_id: u64,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -494,6 +512,10 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
 
     let app_config = config::load_app_config(&config_path);
 
+    if let Some(CliCommand::Runs(runs_args)) = &args.command {
+        return Ok(run_runs_command(&app_config, runs_args));
+    }
+
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
         tracing::warn!(error = %e, "failed to create data dir");
     }
@@ -502,6 +524,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
 
     match args.command {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
+        Some(CliCommand::Runs(_)) => unreachable!("runs command returns before data-directory side effects"),
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
         Some(CliCommand::ImportN8n(import_args)) => Ok(import_n8n_workflow_command(&app_config, &import_args)),
@@ -923,6 +946,40 @@ fn render_orchestration_output(output: &str) -> ExitCode {
 fn orchestration_failure(message: &str) -> ExitCode {
     eprintln!("Orchestration failed: {message}");
     ExitCode::FAILURE
+}
+
+// r[impl lattice.workflow_execution.safe_run_inspection]
+fn run_runs_command(app_config: &config::AppConfig, args: &RunsCommandArgs) -> ExitCode {
+    let (run_id, output) = match &args.command {
+        RunsCliCommand::Show { run_id, output } => (*run_id, *output),
+    };
+    let store_path = config::store_path(&app_config.data_dir);
+    let result = match lattice::run::shell::inspect_path(&store_path, lattice::engine::RunId(run_id)) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("Run inspection failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let rendered = match output {
+        RunOutputFormat::Text => lattice::run::inspection::render_text(&result),
+        RunOutputFormat::Json => match lattice::run::inspection::render_json(&result) {
+            Ok(rendered) => rendered,
+            Err(error) => {
+                eprintln!("Run inspection failed: JSON render failed: {error}");
+                return ExitCode::FAILURE;
+            }
+        },
+    };
+    if let Err(error) = write_stdout_and_flush(&rendered) {
+        eprintln!("Run inspection failed: output failed: {error}");
+        return ExitCode::FAILURE;
+    }
+    if result.valid {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandArgs) -> ExitCode {

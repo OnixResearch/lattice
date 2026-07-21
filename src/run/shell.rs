@@ -1,0 +1,155 @@
+//! Thin read-only persistence shell for safe run inspection.
+
+use redb::ReadableDatabase as _;
+
+const RUNS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("runs");
+const RUN_DETAILS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_details");
+const RUN_REPLAY_EVENTS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_replay_events");
+const ORCHESTRATION_INSTANCES: redb::TableDefinition<&str, &[u8]> =
+    redb::TableDefinition::new("orchestration_instances");
+const ORCHESTRATION_EVENTS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("orchestration_events");
+
+#[derive(Debug)]
+pub enum Error {
+    NotFound(crate::engine::RunId),
+    Store(crate::store::StoreError),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound(run_id) => write!(formatter, "run {} not found", run_id.0),
+            Self::Store(_) => write!(formatter, "run evidence store read failed"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<crate::store::StoreError> for Error {
+    fn from(error: crate::store::StoreError) -> Self {
+        Self::Store(error)
+    }
+}
+
+struct ReadOnlyStore {
+    database: redb::ReadOnlyDatabase,
+}
+
+impl ReadOnlyStore {
+    fn open(path: &std::path::Path) -> Result<Self, crate::store::StoreError> {
+        let database =
+            redb::ReadOnlyDatabase::open(path).map_err(|error| crate::store::StoreError::Db(error.to_string()))?;
+        Ok(Self { database })
+    }
+
+    fn load_run(
+        &self,
+        run_id: crate::engine::RunId,
+    ) -> Result<Option<crate::store::RunRecord>, crate::store::StoreError> {
+        self.load_by_u64(RUNS, run_id.0)
+    }
+
+    fn load_details(
+        &self,
+        run_id: crate::engine::RunId,
+    ) -> Result<Option<crate::store::RunDetailRecord>, crate::store::StoreError> {
+        self.load_by_u64(RUN_DETAILS, run_id.0)
+    }
+
+    fn load_replay(
+        &self,
+        run_id: crate::engine::RunId,
+    ) -> Result<Option<Vec<crate::replay::ReplayEventRecord>>, crate::store::StoreError> {
+        self.load_by_u64(RUN_REPLAY_EVENTS, run_id.0)
+    }
+
+    fn load_instance(
+        &self,
+        instance_id: &str,
+    ) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
+        self.load_by_str(ORCHESTRATION_INSTANCES, instance_id)
+    }
+
+    fn load_events(
+        &self,
+        instance_id: &str,
+    ) -> Result<Vec<crate::orchestration::OrchestrationEvent>, crate::store::StoreError> {
+        Ok(self.load_by_str(ORCHESTRATION_EVENTS, instance_id)?.unwrap_or_default())
+    }
+
+    fn load_by_u64<T: serde::de::DeserializeOwned>(
+        &self,
+        definition: redb::TableDefinition<u64, &[u8]>,
+        key: u64,
+    ) -> Result<Option<T>, crate::store::StoreError> {
+        let transaction = self.database.begin_read().map_err(store_db_error)?;
+        let table = transaction.open_table(definition).map_err(store_table_error)?;
+        deserialize_optional(table.get(key).map_err(store_db_error)?)
+    }
+
+    fn load_by_str<T: serde::de::DeserializeOwned>(
+        &self,
+        definition: redb::TableDefinition<&str, &[u8]>,
+        key: &str,
+    ) -> Result<Option<T>, crate::store::StoreError> {
+        let transaction = self.database.begin_read().map_err(store_db_error)?;
+        let table = transaction.open_table(definition).map_err(store_table_error)?;
+        deserialize_optional(table.get(key).map_err(store_db_error)?)
+    }
+}
+
+fn deserialize_optional<T: serde::de::DeserializeOwned>(
+    data: Option<redb::AccessGuard<'_, &[u8]>>,
+) -> Result<Option<T>, crate::store::StoreError> {
+    data.map(|data| {
+        serde_json::from_slice(data.value()).map_err(|error| crate::store::StoreError::Deserialize(error.to_string()))
+    })
+    .transpose()
+}
+
+fn store_db_error(error: impl std::fmt::Display) -> crate::store::StoreError {
+    crate::store::StoreError::Db(error.to_string())
+}
+
+fn store_table_error(error: impl std::fmt::Display) -> crate::store::StoreError {
+    crate::store::StoreError::Table(error.to_string())
+}
+
+// r[impl lattice.workflow_execution.safe_run_inspection]
+pub fn inspect_path(
+    store_path: &std::path::Path,
+    run_id: crate::engine::RunId,
+) -> Result<super::inspection::Report, Error> {
+    let store = ReadOnlyStore::open(store_path)?;
+    let record = store.load_run(run_id)?.ok_or(Error::NotFound(run_id))?;
+    let details = store.load_details(run_id)?;
+    let replay_events = store.load_replay(run_id)?;
+    let orchestration_instance = load_owner_instance(&store, &record.owner)?;
+    let orchestration_events = match &orchestration_instance {
+        Some(instance) => store.load_events(&instance.id)?,
+        None => Vec::new(),
+    };
+    let orchestration = orchestration_instance.as_ref().map(|instance| super::inspection::OrchestrationInput {
+        instance,
+        events: &orchestration_events,
+    });
+    let result = super::inspection::inspect(super::inspection::Input {
+        record: &record,
+        details: details.as_ref(),
+        replay_events: replay_events.as_deref(),
+        orchestration,
+    });
+    debug_assert_eq!(result.run_id, run_id.0);
+    Ok(result)
+}
+
+fn load_owner_instance(
+    store: &ReadOnlyStore,
+    owner: &crate::store::RunOwner,
+) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
+    match owner {
+        crate::store::RunOwner::Unscoped => Ok(None),
+        crate::store::RunOwner::Orchestration { instance_id, .. } => store.load_instance(instance_id),
+    }
+}
