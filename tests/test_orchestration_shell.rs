@@ -37,6 +37,7 @@ use lattice::orchestration::start_from_trigger;
 use lattice::orchestration::transition;
 use lattice::orchestration::validate_definition_in_store;
 use lattice::orchestration::workflow_revision;
+use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::store::Store;
 use tempfile::tempdir;
@@ -166,7 +167,17 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     assert_eq!(instance.status, OrchestrationStatus::Completed);
     assert_eq!(instance.round, FIRST_SEQUENCE);
     assert!(instance.active_run_id.is_none());
-    assert_eq!(store.list_runs(ROUND_LIMIT as usize).expect("runs must list").len(), FIRST_SEQUENCE as usize);
+    let runs = store.list_runs(ROUND_LIMIT as usize).expect("runs must list");
+    assert_eq!(runs.len(), FIRST_SEQUENCE as usize);
+    let RunOwner::Orchestration {
+        instance_id,
+        dispatch_id,
+    } = &runs[0].owner
+    else {
+        panic!("orchestration run must retain its owner identity");
+    };
+    assert_eq!(instance_id, &instance.id);
+    assert!(!dispatch_id.is_empty());
     let report = replay(&store, &instance.id).expect("side-effect-free replay must validate");
     assert!(report.valid);
     assert_eq!(report.instance, instance);
@@ -292,6 +303,16 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
     store
         .save_run(&RunRecord {
             run_id,
+            owner: RunOwner::Orchestration {
+                instance_id: started.instance.id.clone(),
+                dispatch_id: started
+                    .instance
+                    .pending_dispatch
+                    .as_ref()
+                    .expect("dispatch must remain pending")
+                    .id
+                    .clone(),
+            },
             workflow_name: FIRST_WORKFLOW_NAME.to_string(),
             started_epoch_ms: 0,
             finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
@@ -364,6 +385,10 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
     store
         .save_run(&RunRecord {
             run_id: RunId(RECOVERY_RUN_ID),
+            owner: RunOwner::Orchestration {
+                instance_id: instance.id.clone(),
+                dispatch_id: instance.pending_dispatch.as_ref().expect("dispatch must remain pending").id.clone(),
+            },
             workflow_name: FIRST_WORKFLOW_NAME.to_string(),
             started_epoch_ms: 0,
             finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
@@ -387,6 +412,45 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
     };
     assert_eq!(reconciled.status, OrchestrationStatus::Cancelled);
     assert!(reconciled.pending_dispatch.is_none());
+}
+
+// r[verify lattice.agent_orchestration.run_identity]
+#[test]
+fn foreign_run_record_cannot_satisfy_or_abandon_a_pending_dispatch() {
+    let (_directory, store) = store();
+    let workflow = workflow(FIRST_WORKFLOW_NAME);
+    store.save_workflow(&workflow).expect("workflow must persist");
+    let (instance, events) = cancelled_acknowledged_instance(&workflow);
+    store.create_orchestration(&instance, &events).expect("pending instance must persist");
+    store
+        .save_run(&RunRecord {
+            run_id: RunId(RECOVERY_RUN_ID),
+            owner: RunOwner::Unscoped,
+            workflow_name: FIRST_WORKFLOW_NAME.to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
+            node_count: FIRST_SEQUENCE as usize,
+            cache_hits: 0,
+            failures: 0,
+        })
+        .expect("foreign run must persist");
+
+    let recovery_error = recover_pending(&store, &instance.id).expect_err("foreign run cannot satisfy recovery");
+    let abandon_error = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &instance.id,
+        actor: ACTOR,
+    })
+    .expect_err("foreign run blocks abandonment");
+    let persisted = store
+        .load_orchestration(&instance.id)
+        .expect("instance lookup must succeed")
+        .expect("instance remains persisted");
+
+    assert!(recovery_error.to_string().contains("not owned by the pending orchestration dispatch"));
+    assert!(abandon_error.to_string().contains("not owned by the pending orchestration dispatch"));
+    assert_eq!(persisted, instance);
+    assert!(persisted.pending_dispatch.is_some());
+    assert_eq!(persisted.budgets.reservations.len(), FIRST_SEQUENCE as usize);
 }
 
 // r[verify lattice.agent_orchestration.triggers]

@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:62c44137c89f1a8ba85a087e8e0a61ebe47ae57431bf9fdc19623c62cf1765a2",
+  "baseline_hash": "b3:b7b84338e5e0a9ba1d6ff41108e196fcb82345a2940a232b70f0a8d5d9aa034e",
   "findings": [
     {
       "stable_id": "b3:02a1c82bab65b6c1",
@@ -4349,7 +4349,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 65,
+      "line": 73,
       "column": 1,
       "message": "item name `HeadlessRunError` repeats `headless` from ancestor path segment `headless`",
       "crate_name": "lattice"
@@ -4362,7 +4362,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 92,
+      "line": 100,
       "column": 104,
       "message": "function `summarize_run` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -4375,20 +4375,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 98,
+      "line": 106,
       "column": 20,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1acea75ea9767662",
-      "semantic_id": "b3:1acea75ea9767662",
+      "stable_id": "b3:047df65cc92a433a",
+      "semantic_id": "b3:047df65cc92a433a",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 205,
+      "line": 244,
       "column": 1,
       "message": "function `run_saved_workflow_with_executor_factory` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -4401,7 +4401,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 214,
+      "line": 253,
       "column": 28,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -4414,7 +4414,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 221,
+      "line": 260,
       "column": 29,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -4427,7 +4427,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 234,
+      "line": 273,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "lattice"
@@ -6864,8 +6864,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1f7f55d496e7fe69",
-      "semantic_id": "b3:1f7f55d496e7fe69",
+      "stable_id": "b3:9cb8dd7dd8778bd3",
+      "semantic_id": "b3:9cb8dd7dd8778bd3",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -6873,7 +6873,7 @@
       "file": "src/orchestration/shell.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 502 lines (limit: 300)",
+      "message": "source file is 550 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -7319,8 +7319,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:5e5be3af1c0a255e",
-      "semantic_id": "b3:5e5be3af1c0a255e",
+      "stable_id": "b3:e627584caf55ffbf",
+      "semantic_id": "b3:e627584caf55ffbf",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
@@ -7339,7 +7339,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 164,
+      "line": 168,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -7352,7 +7352,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 176,
+      "line": 180,
       "column": 1,
       "message": "function has 6 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -7365,7 +7365,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 176,
+      "line": 180,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7378,22 +7378,9 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 187,
+      "line": 191,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:434377a9aacb3071",
-      "semantic_id": "b3:434377a9aacb3071",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/orchestration/shell.rs",
-      "line": 222,
-      "column": 61,
-      "message": "function `execute_ready_round` has 0 assertion(s) in 47 lines (need 2+)",
       "crate_name": "lattice"
     },
     {
@@ -7404,7 +7391,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 274,
+      "line": 293,
       "column": 48,
       "message": "function `load_validated_workflow` has 0 assertion(s) in 33 lines (need 2+)",
       "crate_name": "lattice"
@@ -7417,7 +7404,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 361,
+      "line": 380,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7430,7 +7417,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 369,
+      "line": 388,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7443,7 +7430,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 377,
+      "line": 396,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7456,7 +7443,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 391,
+      "line": 410,
       "column": 61,
       "message": "function `approve` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -7469,7 +7456,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 406,
+      "line": 425,
       "column": 9,
       "message": "boolean binding `successor_validated` should have a predicate prefix",
       "crate_name": "lattice"
@@ -7482,7 +7469,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 420,
+      "line": 439,
       "column": 1,
       "message": "3 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7495,7 +7482,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 439,
+      "line": 458,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -8411,8 +8398,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:ffc5f1f3d300ef63",
-      "semantic_id": "b3:ffc5f1f3d300ef63",
+      "stable_id": "b3:656992c7cfc9e49f",
+      "semantic_id": "b3:656992c7cfc9e49f",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -8420,7 +8407,7 @@
       "file": "src/store/mod.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1108 lines (limit: 300)",
+      "message": "source file is 1172 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -8678,7 +8665,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 111,
+      "line": 129,
       "column": 1,
       "message": "trait has 8 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8691,7 +8678,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 157,
+      "line": 175,
       "column": 1,
       "message": "trait has 11 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8704,7 +8691,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 189,
+      "line": 207,
       "column": 1,
       "message": "item name `Store` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -8717,7 +8704,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 267,
+      "line": 286,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8730,7 +8717,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 323,
+      "line": 342,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8743,7 +8730,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 375,
+      "line": 394,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8756,7 +8743,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 403,
+      "line": 422,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8769,7 +8756,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 555,
+      "line": 594,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8782,7 +8769,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 564,
+      "line": 603,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8795,7 +8782,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 784,
+      "line": 848,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8808,7 +8795,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 828,
+      "line": 892,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8821,7 +8808,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 848,
+      "line": 912,
       "column": 116,
       "message": "function `validate_event_batch` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -8834,7 +8821,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 885,
+      "line": 949,
       "column": 63,
       "message": "`as usize` from `u64` is platform-dependent",
       "crate_name": "lattice"
@@ -8847,7 +8834,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 902,
+      "line": 966,
       "column": 1,
       "message": "item name `StoreError` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -9139,8 +9126,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:55eb276103711d31",
-      "semantic_id": "b3:55eb276103711d31",
+      "stable_id": "b3:b22ce72a9c8329c4",
+      "semantic_id": "b3:b22ce72a9c8329c4",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -9148,7 +9135,7 @@
       "file": "src/tui/app.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 3271 lines (limit: 300)",
+      "message": "source file is 3273 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -10381,7 +10368,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2242,
+      "line": 2243,
       "column": 13,
       "message": "`old_viewport` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"

@@ -2,15 +2,21 @@
 
 Lattice writes a round reservation and pending dispatch, then commits `DispatchAcknowledged`, then invokes the headless workflow. If the process terminates during a provider call, the durable instance can contain an acknowledged dispatch with no `RunRecord`. This is intentionally uncertain: the provider may have completed even though Lattice did not persist local completion.
 
-The live drill on instance `555d173a837a54f7795dc139a64e0395b6c0932046f59fc2f841b807392bd475` established the failure shape: two repeated recovery calls returned `PendingUnobserved`, replay remained valid, cancellation was recorded, and the reservation remained held. A separate uninterrupted instance completed, settled its reservation, and replayed validly.
+The live drill on instance `555d173a837a54f7795dc139a64e0395b6c0932046f59fc2f841b807392bd475` established the failure shape: two repeated recovery calls returned `PendingUnobserved`, replay remained valid, cancellation was recorded, and the reservation remained held. It also exposed a deeper identity race across restart: after the wrapper exited with no persisted record for run `2`, a second process allocated the same run ID and persisted another execution. Numeric run ID alone could therefore falsely correlate a foreign record with the interrupted dispatch.
 
 ### Completion contract
 
-The change is complete only when an authorized operator can terminalize a cancellation-requested, locally unobserved pending dispatch; replay reconstructs the exact terminal state; acknowledged uncertainty consumes the complete reservation; and no path retries the effect or reports success. Process exit, test count, or a cleared reservation alone is not completion evidence.
+The change is complete only when run allocation reserves a unique identity atomically before effects, records bind that ID to an exact orchestration instance/dispatch owner, foreign records cannot satisfy recovery, an authorized operator can terminalize a cancellation-requested locally unobserved dispatch, replay reconstructs the exact terminal state, acknowledged uncertainty consumes the complete reservation, and no path retries the effect or reports success. Process exit, test count, numeric run equality, or a cleared reservation alone is not completion evidence.
 
-False completion includes automatic retry, timeout-based inference, cancellation treated as proof of remote cancellation, zero budget settlement for an acknowledged dispatch, a free-form potentially secret terminal reason, or a transition that can override an observed run.
+False completion includes scan-based run allocation, record overwrite, recovery matched only by numeric run ID or workflow name, automatic retry, timeout-based inference, cancellation treated as proof of remote cancellation, zero budget settlement for an acknowledged dispatch, a free-form potentially secret terminal reason, or a transition that can override an observed owned run.
 
 ## Decisions
+
+### Decision: Reserve run IDs atomically and bind run ownership
+
+**Choice:** Change the redb run-ID allocator from a read-only `max + 1` scan to a write-transaction counter seeded above legacy records. Every allocation advances the counter before effects. `save_run` rejects duplicate numeric IDs and advances the counter past explicitly saved IDs. `RunRecord` carries a serde-defaulted `RunOwner`, with orchestration runs bound to both instance ID and dispatch ID.
+
+**Rationale:** Atomic reservation prevents concurrent allocation collisions. Duplicate rejection prevents a late process from overwriting another execution. Owner matching prevents legacy, unscoped, corrupted, or foreign records from satisfying recovery merely because their numeric IDs and workflow names coincide. The serde default reads legacy records as unscoped, which blocks unsafe orchestration reconciliation without rewriting history.
 
 ### Decision: Add an explicit operator abandonment fact
 
@@ -38,11 +44,13 @@ False completion includes automatic retry, timeout-based inference, cancellation
 
 ## Functional Core / Imperative Shell
 
-The core validates authority, cancellation, identity, acknowledgment-sensitive settlement, and terminal state without I/O. The shell loads the instance, checks for a matching persisted run record, and atomically commits the core decision through the existing optimistic event-store boundary. CLI parsing and rendering remain in `main.rs`.
+The core validates authority, cancellation, identity, acknowledgment-sensitive settlement, and terminal state without I/O. The store shell atomically reserves run IDs and persists owner-bound records. The orchestration shell loads the instance, distinguishes an exact owned record from foreign identity, checks local absence before abandonment, and commits the core decision through the existing optimistic event-store boundary. CLI parsing and rendering remain in `main.rs`.
 
 ## Risks / Trade-offs
 
-- A remote provider may finish after the Lattice process dies; abandonment intentionally records no remote outcome and does not prevent that external completion.
+- A remote provider may finish after the Lattice wrapper exits; abandonment intentionally records no remote outcome and does not prevent that external completion.
+- A legacy unscoped record cannot automatically reconcile an orchestration dispatch after this change; the operator must preserve it for investigation rather than promote uncertain identity.
+- Atomic allocation can leave harmless numeric gaps when a reserved run never persists.
 - An acknowledged abandonment consumes the full configured upper bound, which can overcount actual use but cannot undercount the declared reservation.
 - Operators must know the original executor is stopped before abandoning; this slice does not provide distributed process liveness or remote cancellation proof.
 - Headless run-detail inspection and no-clobber `--init` behavior were separate dogfood friction points and remain follow-up work rather than being coupled to recovery semantics.

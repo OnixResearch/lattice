@@ -10,6 +10,7 @@ use lattice::store::RunDetailRecord;
 use lattice::store::RunNodeDetail;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::RunOutputDetail;
+use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::tui::App;
 use lattice::tui::app::run_detail_record_from_results;
@@ -44,6 +45,7 @@ fn test_config(temp_dir: &TempDir) -> AppConfig {
 fn run_record(run_id: RunId, workflow_name: &str) -> RunRecord {
     RunRecord {
         run_id,
+        owner: RunOwner::Unscoped,
         workflow_name: workflow_name.to_string(),
         started_epoch_ms: STARTED_EPOCH_MS,
         finished_epoch_ms: Some(FINISHED_EPOCH_MS),

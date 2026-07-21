@@ -72,7 +72,7 @@ lattice --config ./demo/config.ncl orchestration abandon <instance-id> --actor o
 lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
 ```
 
-Abandonment requires a prior authorized cancellation request and refuses to override a persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
+Run IDs are reserved atomically before effects, and orchestration records are bound to the exact instance and dispatch; foreign or legacy-unscoped records fail closed instead of satisfying recovery. Abandonment requires a prior authorized cancellation request and refuses to override an owned persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
 
 A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
 

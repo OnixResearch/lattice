@@ -38,6 +38,7 @@ const CACHE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("cache");
 const RUNS: TableDefinition<u64, &[u8]> = TableDefinition::new("runs");
 const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_details");
 const RUN_REPLAY_EVENTS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_replay_events");
+const RUN_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("run_counters");
 const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
 const TRIGGERS: TableDefinition<&str, &[u8]> = TableDefinition::new("triggers");
 const TRIGGER_RUNS: TableDefinition<&str, &[u8]> = TableDefinition::new("trigger_runs");
@@ -48,6 +49,8 @@ const ORCHESTRATION_TRIGGER_ADMISSIONS: TableDefinition<&str, &str> =
     TableDefinition::new("orchestration_trigger_admissions");
 const ORCHESTRATION_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("orchestration_counters");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
+const RUN_ID_COUNTER_KEY: &str = "next_run_id";
+const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
 const INITIAL_RUN_ID_VALUE: u64 = 0;
 const NEXT_RUN_ID_INCREMENT: u64 = 1;
 const INITIAL_ORCHESTRATION_SEQUENCE: u64 = 0;
@@ -55,10 +58,25 @@ const NEXT_ORCHESTRATION_SEQUENCE_INCREMENT: u64 = 1;
 const ORCHESTRATION_VERSION_INCREMENT: u64 = 1;
 const ORCHESTRATION_EVENT_SEQUENCE_INCREMENT: u64 = 1;
 
+/// Durable owner identity used to prevent one execution from satisfying another dispatch.
+// r[impl lattice.agent_orchestration.run_identity]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum RunOwner {
+    #[default]
+    Unscoped,
+    Orchestration {
+        instance_id: String,
+        dispatch_id: String,
+    },
+}
+
 /// Serializable run record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunRecord {
     pub run_id: RunId,
+    #[serde(default)]
+    pub owner: RunOwner,
     pub workflow_name: String,
     pub started_epoch_ms: i64,
     pub finished_epoch_ms: Option<i64>,
@@ -204,6 +222,7 @@ impl Store {
             let _ = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
@@ -476,13 +495,33 @@ impl Store {
 
     // -- run records --------------------------------------------------------
 
-    /// Store a run record.
+    /// Store a run record without allowing a global run identity to be overwritten.
+    // r[impl lattice.agent_orchestration.run_identity]
     pub fn save_run(&self, record: &RunRecord) -> Result<(), StoreError> {
         let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
+        let next_after_record = record
+            .run_id
+            .0
+            .checked_add(NEXT_RUN_ID_INCREMENT)
+            .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
             let mut table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+            if table.get(record.run_id.0).map_err(|e| StoreError::Db(e.to_string()))?.is_some() {
+                return Err(StoreError::Conflict(format!("run identity {} is already persisted", record.run_id)));
+            }
             table.insert(record.run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
+        }
+        {
+            let mut counters = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let current = counters
+                .get(RUN_ID_COUNTER_KEY)
+                .map_err(|e| StoreError::Db(e.to_string()))?
+                .map(|value| value.value())
+                .unwrap_or(INITIAL_RUN_ID_VALUE);
+            if next_after_record > current {
+                counters.insert(RUN_ID_COUNTER_KEY, next_after_record).map_err(|e| StoreError::Db(e.to_string()))?;
+            }
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
@@ -568,17 +607,42 @@ impl Store {
         Ok(records)
     }
 
-    /// Return the next run id after currently persisted run records.
+    /// Atomically reserve and return one globally unique run id.
+    // r[impl lattice.agent_orchestration.run_identity]
     pub fn next_run_id(&self) -> Result<RunId, StoreError> {
-        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
-        let table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
-        let mut next_id = INITIAL_RUN_ID_VALUE;
-        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
-        for entry in iter {
-            let (key, _data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
-            let candidate = key.value().saturating_add(NEXT_RUN_ID_INCREMENT);
-            next_id = next_id.max(candidate);
+        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
+        let stored_next = {
+            let counters = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            counters
+                .get(RUN_ID_COUNTER_KEY)
+                .map_err(|e| StoreError::Db(e.to_string()))?
+                .map(|value| value.value())
+        };
+        let next_id = match stored_next {
+            Some(next_id) => next_id,
+            None => {
+                let table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+                let mut seeded_next = INITIAL_RUN_ID_VALUE;
+                let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
+                for entry in iter {
+                    let (key, _data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
+                    let candidate = key
+                        .value()
+                        .checked_add(NEXT_RUN_ID_INCREMENT)
+                        .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
+                    seeded_next = seeded_next.max(candidate);
+                }
+                seeded_next
+            }
+        };
+        let following_id = next_id
+            .checked_add(NEXT_RUN_ID_INCREMENT)
+            .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
+        {
+            let mut counters = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            counters.insert(RUN_ID_COUNTER_KEY, following_id).map_err(|e| StoreError::Db(e.to_string()))?;
         }
+        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(RunId(next_id))
     }
 

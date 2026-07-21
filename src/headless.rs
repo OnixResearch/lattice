@@ -61,6 +61,14 @@ pub struct HeadlessRunSummary {
     pub cache_hits: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct OwnedRunRequest {
+    pub workflow_name: String,
+    pub run_id: RunId,
+    pub owner: crate::store::RunOwner,
+    pub agent_runtime: AgentRuntimeConfig,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeadlessRunError {
     Store(String),
@@ -145,8 +153,18 @@ pub fn run_record_from_summary(
     started_epoch_ms: i64,
     finished_epoch_ms: Option<i64>,
 ) -> RunRecord {
+    run_record_from_summary_with_owner(summary, started_epoch_ms, finished_epoch_ms, crate::store::RunOwner::Unscoped)
+}
+
+fn run_record_from_summary_with_owner(
+    summary: &HeadlessRunSummary,
+    started_epoch_ms: i64,
+    finished_epoch_ms: Option<i64>,
+    owner: crate::store::RunOwner,
+) -> RunRecord {
     RunRecord {
         run_id: summary.run_id,
+        owner,
         workflow_name: summary.workflow_name.clone(),
         started_epoch_ms,
         finished_epoch_ms,
@@ -164,7 +182,14 @@ pub async fn run_saved_workflow(
     workflow_name: &str,
     run_id: RunId,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, Executor::new).await
+    run_saved_workflow_with_executor_factory(
+        store,
+        workflow_name,
+        run_id,
+        crate::store::RunOwner::Unscoped,
+        Executor::new,
+    )
+    .await
 }
 
 // r[impl n8nclone.scheduling.triggers.webhook.headless_run]
@@ -187,8 +212,21 @@ pub async fn run_saved_workflow_with_agent_runtime_config(
     run_id: RunId,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, || {
+    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, crate::store::RunOwner::Unscoped, || {
         Executor::new_with_agent_runtime_config(agent_runtime.clone())
+    })
+    .await
+}
+
+// r[impl lattice.agent_orchestration.run_identity]
+pub async fn run_owned_workflow(
+    store: &Store,
+    request: OwnedRunRequest,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    let workflow_name = request.workflow_name;
+    let agent_runtime = request.agent_runtime;
+    run_saved_workflow_with_executor_factory(store, &workflow_name, request.run_id, request.owner, || {
+        Executor::new_with_agent_runtime_config(agent_runtime)
     })
     .await
 }
@@ -198,6 +236,7 @@ async fn run_saved_workflow_with_executor_factory<S>(
     store: &S,
     workflow_name: &str,
     run_id: RunId,
+    owner: crate::store::RunOwner,
     executor_factory: impl FnOnce() -> Executor,
 ) -> Result<HeadlessRunSummary, HeadlessRunError>
 where
@@ -219,7 +258,7 @@ where
 
     let summary = summarize_run(run_id, &workflow, &results);
     let finished_epoch_ms = chrono::Utc::now().timestamp_millis();
-    let record = run_record_from_summary(&summary, started_epoch_ms, Some(finished_epoch_ms));
+    let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
     store.save_run(&record)?;
     let replay_events =
         replay::replay_events_from_results(run_id, &workflow, &results, started_epoch_ms, Some(finished_epoch_ms));

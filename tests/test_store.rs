@@ -3,12 +3,15 @@
 mod common;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use lattice::engine::executor::RunId;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::Workflow;
 use lattice::store::ExecutionCache;
+use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::store::Store;
 use lattice::store::WorkflowRepository;
@@ -23,6 +26,7 @@ const RUN_RECORD_NODE_COUNT: usize = 1;
 const RUN_RECORD_CACHE_HITS: usize = 0;
 const RUN_RECORD_FAILURES: usize = 0;
 const STARTED_EPOCH_MS: i64 = 1000;
+const CONCURRENT_RUN_ID_ALLOCATIONS: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Store creation
@@ -264,6 +268,7 @@ fn save_and_list_runs() {
 
     let record = RunRecord {
         run_id: RunId(0),
+        owner: RunOwner::Unscoped,
         workflow_name: "test-wf".into(),
         started_epoch_ms: 1000,
         finished_epoch_ms: Some(2000),
@@ -288,6 +293,7 @@ fn list_runs_respects_limit() {
         store
             .save_run(&RunRecord {
                 run_id: RunId(i),
+                owner: RunOwner::Unscoped,
                 workflow_name: format!("wf-{i}"),
                 started_epoch_ms: i as i64 * 1000,
                 finished_epoch_ms: None,
@@ -310,6 +316,7 @@ fn list_runs_newest_first() {
         store
             .save_run(&RunRecord {
                 run_id: RunId(i),
+                owner: RunOwner::Unscoped,
                 workflow_name: format!("wf-{i}"),
                 started_epoch_ms: i as i64 * 1000,
                 finished_epoch_ms: None,
@@ -350,6 +357,7 @@ fn next_run_id_follows_highest_saved_run() {
         store
             .save_run(&RunRecord {
                 run_id: RunId(run_id),
+                owner: RunOwner::Unscoped,
                 workflow_name: format!("wf-{run_id}"),
                 started_epoch_ms: STARTED_EPOCH_MS,
                 finished_epoch_ms: None,
@@ -363,6 +371,76 @@ fn next_run_id_follows_highest_saved_run() {
     let next_run_id = store.next_run_id().unwrap();
 
     assert_eq!(next_run_id, RunId(EXPECTED_NEXT_RUN_ID));
+}
+
+// r[verify lattice.agent_orchestration.run_identity]
+#[test]
+fn concurrent_run_id_allocations_are_unique_before_any_run_is_saved() {
+    let (store, _dir) = common::temp_store();
+    let shared = Arc::new(store);
+    let handles = (0..CONCURRENT_RUN_ID_ALLOCATIONS)
+        .map(|_| {
+            let store = Arc::clone(&shared);
+            std::thread::spawn(move || store.next_run_id().expect("run id allocation must succeed"))
+        })
+        .collect::<Vec<_>>();
+    let allocated = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("allocator thread must not panic"))
+        .collect::<Vec<_>>();
+    let unique = allocated.iter().map(|run_id| run_id.0).collect::<HashSet<_>>();
+
+    assert_eq!(allocated.len(), CONCURRENT_RUN_ID_ALLOCATIONS);
+    assert_eq!(unique.len(), CONCURRENT_RUN_ID_ALLOCATIONS);
+    assert!(unique.contains(&INITIAL_NEXT_RUN_ID));
+    assert!(unique.contains(&(CONCURRENT_RUN_ID_ALLOCATIONS as u64 - 1)));
+}
+
+// r[verify lattice.agent_orchestration.run_identity]
+#[test]
+fn duplicate_run_record_identity_is_rejected_without_overwrite() {
+    let (store, _dir) = common::temp_store();
+    let first = RunRecord {
+        run_id: RunId(INITIAL_NEXT_RUN_ID),
+        owner: RunOwner::Unscoped,
+        workflow_name: "first".to_string(),
+        started_epoch_ms: STARTED_EPOCH_MS,
+        finished_epoch_ms: None,
+        node_count: RUN_RECORD_NODE_COUNT,
+        cache_hits: RUN_RECORD_CACHE_HITS,
+        failures: RUN_RECORD_FAILURES,
+    };
+    let mut conflicting = first.clone();
+    conflicting.workflow_name = "conflicting".to_string();
+    store.save_run(&first).expect("first run must persist");
+
+    let error = store.save_run(&conflicting).expect_err("duplicate run id must fail");
+    let persisted =
+        store.load_run(first.run_id).expect("run lookup must succeed").expect("first run remains persisted");
+
+    assert!(error.to_string().contains("already persisted"));
+    assert_eq!(persisted.workflow_name, first.workflow_name);
+    assert_ne!(persisted.workflow_name, conflicting.workflow_name);
+}
+
+// r[verify lattice.agent_orchestration.run_identity]
+#[test]
+fn legacy_run_record_without_owner_decodes_as_unscoped() {
+    let legacy = serde_json::json!({
+        "run_id": INITIAL_NEXT_RUN_ID,
+        "workflow_name": "legacy",
+        "started_epoch_ms": STARTED_EPOCH_MS,
+        "finished_epoch_ms": null,
+        "node_count": RUN_RECORD_NODE_COUNT,
+        "cache_hits": RUN_RECORD_CACHE_HITS,
+        "failures": RUN_RECORD_FAILURES,
+    });
+
+    let record: RunRecord = serde_json::from_value(legacy).expect("legacy record must decode");
+
+    assert_eq!(record.run_id, RunId(INITIAL_NEXT_RUN_ID));
+    assert_eq!(record.owner, RunOwner::Unscoped);
+    assert_eq!(record.workflow_name, "legacy");
 }
 
 // ---------------------------------------------------------------------------

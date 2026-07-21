@@ -2188,6 +2188,7 @@ impl App {
         let now = chrono::Utc::now().timestamp_millis();
         let record = RunRecord {
             run_id,
+            owner: crate::store::RunOwner::Unscoped,
             workflow_name: workflow_name.to_string(),
             started_epoch_ms: now,
             finished_epoch_ms: Some(now),
@@ -3255,6 +3256,7 @@ mod tests {
 
         let record = RunRecord {
             run_id: RunId(7),
+            owner: crate::store::RunOwner::Unscoped,
             workflow_name: "wf".to_string(),
             started_epoch_ms: 0,
             finished_epoch_ms: Some(0),

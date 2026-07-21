@@ -80,6 +80,7 @@ pub enum OrchestrationShellError {
     InvalidProposal(String),
     NoPendingDispatch(String),
     ObservedRunRequiresRecovery { run_id: RunId },
+    RunIdentityMismatch { run_id: RunId },
     ReplayInvalid(Box<ReplayReport>),
 }
 
@@ -102,6 +103,9 @@ impl fmt::Display for OrchestrationShellError {
             Self::NoPendingDispatch(id) => write!(formatter, "orchestration instance has no pending dispatch: {id}"),
             Self::ObservedRunRequiresRecovery { run_id } => {
                 write!(formatter, "run {run_id} is already persisted; use orchestration recover instead of abandon")
+            }
+            Self::RunIdentityMismatch { run_id } => {
+                write!(formatter, "run {run_id} is not owned by the pending orchestration dispatch")
             }
             Self::ReplayInvalid(report) => {
                 write!(formatter, "orchestration replay is invalid: {} diagnostics", report.diagnostics.len())
@@ -250,9 +254,24 @@ async fn execute_ready_round(
     let acknowledged = apply_and_commit(store, &started, OrchestrationAction::DispatchAcknowledged {
         dispatch_id: intent.id.clone(),
     })?;
+    debug_assert_eq!(acknowledged.active_run_id, Some(run_id));
+    debug_assert!(
+        acknowledged
+            .pending_dispatch
+            .as_ref()
+            .is_some_and(|dispatch| dispatch.status == DispatchStatus::Acknowledged)
+    );
 
-    let result =
-        headless::run_saved_workflow_with_agent_runtime_config(store, &workflow.meta.name, run_id, agent_runtime).await;
+    let result = headless::run_owned_workflow(store, headless::OwnedRunRequest {
+        workflow_name: workflow.meta.name.clone(),
+        run_id,
+        owner: crate::store::RunOwner::Orchestration {
+            instance_id: acknowledged.id.clone(),
+            dispatch_id: intent.id.clone(),
+        },
+        agent_runtime,
+    })
+    .await;
     let current = load_instance(store, &acknowledged.id)?;
     let (succeeded, summary) = match result {
         Ok(summary) => (summary.status == HeadlessRunStatus::Succeeded, safe_run_summary(&summary)),
@@ -452,6 +471,7 @@ pub fn recover_pending(store: &Store, instance_id: &str) -> Result<RecoveryOutco
     let Some(record) = store.load_run(intent.run_id)? else {
         return Ok(RecoveryOutcome::PendingUnobserved { run_id: intent.run_id });
     };
+    validate_run_owner(&instance, &intent, &record)?;
     let reconciled = reconcile_run_record(store, &instance, &intent, &record)?;
     Ok(RecoveryOutcome::Reconciled(Box::new(reconciled)))
 }
@@ -466,7 +486,8 @@ pub fn abandon_pending(
         .pending_dispatch
         .clone()
         .ok_or_else(|| OrchestrationShellError::NoPendingDispatch(request.instance_id.to_string()))?;
-    if store.load_run(intent.run_id)?.is_some() {
+    if let Some(record) = store.load_run(intent.run_id)? {
+        validate_run_owner(&instance, &intent, &record)?;
         return Err(OrchestrationShellError::ObservedRunRequiresRecovery { run_id: intent.run_id });
     }
     apply_and_commit(store, &instance, OrchestrationAction::AbandonPendingDispatch {
@@ -474,6 +495,33 @@ pub fn abandon_pending(
         dispatch_id: intent.id,
         run_id: intent.run_id,
     })
+}
+
+// r[impl lattice.agent_orchestration.run_identity]
+fn validate_run_owner(
+    instance: &OrchestrationInstance,
+    intent: &DispatchIntent,
+    record: &RunRecord,
+) -> Result<(), OrchestrationShellError> {
+    if record.run_id != intent.run_id {
+        return Err(OrchestrationShellError::RunIdentityMismatch { run_id: record.run_id });
+    }
+    if record.workflow_name != intent.workflow_revision.workflow_name {
+        return Err(OrchestrationShellError::RunIdentityMismatch { run_id: record.run_id });
+    }
+    let is_owner_match = matches!(
+        &record.owner,
+        crate::store::RunOwner::Orchestration {
+            instance_id,
+            dispatch_id,
+        } if instance_id == &instance.id && dispatch_id == &intent.id
+    );
+    if !is_owner_match {
+        return Err(OrchestrationShellError::RunIdentityMismatch { run_id: record.run_id });
+    }
+    debug_assert_eq!(record.run_id, intent.run_id);
+    debug_assert!(is_owner_match);
+    Ok(())
 }
 
 fn reconcile_run_record(

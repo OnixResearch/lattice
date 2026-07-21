@@ -2,6 +2,33 @@
 
 ## ADDED Requirements
 
+### Requirement: Atomic owner-bound run identity
+r[lattice.agent_orchestration.run_identity] Lattice MUST reserve globally unique run identities atomically before workflow effects, MUST reject duplicate run-record writes, and MUST reconcile a pending orchestration dispatch only with a run record bound to the exact instance and dispatch identities.
+
+#### Scenario: Concurrent allocators reserve distinct identities
+r[lattice.agent_orchestration.run_identity.scenario.concurrent]
+- GIVEN multiple allocators or restarted executors reserve runs before any of them persists completion
+- WHEN they reserve run identities against the same store
+- THEN each allocator MUST receive a distinct identity and a later allocator MUST NOT infer availability only from completed records
+
+#### Scenario: Duplicate record cannot overwrite history
+r[lattice.agent_orchestration.run_identity.scenario.duplicate]
+- GIVEN a run record already exists for a reserved numeric identity
+- WHEN another execution attempts to persist the same identity
+- THEN Lattice MUST reject the second write and MUST preserve the first record unchanged
+
+#### Scenario: Exact owner record reconciles
+r[lattice.agent_orchestration.run_identity.scenario.match]
+- GIVEN a persisted run record names the pending orchestration instance and dispatch identities
+- WHEN recovery evaluates that record
+- THEN Lattice MUST reconcile the owned result through the ordinary run-finished transition
+
+#### Scenario: Foreign or legacy record fails closed
+r[lattice.agent_orchestration.run_identity.scenario.foreign]
+- GIVEN a persisted record has the same numeric run identity but is unscoped, legacy, or bound to another instance or dispatch
+- WHEN recovery or abandonment evaluates the pending dispatch
+- THEN Lattice MUST reject identity correlation without settling, clearing, retrying, or overwriting either execution
+
 ### Requirement: Explicit abandonment of locally unobserved dispatches
 r[lattice.agent_orchestration.unobserved_abandon] Lattice MUST allow an authorized operator to abandon a cancellation-requested pending dispatch only when no matching persisted run record is observable, MUST terminate the local orchestration as failed without retrying or claiming a remote outcome, and MUST preserve the abandonment as a replayable event.
 
