@@ -40,7 +40,8 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/examples/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
-          || pkgs.lib.hasPrefix "${sourceRoot}/cairn/specs/" (toString path);
+          || pkgs.lib.hasPrefix "${sourceRoot}/cairn/specs/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/cairn-policy/" (toString path);
         isAnimusCompileTimeAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)

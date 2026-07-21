@@ -3139,23 +3139,43 @@
             "extensions": [
               "rs"
             ],
-            "root": "crates",
+            "root": "src",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "rs"
+            ],
+            "root": "tests",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "rs"
+            ],
+            "root": "examples",
             "source_kind": "rust_source"
           },
           {
             "extensions": [
               "ncl"
             ],
-            "root": "crates",
+            "root": "examples",
             "source_kind": "nickel_source"
           },
           {
             "extensions": [
-              "rs",
+              "rs"
+            ],
+            "root": "scripts",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
               "ncl"
             ],
-            "root": "tools",
-            "source_kind": "tool_source"
+            "root": "cairn-policy",
+            "source_kind": "nickel_source"
           }
         ],
         "id": "cairn-default",
