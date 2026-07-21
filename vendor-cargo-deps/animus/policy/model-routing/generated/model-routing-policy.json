@@ -1,0 +1,33 @@
+{
+  "budget_behavior": "prefer-cheaper-then-deny",
+  "missing_price_behavior": "deny",
+  "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "roles": [
+    {
+      "downgrade_role_label": "",
+      "minimum_score": 0,
+      "role_label": "economy"
+    },
+    {
+      "downgrade_role_label": "economy",
+      "minimum_score": 5,
+      "role_label": "balanced"
+    },
+    {
+      "downgrade_role_label": "balanced",
+      "minimum_score": 11,
+      "role_label": "deep-reasoning"
+    }
+  ],
+  "schema_version": 1,
+  "thresholds": {
+    "medium_max_score": 10,
+    "simple_max_score": 4
+  },
+  "weights": {
+    "file_bucket_weight": 1,
+    "risk_bucket_weight": 3,
+    "token_bucket_weight": 2,
+    "tool_bucket_weight": 2
+  }
+}

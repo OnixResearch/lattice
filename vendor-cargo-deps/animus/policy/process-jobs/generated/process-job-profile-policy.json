@@ -1,0 +1,32 @@
+{
+  "allowed_backends": [
+    "native",
+    "pueue"
+  ],
+  "allowed_cwd_prefixes": [
+    "/repo"
+  ],
+  "allowed_env_prefixes": [
+    "APP_"
+  ],
+  "allowed_writable_path_prefixes": [
+    "/repo/target"
+  ],
+  "default_backend": "native",
+  "identity_hash_algorithm": "BLAKE3",
+  "identity_metadata_keys": [
+    "identity.purpose"
+  ],
+  "identity_redaction": "hash-only",
+  "max_resource_limits": {
+    "cpu_millis": 1000,
+    "log_bytes": 2097152,
+    "memory_bytes": 268435456,
+    "timeout_seconds": 600
+  },
+  "notification_defaults": {
+    "notify_on_complete": true
+  },
+  "profile_schema_version": 1,
+  "schema": "animus.process-job-profiles.policy.v1"
+}

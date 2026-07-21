@@ -1,0 +1,36 @@
+mod input;
+mod safe;
+mod select;
+
+pub use input::{
+    RouterRotationCursor, RouterRotationCursorClass, RouterRotationCursorDraft,
+    RouterRotationPolicy, RouterRotationSnapshot, RouterRotationSnapshotDraft,
+    RouterRotationStaleCursorPolicy,
+};
+pub use safe::{RouterRotationReceipt, RouterRotationReceiptDraft};
+pub use select::{RouterRotationDecision, RouterRotationError, rotate_eligible_candidates};
+
+const POLICY_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_policy");
+const STALE_POLICY_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_stale_policy");
+const CURSOR_CLASS_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_cursor_class");
+const MODEL_LABEL_FIELD: crate::FieldName = crate::FieldName::new("router_model_label");
+const RECIPE_ID_FIELD: crate::FieldName = crate::FieldName::new("router_recipe_id");
+const NEXT_CURSOR_HASH_FIELD: crate::FieldName =
+    crate::FieldName::new("router_rotation_next_cursor_hash");
+const EMPTY_CURSORS_FIELD: &str = "router_rotation_cursors";
+const EMPTY_REDACTIONS_FIELD: &str = "router_rotation_receipt_redactions";
+const CURSOR_HASH_SCHEMA: &str = "animus.router-rotation.cursor.v1";
+const RECEIPT_HASH_SCHEMA: &str = "animus.router-rotation.receipt.v1";
+const POLICY_DISABLED: &str = "disabled";
+const POLICY_ROLE_CANDIDATES: &str = "role_candidates";
+const POLICY_ROLE_CANDIDATES_AND_FALLBACK: &str = "role_candidates_and_fallback";
+const STALE_RESET: &str = "reset";
+const STALE_DENY: &str = "deny";
+const CURSOR_DISABLED: &str = "disabled";
+const CURSOR_ABSENT: &str = "absent";
+const CURSOR_MATCHED: &str = "matched";
+const CURSOR_WRAPPED: &str = "wrapped";
+const CURSOR_STALE_RESET: &str = "stale_reset";
+const FIRST_CURSOR_INDEX: usize = 0;
+const CURSOR_ADVANCE: usize = 1;
+const MAX_CURSOR_POSITION: u32 = u32::MAX;

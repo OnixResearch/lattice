@@ -1,0 +1,22 @@
+[package]
+name = "animus-adapter-observability"
+description = "no_std observability adapter contract family for animus."
+edition = "2024"
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+rust-version = "1.85"
+version = "0.1.0"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(animus_octet)'] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+pedantic = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[dependencies]
+animus-adapter-safe = { path = "../animus-adapter-safe", version = "0.1.0" }

@@ -1,0 +1,17 @@
+{
+  "sandbox_policy": {
+    "allowed_constraint_classes": [
+      "filesystem",
+      "workdir_cow",
+      "process",
+      "environment",
+      "network",
+      "determinism"
+    ],
+    "denied_constraint_fixtures": [
+      "http"
+    ],
+    "policy_id": "policy:sandbox-standard",
+    "schema": "animus.sandbox-policy.v1"
+  }
+}

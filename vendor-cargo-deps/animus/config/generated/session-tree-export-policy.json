@@ -1,0 +1,42 @@
+{
+  "allowed_entry_kinds": [
+    "user_omitted",
+    "assistant_omitted",
+    "tool_status",
+    "compaction",
+    "repair",
+    "branch_summary",
+    "system_status"
+  ],
+  "branch_visibility": "all_redacted",
+  "content_posture": "metadata_only",
+  "custom_entry_posture": "reject",
+  "formats": [
+    "html",
+    "safe_lines"
+  ],
+  "malformed_input": "reject",
+  "max_depth": 32,
+  "max_entries": 256,
+  "max_html_bytes": 1048576,
+  "max_safe_lines_bytes": 1048576,
+  "max_summary_chars": 160,
+  "path_posture": "omit",
+  "policy_hash": "828fed5de19fe77a8e7a7050778113872d686343cd2a997070cf5e30930284db",
+  "policy_id": "redacted-session-tree",
+  "receipt_fields": [
+    "source_identity",
+    "projection_identity",
+    "artifact_identity",
+    "counts",
+    "format",
+    "byte_count",
+    "redaction",
+    "write_status",
+    "non_claim"
+  ],
+  "remote_resources": "forbidden",
+  "schema": "animus.session-tree-export-policy.v1",
+  "scripts": "forbidden",
+  "tool_metadata_posture": "status_only"
+}

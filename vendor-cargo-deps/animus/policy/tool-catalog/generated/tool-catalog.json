@@ -1,0 +1,18 @@
+{
+  "descriptors": [
+    {
+      "approval": "allow",
+      "capabilities": [
+        "observe_read"
+      ],
+      "description": "Read bounded context supplied by the host.",
+      "input_schema": "schema:animus.tool.input.context.v1",
+      "name": "inspect_context",
+      "output_schema": "schema:animus.tool.output.context.v1",
+      "redaction": "metadata_only",
+      "runtime_kind": "host_descriptor",
+      "side_effect": "read_only"
+    }
+  ],
+  "schema": "animus.tool-catalog.v1"
+}

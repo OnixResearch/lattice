@@ -1,0 +1,49 @@
+{
+  "profiles": [
+    {
+      "allowed_host_actions": [
+        "model",
+        "tool",
+        "respond",
+        "stop"
+      ],
+      "budget": {
+        "max_turns": 2
+      },
+      "default": true,
+      "enabled": true,
+      "fallback_mode": "block",
+      "name": "default-loop",
+      "receipt_redaction": {
+        "mode": "hash-only"
+      },
+      "script": {
+        "hash": "79d887ab1ffd350d191ad7aea6a10fe3de28f108d34271cc99e4a59e537e9d0e",
+        "label": "scripts/default-loop.scm"
+      }
+    },
+    {
+      "allowed_host_actions": [
+        "model",
+        "tool",
+        "respond",
+        "stop"
+      ],
+      "budget": {
+        "max_turns": 10
+      },
+      "default": false,
+      "enabled": true,
+      "fallback_mode": "block",
+      "name": "ralph-loop",
+      "receipt_redaction": {
+        "mode": "hash-only"
+      },
+      "script": {
+        "hash": "0225dfc88a7cbfe9b1639a199dd961cecee66ecd311a2ff13929867f60b6ca77",
+        "label": "scripts/ralph-loop.scm"
+      }
+    }
+  ],
+  "schema": "animus.steel-runtime-policy.v1"
+}

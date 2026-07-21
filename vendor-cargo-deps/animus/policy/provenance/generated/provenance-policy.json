@@ -1,0 +1,66 @@
+{
+  "backend_requirements": [
+    "disabled",
+    "optional",
+    "required"
+  ],
+  "canonical_mutation_kinds": [
+    "edit",
+    "write",
+    "replace",
+    "rename"
+  ],
+  "receipt_redactions": [
+    "public",
+    "metadata-only",
+    "redacted-payload"
+  ],
+  "schema": "animus.provenance.git-ai.policy.v1",
+  "tools": [
+    {
+      "backend_requirement": "required",
+      "file_identity_fields": [
+        "relative_path",
+        "stable_id",
+        "content_hash"
+      ],
+      "mutation_kind": "edit",
+      "receipt_redaction": "metadata-only",
+      "tool_name": "edit"
+    },
+    {
+      "backend_requirement": "required",
+      "file_identity_fields": [
+        "relative_path",
+        "stable_id",
+        "content_hash"
+      ],
+      "mutation_kind": "write",
+      "receipt_redaction": "metadata-only",
+      "tool_name": "write"
+    },
+    {
+      "backend_requirement": "required",
+      "file_identity_fields": [
+        "relative_path",
+        "stable_id",
+        "content_hash"
+      ],
+      "mutation_kind": "replace",
+      "receipt_redaction": "metadata-only",
+      "tool_name": "replace"
+    },
+    {
+      "backend_requirement": "optional",
+      "file_identity_fields": [
+        "old_relative_path",
+        "new_relative_path",
+        "stable_id",
+        "content_hash"
+      ],
+      "mutation_kind": "rename",
+      "receipt_redaction": "metadata-only",
+      "tool_name": "rename"
+    }
+  ]
+}

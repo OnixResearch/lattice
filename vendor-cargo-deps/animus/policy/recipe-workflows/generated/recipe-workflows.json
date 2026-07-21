@@ -1,0 +1,169 @@
+{
+  "schema": "animus.recipe-workflows.v1",
+  "workflows": [
+    {
+      "activities": [
+        "plan",
+        "execute"
+      ],
+      "capability_ceilings": [
+        "model.generate",
+        "tool.read"
+      ],
+      "dag_steps": [
+        {
+          "capability_ceilings": [
+            "model.generate"
+          ],
+          "depends_on": [],
+          "input_refs": [
+            "topic"
+          ],
+          "kind": "prompt",
+          "output_refs": [
+            "summary"
+          ],
+          "retry_refs": [],
+          "step_id": "research-a",
+          "subrecipe_refs": [],
+          "validation_gates": []
+        },
+        {
+          "capability_ceilings": [
+            "tool.read"
+          ],
+          "depends_on": [],
+          "input_refs": [
+            "context_file"
+          ],
+          "kind": "tool",
+          "output_refs": [
+            "summary"
+          ],
+          "retry_refs": [
+            "cargo-test"
+          ],
+          "step_id": "research-b",
+          "subrecipe_refs": [],
+          "validation_gates": []
+        },
+        {
+          "capability_ceilings": [
+            "model.generate"
+          ],
+          "depends_on": [
+            "research-a",
+            "research-b"
+          ],
+          "input_refs": [
+            "research-a.summary",
+            "research-b.summary"
+          ],
+          "kind": "validation_gate",
+          "output_refs": [
+            "status"
+          ],
+          "retry_refs": [],
+          "step_id": "synthesize",
+          "subrecipe_refs": [],
+          "validation_gates": [
+            "structured-output"
+          ]
+        },
+        {
+          "capability_ceilings": [
+            "model.generate"
+          ],
+          "depends_on": [
+            "synthesize"
+          ],
+          "input_refs": [
+            "synthesize.status"
+          ],
+          "kind": "subrecipe",
+          "output_refs": [
+            "warnings"
+          ],
+          "retry_refs": [],
+          "step_id": "child-run",
+          "subrecipe_refs": [
+            "goose.recipe.child"
+          ],
+          "validation_gates": []
+        }
+      ],
+      "identity": "goose.recipe.workflow",
+      "initial_prompt": "Investigate {{topic}} in {{mode}} using {{context_file}} for {{recipe.identity}}.",
+      "instructions": "Run the bounded workflow and return structured output.",
+      "model_profile": "standard-reasoning",
+      "parameters": [
+        {
+          "default_value": "",
+          "kind": "text",
+          "name": "topic",
+          "required": true,
+          "select_options": []
+        },
+        {
+          "default_value": "review",
+          "kind": "select",
+          "name": "mode",
+          "required": false,
+          "select_options": [
+            "review",
+            "fix"
+          ]
+        },
+        {
+          "default_value": "",
+          "kind": "file",
+          "name": "context_file",
+          "required": true,
+          "select_options": []
+        }
+      ],
+      "provenance": {
+        "admitted": true,
+        "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_kind": "project",
+        "source_label": "config/recipe-workflows.ncl"
+      },
+      "response_schema": {
+        "name": "workflow-result",
+        "required_fields": [
+          {
+            "kind": "string",
+            "name": "status"
+          },
+          {
+            "kind": "array",
+            "name": "warnings"
+          }
+        ]
+      },
+      "retry_policy": {
+        "checks": [
+          {
+            "capability": "tool.read",
+            "cleanup_request": "cleanup-target",
+            "effect_kind": "validation_check",
+            "label": "cargo-test",
+            "receipt_label": "retry-receipt",
+            "sandbox": "readonly",
+            "timeout_class": "standard"
+          }
+        ],
+        "max_attempts": 2
+      },
+      "subrecipes": [
+        "goose.recipe.child"
+      ],
+      "toolsets": [
+        "readonly-tools"
+      ],
+      "validation_gates": [
+        "structured-output"
+      ]
+    }
+  ]
+}

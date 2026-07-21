@@ -1,0 +1,248 @@
+{
+  "backend_allowlist": [
+    "backend:local",
+    "backend:remote"
+  ],
+  "deadline_classes": [
+    "short",
+    "standard",
+    "extended"
+  ],
+  "fallback_policies": [
+    "deny",
+    "best_valid_evidence",
+    "safe_single"
+  ],
+  "family_policies": [
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "single",
+      "required_roles": [
+        "primary"
+      ]
+    },
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "confidence",
+      "required_roles": [
+        "primary",
+        "escalation"
+      ]
+    },
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "ratings",
+      "required_roles": [
+        "primary",
+        "rater"
+      ]
+    },
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "remom",
+      "required_roles": [
+        "worker",
+        "synthesizer"
+      ]
+    },
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "fusion",
+      "required_roles": [
+        "judge",
+        "finalizer"
+      ]
+    },
+    {
+      "backend_allowlist": [
+        "backend:local",
+        "backend:remote"
+      ],
+      "bounds": {
+        "max_candidates": 8,
+        "max_parallelism": 4,
+        "max_quorum": 8,
+        "max_repair_attempts": 2,
+        "max_synthesis_attempts": 3,
+        "min_candidates": 1,
+        "min_parallelism": 1,
+        "min_quorum": 1,
+        "min_repair_attempts": 0,
+        "min_synthesis_attempts": 0
+      },
+      "compatible_output_contracts": [
+        "text",
+        "json",
+        "tool_call",
+        "artifact"
+      ],
+      "fallback_policies": [
+        "deny",
+        "best_valid_evidence",
+        "safe_single"
+      ],
+      "family": "workflow",
+      "required_roles": [
+        "worker",
+        "finalizer"
+      ]
+    }
+  ],
+  "output_contracts": [
+    "text",
+    "json",
+    "tool_call",
+    "artifact"
+  ],
+  "policy_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "roles": [
+    "primary",
+    "escalation",
+    "rater",
+    "synthesizer",
+    "judge",
+    "finalizer",
+    "worker",
+    "repair",
+    "fallback"
+  ],
+  "route_families": [
+    "single",
+    "confidence",
+    "ratings",
+    "remom",
+    "fusion",
+    "workflow"
+  ],
+  "schema": "animus.router-recipe-policy.v1"
+}

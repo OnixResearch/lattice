@@ -1,0 +1,74 @@
+{
+  "artifacts": [
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "model-routing",
+      "family_contract_blake3": "4ae92f09dda1a8b8d0649a2782edd8baa14abc51650de70d0de04d4d8e6284f4",
+      "field": "model_routing_policy",
+      "output": "policy/model-routing/generated/model-routing-policy.json",
+      "output_blake3": "f500f2f52c38fdc74185a69215af8ea14f26ad5fe4c9f02f999988cb5005a5eb",
+      "runtime_owner": "animus-adapters:model-routing",
+      "source": "policy/model-routing/policy.ncl",
+      "source_blake3": "4ae92f09dda1a8b8d0649a2782edd8baa14abc51650de70d0de04d4d8e6284f4"
+    },
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "process-jobs",
+      "family_contract_blake3": "35df12e8cb7e07bcfbd13337e218892202bb462be08dc341e412616ae9c70e88",
+      "field": "process_job_profile_policy",
+      "output": "policy/process-jobs/generated/process-job-profile-policy.json",
+      "output_blake3": "876e8e3aedf280155e40378e5ba1add80ca30a7a0931f9a9c972b898694619f2",
+      "runtime_owner": "animus-runtime:background-policy",
+      "source": "policy/process-jobs/policy.ncl",
+      "source_blake3": "35df12e8cb7e07bcfbd13337e218892202bb462be08dc341e412616ae9c70e88"
+    },
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "process-jobs",
+      "family_contract_blake3": "35df12e8cb7e07bcfbd13337e218892202bb462be08dc341e412616ae9c70e88",
+      "field": "sample_profile_manifest",
+      "output": "policy/process-jobs/generated/sample-profile-manifest.json",
+      "output_blake3": "aa0c6b8c36a59fa8b9fd939c2200f7317e285f6d157bfb2d36edfa11c19bdb9a",
+      "runtime_owner": "animus-runtime:background-profile",
+      "source": "policy/process-jobs/policy.ncl",
+      "source_blake3": "35df12e8cb7e07bcfbd13337e218892202bb462be08dc341e412616ae9c70e88"
+    },
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "steel-runtime",
+      "family_contract_blake3": "d9f5fcabc70de2dad50f23404fe40480630fc89f34a197937df5d24572e8dc22",
+      "field": "steel_runtime_policy",
+      "output": "policy/steel-runtime/generated/steel-runtime-policy.json",
+      "output_blake3": "f540eba5edbe242a0c2ae0a71a91a47ee52f56a85926dbf87f0ebcb1e3922d9d",
+      "runtime_owner": "animus-steel:policy",
+      "source": "policy/steel-runtime/policy.ncl",
+      "source_blake3": "d9f5fcabc70de2dad50f23404fe40480630fc89f34a197937df5d24572e8dc22"
+    },
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "tool-catalog",
+      "family_contract_blake3": "7bd8da7c94e01d07b8f944c1ba0c583132871131ed4cc99f6d76ba8ad61fa6df",
+      "field": "catalog_schema",
+      "output": "policy/tool-catalog/generated/tool-catalog-schema.json",
+      "output_blake3": "b72fc9cc22e173d3b7656201b17f7be262038d918c4695ac23b09361b71c06ea",
+      "runtime_owner": "animus-runtime:tool-catalog-schema",
+      "source": "policy/tool-catalog/catalog.ncl",
+      "source_blake3": "7bd8da7c94e01d07b8f944c1ba0c583132871131ed4cc99f6d76ba8ad61fa6df"
+    },
+    {
+      "evaluator_profile": "nickel-json-export-v1",
+      "family": "tool-catalog",
+      "family_contract_blake3": "7bd8da7c94e01d07b8f944c1ba0c583132871131ed4cc99f6d76ba8ad61fa6df",
+      "field": "sample_catalog",
+      "output": "policy/tool-catalog/generated/tool-catalog.json",
+      "output_blake3": "085b5e29b176d4472871ad33e2335bd399919da4ca21ff4499c0075bcfaa895a",
+      "runtime_owner": "animus-runtime:tool-catalog",
+      "source": "policy/tool-catalog/catalog.ncl",
+      "source_blake3": "7bd8da7c94e01d07b8f944c1ba0c583132871131ed4cc99f6d76ba8ad61fa6df"
+    }
+  ],
+  "evaluator": "nickel-1.17.0",
+  "schema": "animus.policy-projection-receipts.v1",
+  "shared_prelude": "policy/contracts/primitives.ncl",
+  "shared_prelude_blake3": "102e0de517da26582d662cfdc87acb45733099fd62b1d805d6e01eaa077744e0"
+}

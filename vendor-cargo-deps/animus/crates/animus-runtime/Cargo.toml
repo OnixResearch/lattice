@@ -1,0 +1,60 @@
+[package]
+name = "animus-runtime"
+description = "Reusable Steel-backed agent loop runtime for animus."
+edition = "2024"
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+rust-version = "1.85"
+version = "0.1.0"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(animus_octet)'] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+pedantic = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[features]
+default = ["compat", "steel"]
+all-families = [
+  "batch",
+  "compaction",
+  "dataset-export",
+  "headless",
+  "loop",
+  "policy",
+  "provenance",
+  "quality",
+  "research",
+  "scaffold",
+  "status",
+  "worker-team",
+]
+compat = ["all-families", "steel"]
+batch = []
+compaction = []
+dataset-export = []
+headless = []
+loop = []
+policy = []
+provenance = []
+quality = []
+research = []
+scaffold = []
+status = []
+worker-team = []
+steel = ["dep:animus-steel"]
+
+[dependencies]
+animus-adapters = { path = "../animus-adapters", version = "0.1.0" }
+animus-core = { path = "../animus-core", version = "0.1.0" }
+animus-steel = { path = "../animus-steel", version = "0.1.0", optional = true }
+blake3 = { version = "1.8.5", default-features = false }
+
+[dev-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"

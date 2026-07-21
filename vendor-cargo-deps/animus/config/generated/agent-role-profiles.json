@@ -1,0 +1,429 @@
+{
+  "budget_policies": [
+    {
+      "max_actions": 64,
+      "max_context_units": 8192,
+      "max_outputs": 8,
+      "policy_id": "implementer-budget"
+    },
+    {
+      "max_actions": 32,
+      "max_context_units": 4096,
+      "max_outputs": 8,
+      "policy_id": "reviewer-budget"
+    },
+    {
+      "max_actions": 32,
+      "max_context_units": 4096,
+      "max_outputs": 8,
+      "policy_id": "verifier-budget"
+    },
+    {
+      "max_actions": 16,
+      "max_context_units": 2048,
+      "max_outputs": 8,
+      "policy_id": "judge-budget"
+    },
+    {
+      "max_actions": 32,
+      "max_context_units": 4096,
+      "max_outputs": 16,
+      "policy_id": "coordinator-budget"
+    },
+    {
+      "max_actions": 16,
+      "max_context_units": 2048,
+      "max_outputs": 8,
+      "policy_id": "observer-budget"
+    }
+  ],
+  "evidence_contracts": [
+    "metadata-only-evidence"
+  ],
+  "input_contracts": [
+    "bounded-role-input"
+  ],
+  "known_capabilities": [
+    "context_read",
+    "mutation_intent",
+    "tool_use"
+  ],
+  "output_contracts": [
+    "bounded-role-output"
+  ],
+  "profiles": [
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "implementer-budget",
+      "capability_ceiling": [
+        "context_read",
+        "mutation_intent",
+        "tool_use"
+      ],
+      "class": "implementation",
+      "context_posture": "clean_recompose",
+      "eligible_model_profiles": [
+        "mock-standard",
+        "mock-balanced"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "candidate",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "scoped_intent",
+      "output_contract": "bounded-role-output",
+      "output_kind": "implementation_candidate",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "c57907aae8160edf2ce5bc941a05d03f1d6f22dd3babf69a5a9f7dd2a99f5556",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy",
+        "model-guidance"
+      ],
+      "purpose": "Produce bounded implementation candidates without completion authority.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "implementer",
+      "separation_policy_ref": "subject-bound",
+      "skills": [
+        "proof-search"
+      ],
+      "source_scope": "host",
+      "tool_capabilities": [
+        "observe_read"
+      ],
+      "tools": [],
+      "toolsets": [
+        "readonly-context"
+      ],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    },
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "reviewer-budget",
+      "capability_ceiling": [
+        "context_read",
+        "tool_use"
+      ],
+      "class": "review",
+      "context_posture": "clean_recompose",
+      "eligible_model_profiles": [
+        "mock-balanced"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "findings",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "subject_read_only",
+      "output_contract": "bounded-role-output",
+      "output_kind": "review_report",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "45b911ffee514570ac8c86feee116254bb2bf86787a233b3d5f3368ff6137fb2",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy",
+        "model-guidance"
+      ],
+      "purpose": "Review an immutable subject and emit advisory findings.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "reviewer",
+      "separation_policy_ref": "independent-review",
+      "skills": [
+        "proof-search"
+      ],
+      "source_scope": "host",
+      "tool_capabilities": [
+        "observe_read"
+      ],
+      "tools": [],
+      "toolsets": [
+        "readonly-context"
+      ],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    },
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "verifier-budget",
+      "capability_ceiling": [
+        "context_read"
+      ],
+      "class": "verification",
+      "context_posture": "clean_recompose",
+      "eligible_model_profiles": [
+        "mock-standard"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "check_evidence",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "verification_service_only",
+      "output_contract": "bounded-role-output",
+      "output_kind": "verification_report",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "bd537afe4a8edbda1ca5ab5e2d61f2a3a53f02c26a5fe18d2eb04dea49bbd713",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy"
+      ],
+      "purpose": "Run supplied named checks over an immutable subject and report bounded evidence.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "verifier",
+      "separation_policy_ref": "independent-verifier",
+      "skills": [],
+      "source_scope": "host",
+      "tool_capabilities": [],
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    },
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "judge-budget",
+      "capability_ceiling": [
+        "context_read"
+      ],
+      "class": "judgment",
+      "context_posture": "clean_recompose",
+      "eligible_model_profiles": [
+        "mock-standard"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "judgment",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "none",
+      "output_contract": "bounded-role-output",
+      "output_kind": "judgment_report",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "64171d6f89a466eceef3380b9149566c634898de4519476f23ad9be06aee03d0",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy"
+      ],
+      "purpose": "Apply a pinned rubric without granting authority or overriding deterministic denials.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "judge",
+      "separation_policy_ref": "independent-judge",
+      "skills": [],
+      "source_scope": "host",
+      "tool_capabilities": [],
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    },
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "coordinator-budget",
+      "capability_ceiling": [
+        "context_read"
+      ],
+      "class": "coordination",
+      "context_posture": "bounded_shared",
+      "eligible_model_profiles": [
+        "mock-standard"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "coordination",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "none",
+      "output_contract": "bounded-role-output",
+      "output_kind": "coordination_report",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "3c9fd74d6a778558bb470221dbd5069ce4174a8e633154c8668c8e7f58ddea21",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy"
+      ],
+      "purpose": "Coordinate bounded metadata-only work and handoffs without inherited authority.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "coordinator",
+      "separation_policy_ref": "subject-bound",
+      "skills": [],
+      "source_scope": "host",
+      "tool_capabilities": [],
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    },
+    {
+      "admission_status": "admitted",
+      "budget_policy_ref": "observer-budget",
+      "capability_ceiling": [
+        "context_read"
+      ],
+      "class": "observation",
+      "context_posture": "read_only_observation",
+      "eligible_model_profiles": [
+        "mock-standard"
+      ],
+      "evidence_contract": "metadata-only-evidence",
+      "evidence_posture": "observation",
+      "input_contract": "bounded-role-input",
+      "memory_policy_hashes": [
+        "9999999999999999999999999999999999999999999999999999999999999999"
+      ],
+      "model_targets": [
+        "mock:mock-text"
+      ],
+      "mutation_posture": "none",
+      "output_contract": "bounded-role-output",
+      "output_kind": "observation_report",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "44b5d142714b08795bf8abbab3332913e877097fb01db17304017a2875331e57",
+      "project_profile_admitted": false,
+      "prompt_modes": [
+        "standard"
+      ],
+      "prompt_sources": [
+        "host-policy"
+      ],
+      "purpose": "Observe bounded admitted records without mutation or completion authority.",
+      "required_capabilities": [
+        "context_read"
+      ],
+      "role_id": "observer",
+      "separation_policy_ref": "subject-bound",
+      "skills": [],
+      "source_scope": "host",
+      "tool_capabilities": [],
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted",
+      "workspace_scopes": [
+        "workspace:project"
+      ]
+    }
+  ],
+  "schema": "animus.agent-role-catalog.v1",
+  "separation_policies": [
+    {
+      "policy_id": "subject-bound",
+      "require_clean_context": false,
+      "require_distinct_actor": false,
+      "require_distinct_assignment": false,
+      "require_distinct_model_profile": false,
+      "require_distinct_mutation_lineage": false,
+      "require_distinct_run_thread": false,
+      "require_distinct_session": false,
+      "require_distinct_workspace": false,
+      "require_rubric_immutable": false,
+      "require_subject_immutable": true,
+      "require_verifier_immutable": false
+    },
+    {
+      "policy_id": "independent-review",
+      "require_clean_context": true,
+      "require_distinct_actor": true,
+      "require_distinct_assignment": true,
+      "require_distinct_model_profile": true,
+      "require_distinct_mutation_lineage": true,
+      "require_distinct_run_thread": true,
+      "require_distinct_session": true,
+      "require_distinct_workspace": true,
+      "require_rubric_immutable": false,
+      "require_subject_immutable": true,
+      "require_verifier_immutable": false
+    },
+    {
+      "policy_id": "independent-verifier",
+      "require_clean_context": true,
+      "require_distinct_actor": true,
+      "require_distinct_assignment": true,
+      "require_distinct_model_profile": true,
+      "require_distinct_mutation_lineage": true,
+      "require_distinct_run_thread": true,
+      "require_distinct_session": true,
+      "require_distinct_workspace": true,
+      "require_rubric_immutable": false,
+      "require_subject_immutable": true,
+      "require_verifier_immutable": true
+    },
+    {
+      "policy_id": "independent-judge",
+      "require_clean_context": true,
+      "require_distinct_actor": true,
+      "require_distinct_assignment": true,
+      "require_distinct_model_profile": true,
+      "require_distinct_mutation_lineage": true,
+      "require_distinct_run_thread": true,
+      "require_distinct_session": true,
+      "require_distinct_workspace": true,
+      "require_rubric_immutable": true,
+      "require_subject_immutable": true,
+      "require_verifier_immutable": false
+    }
+  ],
+  "toolsets": [
+    {
+      "tool_names": [
+        "inspect_context"
+      ],
+      "toolset_id": "readonly-context"
+    }
+  ]
+}

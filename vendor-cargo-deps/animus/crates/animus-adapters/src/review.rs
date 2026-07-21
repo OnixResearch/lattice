@@ -1,0 +1,21 @@
+#![allow(unknown_lints)]
+#![allow(
+    ambiguous_params,
+    assertion_density,
+    bool_naming,
+    borrowed_argument_types,
+    excessive_file_length,
+    non_trait_imports,
+    numeric_units,
+    path_segment_repetition,
+    raw_arithmetic_overflow,
+    usize_in_public_api
+)]
+
+include!("review/impl/report/types.rs");
+include!("review/impl/metric/records.rs");
+include!("review/impl/report/reducers.rs");
+include!("review/impl/report/parser.rs");
+include!("review/impl/impl005.rs");
+include!("review/impl/corrective/memory.rs");
+include!("review/impl/lifecycle/review.rs");

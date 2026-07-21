@@ -1,0 +1,30 @@
+[package]
+name = "animus-adapters"
+description = "no_std adapter contracts for swappable animus components."
+edition = "2024"
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+rust-version = "1.85"
+version = "0.1.0"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(animus_octet)'] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+pedantic = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[dependencies]
+animus-adapter-observability = { path = "../animus-adapter-observability", version = "0.1.0" }
+animus-adapter-safe = { path = "../animus-adapter-safe", version = "0.1.0" }
+animus-core = { path = "../animus-core", version = "0.1.0" }
+animus-router = { path = "../animus-router", version = "0.1.0" }
+blake3 = { version = "1.8.5", default-features = false }
+
+[dev-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"

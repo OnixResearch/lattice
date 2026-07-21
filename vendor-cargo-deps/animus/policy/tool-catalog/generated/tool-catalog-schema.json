@@ -1,0 +1,35 @@
+{
+  "approvals": [
+    "allow",
+    "prompt",
+    "deny"
+  ],
+  "capabilities": [
+    "observe_read",
+    "workspace_mutation",
+    "shell",
+    "network",
+    "process",
+    "secret_adjacent",
+    "host_custom"
+  ],
+  "redactions": [
+    "metadata_only",
+    "hash_only",
+    "none"
+  ],
+  "runtime_kinds": [
+    "host_descriptor",
+    "injected_service",
+    "external_adapter"
+  ],
+  "schema": "animus.tool-catalog.schema.v1",
+  "schema_reference_prefix": "schema:",
+  "side_effects": [
+    "read_only",
+    "workspace_write",
+    "process",
+    "network",
+    "secret_adjacent"
+  ]
+}

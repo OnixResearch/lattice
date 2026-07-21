@@ -1,0 +1,231 @@
+{
+  "invalid_rule_fixtures": [
+    {
+      "expected_error": "empty_collection",
+      "name": "empty-prefix",
+      "rule": {
+        "command_prefix": [],
+        "decision": "allow",
+        "id": "empty-prefix",
+        "negative_examples": [
+          {
+            "argv": [
+              "rm"
+            ]
+          }
+        ],
+        "positive_examples": [
+          {
+            "argv": [
+              "cargo"
+            ]
+          }
+        ],
+        "rationale": "bounded command prefix"
+      }
+    },
+    {
+      "expected_error": "unsupported_decision",
+      "name": "unsupported-decision",
+      "rule": {
+        "command_prefix": [
+          "cargo"
+        ],
+        "decision": "maybe",
+        "id": "unsupported-decision",
+        "negative_examples": [
+          {
+            "argv": [
+              "rm"
+            ]
+          }
+        ],
+        "positive_examples": [
+          {
+            "argv": [
+              "cargo"
+            ]
+          }
+        ],
+        "rationale": "bounded command prefix"
+      }
+    },
+    {
+      "expected_error": "positive_example_mismatch",
+      "name": "positive-example-mismatch",
+      "rule": {
+        "command_prefix": [
+          "cargo"
+        ],
+        "decision": "allow",
+        "id": "positive-example-mismatch",
+        "negative_examples": [
+          {
+            "argv": [
+              "rm",
+              "-rf",
+              "target"
+            ]
+          }
+        ],
+        "positive_examples": [
+          {
+            "argv": [
+              "rm"
+            ]
+          }
+        ],
+        "rationale": "bounded command prefix"
+      }
+    },
+    {
+      "expected_error": "negative_example_matched",
+      "name": "negative-example-matched",
+      "rule": {
+        "command_prefix": [
+          "cargo"
+        ],
+        "decision": "allow",
+        "id": "negative-example-matched",
+        "negative_examples": [
+          {
+            "argv": [
+              "cargo",
+              "test"
+            ]
+          }
+        ],
+        "positive_examples": [
+          {
+            "argv": [
+              "cargo"
+            ]
+          }
+        ],
+        "rationale": "bounded command prefix"
+      }
+    }
+  ],
+  "sandbox_context": {
+    "active_sandbox": "workspace-readonly",
+    "escalation_reason": "process-adapter-request",
+    "requested_capability": "exec:outside-sandbox"
+  },
+  "schema": "animus.exec-policy.v1",
+  "valid_rules": [
+    {
+      "command_prefix": [
+        "cargo"
+      ],
+      "decision": "allow",
+      "id": "allow-cargo-readonly",
+      "negative_examples": [
+        {
+          "argv": [
+            "rm",
+            "-rf",
+            "target"
+          ]
+        },
+        {
+          "argv": [
+            "nix",
+            "build"
+          ]
+        }
+      ],
+      "positive_examples": [
+        {
+          "argv": [
+            "cargo",
+            "metadata"
+          ]
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "-p",
+            "animus-adapters"
+          ]
+        }
+      ],
+      "rationale": "bounded command prefix"
+    },
+    {
+      "command_prefix": [
+        "nix"
+      ],
+      "decision": "prompt",
+      "id": "prompt-nix-build",
+      "negative_examples": [
+        {
+          "argv": [
+            "cargo",
+            "metadata"
+          ]
+        },
+        {
+          "argv": [
+            "rm",
+            "-rf",
+            "target"
+          ]
+        }
+      ],
+      "positive_examples": [
+        {
+          "argv": [
+            "nix",
+            "build"
+          ]
+        },
+        {
+          "argv": [
+            "nix",
+            "develop"
+          ]
+        }
+      ],
+      "rationale": "host approval required"
+    },
+    {
+      "command_prefix": [
+        "rm"
+      ],
+      "decision": "forbid",
+      "id": "forbid-destructive-remove",
+      "negative_examples": [
+        {
+          "argv": [
+            "cargo",
+            "metadata"
+          ]
+        },
+        {
+          "argv": [
+            "nix",
+            "build"
+          ]
+        }
+      ],
+      "positive_examples": [
+        {
+          "argv": [
+            "rm",
+            "-rf",
+            "target"
+          ]
+        },
+        {
+          "argv": [
+            "rm",
+            "-r",
+            "tmp"
+          ]
+        }
+      ],
+      "rationale": "destructive prefix denied"
+    }
+  ]
+}

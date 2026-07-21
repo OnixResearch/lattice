@@ -1,0 +1,65 @@
+{
+  "cancellation_posture": "required",
+  "delay_schedule_ms": [
+    0,
+    250,
+    1000
+  ],
+  "mappings": [
+    {
+      "canonical_class": "authentication",
+      "mapping_version": "v1",
+      "native_class": "auth",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "conflict",
+      "mapping_version": "v1",
+      "native_class": "conflict",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "transient_transport",
+      "mapping_version": "v1",
+      "native_class": "network-reset",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "rate_limited",
+      "mapping_version": "v1",
+      "native_class": "rate-limit",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "service_unavailable",
+      "mapping_version": "v1",
+      "native_class": "service-down",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "request_timeout",
+      "mapping_version": "v1",
+      "native_class": "timeout",
+      "provider_family": "mock"
+    },
+    {
+      "canonical_class": "unsupported_feature",
+      "mapping_version": "v1",
+      "native_class": "unsupported",
+      "provider_family": "mock"
+    }
+  ],
+  "max_attempts": 4,
+  "max_delay_ms": 30000,
+  "policy_hash": "c4c5f883019c739cc4dd3c4edd790dfa038d095109f6bbac2e5f40f7483c15a6",
+  "policy_id": "bounded-provider-retry",
+  "retryable_classes": [
+    "conflict",
+    "rate_limited",
+    "request_timeout",
+    "service_unavailable",
+    "transient_transport"
+  ],
+  "schema": "animus.provider-retry-policy.v1",
+  "stream_commit_policy": "deny_after_semantic"
+}

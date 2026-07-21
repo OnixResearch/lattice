@@ -1,0 +1,125 @@
+{
+  "budget_policies": [
+    {
+      "max_context_units": 4096,
+      "max_parallel_tool_calls": 2,
+      "max_tool_calls": 8,
+      "policy_id": "standard-budget"
+    }
+  ],
+  "enablement": "required",
+  "explicit_default_profile_id": "compat-default",
+  "profiles": [
+    {
+      "admission_status": "admitted",
+      "binding": {
+        "capability_identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "kind": "exact",
+        "model_id": "mock-text",
+        "provider_id": "mock",
+        "router_role": ""
+      },
+      "context_budget_policy": "standard-budget",
+      "memory_access_mode": "disabled",
+      "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "dba2fff3a916d9b631208f1dae89c7e30591add42e33c0568223432a4fb97428",
+      "profile_id": "mock-standard",
+      "project_profile_admitted": false,
+      "prompt_mode_ref": "standard",
+      "prompt_sources": [
+        {
+          "label": "host-policy",
+          "required": true
+        }
+      ],
+      "skills": [],
+      "source_scope": "host",
+      "tool_budget_policy": "standard-budget",
+      "tool_calling_mode": "disabled",
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted"
+    },
+    {
+      "admission_status": "admitted",
+      "binding": {
+        "capability_identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "kind": "exact",
+        "model_id": "mock-text",
+        "provider_id": "mock",
+        "router_role": "balanced"
+      },
+      "context_budget_policy": "standard-budget",
+      "memory_access_mode": "read_only",
+      "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "6c55a406c8b9e0855adcf189156bcf1b8e49c6ec03402b2d45d52f46a920c91f",
+      "profile_id": "mock-balanced",
+      "project_profile_admitted": false,
+      "prompt_mode_ref": "standard",
+      "prompt_sources": [
+        {
+          "label": "host-policy",
+          "required": true
+        },
+        {
+          "label": "model-guidance",
+          "required": false
+        }
+      ],
+      "skills": [
+        {
+          "name": "proof-search",
+          "posture": "selectable"
+        }
+      ],
+      "source_scope": "host",
+      "tool_budget_policy": "standard-budget",
+      "tool_calling_mode": "disabled",
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted"
+    },
+    {
+      "admission_status": "admitted",
+      "binding": {
+        "capability_identity": "",
+        "kind": "default",
+        "model_id": "",
+        "provider_id": "",
+        "router_role": ""
+      },
+      "context_budget_policy": "standard-budget",
+      "memory_access_mode": "disabled",
+      "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_hash": "afbe344c0f904052774b59c2cf1419de8c5ae445470a04d89a7300acdd48726b",
+      "profile_id": "compat-default",
+      "project_profile_admitted": false,
+      "prompt_mode_ref": "standard",
+      "prompt_sources": [
+        {
+          "label": "host-policy",
+          "required": true
+        }
+      ],
+      "skills": [],
+      "source_scope": "host",
+      "tool_budget_policy": "standard-budget",
+      "tool_calling_mode": "disabled",
+      "tools": [],
+      "toolsets": [],
+      "trust_status": "trusted"
+    }
+  ],
+  "schema": "animus.model-runtime-profiles.v1",
+  "toolsets": [
+    {
+      "tool_names": [
+        "inspect_context"
+      ],
+      "toolset_id": "readonly-context"
+    }
+  ]
+}

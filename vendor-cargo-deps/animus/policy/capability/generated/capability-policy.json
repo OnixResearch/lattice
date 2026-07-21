@@ -1,0 +1,107 @@
+{
+  "contracts": [
+    {
+      "ability": "call",
+      "action": "model",
+      "contract": "animus.runtime",
+      "resource_prefix": "model:"
+    },
+    {
+      "ability": "invoke",
+      "action": "tool",
+      "contract": "animus.runtime",
+      "resource_prefix": "tool:"
+    },
+    {
+      "ability": "read",
+      "action": "filesystem",
+      "contract": "animus.runtime",
+      "resource_prefix": "fs:workspace/"
+    },
+    {
+      "ability": "run",
+      "action": "exec",
+      "contract": "animus.runtime",
+      "resource_prefix": "exec:"
+    },
+    {
+      "ability": "connect",
+      "action": "network",
+      "contract": "animus.runtime",
+      "resource_prefix": "net:"
+    },
+    {
+      "ability": "evaluate",
+      "action": "steel",
+      "contract": "animus.runtime",
+      "resource_prefix": "steel:"
+    },
+    {
+      "ability": "assign",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "activate",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "handoff",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_candidate",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_review",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_verification",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_judgment",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_coordination",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "emit_observation",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "select",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    },
+    {
+      "ability": "veto",
+      "action": "agent_role",
+      "contract": "animus.runtime",
+      "resource_prefix": "role:"
+    }
+  ],
+  "schema": "animus.capability-policy.v1"
+}

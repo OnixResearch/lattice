@@ -1,0 +1,31 @@
+{
+  "committed_corruption": "reject",
+  "durability": "sync_all_each_commit",
+  "encryption_postures": [
+    "absent_explicit",
+    "external_required"
+  ],
+  "file_mode": 384,
+  "locking": "exclusive_create_new",
+  "max_file_bytes": 67108864,
+  "max_frame_payload_bytes": 65536,
+  "max_transaction_frames": 64,
+  "policy_hash": "cb51ed6a1173d80feeac2e39011cc74ad0a5f51b52df2082b8b5af9643b5e68c",
+  "policy_id": "local-sync-each-commit",
+  "private_data": "replay_private",
+  "receipt_fields": [
+    "store_identity",
+    "session_identity",
+    "branch_identity",
+    "head_identity",
+    "operation",
+    "durability",
+    "counts",
+    "lock_status",
+    "recovery_status",
+    "redaction",
+    "non_claim"
+  ],
+  "schema": "animus.durable-session-store-policy.v1",
+  "tail_recovery": "ignore_uncommitted"
+}

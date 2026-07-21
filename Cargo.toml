@@ -7,6 +7,7 @@ license = "AGPL-3.0-or-later"
 [workspace]
 members = ["."]
 default-members = ["."]
+exclude = ["vendor-cargo-deps/animus"]
 resolver = "3"
 
 [workspace.package]
@@ -76,6 +77,12 @@ rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor
 home = "0.5.12"
 dirs-next = "2.0.0"
 cap-std = "4.0.2"
+animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
+animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
+animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
+
+[patch."ssh://git@github.com/OnixResearch/host-control.git"]
+host-control-core = { path = "vendor-cargo-deps/host-control-core" }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

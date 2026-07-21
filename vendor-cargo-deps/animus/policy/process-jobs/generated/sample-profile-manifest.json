@@ -1,0 +1,40 @@
+{
+  "profiles": [
+    {
+      "args": [
+        "check",
+        "--tests"
+      ],
+      "backend": "pueue",
+      "command": "",
+      "cwd": "/repo",
+      "env": [
+        {
+          "key": "APP_MODE",
+          "value": "ci"
+        }
+      ],
+      "metadata": [
+        {
+          "key": "identity.purpose",
+          "value": "developer-smoke"
+        }
+      ],
+      "name": "quick-check",
+      "notification": {
+        "notify_on_complete": true
+      },
+      "program": "cargo",
+      "resource_limits": {
+        "cpu_millis": 500,
+        "log_bytes": 1048576,
+        "memory_bytes": 134217728,
+        "timeout_seconds": 300
+      },
+      "writable_paths": [
+        "/repo/target"
+      ]
+    }
+  ],
+  "schema_version": 1
+}
