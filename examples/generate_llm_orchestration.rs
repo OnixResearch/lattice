@@ -14,6 +14,7 @@ use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::workflow_revision;
@@ -34,6 +35,7 @@ const MAX_TOKENS: u64 = MAX_ROUNDS * TOKENS_PER_ROUND;
 const DURATION_PER_ROUND_MILLIS: u64 = 600_000;
 const MAX_DURATION_MILLIS: u64 = MAX_ROUNDS * DURATION_PER_ROUND_MILLIS;
 const ROUND_CHARGE: u64 = 1;
+const MAX_OBSERVED_FAILURE_RETRIES: u64 = 1;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let workflow = load_workflow_nickel_file(Path::new(WORKFLOW_PATH))?;
@@ -43,6 +45,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow)?,
         completion: CompletionPolicy::AwaitProposal,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: MAX_OBSERVED_FAILURE_RETRIES,
+        }),
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,

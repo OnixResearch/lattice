@@ -39,6 +39,8 @@ use crate::workflow_validation::WorkflowDiagnostic;
 
 const ROUND_CHARGE: u64 = 1;
 const AGENT_INVOCATION_CHARGE: u64 = 1;
+const UNOBSERVED_ROUND_FAILURE_SUMMARY: &str =
+    "round execution failed before exact terminal run evidence was persisted";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DefinitionValidationReport {
@@ -68,6 +70,12 @@ pub struct AbandonPendingRequest<'a> {
     pub actor: &'a str,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryRequest<'a> {
+    pub instance_id: &'a str,
+    pub actor: &'a str,
+}
+
 #[derive(Debug)]
 pub enum OrchestrationShellError {
     Store(StoreError),
@@ -80,6 +88,7 @@ pub enum OrchestrationShellError {
     InvalidProposal(String),
     NoPendingDispatch(String),
     ObservedRunRequiresRecovery { run_id: RunId },
+    PendingDispatchCannotRetry { run_id: RunId },
     RunIdentityMismatch { run_id: RunId },
     ReplayInvalid(Box<ReplayReport>),
 }
@@ -102,8 +111,12 @@ impl fmt::Display for OrchestrationShellError {
             Self::InvalidProposal(message) => write!(formatter, "orchestration proposal is invalid: {message}"),
             Self::NoPendingDispatch(id) => write!(formatter, "orchestration instance has no pending dispatch: {id}"),
             Self::ObservedRunRequiresRecovery { run_id } => {
-                write!(formatter, "run {run_id} is already persisted; use orchestration recover instead of abandon")
+                write!(formatter, "run {run_id} is already persisted; use orchestration recover before another action")
             }
+            Self::PendingDispatchCannotRetry { run_id } => write!(
+                formatter,
+                "run {run_id} remains pending and locally unobserved; use orchestration recover or authorized abandonment, not retry"
+            ),
             Self::RunIdentityMismatch { run_id } => {
                 write!(formatter, "run {run_id} is not owned by the pending orchestration dispatch")
             }
@@ -225,6 +238,7 @@ async fn execute_ready_round(
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let workflow = load_validated_workflow(store, &instance.workflow_revision)?;
+    debug_assert_eq!(workflow.meta.name, instance.workflow_revision.workflow_name);
     let run_id = store.next_run_id()?;
     let intent = DispatchIntent {
         id: core::dispatch_identity(&instance, run_id)?,
@@ -233,6 +247,7 @@ async fn execute_ready_round(
         status: DispatchStatus::Pending,
     };
     let plan = planned_charge(&instance.definition, &workflow)?;
+    debug_assert_eq!(intent.workflow_revision, instance.workflow_revision);
     let start_action = OrchestrationAction::StartRound {
         intent: intent.clone(),
         planned_charge: plan,
@@ -251,6 +266,17 @@ async fn execute_ready_round(
         }
         Err(error) => return Err(error),
     };
+    execute_started_round(store, started, workflow, intent, agent_runtime).await
+}
+
+async fn execute_started_round(
+    store: &Store,
+    started: OrchestrationInstance,
+    workflow: Workflow,
+    intent: DispatchIntent,
+    agent_runtime: AgentRuntimeConfig,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let run_id = intent.run_id;
     let acknowledged = apply_and_commit(store, &started, OrchestrationAction::DispatchAcknowledged {
         dispatch_id: intent.id.clone(),
     })?;
@@ -273,18 +299,39 @@ async fn execute_ready_round(
     })
     .await;
     let current = load_instance(store, &acknowledged.id)?;
-    let (succeeded, summary) = match result {
-        Ok(summary) => (summary.status == HeadlessRunStatus::Succeeded, safe_run_summary(&summary)),
-        Err(error) => (false, format!("round execution failed: {error}")),
+    let (is_succeeded, is_retryable_observed_failure, summary) = match result {
+        Ok(summary) => {
+            let is_succeeded = summary.status == HeadlessRunStatus::Succeeded;
+            let is_retryable = !is_succeeded && exact_owned_failed_run(store, &current, &intent)?;
+            (is_succeeded, is_retryable, safe_run_summary(&summary))
+        }
+        Err(_) => (false, false, UNOBSERVED_ROUND_FAILURE_SUMMARY.to_string()),
     };
     let observed_usage = observed_usage(&current, &intent.id).unwrap_or_default();
     apply_and_commit(store, &current, OrchestrationAction::RunFinished {
         dispatch_id: intent.id,
         run_id,
-        succeeded,
+        succeeded: is_succeeded,
+        retryable_observed_failure: is_retryable_observed_failure,
         observed_usage,
         safe_summary: summary,
     })
+}
+
+// r[impl lattice.agent_orchestration.observed_failure_retry]
+fn exact_owned_failed_run(
+    store: &Store,
+    instance: &OrchestrationInstance,
+    intent: &DispatchIntent,
+) -> Result<bool, OrchestrationShellError> {
+    if instance.definition.retry.is_none() {
+        return Ok(false);
+    }
+    let Some(record) = store.load_run(intent.run_id)? else {
+        return Ok(false);
+    };
+    validate_run_owner(instance, intent, &record)?;
+    Ok(record.finished_epoch_ms.is_some() && record.failures > 0)
 }
 
 fn load_validated_workflow(
@@ -449,6 +496,45 @@ pub fn reject(
     })
 }
 
+// r[impl lattice.agent_orchestration.retry_round]
+pub async fn retry(
+    store: &Store,
+    request: RetryRequest<'_>,
+    agent_runtime: AgentRuntimeConfig,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let instance = load_instance(store, request.instance_id)?;
+    reject_pending_retry(store, &instance)?;
+    let workflow = load_validated_workflow(store, &instance.workflow_revision)?;
+    let plan = planned_charge(&instance.definition, &workflow)?;
+    let failed = core::preflight_retry(&instance, request.actor, plan)?;
+    let run_id = store.next_run_id()?;
+    let intent = DispatchIntent {
+        id: core::dispatch_identity(&instance, run_id)?,
+        run_id,
+        workflow_revision: instance.workflow_revision.clone(),
+        status: DispatchStatus::Pending,
+    };
+    debug_assert_ne!(intent.run_id, failed.run_id);
+    debug_assert_ne!(intent.id, failed.dispatch_id);
+    let started = apply_and_commit(store, &instance, OrchestrationAction::RetryRound {
+        actor: request.actor.to_string(),
+        intent: intent.clone(),
+        planned_charge: plan,
+    })?;
+    execute_started_round(store, started, workflow, intent, agent_runtime).await
+}
+
+fn reject_pending_retry(store: &Store, instance: &OrchestrationInstance) -> Result<(), OrchestrationShellError> {
+    let Some(intent) = instance.pending_dispatch.as_ref() else {
+        return Ok(());
+    };
+    let Some(record) = store.load_run(intent.run_id)? else {
+        return Err(OrchestrationShellError::PendingDispatchCannotRetry { run_id: intent.run_id });
+    };
+    validate_run_owner(instance, intent, &record)?;
+    Err(OrchestrationShellError::ObservedRunRequiresRecovery { run_id: intent.run_id })
+}
+
 // r[impl lattice.agent_orchestration.events]
 pub fn replay(store: &Store, instance_id: &str) -> Result<ReplayReport, OrchestrationShellError> {
     let current = load_instance(store, instance_id)?;
@@ -531,10 +617,14 @@ fn reconcile_run_record(
     record: &RunRecord,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let observed_usage = observed_usage(instance, &intent.id).unwrap_or_default();
+    let is_succeeded = record.failures == 0;
+    let is_retryable_observed_failure =
+        !is_succeeded && record.finished_epoch_ms.is_some() && instance.definition.retry.is_some();
     apply_and_commit(store, instance, OrchestrationAction::RunFinished {
         dispatch_id: intent.id.clone(),
         run_id: intent.run_id,
-        succeeded: record.failures == 0,
+        succeeded: is_succeeded,
+        retryable_observed_failure: is_retryable_observed_failure,
         observed_usage,
         safe_summary: format!(
             "recovered workflow {} run {} with {} failures",

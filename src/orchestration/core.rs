@@ -31,6 +31,8 @@ const INSTANCE_VERSION_INCREMENT: u64 = 1;
 const EPOCH_INCREMENT: u64 = 1;
 const ROUND_INCREMENT: u64 = 1;
 const MAX_REPLAY_DIAGNOSTICS: usize = 1;
+const RETRY_INCREMENT: u64 = 1;
+const RETRY_PREFLIGHT_RESERVATION_ID: &str = "retry-preflight";
 pub const ABANDONED_ACKNOWLEDGED_SUMMARY: &str =
     "local dispatch abandoned after acknowledgement; remote outcome unknown";
 pub const ABANDONED_PENDING_SUMMARY: &str =
@@ -48,6 +50,13 @@ pub struct WorkflowRevisionRef {
 pub enum CompletionPolicy {
     RunSucceeded,
     AwaitProposal,
+}
+
+// r[impl lattice.agent_orchestration.observed_failure_retry]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RetryPolicy {
+    pub max_observed_failure_retries: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,6 +142,8 @@ pub struct OrchestrationDefinition {
     pub objective: String,
     pub workflow: WorkflowRevisionRef,
     pub completion: CompletionPolicy,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<RetryPolicy>,
     pub budgets: BudgetPolicy,
     pub authority: AuthorityPolicy,
     pub triggers: Vec<OrchestrationTriggerBinding>,
@@ -151,6 +162,24 @@ pub struct BudgetLedger {
     pub consumed: BudgetCharge,
     pub reservations: BTreeMap<String, BudgetReservation>,
     pub breached: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RetryableFailure {
+    pub run_id: RunId,
+    pub dispatch_id: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RetryLedger {
+    pub admitted: u64,
+    pub retryable_failure: Option<RetryableFailure>,
+}
+
+impl RetryLedger {
+    fn is_empty(&self) -> bool {
+        self.admitted == 0 && self.retryable_failure.is_none()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -223,6 +252,8 @@ pub struct OrchestrationInstance {
     pub pending_dispatch: Option<DispatchIntent>,
     pub pending_proposal: Option<RevisionProposal>,
     pub budgets: BudgetLedger,
+    #[serde(default, skip_serializing_if = "RetryLedger::is_empty")]
+    pub retry: RetryLedger,
     pub accepted_fact_ids: BTreeSet<String>,
     pub last_event_sequence: Option<u64>,
     pub event_head: Option<String>,
@@ -242,6 +273,11 @@ pub enum OrchestrationAction {
         intent: DispatchIntent,
         planned_charge: BudgetChargePlan,
     },
+    RetryRound {
+        actor: String,
+        intent: DispatchIntent,
+        planned_charge: BudgetChargePlan,
+    },
     DispatchAcknowledged {
         dispatch_id: String,
     },
@@ -249,6 +285,8 @@ pub enum OrchestrationAction {
         dispatch_id: String,
         run_id: RunId,
         succeeded: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        retryable_observed_failure: bool,
         observed_usage: BudgetCharge,
         safe_summary: String,
     },
@@ -290,6 +328,7 @@ pub enum OrchestrationAction {
 #[serde(rename_all = "snake_case")]
 pub enum OrchestrationEventKind {
     RoundStarted,
+    RetryRoundStarted,
     DispatchAcknowledged,
     RoundCompleted,
     RoundFailed,
@@ -347,6 +386,9 @@ pub enum OrchestrationDiagnosticCode {
     StaleApproval,
     UnauthorizedActor,
     CancellationRequired,
+    RetryDisabled,
+    RetryLimitExceeded,
+    RetryEvidenceMissing,
     SuccessorValidationFailed,
     InvalidIdentity,
     ReplayMismatch,
@@ -410,6 +452,10 @@ pub fn current_schema_version() -> u32 {
     CURRENT_SCHEMA_VERSION
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 // r[impl lattice.agent_orchestration.model]
 pub fn workflow_revision(workflow: &Workflow) -> Result<WorkflowRevisionRef, OrchestrationDiagnostic> {
     let portable_workflow = crate::workflow_format::workflow_to_portable(workflow);
@@ -455,31 +501,48 @@ pub fn validate_definition(
     actual_workflow_revision: Option<&WorkflowRevisionRef>,
 ) -> Vec<OrchestrationDiagnostic> {
     let mut diagnostics = Vec::new();
-    if definition.schema_version != CURRENT_SCHEMA_VERSION {
-        diagnostics.push(diagnostic(
-            OrchestrationDiagnosticCode::InvalidSchemaVersion,
-            format!(
-                "orchestration schema version {} is unsupported; expected {CURRENT_SCHEMA_VERSION}",
-                definition.schema_version
-            ),
-        ));
+    if let Some(diagnostic) = schema_version_diagnostic(definition.schema_version) {
+        diagnostics.push(diagnostic);
     }
-    if definition.id.trim().is_empty() {
-        diagnostics.push(diagnostic(
-            OrchestrationDiagnosticCode::EmptyDefinitionId,
-            "orchestration definition id cannot be empty",
-        ));
+    if let Some(diagnostic) = empty_definition_id_diagnostic(&definition.id) {
+        diagnostics.push(diagnostic);
     }
-    if definition.objective.trim().is_empty() {
-        diagnostics
-            .push(diagnostic(OrchestrationDiagnosticCode::EmptyObjective, "orchestration objective cannot be empty"));
+    if let Some(diagnostic) = empty_objective_diagnostic(&definition.objective) {
+        diagnostics.push(diagnostic);
     }
     validate_workflow_ref(&definition.workflow, &mut diagnostics);
     validate_actual_workflow_revision(definition, actual_workflow_revision, &mut diagnostics);
     validate_authority_policy(&definition.authority, &mut diagnostics);
     validate_trigger_bindings(&definition.triggers, &mut diagnostics);
     validate_budget_policy(&definition.budgets, &mut diagnostics);
+    if let Some(diagnostic) = retry_policy_diagnostic(definition.retry) {
+        diagnostics.push(diagnostic);
+    }
+    debug_assert!(!diagnostics.is_empty() || definition.schema_version == CURRENT_SCHEMA_VERSION);
+    debug_assert!(!diagnostics.is_empty() || !definition.authority.approvers.is_empty());
     diagnostics
+}
+
+fn schema_version_diagnostic(schema_version: u32) -> Option<OrchestrationDiagnostic> {
+    (schema_version != CURRENT_SCHEMA_VERSION).then(|| {
+        diagnostic(
+            OrchestrationDiagnosticCode::InvalidSchemaVersion,
+            format!("orchestration schema version {schema_version} is unsupported; expected {CURRENT_SCHEMA_VERSION}"),
+        )
+    })
+}
+
+fn empty_definition_id_diagnostic(definition_id: &str) -> Option<OrchestrationDiagnostic> {
+    definition_id.trim().is_empty().then(|| {
+        diagnostic(OrchestrationDiagnosticCode::EmptyDefinitionId, "orchestration definition id cannot be empty")
+    })
+}
+
+fn empty_objective_diagnostic(objective: &str) -> Option<OrchestrationDiagnostic> {
+    objective
+        .trim()
+        .is_empty()
+        .then(|| diagnostic(OrchestrationDiagnosticCode::EmptyObjective, "orchestration objective cannot be empty"))
 }
 
 fn validate_workflow_ref(reference: &WorkflowRevisionRef, diagnostics: &mut Vec<OrchestrationDiagnostic>) {
@@ -548,6 +611,17 @@ fn validate_trigger_bindings(bindings: &[OrchestrationTriggerBinding], diagnosti
     }
 }
 
+// r[impl lattice.agent_orchestration.observed_failure_retry]
+fn retry_policy_diagnostic(policy: Option<RetryPolicy>) -> Option<OrchestrationDiagnostic> {
+    match policy {
+        Some(policy) if policy.max_observed_failure_retries == 0 => Some(diagnostic(
+            OrchestrationDiagnosticCode::RetryDisabled,
+            "enabled retry policy must allow at least one observed-failure retry",
+        )),
+        Some(_) | None => None,
+    }
+}
+
 fn validate_budget_policy(policy: &BudgetPolicy, diagnostics: &mut Vec<OrchestrationDiagnostic>) {
     validate_configured_charge(
         policy.enforced.rounds,
@@ -613,7 +687,7 @@ pub fn new_instance(
     )?;
     let workflow_revision = definition.workflow.clone();
     let policy = definition.budgets;
-    Ok(OrchestrationInstance {
+    let instance = OrchestrationInstance {
         id,
         sequence,
         trigger_idempotency_key,
@@ -634,11 +708,15 @@ pub fn new_instance(
             policy,
             ..BudgetLedger::default()
         },
+        retry: RetryLedger::default(),
         accepted_fact_ids: BTreeSet::new(),
         last_event_sequence: None,
         event_head: None,
         terminal_summary: None,
-    })
+    };
+    debug_assert_eq!(instance.workflow_revision, instance.definition.workflow);
+    debug_assert_eq!(instance.budgets.policy, instance.definition.budgets);
+    Ok(instance)
 }
 
 // r[impl lattice.agent_orchestration.core]
@@ -656,7 +734,9 @@ pub fn transition(
     if fact.id.trim().is_empty() {
         return Err(diagnostic(OrchestrationDiagnosticCode::InvalidIdentity, "orchestration fact id cannot be empty"));
     }
-    reject_terminal_mutation(instance)?;
+    if !matches!(fact.action, OrchestrationAction::RetryRound { .. }) {
+        reject_terminal_mutation(instance)?;
+    }
     let mut next = instance.clone();
     let kind = apply_action(&mut next, &fact.action)?;
     let is_inserted = next.accepted_fact_ids.insert(fact.id.clone());
@@ -682,20 +762,43 @@ fn reject_terminal_mutation(instance: &OrchestrationInstance) -> Result<(), Orch
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RunFinishedInput<'a> {
+    dispatch_id: &'a str,
+    run_id: RunId,
+    is_succeeded: bool,
+    is_retryable_observed_failure: bool,
+    observed_usage: BudgetCharge,
+    safe_summary: &'a str,
+}
+
 fn apply_action(
     instance: &mut OrchestrationInstance,
     action: &OrchestrationAction,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     match action {
         OrchestrationAction::StartRound { intent, planned_charge } => start_round(instance, intent, *planned_charge),
+        OrchestrationAction::RetryRound {
+            actor,
+            intent,
+            planned_charge,
+        } => start_retry_round(instance, actor, intent, *planned_charge),
         OrchestrationAction::DispatchAcknowledged { dispatch_id } => acknowledge_dispatch(instance, dispatch_id),
         OrchestrationAction::RunFinished {
             dispatch_id,
             run_id,
             succeeded,
+            retryable_observed_failure,
             observed_usage,
             safe_summary,
-        } => finish_run(instance, dispatch_id, *run_id, *succeeded, *observed_usage, safe_summary),
+        } => finish_run(instance, RunFinishedInput {
+            dispatch_id,
+            run_id: *run_id,
+            is_succeeded: *succeeded,
+            is_retryable_observed_failure: *retryable_observed_failure,
+            observed_usage: *observed_usage,
+            safe_summary,
+        }),
         OrchestrationAction::SubmitProposal { proposal } => submit_proposal(instance, proposal),
         OrchestrationAction::DecideProposal {
             approval,
@@ -725,10 +828,102 @@ fn start_round(
     if instance.status != OrchestrationStatus::Ready || instance.pause_requested {
         return Err(invalid_transition("a round can start only from an unpaused ready instance"));
     }
+    begin_dispatch(instance, intent, planned_charge)?;
+    Ok(OrchestrationEventKind::RoundStarted)
+}
+
+// r[impl lattice.agent_orchestration.retry_round]
+fn start_retry_round(
+    instance: &mut OrchestrationInstance,
+    actor: &str,
+    intent: &DispatchIntent,
+    planned_charge: BudgetChargePlan,
+) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
+    let failed = preflight_retry(instance, actor, planned_charge)?;
+    if intent.run_id == failed.run_id || intent.id == failed.dispatch_id {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::DispatchMismatch,
+            "retry must use run and dispatch identities distinct from the observed failure",
+        ));
+    }
+    if dispatch_identity(instance, intent.run_id)? != intent.id {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::InvalidIdentity,
+            "retry dispatch BLAKE3 identity does not match its canonical inputs",
+        ));
+    }
+    begin_dispatch(instance, intent, planned_charge)?;
+    instance.retry.admitted = instance.retry.admitted.saturating_add(RETRY_INCREMENT);
+    instance.retry.retryable_failure = None;
+    instance.terminal_summary = None;
+    debug_assert!(instance.retry.admitted > 0);
+    debug_assert!(instance.retry.retryable_failure.is_none());
+    Ok(OrchestrationEventKind::RetryRoundStarted)
+}
+
+// r[impl lattice.agent_orchestration.retry_round]
+pub fn preflight_retry(
+    instance: &OrchestrationInstance,
+    actor: &str,
+    planned_charge: BudgetChargePlan,
+) -> Result<RetryableFailure, OrchestrationDiagnostic> {
+    let failed = retryable_failure(instance, actor)?;
+    let mut budget = instance.budgets.clone();
+    reserve_budget(&mut budget, RETRY_PREFLIGHT_RESERVATION_ID, planned_charge)?;
+    Ok(failed)
+}
+
+fn retryable_failure(
+    instance: &OrchestrationInstance,
+    actor: &str,
+) -> Result<RetryableFailure, OrchestrationDiagnostic> {
+    authorize_actor(instance, actor)?;
+    if instance.status != OrchestrationStatus::Failed
+        || instance.active_run_id.is_some()
+        || instance.pending_dispatch.is_some()
+    {
+        return Err(invalid_transition(
+            "retry requires a terminal failed instance without an active or pending dispatch",
+        ));
+    }
+    let policy = instance.definition.retry.ok_or_else(|| {
+        diagnostic(
+            OrchestrationDiagnosticCode::RetryDisabled,
+            "orchestration definition does not enable observed-failure retries",
+        )
+    })?;
+    if instance.retry.admitted >= policy.max_observed_failure_retries {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::RetryLimitExceeded,
+            "observed-failure retry limit is exhausted",
+        ));
+    }
+    let failed = instance.retry.retryable_failure.clone().ok_or_else(|| {
+        diagnostic(
+            OrchestrationDiagnosticCode::RetryEvidenceMissing,
+            "failed orchestration has no exact persisted terminal-failure retry evidence",
+        )
+    })?;
+    debug_assert_eq!(instance.status, OrchestrationStatus::Failed);
+    debug_assert!(instance.retry.admitted < policy.max_observed_failure_retries);
+    Ok(failed)
+}
+
+fn begin_dispatch(
+    instance: &mut OrchestrationInstance,
+    intent: &DispatchIntent,
+    planned_charge: BudgetChargePlan,
+) -> Result<(), OrchestrationDiagnostic> {
     if intent.workflow_revision != instance.workflow_revision {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::WorkflowRevisionMismatch,
             "dispatch intent workflow revision does not match the active orchestration revision",
+        ));
+    }
+    if intent.status != DispatchStatus::Pending {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::InvalidLifecycleTransition,
+            "new dispatch intent must begin in pending state",
         ));
     }
     reserve_budget(&mut instance.budgets, &intent.id, planned_charge)?;
@@ -737,7 +932,9 @@ fn start_round(
     instance.pending_dispatch = Some(intent.clone());
     instance.status = OrchestrationStatus::Running;
     instance.cancellation_requested = false;
-    Ok(OrchestrationEventKind::RoundStarted)
+    debug_assert_eq!(instance.active_run_id, Some(intent.run_id));
+    debug_assert_eq!(instance.pending_dispatch.as_ref(), Some(intent));
+    Ok(())
 }
 
 fn acknowledge_dispatch(
@@ -749,26 +946,31 @@ fn acknowledge_dispatch(
     Ok(OrchestrationEventKind::DispatchAcknowledged)
 }
 
+// r[impl lattice.agent_orchestration.observed_failure_retry]
 fn finish_run(
     instance: &mut OrchestrationInstance,
-    dispatch_id: &str,
-    run_id: RunId,
-    succeeded: bool,
-    observed_usage: BudgetCharge,
-    safe_summary: &str,
+    input: RunFinishedInput<'_>,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
-    let dispatch = matching_dispatch(instance, dispatch_id)?;
-    if dispatch.run_id != run_id || instance.active_run_id != Some(run_id) {
+    let dispatch = matching_dispatch(instance, input.dispatch_id)?;
+    if dispatch.run_id != input.run_id || instance.active_run_id != Some(input.run_id) {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::DispatchMismatch,
             "run completion does not match the active dispatch identity",
         ));
     }
-    let settlement = settle_budget(&mut instance.budgets, dispatch_id, observed_usage)?;
+    if input.is_succeeded && input.is_retryable_observed_failure {
+        return Err(diagnostic(
+            OrchestrationDiagnosticCode::RetryEvidenceMissing,
+            "successful run cannot be marked as observed retryable failure",
+        ));
+    }
+    let settlement = settle_budget(&mut instance.budgets, input.dispatch_id, input.observed_usage)?;
     instance.active_run_id = None;
     instance.pending_dispatch = None;
-    instance.terminal_summary = instance.definition.redaction.retain_safe_summaries.then(|| safe_summary.to_string());
-    let kind = if succeeded {
+    instance.retry.retryable_failure = None;
+    instance.terminal_summary =
+        instance.definition.redaction.retain_safe_summaries.then(|| input.safe_summary.to_string());
+    let kind = if input.is_succeeded {
         OrchestrationEventKind::RoundCompleted
     } else {
         OrchestrationEventKind::RoundFailed
@@ -781,8 +983,16 @@ fn finish_run(
         instance.status = OrchestrationStatus::Cancelled;
         return Ok(kind);
     }
-    if !succeeded {
+    if !input.is_succeeded {
         instance.status = OrchestrationStatus::Failed;
+        if input.is_retryable_observed_failure && instance.definition.retry.is_some() {
+            instance.retry.retryable_failure = Some(RetryableFailure {
+                run_id: input.run_id,
+                dispatch_id: input.dispatch_id.to_string(),
+            });
+        }
+        debug_assert!(instance.active_run_id.is_none());
+        debug_assert!(instance.pending_dispatch.is_none());
         return Ok(kind);
     }
     let next_status = match instance.definition.completion {
@@ -795,6 +1005,8 @@ fn finish_run(
     } else {
         instance.status = next_status;
     }
+    debug_assert!(instance.active_run_id.is_none());
+    debug_assert!(instance.pending_dispatch.is_none());
     Ok(kind)
 }
 
@@ -970,6 +1182,7 @@ fn abandon_pending_dispatch(
     instance.pause_requested = false;
     instance.paused_status = None;
     instance.cancellation_requested = false;
+    instance.retry.retryable_failure = None;
     instance.status = OrchestrationStatus::Failed;
     instance.terminal_summary = instance.definition.redaction.retain_safe_summaries.then(|| safe_summary.to_string());
     debug_assert!(!settlement.breached);
@@ -1476,6 +1689,7 @@ fn next_action(instance: &OrchestrationInstance) -> &'static str {
         OrchestrationStatus::WaitingForApproval if instance.pending_proposal.is_some() => "approve_or_reject",
         OrchestrationStatus::WaitingForApproval => "submit_proposal",
         OrchestrationStatus::Paused => "resume_or_cancel",
+        OrchestrationStatus::Failed if instance.retry.retryable_failure.is_some() => "retry",
         OrchestrationStatus::Completed
         | OrchestrationStatus::Failed
         | OrchestrationStatus::Cancelled

@@ -65,6 +65,14 @@ lattice --config ./demo/config.ncl orchestration status <instance-id>
 lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
 ```
 
+A definition may opt into a positive bound for retries of exact locally observed terminal failures. Each authorized retry starts one fresh round with a new run ID, a new BLAKE3 dispatch identity, and a fresh multidimensional budget reservation:
+
+```bash
+lattice --config ./demo/config.ncl orchestration retry <instance-id> --actor operator:local --output json
+```
+
+Retry is explicit rather than automatic. It is refused before dispatch when policy is disabled or exhausted, authority is missing, fresh budget does not fit, or the failed instance lacks the exact owned terminal `RunRecord`. A shell error without that record, abandonment, and foreign or legacy-unscoped records never create retry authority.
+
 If the original executor has stopped and recovery reports `PendingUnobserved`, close the uncertain local dispatch explicitly rather than retrying it:
 
 ```bash
@@ -74,7 +82,7 @@ lattice --config ./demo/config.ncl orchestration abandon <instance-id> --actor o
 lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
 ```
 
-Run IDs are reserved atomically before effects, and orchestration records are bound to the exact instance and dispatch; foreign or legacy-unscoped records fail closed instead of satisfying recovery. Terminal headless runs persist the same node-detail and replay model used by run history, with sensitive values replaced by a fixed redaction marker before storage. Abandonment requires a prior authorized cancellation request and refuses to override an owned persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
+Run IDs are reserved atomically before effects, and orchestration records are bound to the exact instance and dispatch; foreign or legacy-unscoped records fail closed instead of satisfying recovery. Terminal headless runs persist the same node-detail and replay model used by run history, with sensitive values replaced by a fixed redaction marker before storage. Abandonment requires a prior authorized cancellation request and refuses to override an owned persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. Neither abandonment nor bounded observed-failure retry proves provider cancellation, provider failure, arbitrary kill safety, workflow success, provider truth, actual billing or token usage, remote effect deduplication, remote exactly-once execution, or production readiness.
 
 A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
 

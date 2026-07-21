@@ -11,6 +11,7 @@ use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::load_definition_nickel_file;
@@ -30,6 +31,7 @@ const ACTOR: &str = "operator:format";
 const TRIGGER_ID: &str = "format-schedule";
 const FIRST_SEQUENCE: u64 = 1;
 const ROUND_LIMIT: u64 = 3;
+const RETRY_LIMIT: u64 = 1;
 
 fn definition() -> OrchestrationDefinition {
     let workflow = Workflow::new(WORKFLOW_NAME);
@@ -39,6 +41,9 @@ fn definition() -> OrchestrationDefinition {
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion: CompletionPolicy::AwaitProposal,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -78,6 +83,23 @@ fn typed_nickel_definition_round_trip_preserves_meaning() {
     let loaded = load_definition_nickel_file(&path).expect("rendered Nickel must load");
 
     assert_eq!(loaded, expected);
+}
+
+// r[verify lattice.agent_orchestration.observed_failure_retry.scenario.compatibility]
+#[test]
+fn default_disabled_retry_is_omitted_and_round_trips_through_nickel() {
+    let directory = tempdir().expect("temporary directory must exist");
+    let path = directory.path().join("disabled-retry.ncl");
+    let mut expected = definition();
+    expected.retry = None;
+    let rendered = definition_to_nickel(&expected).expect("disabled definition must render");
+    assert!(!rendered.contains("\n  retry ="));
+    std::fs::write(&path, rendered).expect("definition must write");
+
+    let loaded = load_definition_nickel_file(&path).expect("disabled definition must load");
+
+    assert_eq!(loaded, expected);
+    assert!(loaded.retry.is_none());
 }
 
 // r[verify lattice.agent_orchestration.format]

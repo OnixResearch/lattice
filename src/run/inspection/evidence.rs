@@ -66,6 +66,7 @@ pub(super) fn orchestration_event_chain(
     }
 }
 
+// r[impl lattice.agent_orchestration.retry_round]
 pub(super) fn collect_dispatch_facts(
     run_id: crate::engine::RunId,
     dispatch_id: &str,
@@ -75,9 +76,10 @@ pub(super) fn collect_dispatch_facts(
     let mut facts = DispatchFacts::new();
     for event in events {
         match &event.fact.action {
-            crate::orchestration::OrchestrationAction::StartRound { intent, planned_charge } => {
-                collect_start_fact(&mut facts, target, intent, *planned_charge)
-            }
+            crate::orchestration::OrchestrationAction::StartRound { intent, planned_charge }
+            | crate::orchestration::OrchestrationAction::RetryRound {
+                intent, planned_charge, ..
+            } => collect_start_fact(&mut facts, target, intent, *planned_charge),
             crate::orchestration::OrchestrationAction::DispatchAcknowledged {
                 dispatch_id: acknowledged,
             } if acknowledged == target.dispatch_id => {

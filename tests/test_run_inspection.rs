@@ -19,6 +19,7 @@ use lattice::orchestration::OrchestrationEvent;
 use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::dispatch_identity;
 use lattice::orchestration::fact_identity;
@@ -65,6 +66,7 @@ const SECOND_SEQUENCE: u64 = 1;
 const INSTANCE_SEQUENCE: u64 = 3;
 const ROUND_LIMIT: u64 = 2;
 const ROUND_CHARGE: u64 = 1;
+const RETRY_LIMIT: u64 = 1;
 const PRIVATE_PROMPT: &str = "PRIVATE_PROMPT_DO_NOT_RENDER";
 const PRIVATE_REASONING: &str = "<think>PRIVATE_REASONING_DO_NOT_RENDER</think>";
 const PRIVATE_CREDENTIAL: &str = "sk-live-PRIVATE_CREDENTIAL_DO_NOT_RENDER";
@@ -145,6 +147,7 @@ fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
         objective: PRIVATE_PROMPT.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow revision"),
         completion: CompletionPolicy::RunSucceeded,
+        retry: None,
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -199,6 +202,7 @@ fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, S
         dispatch_id: dispatch_id.clone(),
         run_id: RunId(RUN_ID_VALUE),
         succeeded: true,
+        retryable_observed_failure: false,
         observed_usage: BudgetCharge {
             rounds: ROUND_CHARGE,
             ..BudgetCharge::default()
@@ -207,6 +211,108 @@ fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, S
     });
     events.push(finished.1);
     (finished.0, events, dispatch_id)
+}
+
+fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
+    let workflow = Workflow::new(PRIVATE_PROMPT);
+    let definition = OrchestrationDefinition {
+        schema_version: current_schema_version(),
+        id: ORCHESTRATION_ID.to_string(),
+        objective: PRIVATE_PROMPT.to_string(),
+        workflow: workflow_revision(&workflow).expect("workflow revision"),
+        completion: CompletionPolicy::RunSucceeded,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
+        budgets: BudgetPolicy {
+            enforced: BudgetDimensions {
+                rounds: true,
+                ..BudgetDimensions::default()
+            },
+            limits: BudgetLimits {
+                rounds: ROUND_LIMIT,
+                ..BudgetLimits::default()
+            },
+            per_round_upper_bound: BudgetCharge {
+                rounds: ROUND_CHARGE,
+                ..BudgetCharge::default()
+            },
+        },
+        authority: AuthorityPolicy {
+            approvers: BTreeSet::from([SAFE_ACTOR.to_string(), PRIVATE_CREDENTIAL.to_string()]),
+        },
+        triggers: Vec::new(),
+        redaction: RedactionPolicy {
+            retain_safe_summaries: true,
+        },
+    };
+    let initial = new_instance(definition, INSTANCE_SEQUENCE, None).expect("instance");
+    let first_run_id = RunId(RUN_ID_VALUE);
+    let first_dispatch_id = dispatch_identity(&initial, first_run_id).expect("first dispatch identity");
+    let started = apply(&initial, OrchestrationAction::StartRound {
+        intent: DispatchIntent {
+            id: first_dispatch_id.clone(),
+            run_id: first_run_id,
+            workflow_revision: initial.workflow_revision.clone(),
+            status: DispatchStatus::Pending,
+        },
+        planned_charge: BudgetChargePlan {
+            rounds: Some(ROUND_CHARGE),
+            ..BudgetChargePlan::default()
+        },
+    });
+    let acknowledged = apply(&started.0, OrchestrationAction::DispatchAcknowledged {
+        dispatch_id: first_dispatch_id.clone(),
+    });
+    let failed = apply(&acknowledged.0, OrchestrationAction::RunFinished {
+        dispatch_id: first_dispatch_id,
+        run_id: first_run_id,
+        succeeded: false,
+        retryable_observed_failure: true,
+        observed_usage: BudgetCharge {
+            rounds: ROUND_CHARGE,
+            ..BudgetCharge::default()
+        },
+        safe_summary: PRIVATE_REASONING.to_string(),
+    });
+    let retry_run_id = RunId(OTHER_RUN_ID_VALUE);
+    let retry_dispatch_id = dispatch_identity(&failed.0, retry_run_id).expect("retry dispatch identity");
+    let retry_started = apply(&failed.0, OrchestrationAction::RetryRound {
+        actor: SAFE_ACTOR.to_string(),
+        intent: DispatchIntent {
+            id: retry_dispatch_id.clone(),
+            run_id: retry_run_id,
+            workflow_revision: failed.0.workflow_revision.clone(),
+            status: DispatchStatus::Pending,
+        },
+        planned_charge: BudgetChargePlan {
+            rounds: Some(ROUND_CHARGE),
+            ..BudgetChargePlan::default()
+        },
+    });
+    let retry_acknowledged = apply(&retry_started.0, OrchestrationAction::DispatchAcknowledged {
+        dispatch_id: retry_dispatch_id.clone(),
+    });
+    let completed = apply(&retry_acknowledged.0, OrchestrationAction::RunFinished {
+        dispatch_id: retry_dispatch_id.clone(),
+        run_id: retry_run_id,
+        succeeded: true,
+        retryable_observed_failure: false,
+        observed_usage: BudgetCharge {
+            rounds: ROUND_CHARGE,
+            ..BudgetCharge::default()
+        },
+        safe_summary: PRIVATE_REASONING.to_string(),
+    });
+    let events = vec![
+        started.1,
+        acknowledged.1,
+        failed.1,
+        retry_started.1,
+        retry_acknowledged.1,
+        completed.1,
+    ];
+    (completed.0, events, retry_dispatch_id)
 }
 
 fn abandoned_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
@@ -350,6 +456,41 @@ fn exact_orchestration_owner_reports_finished_dispatch_and_settled_budget() {
     assert_eq!(evidence.recovery, RecoveryEvidenceState::Closed);
     assert_eq!(evidence.budget.settlement, BudgetSettlementState::Settled);
     assert_eq!(evidence.budget.observed.expect("observed budget").rounds, ROUND_CHARGE);
+}
+
+// r[verify lattice.agent_orchestration.retry_round.scenario.non-claim]
+// r[verify lattice.workflow_execution.safe_run_inspection]
+#[test]
+fn exact_retry_dispatch_remains_safe_and_inspectable() {
+    let (instance, events, dispatch_id) = retried_orchestration_fixture();
+    let mut retry_record = record(RunOwner::Orchestration {
+        instance_id: instance.id.clone(),
+        dispatch_id,
+    });
+    retry_record.run_id = RunId(OTHER_RUN_ID_VALUE);
+    let report = inspect(Input {
+        record: &retry_record,
+        details: None,
+        replay_events: None,
+        orchestration: Some(OrchestrationInput {
+            instance: &instance,
+            events: &events,
+        }),
+    });
+
+    assert!(report.valid, "report: {report:?}");
+    assert!(matches!(report.owner, SafeOwner::Orchestration {
+        binding: OwnerBindingState::Exact,
+        ..
+    }));
+    let rendered = render_text(&report);
+    let evidence = report.orchestration.as_ref().expect("orchestration evidence");
+    assert_eq!(evidence.event_chain, EvidenceState::Valid);
+    assert_eq!(evidence.dispatch, DispatchEvidenceState::Finished);
+    assert_eq!(evidence.recovery, RecoveryEvidenceState::Closed);
+    assert_eq!(evidence.budget.settlement, BudgetSettlementState::Settled);
+    assert_eq!(evidence.budget.observed.expect("observed budget").rounds, ROUND_CHARGE);
+    assert_private_content_absent(&rendered);
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]

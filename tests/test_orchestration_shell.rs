@@ -3,8 +3,10 @@ use std::path::Path;
 use std::process::Command;
 
 use lattice::agent_node::AgentRuntimeConfig;
+use lattice::engine::NodeConfig;
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
+use lattice::file_node::FileOperationKind;
 use lattice::orchestration::AbandonPendingRequest;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
@@ -18,6 +20,7 @@ use lattice::orchestration::DispatchStatus;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationEvent;
+use lattice::orchestration::OrchestrationEventKind;
 use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::OrchestrationStatus;
@@ -25,6 +28,8 @@ use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RecoveryOutcome;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::RetryRequest;
 use lattice::orchestration::abandon_pending;
 use lattice::orchestration::approve;
 use lattice::orchestration::current_schema_version;
@@ -34,6 +39,7 @@ use lattice::orchestration::make_proposal;
 use lattice::orchestration::new_instance;
 use lattice::orchestration::recover_pending;
 use lattice::orchestration::replay;
+use lattice::orchestration::retry;
 use lattice::orchestration::start;
 use lattice::orchestration::start_from_trigger;
 use lattice::orchestration::transition;
@@ -55,6 +61,7 @@ const TRIGGER_ID: &str = "shell-webhook";
 const IDEMPOTENCY_KEY: &str = "request-one";
 const FIRST_SEQUENCE: u64 = 1;
 const ROUND_LIMIT: u64 = 2;
+const RETRY_LIMIT: u64 = 1;
 const RECOVERY_RUN_ID: u64 = 77;
 const RESTART_TEST_NAME: &str = "restart_duplicate_trigger_reuses_original_admission_across_processes";
 const RESTART_PHASE_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_PHASE";
@@ -64,6 +71,10 @@ const RESTART_DUPLICATE_RESULT_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_DUPLICA
 const RESTART_PHASE_FIRST: &str = "first";
 const RESTART_PHASE_DUPLICATE: &str = "duplicate";
 const RESTART_PHASE_INVALID: &str = "invalid";
+const RETRY_MARKER_CONTENT: &str = "first-attempt-observed";
+const FIRST_ALLOCATED_RUN_ID: u64 = 0;
+const SECOND_ALLOCATED_RUN_ID: u64 = 1;
+const RETRY_RUN_LIST_LIMIT: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RestartPhase {
@@ -109,6 +120,21 @@ fn workflow(name: &str) -> Workflow {
     workflow
 }
 
+fn fail_once_workflow(name: &str, marker: &Path) -> Workflow {
+    let marker_path = marker.to_string_lossy().into_owned();
+    let allowed_root = marker.parent().expect("retry marker must have a parent").to_string_lossy().into_owned();
+    let mut workflow = Workflow::new(name);
+    let node_id = workflow.add_file_node("bounded", FileOperationKind::Read, &marker_path);
+    workflow.set_node_config(node_id, NodeConfig::File {
+        operation: FileOperationKind::Read,
+        path: marker_path,
+        content: None,
+        overwrite: false,
+        allowed_roots: vec![allowed_root],
+    });
+    workflow
+}
+
 fn definition(workflow: &Workflow, completion: CompletionPolicy) -> OrchestrationDefinition {
     OrchestrationDefinition {
         schema_version: current_schema_version(),
@@ -116,6 +142,9 @@ fn definition(workflow: &Workflow, completion: CompletionPolicy) -> Orchestratio
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(workflow).expect("workflow must hash"),
         completion,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -477,6 +506,174 @@ fn invoke_restart_child(
         .env(RESTART_DUPLICATE_RESULT_ENV, duplicate_result_path)
         .status()
         .expect("restart child process must launch")
+}
+
+// r[verify lattice.agent_orchestration.observed_failure_retry.scenario.observed]
+// r[verify lattice.agent_orchestration.retry_round.scenario.success]
+#[tokio::test]
+async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() {
+    let (directory, store) = store();
+    let marker = directory.path().join("retry-marker");
+    let workflow = fail_once_workflow(FIRST_WORKFLOW_NAME, &marker);
+    store.save_workflow(&workflow).expect("retry workflow must persist");
+
+    let failed =
+        start(&store, definition(&workflow, CompletionPolicy::RunSucceeded), ACTOR, AgentRuntimeConfig::default())
+            .await
+            .expect("first observed attempt must terminalize");
+    let first_record = store
+        .load_run(RunId(FIRST_ALLOCATED_RUN_ID))
+        .expect("first run lookup must succeed")
+        .expect("first run must persist");
+    let first_failure = failed.retry.retryable_failure.clone().unwrap_or_else(|| {
+        panic!("exact failed run must become retryable: record={first_record:?}, instance={failed:?}")
+    });
+    assert_eq!(failed.status, OrchestrationStatus::Failed);
+    assert_eq!(first_failure.run_id, RunId(FIRST_ALLOCATED_RUN_ID));
+    assert_eq!(failed.budgets.consumed.rounds, FIRST_SEQUENCE);
+    assert!(failed.budgets.reservations.is_empty());
+    assert!(!marker.exists());
+    let unauthorized = retry(
+        &store,
+        RetryRequest {
+            instance_id: &failed.id,
+            actor: UNAUTHORIZED_ACTOR,
+        },
+        AgentRuntimeConfig::default(),
+    )
+    .await
+    .expect_err("unauthorized retry must fail before dispatch");
+    assert!(unauthorized.to_string().contains("not authorized"));
+    assert_eq!(store.list_runs(RETRY_RUN_LIST_LIMIT).expect("run list must load").len(), FIRST_SEQUENCE as usize);
+    assert_eq!(store.load_orchestration(&failed.id).expect("failed instance must load"), Some(failed.clone()));
+    std::fs::write(&marker, RETRY_MARKER_CONTENT).expect("retry marker must persist");
+
+    let completed = retry(
+        &store,
+        RetryRequest {
+            instance_id: &failed.id,
+            actor: ACTOR,
+        },
+        AgentRuntimeConfig::default(),
+    )
+    .await
+    .expect("authorized observed failure retry must run");
+
+    assert_eq!(completed.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.round, ROUND_LIMIT);
+    assert_eq!(completed.retry.admitted, RETRY_LIMIT);
+    assert!(completed.retry.retryable_failure.is_none());
+    assert_eq!(completed.budgets.consumed.rounds, ROUND_LIMIT);
+    assert!(completed.budgets.reservations.is_empty());
+    let runs = store.list_runs(RETRY_RUN_LIST_LIMIT).expect("retry run history must load");
+    assert_eq!(runs.len(), RETRY_RUN_LIST_LIMIT);
+    let first = runs
+        .iter()
+        .find(|record| record.run_id == RunId(FIRST_ALLOCATED_RUN_ID))
+        .expect("first run must remain durable");
+    let second = runs
+        .iter()
+        .find(|record| record.run_id == RunId(SECOND_ALLOCATED_RUN_ID))
+        .expect("retry run must remain durable");
+    assert!(first.failures > 0);
+    assert_eq!(second.failures, 0);
+    let RunOwner::Orchestration {
+        instance_id: retry_instance,
+        dispatch_id: retry_dispatch,
+    } = &second.owner
+    else {
+        panic!("retry run must have orchestration ownership");
+    };
+    assert_eq!(retry_instance, &completed.id);
+    assert_ne!(retry_dispatch, &first_failure.dispatch_id);
+    let events = store.load_orchestration_events(&completed.id).expect("retry events must load");
+    assert_eq!(
+        events.iter().filter(|event| event.kind == OrchestrationEventKind::RetryRoundStarted).count(),
+        RETRY_LIMIT as usize
+    );
+    let report = replay(&store, &completed.id).expect("retry replay must validate");
+    assert!(report.valid);
+    assert_eq!(report.instance, completed);
+}
+
+// r[verify lattice.agent_orchestration.retry_round.scenario.pending-unobserved]
+// r[verify lattice.agent_orchestration.retry_round.scenario.unsafe-evidence]
+#[tokio::test]
+async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
+    let (_directory, store) = store();
+    let workflow = workflow(FIRST_WORKFLOW_NAME);
+    store.save_workflow(&workflow).expect("workflow must persist");
+    let (pending, events) = cancelled_acknowledged_instance(&workflow);
+    store.create_orchestration(&pending, &events).expect("pending instance must persist");
+
+    let pending_error = retry(
+        &store,
+        RetryRequest {
+            instance_id: &pending.id,
+            actor: ACTOR,
+        },
+        AgentRuntimeConfig::default(),
+    )
+    .await
+    .expect_err("pending-unobserved dispatch cannot retry");
+    assert!(pending_error.to_string().contains("pending and locally unobserved"));
+    assert_eq!(store.load_orchestration(&pending.id).expect("pending instance must load"), Some(pending.clone()));
+    assert!(store.list_runs(RETRY_RUN_LIST_LIMIT).expect("run list must load").is_empty());
+
+    let abandoned = abandon_pending(&store, AbandonPendingRequest {
+        instance_id: &pending.id,
+        actor: ACTOR,
+    })
+    .expect("authorized abandonment must close uncertainty");
+    let abandoned_error = retry(
+        &store,
+        RetryRequest {
+            instance_id: &abandoned.id,
+            actor: ACTOR,
+        },
+        AgentRuntimeConfig::default(),
+    )
+    .await
+    .expect_err("abandoned dispatch cannot become retry authority");
+    assert!(abandoned_error.to_string().contains("no exact persisted terminal-failure retry evidence"));
+    assert_eq!(store.load_orchestration(&abandoned.id).expect("abandoned instance must load"), Some(abandoned));
+    assert!(store.list_runs(RETRY_RUN_LIST_LIMIT).expect("run list must load").is_empty());
+
+    let foreign_directory = tempdir().expect("foreign temporary directory must exist");
+    let foreign_store =
+        Store::new(foreign_directory.path().join("foreign-shell.redb")).expect("foreign store must open");
+    foreign_store.save_workflow(&workflow).expect("foreign workflow must persist");
+    let (foreign_pending, foreign_events) = cancelled_acknowledged_instance(&workflow);
+    foreign_store
+        .create_orchestration(&foreign_pending, &foreign_events)
+        .expect("foreign pending instance must persist");
+    foreign_store
+        .save_run(&RunRecord {
+            run_id: RunId(RECOVERY_RUN_ID),
+            owner: RunOwner::Unscoped,
+            workflow_name: FIRST_WORKFLOW_NAME.to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
+            node_count: FIRST_SEQUENCE as usize,
+            cache_hits: 0,
+            failures: FIRST_SEQUENCE as usize,
+        })
+        .expect("foreign run must persist");
+    let foreign_error = retry(
+        &foreign_store,
+        RetryRequest {
+            instance_id: &foreign_pending.id,
+            actor: ACTOR,
+        },
+        AgentRuntimeConfig::default(),
+    )
+    .await
+    .expect_err("foreign owner cannot provide retry evidence");
+    assert!(foreign_error.to_string().contains("not owned by the pending orchestration dispatch"));
+    assert_eq!(
+        foreign_store.load_orchestration(&foreign_pending.id).expect("foreign pending instance must load"),
+        Some(foreign_pending)
+    );
 }
 
 // r[verify lattice.agent_orchestration.durability]

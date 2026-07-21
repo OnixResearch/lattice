@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:1aeb6f42e5bbb4bf92fbb1b16fbc2a05fe03e997ac30a3b7ba2b00b63ffab8f0",
+  "baseline_hash": "b3:ec5609b38db008f4145f4c38490b04290d8b52266e7b5a067d2cb29751ac208f",
   "findings": [
     {
       "stable_id": "b3:02a1c82bab65b6c1",
@@ -6110,8 +6110,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:a14b71748a6e91f5",
-      "semantic_id": "b3:a14b71748a6e91f5",
+      "stable_id": "b3:e47e816c6957b687",
+      "semantic_id": "b3:e47e816c6957b687",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -6119,7 +6119,7 @@
       "file": "src/orchestration/core.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1516 lines (limit: 300)",
+      "message": "source file is 1730 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -6208,7 +6208,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 109,
+      "line": 118,
       "column": 1,
       "message": "item name `OrchestrationTriggerKind` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6221,22 +6221,35 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 117,
+      "line": 126,
       "column": 1,
       "message": "item name `OrchestrationTriggerBinding` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:4a2b7600060dfebb",
-      "semantic_id": "b3:4a2b7600060dfebb",
+      "stable_id": "b3:f03d78c80ad69612",
+      "semantic_id": "b3:f03d78c80ad69612",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 130,
+      "line": 139,
       "column": 1,
       "message": "item name `OrchestrationDefinition` repeats `orchestration` from ancestor path segment `orchestration`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:8d46c524b1354953",
+      "semantic_id": "b3:8d46c524b1354953",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/orchestration/core.rs",
+      "line": 145,
+      "column": 5,
+      "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
     },
     {
@@ -6247,20 +6260,20 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 158,
+      "line": 187,
       "column": 1,
       "message": "item name `OrchestrationStatus` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:be02ee9e653a4409",
-      "semantic_id": "b3:be02ee9e653a4409",
+      "stable_id": "b3:e2dc57d9e34f81d8",
+      "semantic_id": "b3:e2dc57d9e34f81d8",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 208,
+      "line": 237,
       "column": 1,
       "message": "item name `OrchestrationInstance` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6273,33 +6286,33 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 233,
+      "line": 264,
       "column": 1,
       "message": "item name `OrchestrationFact` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:efd59a69d397bb61",
-      "semantic_id": "b3:efd59a69d397bb61",
+      "stable_id": "b3:19d9fb5c429eb1c9",
+      "semantic_id": "b3:19d9fb5c429eb1c9",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 240,
+      "line": 271,
       "column": 1,
       "message": "item name `OrchestrationAction` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:13388578c8a8aba5",
-      "semantic_id": "b3:13388578c8a8aba5",
+      "stable_id": "b3:edd085851f3d7c54",
+      "semantic_id": "b3:edd085851f3d7c54",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 291,
+      "line": 329,
       "column": 1,
       "message": "item name `OrchestrationEventKind` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6312,7 +6325,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 308,
+      "line": 347,
       "column": 1,
       "message": "item name `OrchestrationEvent` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6325,20 +6338,20 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 319,
+      "line": 358,
       "column": 1,
       "message": "item name `OrchestrationTransition` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:519866c9c8e43163",
-      "semantic_id": "b3:519866c9c8e43163",
+      "stable_id": "b3:35cae9452e9d7109",
+      "semantic_id": "b3:35cae9452e9d7109",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 327,
+      "line": 366,
       "column": 1,
       "message": "item name `OrchestrationDiagnosticCode` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6351,7 +6364,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 360,
+      "line": 402,
       "column": 1,
       "message": "item name `OrchestrationDiagnostic` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6364,7 +6377,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 381,
+      "line": 423,
       "column": 1,
       "message": "item name `OrchestrationTriggerContext` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6377,7 +6390,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 397,
+      "line": 439,
       "column": 1,
       "message": "item name `OrchestrationTriggerPlan` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6390,7 +6403,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 404,
+      "line": 446,
       "column": 1,
       "message": "item name `OrchestrationTriggerAdmission` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6403,22 +6416,9 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 415,
+      "line": 461,
       "column": 9,
       "message": "`portable_workflow` looks like a quantity but has no unit suffix",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:a2a9490cfc1ab936",
-      "semantic_id": "b3:a2a9490cfc1ab936",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/orchestration/core.rs",
-      "line": 456,
-      "column": 35,
-      "message": "function `validate_definition` has 0 assertion(s) in 28 lines (need 2+)",
       "crate_name": "lattice"
     },
     {
@@ -6429,7 +6429,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 485,
+      "line": 548,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6442,7 +6442,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 498,
+      "line": 561,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6455,7 +6455,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 518,
+      "line": 581,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6468,7 +6468,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 533,
+      "line": 596,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6481,7 +6481,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 551,
+      "line": 625,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6494,7 +6494,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 551,
+      "line": 625,
       "column": 98,
       "message": "function `validate_budget_policy` has 0 assertion(s) in 37 lines (need 2+)",
       "crate_name": "lattice"
@@ -6507,7 +6507,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 589,
+      "line": 663,
       "column": 1,
       "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6520,48 +6520,9 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 589,
+      "line": 663,
       "column": 1,
       "message": "2 consecutive `u64` parameters are easy to swap by accident",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:039174529718612c",
-      "semantic_id": "b3:039174529718612c",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/orchestration/core.rs",
-      "line": 608,
-      "column": 61,
-      "message": "function `new_instance` has 0 assertion(s) in 35 lines (need 2+)",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:1fdfcfb3a0c17e93",
-      "semantic_id": "b3:1fdfcfb3a0c17e93",
-      "identity_status": "computed",
-      "lint": "too_many_parameters",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/orchestration/core.rs",
-      "line": 752,
-      "column": 1,
-      "message": "function has 6 parameters (limit: 5) — consider an options struct",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:edcb552b53ad6ae9",
-      "semantic_id": "b3:edcb552b53ad6ae9",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/orchestration/core.rs",
-      "line": 759,
-      "column": 62,
-      "message": "function `finish_run` has 0 assertion(s) in 41 lines (need 2+)",
       "crate_name": "lattice"
     },
     {
@@ -6572,7 +6533,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 817,
+      "line": 1029,
       "column": 62,
       "message": "function `decide_proposal` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -6585,20 +6546,20 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 842,
+      "line": 1054,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1f9c6bca8a569657",
-      "semantic_id": "b3:1f9c6bca8a569657",
+      "stable_id": "b3:a5b758886093b179",
+      "semantic_id": "b3:a5b758886093b179",
       "identity_status": "computed",
       "lint": "ambiguous_params",
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 926,
+      "line": 1138,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -6611,7 +6572,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 996,
+      "line": 1209,
       "column": 42,
       "message": "function `validate_proposal` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -6624,7 +6585,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 997,
+      "line": 1210,
       "column": 8,
       "message": "condition has 3 boolean operators",
       "crate_name": "lattice"
@@ -6637,7 +6598,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1025,
+      "line": 1238,
       "column": 42,
       "message": "function `validate_approval` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -6650,7 +6611,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1028,
+      "line": 1241,
       "column": 8,
       "message": "condition has 4 boolean operators",
       "crate_name": "lattice"
@@ -6663,7 +6624,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1202,
+      "line": 1415,
       "column": 1,
       "message": "2 consecutive `u64` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -6676,7 +6637,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1208,
+      "line": 1421,
       "column": 109,
       "message": "function `ensure_within_limits` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -6689,7 +6650,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1231,
+      "line": 1444,
       "column": 1,
       "message": "2 consecutive `u64` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -6702,7 +6663,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1289,
+      "line": 1502,
       "column": 19,
       "message": "function `replay_events` has 0 assertion(s) in 46 lines (need 2+)",
       "crate_name": "lattice"
@@ -6715,7 +6676,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/core.rs",
-      "line": 1387,
+      "line": 1600,
       "column": 1,
       "message": "3 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -6819,7 +6780,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/format.rs",
-      "line": 60,
+      "line": 61,
       "column": 1,
       "message": "item name `reject_default_n8n_orchestration_export` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -6832,7 +6793,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/format.rs",
-      "line": 67,
+      "line": 68,
       "column": 1,
       "message": "3 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -6845,14 +6806,14 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/format.rs",
-      "line": 111,
+      "line": 112,
       "column": 47,
       "message": "function `render_object` has 0 assertion(s) in 20 lines (need 2+)",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:9cb8dd7dd8778bd3",
-      "semantic_id": "b3:9cb8dd7dd8778bd3",
+      "stable_id": "b3:bed77375a490d17d",
+      "semantic_id": "b3:bed77375a490d17d",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -6860,7 +6821,7 @@
       "file": "src/orchestration/shell.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 550 lines (limit: 300)",
+      "message": "source file is 640 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -7306,14 +7267,14 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:e627584caf55ffbf",
-      "semantic_id": "b3:e627584caf55ffbf",
+      "stable_id": "b3:fa6ea155d8851f4f",
+      "semantic_id": "b3:fa6ea155d8851f4f",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 72,
+      "line": 80,
       "column": 1,
       "message": "item name `OrchestrationShellError` repeats `orchestration` from ancestor path segment `orchestration`",
       "crate_name": "lattice"
@@ -7326,7 +7287,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 168,
+      "line": 181,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -7339,7 +7300,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 180,
+      "line": 193,
       "column": 1,
       "message": "function has 6 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -7352,7 +7313,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 180,
+      "line": 193,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7365,7 +7326,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 191,
+      "line": 204,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -7378,7 +7339,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 293,
+      "line": 340,
       "column": 48,
       "message": "function `load_validated_workflow` has 0 assertion(s) in 33 lines (need 2+)",
       "crate_name": "lattice"
@@ -7391,7 +7352,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 380,
+      "line": 427,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7404,7 +7365,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 388,
+      "line": 435,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7417,7 +7378,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 396,
+      "line": 443,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7430,7 +7391,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 410,
+      "line": 457,
       "column": 61,
       "message": "function `approve` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -7443,7 +7404,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 425,
+      "line": 472,
       "column": 9,
       "message": "boolean binding `successor_validated` should have a predicate prefix",
       "crate_name": "lattice"
@@ -7456,7 +7417,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 439,
+      "line": 486,
       "column": 1,
       "message": "3 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7469,7 +7430,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/orchestration/shell.rs",
-      "line": 458,
+      "line": 544,
       "column": 9,
       "message": "`report` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"

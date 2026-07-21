@@ -18,6 +18,7 @@ use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::OrchestrationStatus;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::dispatch_identity;
@@ -25,6 +26,8 @@ use lattice::orchestration::fact_identity;
 use lattice::orchestration::new_instance;
 use lattice::orchestration::transition;
 use lattice::orchestration::workflow_revision;
+use lattice::store::RunOwner;
+use lattice::store::RunRecord;
 use lattice::store::Store;
 use tempfile::tempdir;
 
@@ -41,6 +44,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
 const ROUND_LIMIT: u64 = 2;
 const ROUND_CHARGE: u64 = 1;
+const RETRY_LIMIT: u64 = 1;
 const PENDING_INSTANCE_SEQUENCE: u64 = 1;
 const PENDING_RUN_ID: u64 = 77;
 
@@ -67,6 +71,9 @@ fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathB
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -101,6 +108,111 @@ fn command(config_path: &std::path::Path) -> Command {
     command
 }
 
+fn persist_observed_failure(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
+    let definition = OrchestrationDefinition {
+        schema_version: current_schema_version(),
+        id: DEFINITION_ID.to_string(),
+        objective: OBJECTIVE.to_string(),
+        workflow: workflow_revision(workflow).expect("workflow must hash"),
+        completion: CompletionPolicy::RunSucceeded,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
+        budgets: BudgetPolicy {
+            enforced: BudgetDimensions {
+                rounds: true,
+                ..BudgetDimensions::default()
+            },
+            limits: BudgetLimits {
+                rounds: ROUND_LIMIT,
+                ..BudgetLimits::default()
+            },
+            per_round_upper_bound: BudgetCharge {
+                rounds: ROUND_CHARGE,
+                ..BudgetCharge::default()
+            },
+        },
+        authority: AuthorityPolicy {
+            approvers: BTreeSet::from([ACTOR.to_string()]),
+        },
+        triggers: Vec::new(),
+        redaction: RedactionPolicy {
+            retain_safe_summaries: true,
+        },
+    };
+    let base = new_instance(definition, PENDING_INSTANCE_SEQUENCE, None).expect("instance must hash");
+    let run_id = RunId(PENDING_RUN_ID);
+    let intent = DispatchIntent {
+        id: dispatch_identity(&base, run_id).expect("dispatch must hash"),
+        run_id,
+        workflow_revision: base.workflow_revision.clone(),
+        status: DispatchStatus::Pending,
+    };
+    let start_action = OrchestrationAction::StartRound {
+        intent: intent.clone(),
+        planned_charge: BudgetChargePlan {
+            rounds: Some(ROUND_CHARGE),
+            agent_invocations: Some(0),
+            tokens: Some(0),
+            monetary_microunits: Some(0),
+            duration_millis: Some(0),
+        },
+    };
+    let started = transition(&base, OrchestrationFact {
+        id: fact_identity(&base.id, base.version, &start_action).expect("start fact must hash"),
+        action: start_action,
+    })
+    .expect("start must apply");
+    let acknowledge_action = OrchestrationAction::DispatchAcknowledged {
+        dispatch_id: intent.id.clone(),
+    };
+    let acknowledged = transition(&started.instance, OrchestrationFact {
+        id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
+            .expect("acknowledgement fact must hash"),
+        action: acknowledge_action,
+    })
+    .expect("acknowledgement must apply");
+    store
+        .save_run(&RunRecord {
+            run_id,
+            owner: RunOwner::Orchestration {
+                instance_id: base.id.clone(),
+                dispatch_id: intent.id.clone(),
+            },
+            workflow_name: WORKFLOW_NAME.to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(1),
+            node_count: 1,
+            cache_hits: 0,
+            failures: 1,
+        })
+        .expect("observed failed run must persist");
+    let finish_action = OrchestrationAction::RunFinished {
+        dispatch_id: intent.id,
+        run_id,
+        succeeded: false,
+        retryable_observed_failure: true,
+        observed_usage: BudgetCharge {
+            rounds: ROUND_CHARGE,
+            ..BudgetCharge::default()
+        },
+        safe_summary: "observed terminal failure".to_string(),
+    };
+    let finished = transition(&acknowledged.instance, OrchestrationFact {
+        id: fact_identity(&acknowledged.instance.id, acknowledged.instance.version, &finish_action)
+            .expect("finish fact must hash"),
+        action: finish_action,
+    })
+    .expect("failure must terminalize");
+    let events = vec![
+        started.event.expect("start event must exist"),
+        acknowledged.event.expect("acknowledgement event must exist"),
+        finished.event.expect("failure event must exist"),
+    ];
+    store.create_orchestration(&finished.instance, &events).expect("failed instance must persist");
+    finished.instance
+}
+
 fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
@@ -108,6 +220,9 @@ fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Orchestra
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(workflow).expect("workflow must hash"),
         completion: CompletionPolicy::RunSucceeded,
+        retry: Some(RetryPolicy {
+            max_observed_failure_retries: RETRY_LIMIT,
+        }),
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -211,6 +326,48 @@ fn cli_validates_starts_and_reports_json_status() {
     assert_eq!(loaded, instance);
 }
 
+// r[verify lattice.agent_orchestration.retry_round.scenario.success]
+// r[verify lattice.agent_orchestration.cli]
+#[test]
+fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
+    let (_directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    let workflow = store
+        .load_workflow(WORKFLOW_NAME)
+        .expect("workflow lookup must succeed")
+        .expect("workflow must exist");
+    let failed = persist_observed_failure(&store, &workflow);
+    drop(store);
+
+    let retry = command(&config_path)
+        .arg("retry")
+        .arg(&failed.id)
+        .arg("--actor")
+        .arg(ACTOR)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("retry command must execute");
+    assert!(retry.status.success(), "stderr: {}", String::from_utf8_lossy(&retry.stderr));
+    let completed: OrchestrationInstance = serde_json::from_slice(&retry.stdout).expect("retry JSON must parse");
+    assert_eq!(completed.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.round, ROUND_LIMIT);
+    assert_eq!(completed.retry.admitted, RETRY_LIMIT);
+    assert!(completed.retry.retryable_failure.is_none());
+
+    let replay = command(&config_path)
+        .arg("replay")
+        .arg(&completed.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("replay command must execute");
+    assert!(replay.status.success(), "stderr: {}", String::from_utf8_lossy(&replay.stderr));
+    let report: lattice::orchestration::ReplayReport =
+        serde_json::from_slice(&replay.stdout).expect("replay JSON must parse");
+    assert!(report.valid);
+    assert_eq!(report.instance, completed);
+}
+
 // r[verify lattice.agent_orchestration.controls]
 // r[verify lattice.agent_orchestration.cli]
 #[test]
@@ -291,6 +448,16 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
     assert!(recovery.status.success(), "stderr: {}", String::from_utf8_lossy(&recovery.stderr));
     assert!(String::from_utf8_lossy(&recovery.stdout).contains("PendingUnobserved"));
 
+    let retry_pending = command(&config_path)
+        .arg("retry")
+        .arg(&instance.id)
+        .arg("--actor")
+        .arg(ACTOR)
+        .output()
+        .expect("pending retry command must execute");
+    assert!(!retry_pending.status.success());
+    assert!(String::from_utf8_lossy(&retry_pending.stderr).contains("pending and locally unobserved"));
+
     let cancel = command(&config_path)
         .arg("cancel")
         .arg(&instance.id)
@@ -335,6 +502,16 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
         serde_json::from_slice(&replay.stdout).expect("replay JSON must parse");
     assert!(report.valid);
     assert_eq!(report.instance, abandoned);
+
+    let retry_abandoned = command(&config_path)
+        .arg("retry")
+        .arg(&instance.id)
+        .arg("--actor")
+        .arg(ACTOR)
+        .output()
+        .expect("abandoned retry command must execute");
+    assert!(!retry_abandoned.status.success());
+    assert!(String::from_utf8_lossy(&retry_abandoned.stderr).contains("no exact persisted terminal-failure"));
 
     let repeated = command(&config_path)
         .arg("abandon")

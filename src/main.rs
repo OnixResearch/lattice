@@ -438,6 +438,14 @@ enum OrchestrationCliCommand {
         #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
         output: OrchestrationOutputFormat,
     },
+    /// Retry an exact observed terminal failure under immutable policy and budget bounds
+    Retry {
+        instance: String,
+        #[arg(long)]
+        actor: String,
+        #[arg(long, value_enum, default_value_t = OrchestrationOutputFormat::Text)]
+        output: OrchestrationOutputFormat,
+    },
     /// Fail a cancelled, locally unobserved dispatch without retrying its effect
     Abandon {
         instance: String,
@@ -888,6 +896,23 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Err(error) => orchestration_failure(&error.to_string()),
             }
         }
+        OrchestrationCliCommand::Retry {
+            instance,
+            actor,
+            output,
+        } => match orchestration::retry(
+            &store,
+            orchestration::RetryRequest {
+                instance_id: instance,
+                actor,
+            },
+            app_config.agent_runtime.clone(),
+        )
+        .await
+        {
+            Ok(instance) => render_orchestration_instance(&instance, *output),
+            Err(error) => orchestration_failure(&error.to_string()),
+        },
         OrchestrationCliCommand::Abandon {
             instance,
             actor,

@@ -15,6 +15,7 @@ use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::dispatch_identity;
 use lattice::orchestration::fact_identity;
@@ -33,6 +34,9 @@ const ACTOR: &str = "operator:store";
 const FIRST_SEQUENCE: u64 = 1;
 const SECOND_SEQUENCE: u64 = 2;
 const RUN_ID: u64 = 41;
+const FIRST_RETRY_RUN_ID: u64 = 42;
+const SECOND_RETRY_RUN_ID: u64 = 43;
+const RETRY_LIMIT: u64 = 2;
 const BUDGET_LIMIT: u64 = 10;
 
 fn definition() -> OrchestrationDefinition {
@@ -43,6 +47,7 @@ fn definition() -> OrchestrationDefinition {
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion: CompletionPolicy::RunSucceeded,
+        retry: None,
         budgets: BudgetPolicy {
             enforced: BudgetDimensions {
                 rounds: true,
@@ -163,6 +168,90 @@ fn stale_concurrent_transition_cannot_overwrite_newer_state() {
         )
         .expect_err("stale writer must fail");
     assert!(matches!(error, StoreError::Conflict(_)));
+}
+
+// r[verify lattice.agent_orchestration.retry_round.scenario.success]
+// r[verify lattice.agent_orchestration.retry_round.scenario.refusal]
+#[test]
+fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
+    let (_directory, store) = store();
+    let mut retry_definition = definition();
+    retry_definition.retry = Some(RetryPolicy {
+        max_observed_failure_retries: RETRY_LIMIT,
+    });
+    let base = new_instance(retry_definition, FIRST_SEQUENCE, None).expect("instance must hash");
+    let started = start(&base);
+    let dispatch = started.instance.pending_dispatch.as_ref().expect("dispatch exists");
+    let failed_action = OrchestrationAction::RunFinished {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded: false,
+        retryable_observed_failure: true,
+        observed_usage: BudgetCharge {
+            rounds: FIRST_SEQUENCE,
+            ..BudgetCharge::default()
+        },
+        safe_summary: "observed terminal failure".to_string(),
+    };
+    let failed = transition(&started.instance, OrchestrationFact {
+        id: fact_identity(&started.instance.id, started.instance.version, &failed_action)
+            .expect("failure fact must hash"),
+        action: failed_action,
+    })
+    .expect("failure must apply");
+    store
+        .create_orchestration(&failed.instance, &[
+            started.event.expect("start event exists"),
+            failed.event.clone().expect("failure event exists"),
+        ])
+        .expect("failed instance must persist");
+
+    let make_retry = |run_id| {
+        let intent = DispatchIntent {
+            id: dispatch_identity(&failed.instance, RunId(run_id)).expect("retry dispatch must hash"),
+            run_id: RunId(run_id),
+            workflow_revision: failed.instance.workflow_revision.clone(),
+            status: DispatchStatus::Pending,
+        };
+        let action = OrchestrationAction::RetryRound {
+            actor: ACTOR.to_string(),
+            intent,
+            planned_charge: BudgetChargePlan {
+                rounds: Some(FIRST_SEQUENCE),
+                ..BudgetChargePlan::default()
+            },
+        };
+        transition(&failed.instance, OrchestrationFact {
+            id: fact_identity(&failed.instance.id, failed.instance.version, &action).expect("retry fact must hash"),
+            action,
+        })
+        .expect("retry decision must apply")
+    };
+    let first = make_retry(FIRST_RETRY_RUN_ID);
+    let second = make_retry(SECOND_RETRY_RUN_ID);
+    store
+        .commit_orchestration_transition(
+            failed.instance.version,
+            &first.instance,
+            first.event.as_ref().expect("first retry event exists"),
+        )
+        .expect("first retry writer must commit");
+    let conflict = store
+        .commit_orchestration_transition(
+            failed.instance.version,
+            &second.instance,
+            second.event.as_ref().expect("second retry event exists"),
+        )
+        .expect_err("second retry writer must lose optimistic commit");
+
+    assert!(matches!(conflict, StoreError::Conflict(_)));
+    let current = store
+        .load_orchestration(&failed.instance.id)
+        .expect("current instance must load")
+        .expect("current instance must exist");
+    assert_eq!(current, first.instance);
+    assert_eq!(current.budgets.reservations.len(), FIRST_SEQUENCE as usize);
+    assert_eq!(current.retry.admitted, FIRST_SEQUENCE);
 }
 
 // r[verify lattice.agent_orchestration.triggers]
