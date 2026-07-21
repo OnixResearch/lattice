@@ -1,8 +1,8 @@
 ## Phase 1: Pure orchestration model
 
-- [ ] [serial] Add immutable orchestration definition, workflow revision, instance, lifecycle, fact, decision, proposal, approval, and budget types with BLAKE3 identities and serialization boundaries. r[lattice.agent_orchestration.model]
-- [ ] [serial] Implement the pure lifecycle/objective/termination decision core with explicit inputs and terminal-state rejection. r[lattice.agent_orchestration.core]
-- [ ] [parallel] Add positive and negative model tests for valid progression, invalid definitions, stale facts, duplicate facts, missing authority, and terminal mutation. r[lattice.agent_orchestration.model] r[lattice.agent_orchestration.core]
+- [x] [serial] Add immutable orchestration definition, workflow revision, instance, lifecycle, fact, decision, proposal, approval, and budget types with BLAKE3 identities and serialization boundaries. r[lattice.agent_orchestration.model]
+- [x] [serial] Implement the pure lifecycle/objective/termination decision core with explicit inputs and terminal-state rejection. r[lattice.agent_orchestration.core]
+- [x] [parallel] Add positive and negative model tests for valid progression, invalid definitions, stale facts, duplicate facts, missing authority, and terminal mutation. r[lattice.agent_orchestration.model] r[lattice.agent_orchestration.core]
 
 ## Phase 2: Rounds, authority, and budgets
 
