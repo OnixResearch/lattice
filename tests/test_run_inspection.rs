@@ -344,6 +344,8 @@ fn apply(instance: &OrchestrationInstance, action: OrchestrationAction) -> (Orch
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.safe_output]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.replay]
 #[test]
 fn safe_projection_omits_arbitrary_persisted_content() {
     let record = record(RunOwner::Unscoped);
@@ -369,6 +371,7 @@ fn safe_projection_omits_arbitrary_persisted_content() {
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.not_recorded]
 #[test]
 fn missing_optional_history_is_explicit_without_invalidating_legacy_run() {
     let record = record(RunOwner::Unscoped);
@@ -378,14 +381,22 @@ fn missing_optional_history_is_explicit_without_invalidating_legacy_run() {
         replay_events: None,
         orchestration: None,
     });
+    let json = render_json(&report).expect("JSON rendering");
+    let text = render_text(&report);
 
     assert!(report.valid);
     assert_eq!(report.details.state, EvidenceState::NotRecorded);
     assert_eq!(report.replay.state, EvidenceState::NotRecorded);
     assert!(report.diagnostic_codes.is_empty());
+    assert!(json.contains("\"state\": \"not_recorded\""));
+    assert!(text.contains("details state=not_recorded"));
+    assert!(text.contains("run_replay state=not_recorded"));
+    assert!(!text.contains("details state=valid"));
+    assert!(!text.contains("run_replay state=valid"));
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.replay]
 #[test]
 fn present_foreign_detail_and_replay_identity_fail_closed() {
     let record = record(RunOwner::Unscoped);
@@ -428,6 +439,7 @@ fn malformed_missing_owner_identities_are_not_echoed() {
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.owner_binding]
 #[test]
 fn exact_orchestration_owner_reports_finished_dispatch_and_settled_budget() {
     let (instance, events, dispatch_id) = orchestration_fixture();
@@ -521,6 +533,7 @@ fn acknowledged_abandonment_reports_conservative_closed_settlement() {
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.owner_binding]
 #[test]
 fn foreign_dispatch_owner_and_duplicate_admission_are_invalid() {
     let (instance, events, dispatch_id) = orchestration_fixture();
@@ -537,10 +550,42 @@ fn foreign_dispatch_owner_and_duplicate_admission_are_invalid() {
             events: &events,
         }),
     });
+    let foreign_instance_record = record(RunOwner::Orchestration {
+        instance_id: dispatch_id.clone(),
+        dispatch_id: dispatch_id.clone(),
+    });
+    let foreign_instance_report = inspect(Input {
+        record: &foreign_instance_record,
+        details: None,
+        replay_events: None,
+        orchestration: Some(OrchestrationInput {
+            instance: &instance,
+            events: &events,
+        }),
+    });
+    let mut wrong_run_record = record(RunOwner::Orchestration {
+        instance_id: instance.id.clone(),
+        dispatch_id: dispatch_id.clone(),
+    });
+    wrong_run_record.run_id = RunId(OTHER_RUN_ID_VALUE);
+    let wrong_run_report = inspect(Input {
+        record: &wrong_run_record,
+        details: None,
+        replay_events: None,
+        orchestration: Some(OrchestrationInput {
+            instance: &instance,
+            events: &events,
+        }),
+    });
 
     assert!(!foreign_report.valid);
     assert!(foreign_report.diagnostic_codes.contains(&DiagnosticCode::DispatchBindingMissing));
     assert!(foreign_report.diagnostic_codes.contains(&DiagnosticCode::DispatchFactMismatch));
+    assert!(!foreign_instance_report.valid);
+    assert!(foreign_instance_report.diagnostic_codes.contains(&DiagnosticCode::OrchestrationIdentityMismatch));
+    assert!(!wrong_run_report.valid);
+    assert!(wrong_run_report.diagnostic_codes.contains(&DiagnosticCode::DispatchBindingMissing));
+    assert!(wrong_run_report.diagnostic_codes.contains(&DiagnosticCode::DispatchFactMismatch));
 
     let mut duplicate_events = events.clone();
     duplicate_events.push(events[0].clone());
@@ -562,6 +607,8 @@ fn foreign_dispatch_owner_and_duplicate_admission_are_invalid() {
     assert!(duplicate_report.diagnostic_codes.contains(&DiagnosticCode::OrchestrationReplayInvalid));
     assert!(duplicate_report.diagnostic_codes.contains(&DiagnosticCode::DispatchBindingDuplicate));
     assert_private_content_absent(&render_json(&foreign_report).expect("foreign JSON rendering"));
+    assert_private_content_absent(&render_json(&foreign_instance_report).expect("foreign instance JSON rendering"));
+    assert_private_content_absent(&render_json(&wrong_run_report).expect("wrong run JSON rendering"));
     assert_private_content_absent(&render_json(&duplicate_report).expect("duplicate JSON rendering"));
 }
 
@@ -615,6 +662,26 @@ fn orchestration_cli_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
     (directory, config_path)
 }
 
+fn orchestration_without_run_record_cli_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let data_dir = directory.path().join("data");
+    std::fs::create_dir_all(&data_dir).expect("data directory");
+    let config_path = directory.path().join(CONFIG_FILE_NAME);
+    std::fs::write(
+        &config_path,
+        format!(
+            "{{\n  data_dir = {:?},\n  default_timeout_secs = {DEFAULT_TIMEOUT_SECS},\n  shell = \"sh\",\n  max_parallelism = {MAX_PARALLELISM},\n}}\n",
+            data_dir.display().to_string()
+        ),
+    )
+    .expect("config write");
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store");
+    let (instance, events, _) = retried_orchestration_fixture();
+    store.create_orchestration(&instance, &events).expect("orchestration save");
+    drop(store);
+    (directory, config_path)
+}
+
 fn run_show(config_path: &std::path::Path, output: &str, run_id: u64) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_lattice"))
         .arg("--config")
@@ -629,6 +696,7 @@ fn run_show(config_path: &std::path::Path, output: &str, run_id: u64) -> std::pr
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.safe_output]
 #[test]
 fn cli_renders_safe_text_and_json_for_persisted_run() {
     let (_directory, config_path) = cli_fixture(NODE_COUNT);
@@ -644,6 +712,8 @@ fn cli_renders_safe_text_and_json_for_persisted_run() {
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.safe_output]
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.owner_binding]
 #[test]
 fn cli_reports_exact_orchestration_binding_without_private_content() {
     let (_directory, config_path) = orchestration_cli_fixture();
@@ -683,6 +753,41 @@ fn cli_missing_store_does_not_create_data_directory_or_database() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("run evidence store is unavailable"));
     assert!(!data_dir.exists());
+}
+
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.replay]
+#[test]
+fn cli_invalid_replay_exits_unsuccessfully_without_summaries() {
+    let (directory, config_path) = cli_fixture(NODE_COUNT);
+    let store = Store::new(directory.path().join("data").join(STORE_FILE_NAME)).expect("store reopen");
+    store
+        .save_run_replay_events(RunId(RUN_ID_VALUE), &valid_replay(RunId(OTHER_RUN_ID_VALUE)))
+        .expect("invalid replay fixture save");
+    drop(store);
+
+    let output = run_show(&config_path, "json", RUN_ID_VALUE);
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+    let report: Report = serde_json::from_slice(&output.stdout).expect("invalid replay report JSON");
+    assert!(!report.valid);
+    assert_eq!(report.replay.state, EvidenceState::Invalid);
+    assert!(report.diagnostic_codes.contains(&DiagnosticCode::ReplayRunIdentityMismatch));
+    assert_private_content_absent(&String::from_utf8_lossy(&output.stdout));
+}
+
+// r[verify lattice.workflow_execution.safe_run_inspection.scenario.missing]
+#[test]
+fn cli_missing_run_is_not_synthesized_from_orchestration_history() {
+    let (_directory, config_path) = orchestration_without_run_record_cli_fixture();
+
+    let output = run_show(&config_path, "json", OTHER_RUN_ID_VALUE);
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("run 42 not found"), "stderr: {stderr}");
+    assert_private_content_absent(&stderr);
 }
 
 // r[verify lattice.workflow_execution.safe_run_inspection]

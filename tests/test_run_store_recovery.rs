@@ -34,6 +34,14 @@ const HOLD_POLL_MILLIS: u64 = 10;
 const HOLD_POLL_LIMIT: usize = 1_000;
 const REPAIR_SUCCESS: &str = "Run evidence store recovery completed.\n";
 const ALREADY_CLEAN: &str = "Run evidence store is already clean.\n";
+const FORBIDDEN_RECOVERY_CLAIMS: &[&str] = &[
+    "semantic correctness",
+    "complete history",
+    "external anchoring",
+    "provider truth",
+    "exactly-once",
+    "production readiness",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ChildPhase {
@@ -161,6 +169,16 @@ fn assert_fixed_error(output: &std::process::Output, expected: &str, forbidden_p
     assert!(!stderr.contains(&forbidden_path.display().to_string()));
 }
 
+fn assert_bounded_recovery_success(output: &std::process::Output, expected: &str) {
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), expected);
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for forbidden in FORBIDDEN_RECOVERY_CLAIMS {
+        assert!(!stdout.contains(forbidden), "recovery output made forbidden claim: {forbidden}");
+    }
+}
+
 // r[verify lattice.workflow_execution.run_store_recovery]
 #[test]
 fn run_store_child_entrypoint() {
@@ -187,6 +205,7 @@ fn run_store_child_entrypoint() {
 
 // r[verify lattice.workflow_execution.safe_run_inspection.scenario.recovery-required]
 // r[verify lattice.workflow_execution.run_store_recovery.scenario.success]
+// r[verify lattice.workflow_execution.run_store_recovery.scenario.non-claim]
 #[test]
 fn panic_and_abort_require_explicit_repair_before_safe_inspection() {
     for phase in [PHASE_PANIC, PHASE_ABORT] {
@@ -203,9 +222,7 @@ fn panic_and_abort_require_explicit_repair_before_safe_inspection() {
         assert_eq!(file_identity(&store_path), identity_before);
 
         let repaired = run_repair(&config_path);
-        assert!(repaired.status.success(), "stderr: {}", String::from_utf8_lossy(&repaired.stderr));
-        assert_eq!(String::from_utf8_lossy(&repaired.stdout), REPAIR_SUCCESS);
-        assert!(repaired.stderr.is_empty());
+        assert_bounded_recovery_success(&repaired, REPAIR_SUCCESS);
         let inspected = run_show(&config_path);
         assert!(inspected.status.success(), "stderr: {}", String::from_utf8_lossy(&inspected.stderr));
         let report: Report = serde_json::from_slice(&inspected.stdout).expect("safe report must decode");
@@ -293,9 +310,7 @@ fn clean_writer_exit_remains_immediately_inspectable() {
     let report: Report = serde_json::from_slice(&inspected.stdout).expect("safe report must decode");
     assert!(report.valid);
     let repair = run_repair(&config_path);
-    assert!(repair.status.success(), "stderr: {}", String::from_utf8_lossy(&repair.stderr));
-    assert_eq!(String::from_utf8_lossy(&repair.stdout), ALREADY_CLEAN);
-    assert!(repair.stderr.is_empty());
+    assert_bounded_recovery_success(&repair, ALREADY_CLEAN);
     let inspected_again = run_show(&config_path);
     assert!(inspected_again.status.success(), "stderr: {}", String::from_utf8_lossy(&inspected_again.stderr));
 }

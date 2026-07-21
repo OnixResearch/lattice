@@ -3,27 +3,26 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 702,
-    "referenced": 335,
-    "missing": 367,
+    "requirements": 706,
+    "referenced": 345,
+    "missing": 361,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9da7f2ac27fe944759a13e44cc37c98bcbc5a8f2a5fb16cb6a0666487d1ab598",
-    "receipt_hash": "3c5d763c6bb439a512735f73ed3421484abc894c6805cff35876ac295abebe8f"
+    "input_hash": "8e2f5b622c9fd99677e5187a71f8fcbdb3fa5ee763ae34bc053ffb8c731c9a02",
+    "receipt_hash": "22637d7584cc23085a3d40b992451e7b4d8622f989ddf2baeeb5c723cce269af"
   },
   "review_policy": {
-    "expected_missing_count": 367,
-    "expected_missing_hash": "4b62e23c7c961ef56cff234e25dd31ab1f0ecfc1fb4278537a981f930e48471d",
-    "reviewed_decisions": 6,
-    "policy_hash": "8f9ac601cb7a5922b2911d588a9094b290817df5247d3f73f6afaad7db199921"
+    "expected_missing_count": 361,
+    "expected_missing_hash": "df059bfa0b70e75996de6dc41990d0d744197b90bee9195bf1b873c505abaf3c",
+    "reviewed_decisions": 0,
+    "policy_hash": "07b29b6d3b14922c5867947cb034834355174cc70c975d54b1b11739699f4f66"
   },
   "summary": {
-    "total": 367,
-    "reviewed": 6,
+    "total": 361,
+    "reviewed": 0,
     "unassessed": 361,
     "by_classification": {
-      "exact_maintained_evidence": 6,
       "unassessed": 361
     },
     "by_subsystem": {
@@ -36,7 +35,7 @@
       "scheduling": 7,
       "tui-ux": 98,
       "workflow-examples": 2,
-      "workflow-execution": 89,
+      "workflow-execution": 83,
       "workflow-format": 41,
       "workflow-validation": 29
     }
@@ -412,78 +411,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.run_store_recovery.scenario.non-claim",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_store_recovery.rs",
-          "blake3": "ccd64b7cdc5da4346ced7d937413ec4e75b3f71e4fc33798ba36bd6d16b7c549"
-        }
-      ],
-      "rationale_code": "assertions.fixed-recovery-output"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.safe_run_inspection.scenario.missing",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_inspection.rs",
-          "blake3": "f726fbd68d1a478dff3da62b65d72604afb1b533452c9191272367876bb09484"
-        }
-      ],
-      "rationale_code": "assertions.missing-run"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.safe_run_inspection.scenario.not_recorded",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_inspection.rs",
-          "blake3": "f726fbd68d1a478dff3da62b65d72604afb1b533452c9191272367876bb09484"
-        }
-      ],
-      "rationale_code": "assertions.not-recorded"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.safe_run_inspection.scenario.owner_binding",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_inspection.rs",
-          "blake3": "f726fbd68d1a478dff3da62b65d72604afb1b533452c9191272367876bb09484"
-        }
-      ],
-      "rationale_code": "assertions.owner-binding"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.safe_run_inspection.scenario.replay",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_inspection.rs",
-          "blake3": "f726fbd68d1a478dff3da62b65d72604afb1b533452c9191272367876bb09484"
-        }
-      ],
-      "rationale_code": "assertions.replay-validation"
-    },
-    {
-      "requirement_id": "lattice.workflow_execution.safe_run_inspection.scenario.safe_output",
-      "subsystem": "workflow-execution",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_run_inspection.rs",
-          "blake3": "f726fbd68d1a478dff3da62b65d72604afb1b533452c9191272367876bb09484"
-        }
-      ],
-      "rationale_code": "assertions.safe-output"
     },
     {
       "requirement_id": "n8nclone.credentials.cache_identity.reference",
@@ -2642,7 +2569,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "4b62e23c7c961ef56cff234e25dd31ab1f0ecfc1fb4278537a981f930e48471d",
+  "missing_set_hash": "df059bfa0b70e75996de6dc41990d0d744197b90bee9195bf1b873c505abaf3c",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2650,5 +2577,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "816ee64ede6615978f39b389583e93dd0e4967f00f8007eb42a02270e415f875"
+  "inventory_hash": "e42fa6b22c8f5b08c30a06d56e068043f7ae2953a8c90497d91d89d900a218cf"
 }
