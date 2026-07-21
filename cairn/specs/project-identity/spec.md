@@ -17,8 +17,8 @@ r[lattice.project_identity.canonical.scenario.build-and-run]
 
 #### Scenario: Stale public branding remains
 r[lattice.project_identity.canonical.scenario.stale-branding]
-- GIVEN a current non-compatibility source, test, example, or operator document still presents `n8nclone` as the product name
-- WHEN the identity audit runs
+- GIVEN a current non-compatibility source, test, example, script, or operator document still presents `n8nclone` as the product name
+- WHEN the maintained repository identity audit runs
 - THEN validation MUST fail until the stale public branding is removed
 
 ### Requirement: Legacy state compatibility
@@ -53,6 +53,6 @@ r[lattice.project_identity.stable-identities.scenario.webhook-domain]
 
 #### Scenario: Historical evidence is validated after rename
 r[lattice.project_identity.stable-identities.scenario.cairn-history]
-- GIVEN accepted requirements and archived receipts use durable `n8nclone.*` identifiers
-- WHEN Cairn validates the renamed repository
-- THEN those identifiers and prior archive contents MUST remain unchanged and linked
+- GIVEN accepted requirements use durable `n8nclone.*` identifiers and the original rename archive records their preservation boundary
+- WHEN the maintained identity audit and Cairn validation run
+- THEN the accepted identifier manifest and the recorded rename archive paths and bytes MUST remain unchanged

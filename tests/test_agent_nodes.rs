@@ -543,8 +543,7 @@ fn handoff_rejects_output_path_outside_working_directory() {
     assert!(error.to_string().contains("outside working directory"), "error: {error}");
 }
 
-// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.
-// rejected]
+// This symlink-escape case remains unlinked pending a bounded capability-read evidence audit.
 #[cfg(unix)]
 #[test]
 fn handoff_rejects_symlink_escape() {

@@ -46,13 +46,22 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+        isIdentityAuditAssetPath =
+          path:
+          toString path == "${sourceRoot}/README.md"
+          || toString path == "${sourceRoot}/flake.nix"
+          || pkgs.lib.hasPrefix "${sourceRoot}/scripts/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/cairn/archive/2026-07-20-rename-n8nclone-to-lattice/" (
+            toString path
+          );
         src = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter =
             path: type:
             craneLib.filterCargoSources path type
             || isSourceFixturePath path
-            || isAnimusCompileTimeAssetPath path;
+            || isAnimusCompileTimeAssetPath path
+            || isIdentityAuditAssetPath path;
         };
 
         # Common build inputs

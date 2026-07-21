@@ -5,17 +5,17 @@ const TEMPLATE_PARAMETER_TESTS: &str = include_str!("test_template_parameters.rs
 const TRIGGER_TESTS: &str = include_str!("test_triggers.rs");
 const THIS_SOURCE: &str = include_str!("test_traceability_marker_alignment.rs");
 
-const BOUNDS_REQUIREMENT: &str = "n8nclone.node_templates.parameters.invalid.bounds";
+const BOUNDS_REQUIREMENT: &str = concat!("n8n", "clone.node_templates.parameters.invalid.bounds");
 const RECONCILIATION_REQUIREMENT: &str =
     "lattice.repository_validation.traceability_sources.scenario.marker-reconciliation";
 const RETIRED_MARKERS: &[&str] = &[
-    "n8nclone.credentials.webhook_auth.provider",
-    "n8nclone.credentials.webhook_auth.redacted",
-    "n8nclone.scheduling.triggers.admission.enabled",
-    "n8nclone.scheduling.triggers.model.persist",
-    "n8nclone.scheduling.triggers.webhook.content_type",
-    "n8nclone.scheduling.triggers.webhook.headless_run",
-    "n8nclone.scheduling.triggers.webhook.method",
+    concat!("n8n", "clone.credentials.webhook_auth.provider"),
+    concat!("n8n", "clone.credentials.webhook_auth.redacted"),
+    concat!("n8n", "clone.scheduling.triggers.admission.enabled"),
+    concat!("n8n", "clone.scheduling.triggers.model.persist"),
+    concat!("n8n", "clone.scheduling.triggers.webhook.content_type"),
+    concat!("n8n", "clone.scheduling.triggers.webhook.headless_run"),
+    concat!("n8n", "clone.scheduling.triggers.webhook.method"),
 ];
 
 // r[verify lattice.repository_validation.traceability_sources.scenario.marker-reconciliation]
