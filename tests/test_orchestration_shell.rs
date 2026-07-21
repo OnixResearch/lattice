@@ -1,4 +1,6 @@
 use std::collections::BTreeSet;
+use std::path::Path;
+use std::process::Command;
 
 use lattice::agent_node::AgentRuntimeConfig;
 use lattice::engine::RunId;
@@ -54,6 +56,52 @@ const IDEMPOTENCY_KEY: &str = "request-one";
 const FIRST_SEQUENCE: u64 = 1;
 const ROUND_LIMIT: u64 = 2;
 const RECOVERY_RUN_ID: u64 = 77;
+const RESTART_TEST_NAME: &str = "restart_duplicate_trigger_reuses_original_admission_across_processes";
+const RESTART_PHASE_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_PHASE";
+const RESTART_STORE_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_STORE";
+const RESTART_FIRST_RESULT_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_FIRST_RESULT";
+const RESTART_DUPLICATE_RESULT_ENV: &str = "LATTICE_RESTART_TRIGGER_TEST_DUPLICATE_RESULT";
+const RESTART_PHASE_FIRST: &str = "first";
+const RESTART_PHASE_DUPLICATE: &str = "duplicate";
+const RESTART_PHASE_INVALID: &str = "invalid";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestartPhase {
+    First,
+    Duplicate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RestartResult {
+    process_id: u32,
+    instance_id: String,
+}
+
+fn parse_restart_phase(value: &str) -> Result<RestartPhase, &'static str> {
+    match value {
+        RESTART_PHASE_FIRST => Ok(RestartPhase::First),
+        RESTART_PHASE_DUPLICATE => Ok(RestartPhase::Duplicate),
+        _ => Err("unknown restart trigger test phase"),
+    }
+}
+
+fn encode_restart_result(result: &RestartResult) -> String {
+    format!("{}\n{}", result.process_id, result.instance_id)
+}
+
+fn parse_restart_result(value: &str) -> Result<RestartResult, &'static str> {
+    let Some((process_id, instance_id)) = value.split_once('\n') else {
+        return Err("restart result is missing its identity separator");
+    };
+    let process_id = process_id.parse::<u32>().map_err(|_| "restart process identity is invalid")?;
+    if instance_id.is_empty() {
+        return Err("restart instance identity is empty");
+    }
+    Ok(RestartResult {
+        process_id,
+        instance_id: instance_id.to_string(),
+    })
+}
 
 fn workflow(name: &str) -> Workflow {
     let mut workflow = Workflow::new(name);
@@ -268,6 +316,167 @@ async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     assert_eq!(duplicate.id, first.id);
     assert_eq!(store.list_orchestrations().expect("instances must list").len(), FIRST_SEQUENCE as usize);
     assert_eq!(store.list_runs(ROUND_LIMIT as usize).expect("runs must list").len(), FIRST_SEQUENCE as usize);
+}
+
+// r[verify lattice.agent_orchestration.triggers.scenario.process-restart]
+#[test]
+fn restart_duplicate_trigger_reuses_original_admission_across_processes() {
+    if run_restart_child_phase() {
+        return;
+    }
+
+    let directory = tempdir().expect("temporary directory must exist");
+    let store_path = directory.path().join("restart.redb");
+    let first_result_path = directory.path().join("first-instance-id");
+    let duplicate_result_path = directory.path().join("duplicate-instance-id");
+    let first_status =
+        invoke_restart_child(&store_path, &first_result_path, &duplicate_result_path, RESTART_PHASE_FIRST);
+    assert!(first_status.success(), "first process must admit and complete the trigger");
+    let duplicate_status =
+        invoke_restart_child(&store_path, &first_result_path, &duplicate_result_path, RESTART_PHASE_DUPLICATE);
+    assert!(duplicate_status.success(), "restarted process must reuse the trigger admission");
+
+    let first_result = parse_restart_result(
+        &std::fs::read_to_string(&first_result_path).expect("first process must record its safe identity"),
+    )
+    .expect("first process result must decode");
+    let duplicate_result = parse_restart_result(
+        &std::fs::read_to_string(&duplicate_result_path).expect("duplicate process must record its safe identity"),
+    )
+    .expect("duplicate process result must decode");
+    assert_ne!(duplicate_result.process_id, first_result.process_id);
+    assert_eq!(duplicate_result.instance_id, first_result.instance_id);
+
+    let store = Store::new(&store_path).expect("parent must reopen the released store");
+    let admissions = store.list_orchestration_trigger_admissions().expect("admissions must list");
+    let instances = store.list_orchestrations().expect("instances must list");
+    let runs = store.list_runs(ROUND_LIMIT as usize).expect("runs must list");
+    assert_eq!(admissions.len(), FIRST_SEQUENCE as usize);
+    assert_eq!(instances.len(), FIRST_SEQUENCE as usize);
+    assert_eq!(runs.len(), FIRST_SEQUENCE as usize);
+    let instance = &instances[0];
+    let expected_scoped_key =
+        lattice::orchestration::scoped_trigger_key(&instance.definition_revision, TRIGGER_ID, IDEMPOTENCY_KEY)
+            .expect("scoped trigger identity must hash");
+    assert_eq!(admissions.get(&expected_scoped_key).map(String::as_str), Some(first_result.instance_id.as_str()));
+    assert_eq!(instance.trigger_idempotency_key.as_deref(), Some(expected_scoped_key.as_str()));
+    assert_eq!(instance.id, first_result.instance_id);
+    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert_eq!(instance.budgets.consumed, BudgetCharge {
+        rounds: FIRST_SEQUENCE,
+        ..BudgetCharge::default()
+    });
+    assert!(instance.budgets.reservations.is_empty());
+    assert!(!instance.budgets.breached);
+    assert_eq!(instance.round, FIRST_SEQUENCE);
+    assert!(instance.active_run_id.is_none());
+    assert!(instance.pending_dispatch.is_none());
+    let RunOwner::Orchestration {
+        instance_id,
+        dispatch_id,
+    } = &runs[0].owner
+    else {
+        panic!("restarted trigger run must retain orchestration ownership");
+    };
+    assert_eq!(instance_id, &instance.id);
+    assert!(!dispatch_id.is_empty());
+    let report = replay(&store, &instance.id).expect("restarted instance replay must validate");
+    assert!(report.valid);
+}
+
+// r[verify lattice.agent_orchestration.triggers.scenario.process-restart]
+#[test]
+fn restart_child_rejects_unknown_phase_before_creating_store() {
+    if run_restart_child_phase() {
+        return;
+    }
+
+    let directory = tempdir().expect("temporary directory must exist");
+    let store_path = directory.path().join("must-not-exist.redb");
+    let first_result_path = directory.path().join("must-not-write-first");
+    let duplicate_result_path = directory.path().join("must-not-write-duplicate");
+    let status = invoke_restart_child(&store_path, &first_result_path, &duplicate_result_path, RESTART_PHASE_INVALID);
+
+    assert!(!status.success());
+    assert!(!store_path.exists());
+    assert!(!first_result_path.exists());
+    assert!(!duplicate_result_path.exists());
+}
+
+fn run_restart_child_phase() -> bool {
+    let Ok(phase_value) = std::env::var(RESTART_PHASE_ENV) else {
+        return false;
+    };
+    let phase = parse_restart_phase(&phase_value).expect("restart child phase must be recognized");
+    let store_path = std::env::var_os(RESTART_STORE_ENV).expect("restart child store path must be present");
+    let first_result_path =
+        std::env::var_os(RESTART_FIRST_RESULT_ENV).expect("restart child first result path must be present");
+    let duplicate_result_path =
+        std::env::var_os(RESTART_DUPLICATE_RESULT_ENV).expect("restart child duplicate result path must be present");
+    run_restart_child(phase, Path::new(&store_path), Path::new(&first_result_path), Path::new(&duplicate_result_path));
+    true
+}
+
+fn run_restart_child(phase: RestartPhase, store_path: &Path, first_result_path: &Path, duplicate_result_path: &Path) {
+    let store = Store::new(store_path).expect("restart child store must open");
+    if phase == RestartPhase::First {
+        let workflow = workflow(FIRST_WORKFLOW_NAME);
+        let definition = definition(&workflow, CompletionPolicy::RunSucceeded);
+        store.save_workflow(&workflow).expect("restart workflow must persist");
+        store.save_orchestration_definition(&definition).expect("restart definition must persist");
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("restart child runtime must build");
+    let instance = runtime
+        .block_on(start_from_trigger(
+            &store,
+            DEFINITION_ID,
+            TRIGGER_ID,
+            OrchestrationTriggerKind::Webhook,
+            IDEMPOTENCY_KEY,
+            AgentRuntimeConfig::default(),
+        ))
+        .expect("restart child trigger must succeed");
+    let result = RestartResult {
+        process_id: std::process::id(),
+        instance_id: instance.id.clone(),
+    };
+    match phase {
+        RestartPhase::First => {
+            std::fs::write(first_result_path, encode_restart_result(&result))
+                .expect("first child must record safe process and instance identities");
+        }
+        RestartPhase::Duplicate => {
+            let expected = parse_restart_result(
+                &std::fs::read_to_string(first_result_path)
+                    .expect("duplicate child must read first process and instance identities"),
+            )
+            .expect("first process result must decode");
+            assert_ne!(result.process_id, expected.process_id);
+            assert_eq!(result.instance_id, expected.instance_id);
+            std::fs::write(duplicate_result_path, encode_restart_result(&result))
+                .expect("duplicate child must record safe process and instance identities");
+        }
+    }
+}
+
+fn invoke_restart_child(
+    store_path: &Path,
+    first_result_path: &Path,
+    duplicate_result_path: &Path,
+    phase: &str,
+) -> std::process::ExitStatus {
+    Command::new(std::env::current_exe().expect("current integration-test executable must resolve"))
+        .arg("--exact")
+        .arg(RESTART_TEST_NAME)
+        .env(RESTART_PHASE_ENV, phase)
+        .env(RESTART_STORE_ENV, store_path)
+        .env(RESTART_FIRST_RESULT_ENV, first_result_path)
+        .env(RESTART_DUPLICATE_RESULT_ENV, duplicate_result_path)
+        .status()
+        .expect("restart child process must launch")
 }
 
 // r[verify lattice.agent_orchestration.durability]

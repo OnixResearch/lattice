@@ -177,6 +177,12 @@ r[lattice.agent_orchestration.triggers.scenario.duplicate]
 - WHEN the same trigger fact is received again
 - THEN Lattice MUST return the prior admission outcome and MUST NOT create another instance or budget reservation
 
+#### Scenario: Duplicate admission survives process restart
+r[lattice.agent_orchestration.triggers.scenario.process-restart]
+- GIVEN one process durably accepted an orchestration trigger fact and released its store ownership
+- WHEN a separately started process reopens that store and submits the exact same definition revision, trigger identity, and idempotency key
+- THEN Lattice MUST return the original instance and MUST NOT create another admission, instance, run, or budget charge
+
 ### Requirement: Typed Nickel orchestration format
 r[lattice.agent_orchestration.format] Lattice MUST import and export orchestration definitions through typed Nickel contracts without plaintext secrets and MUST keep unsupported n8n orchestration semantics outside default parity claims.
 
