@@ -16,4 +16,14 @@
 
 ## Phase 3: Validation and closure
 
-- [ ] [serial] Run focused tests, `scripts/check.rs`, Octet, Cairn gates/validation, and bounded Nix validation; sync the accepted spec and archive with current evidence. r[lattice.agent_orchestration.unobserved_abandon]
+- [x] [serial] Run focused tests, `scripts/check.rs`, Octet, Cairn gates/validation, and bounded Nix validation; sync the accepted spec and archive with current evidence. r[lattice.agent_orchestration.unobserved_abandon]
+
+## Verification evidence
+
+- Pre-change focused orchestration baselines passed 13 core tests, 6 shell tests, and the existing CLI suite.
+- Post-change focused store, headless, core, shell, and CLI suites passed, including concurrent pre-persistence allocation, duplicate write rejection, legacy-unscoped decoding, exact owner recovery, foreign owner rejection, acknowledged/planned abandonment, authority, mismatch, duplicate, terminal, and replay paths.
+- Production-shaped live dogfood reserved run `0`, terminated the wrapper during dispatch, restarted with distinct run `1`, completed that run, then cancelled and abandoned run `0` without retry; abandonment failed terminally, consumed the full reservation, replayed validly, and returned `NothingPending` from later recovery.
+- `scripts/check.rs` passed the full default-member test suite and strict Clippy; `nix flake check -L --option secret-key-files ''` passed 483 nextest cases and all bounded checks on `x86_64-linux`.
+- `octet-precommit-check` passed with 919 accepted/current findings, zero new, zero stale, 1,169 total findings, and baseline hash `b3:b7b84338e5e0a9ba1d6ff41108e196fcb82345a2940a232b70f0a8d5d9aa034e`.
+- Cairn validation plus proposal, design, and tasks gates passed through the canonical sibling Cairn CLI.
+- No provider cancellation, provider failure, interrupted-workflow success, actual billing/token usage, remote exactly-once execution, external anchoring, or production-readiness claim is made.
