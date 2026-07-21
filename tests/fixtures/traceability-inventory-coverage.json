@@ -1,0 +1,13 @@
+{
+  "profile_id": "test-profile",
+  "requirements": 1,
+  "referenced": 0,
+  "missing": [
+    "lattice.example.alpha"
+  ],
+  "dangling": [],
+  "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "input_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "receipt_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "valid": false
+}

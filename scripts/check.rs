@@ -17,6 +17,14 @@ const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
+const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
+const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
+    "-q",
+    "-Zscript",
+    "scripts/traceability-inventory.rs",
+    "hash",
+    "tests/fixtures/traceability-inventory-coverage.json",
+];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const TEST_ARGS: &[&str] = &["test"];
 const CLIPPY_ARGS: &[&str] = &[
@@ -45,6 +53,18 @@ const COMMAND_STEPS: &[CheckStep] = &[
         program: RUSTFMT_PROGRAM,
         args: SCRIPT_FORMAT_ARGS,
         use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "inventory script format",
+        program: RUSTFMT_PROGRAM,
+        args: INVENTORY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "inventory script smoke",
+        program: CARGO_PROGRAM,
+        args: INVENTORY_SCRIPT_SMOKE_ARGS,
+        use_repo_local_target: true,
     },
     CheckStep {
         name: "format",

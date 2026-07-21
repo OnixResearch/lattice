@@ -184,6 +184,21 @@
               mkdir -p "$out"
             '';
 
+        traceabilityInventoryPolicyCheck =
+          pkgs.runCommand "lattice-traceability-inventory-policy"
+            {
+              nativeBuildInputs = [ pkgs.nickel ];
+            }
+            ''
+              unexpected_success=1
+              nickel export --format json ${src}/cairn-policy/traceability-inventory.ncl > inventory-policy.json
+              if nickel export --format json ${src}/cairn-policy/fixtures/invalid-traceability-inventory.ncl > /dev/null 2>&1; then
+                echo "invalid traceability inventory policy unexpectedly exported" >&2
+                exit "$unexpected_success"
+              fi
+              touch "$out"
+            '';
+
         # Build the actual package
         lattice = craneLib.buildPackage {
           inherit
@@ -234,6 +249,9 @@
 
           # Octet Tiger Style lints
           octet = octetCheck;
+
+          # Typed traceability inventory policy and negative fixture
+          traceability-inventory-policy = traceabilityInventoryPolicyCheck;
         };
 
         devShells.default = craneLib.devShell {

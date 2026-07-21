@@ -14,6 +14,18 @@ nix flake check -L --option secret-key-files '' # full CI; check outputs do not 
 
 The Octet hook runs the lib target profile, keeps every configured Octet lint at `deny`, and accepts the current checked-in `octet-baseline.json` debt. New unaccepted Octet finding IDs fail the hook.
 
+## Traceability debt inventory
+
+The maintained inventory partitions Cairn's exact missing-requirement set without turning inventory rows into Tracey evidence. Generate the failing coverage receipt first, then regenerate or check the BLAKE3-bound report:
+
+```bash
+cairn traceability coverage --root . > target/traceability-coverage.json # expected to exit nonzero while debt remains
+./scripts/traceability-inventory.rs generate target/traceability-coverage.json
+./scripts/traceability-inventory.rs check target/traceability-coverage.json
+```
+
+The typed review policy lives at `cairn-policy/traceability-inventory.ncl`; the generated report lives at `cairn-policy/generated/traceability-debt-inventory.json`. Reviewed candidates bind safe relative evidence paths and current file-byte BLAKE3 hashes. Rows without an explicit decision remain `unassessed`, which does not claim that behavior or evidence is absent.
+
 ## Examples
 
 Complex templates and runnable Nickel workflow examples live under `examples/`, including daily digest, CSV cleanup, log triage, webhook trigger cookbook, and the Markdown-backed [`llm-operating-graph`](examples/workflows/llm-operating-graph.md). The LLM example models roles and sequences inside an admitted DAG; feedback and reorganization become explicit inputs to a later acyclic run rather than hidden runtime cycles.
