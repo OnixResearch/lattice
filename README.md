@@ -35,6 +35,20 @@ lattice --config examples/config/openai-compatible-agent.ncl import examples/wor
 lattice --config examples/config/openai-compatible-agent.ncl run llm-operating-graph --output json
 ```
 
+## Bounded Animus leaf agents
+
+[`examples/config/animus-agent.ncl`](examples/config/animus-agent.ncl) routes the additive `animus` target through a fixed BLAKE3-identified two-turn Steel loop. Animus decides only the inner model/response sequence for one generic agent node. Lattice retains provider credentials, transport limits, workflow and Seaglass graph semantics, effects, budgets, events, persistence, triggers, approvals, and durable orchestration.
+
+The first slice performs exactly one OpenAI-compatible model dispatch and supports text or JSON output. It exposes no tool definitions, tool capabilities, arbitrary Steel programs, profile loading, sessions, provider fallback, Animus DAGs, or Animus persistence. Returned metadata contains bounded identities and counts, not prompts, responses, credentials, or a second provenance ledger.
+
+```bash
+cargo run --example generate_animus_workflow
+lattice --config examples/config/animus-agent.ncl import examples/workflows/animus-bounded-agent.ncl
+lattice --config examples/config/animus-agent.ncl run animus-bounded-agent --output json
+```
+
+The checked-in Animus snapshot is reproducibly refreshed from its reviewed revision with `scripts/sync_animus.rs ../animus vendor-cargo-deps/animus`.
+
 ## Durable agent orchestration
 
 Lattice can coordinate immutable workflow revisions across explicit rounds with operator authority, budget reservations, crash recovery, and side-effect-free replay. Each round remains an acyclic workflow admitted through the Seaglass-backed runner. Agent output may propose a successor revision, but it cannot mutate graphs, credentials, triggers, runtime abilities, or budgets without an authorized hash-bound approval.
@@ -70,3 +84,4 @@ verus verus/example_spec.rs
 - [Callee](https://github.com/baldaworks/callee): Markdown-defined provider-backed roles and bounded `Sequential`/`Loop` composition used as an authoring and orchestration reference.
 - [FarmTable](https://github.com/scion-frontiers/farmtable): graph-native ready-task, dependency, critical-path, bottleneck, and lifecycle separation used as an execution-graph architecture reference.
 - [cap-std](https://github.com/bytecodealliance/cap-std): portable capability-directory implementation used to keep local file effects descriptor-relative and reject traversal or symlink escapes.
+- [Animus](https://github.com/OnixResearch/animus): authority-free adapter contracts, deterministic bounded agent loop, and Rust-revalidated Steel fabric used beneath Lattice's generic agent boundary.

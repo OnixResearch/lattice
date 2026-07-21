@@ -217,6 +217,7 @@ fn command_plan(target: AgentTarget, output_mode: AgentOutputMode) -> AgentComma
         adapter_label: match target {
             AgentTarget::Pi => "pi",
             AgentTarget::Clankers => "clankers",
+            AgentTarget::Animus => "animus",
         },
         program: "agent".to_string(),
         args: Vec::new(),

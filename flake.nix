@@ -41,9 +41,17 @@
           pkgs.lib.hasPrefix "${sourceRoot}/examples/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/cairn/specs/" (toString path);
+        isAnimusCompileTimeAssetPath =
+          path:
+          pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
         src = pkgs.lib.cleanSourceWith {
           src = ./.;
-          filter = path: type: craneLib.filterCargoSources path type || isSourceFixturePath path;
+          filter =
+            path: type:
+            craneLib.filterCargoSources path type
+            || isSourceFixturePath path
+            || isAnimusCompileTimeAssetPath path;
         };
 
         # Common build inputs

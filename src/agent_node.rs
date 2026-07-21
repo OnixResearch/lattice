@@ -16,6 +16,7 @@ use crate::openai::Transport;
 
 const DEFAULT_PI_RUNTIME_KEY: &str = "pi";
 const DEFAULT_CLANKERS_RUNTIME_KEY: &str = "clankers";
+const DEFAULT_ANIMUS_RUNTIME_KEY: &str = "animus";
 const DEFAULT_PI_COMMAND: &str = "pi";
 const DEFAULT_CLANKERS_COMMAND: &str = "clankers";
 const PRINT_MODE_FLAG: &str = "-p";
@@ -46,6 +47,7 @@ const AGENT_COMMAND_NO_TIMEOUT_SECS: u64 = 0;
 pub enum AgentTarget {
     Pi,
     Clankers,
+    Animus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -304,20 +306,29 @@ struct AgentOutputFile {
 enum RuntimeRoute<'a> {
     Command,
     OpenAi(&'a crate::openai::RuntimeConfig),
+    Animus(&'a crate::openai::RuntimeConfig),
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.route]
+// r[impl lattice.agent_runtime.animus_leaf]
+// r[impl lattice.agent_runtime.animus_compatibility]
 fn runtime_route_for_target(config: &AgentRuntimeConfig, target: AgentTarget) -> Result<RuntimeRoute<'_>, AgentError> {
     let target_label = agent_target_label(target);
-    match (config.runtimes.contains_key(target_label), config.openai_compatible.get(target_label)) {
-        (true, None) => Ok(RuntimeRoute::Command),
-        (false, Some(runtime)) => Ok(RuntimeRoute::OpenAi(runtime)),
-        (false, None) => {
+    let has_command_runtime = config.runtimes.contains_key(target_label);
+    let openai_runtime = config.openai_compatible.get(target_label);
+    match (has_command_runtime, openai_runtime, target) {
+        (true, None, AgentTarget::Pi | AgentTarget::Clankers) => Ok(RuntimeRoute::Command),
+        (false, Some(runtime), AgentTarget::Pi | AgentTarget::Clankers) => Ok(RuntimeRoute::OpenAi(runtime)),
+        (false, Some(runtime), AgentTarget::Animus) => Ok(RuntimeRoute::Animus(runtime)),
+        (false, None, _) => {
             Err(AgentError::PreflightRejected(format!("missing {target_label} agent runtime configuration")))
         }
-        (true, Some(_)) => {
+        (true, Some(_), _) => {
             Err(AgentError::PreflightRejected(format!("ambiguous {target_label} agent runtime configuration")))
         }
+        (true, None, AgentTarget::Animus) => Err(AgentError::PreflightRejected(
+            "Animus target requires an OpenAI-compatible model runtime and cannot use a command runtime".to_string(),
+        )),
     }
 }
 
@@ -361,9 +372,7 @@ impl AgentAdapter for ProductionAgentAdapter {
                 decode_agent_command_output(&plan, &output)
             }
             RuntimeRoute::OpenAi(runtime) => {
-                let global_output_max_bytes = u64::try_from(self.config.max_output_bytes).map_err(|_| {
-                    AgentError::PreflightRejected("global agent output bound is unsupported".to_string())
-                })?;
+                let global_output_max_bytes = global_output_max_bytes(&self.config)?;
                 crate::openai::execute(
                     runtime,
                     request,
@@ -372,8 +381,20 @@ impl AgentAdapter for ProductionAgentAdapter {
                     self.openai_transport.as_ref(),
                 )
             }
+            RuntimeRoute::Animus(runtime) => crate::animus_agent::execute(
+                runtime,
+                request,
+                context,
+                global_output_max_bytes(&self.config)?,
+                self.openai_transport.as_ref(),
+            ),
         }
     }
+}
+
+fn global_output_max_bytes(config: &AgentRuntimeConfig) -> Result<u64, AgentError> {
+    u64::try_from(config.max_output_bytes)
+        .map_err(|_| AgentError::PreflightRejected("global agent output bound is unsupported".to_string()))
 }
 
 fn absent_prompt_file() -> Option<String> {
@@ -412,6 +433,10 @@ impl AgentNodeSettings {
 
     pub fn clankers(prompt: impl Into<String>, output_mode: AgentOutputMode) -> Self {
         Self::new(AgentTarget::Clankers, prompt, output_mode)
+    }
+
+    pub fn animus(prompt: impl Into<String>, output_mode: AgentOutputMode) -> Self {
+        Self::new(AgentTarget::Animus, prompt, output_mode)
     }
 
     pub fn new(target: AgentTarget, prompt: impl Into<String>, output_mode: AgentOutputMode) -> Self {
@@ -461,6 +486,7 @@ pub fn agent_target_label(target: AgentTarget) -> &'static str {
     match target {
         AgentTarget::Pi => DEFAULT_PI_RUNTIME_KEY,
         AgentTarget::Clankers => DEFAULT_CLANKERS_RUNTIME_KEY,
+        AgentTarget::Animus => DEFAULT_ANIMUS_RUNTIME_KEY,
     }
 }
 
@@ -468,6 +494,7 @@ pub fn parse_agent_target(value: &str) -> Result<AgentTarget, AgentError> {
     match value {
         DEFAULT_PI_RUNTIME_KEY => Ok(AgentTarget::Pi),
         DEFAULT_CLANKERS_RUNTIME_KEY => Ok(AgentTarget::Clankers),
+        DEFAULT_ANIMUS_RUNTIME_KEY => Ok(AgentTarget::Animus),
         _ => Err(AgentError::UnsupportedTarget(value.to_string())),
     }
 }

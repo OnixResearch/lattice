@@ -1598,7 +1598,7 @@ impl App {
                 false
             }
             Err(PropertyEditError::InvalidAgentTarget) => {
-                self.output.push_line("Invalid agent target; enter pi or clankers");
+                self.output.push_line("Invalid agent target; enter pi, clankers, or animus");
                 false
             }
             Err(PropertyEditError::InvalidAgentOutputMode) => {

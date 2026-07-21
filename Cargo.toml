@@ -81,9 +81,6 @@ animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
 animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
 animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
 
-[patch."ssh://git@github.com/OnixResearch/host-control.git"]
-host-control-core = { path = "vendor-cargo-deps/host-control-core" }
-
 [dev-dependencies]
 pretty_assertions = "1.4"
 tempfile = "3.27"

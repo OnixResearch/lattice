@@ -1,4 +1,5 @@
 pub mod agent_node;
+pub mod animus_agent;
 mod capability;
 pub mod config;
 pub mod control_flow;

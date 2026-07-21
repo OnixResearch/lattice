@@ -21,6 +21,7 @@ They are useful for demos, import/export validation, and headless regression tes
 - `complex-text-normalization.ncl` — sorts, deduplicates, filters, replaces, and counts text lines.
 - `selfie-to-fine-art.ncl` — routes a selfie plus inspiration images through a generic Clankers agent node.
 - `webhook-cookbook.ncl` — imports a credential-reference authenticated webhook trigger for local listener demos.
+- `animus-bounded-agent.ncl` — runs one generic agent node through the fixed two-turn, model-only Animus leaf runtime.
 
 ## Orchestrations
 
@@ -46,6 +47,18 @@ lattice --config ./demo/config.ncl --init
 lattice --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
 lattice --config ./demo/config.ncl run daily-digest --output json
 ```
+
+## Bounded Animus agent
+
+Regenerate, import, and run the model-only Animus example against an explicitly configured OpenAI-compatible endpoint:
+
+```bash
+cargo run --example generate_animus_workflow
+lattice --config examples/config/animus-agent.ncl import examples/workflows/animus-bounded-agent.ncl
+lattice --config examples/config/animus-agent.ncl run animus-bounded-agent --output json
+```
+
+This example is one Lattice agent node, not an Animus workflow orchestrator. Tools, sessions, arbitrary Steel, provider fallback, and Animus persistence remain disabled.
 
 ## Webhook cookbook
 
