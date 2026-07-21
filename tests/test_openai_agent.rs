@@ -37,6 +37,19 @@ const MODEL_OVERRIDE: &str = "override-model";
 const PROMPT: &str = "Return a concise answer";
 const TEXT_CONTENT: &str = "bounded answer";
 const JSON_CONTENT: &str = r#"{"ok":true}"#;
+const INLINE_REASONING_PRIVATE: &str = "private reasoning repeats Return a concise answer";
+const INLINE_REASONING_TEXT_CONTENT: &str =
+    "<think>private reasoning repeats Return a concise answer</think> bounded answer ";
+const INLINE_REASONING_JSON_CONTENT: &str =
+    "<think>private reasoning repeats Return a concise answer</think> {\"ok\":true} ";
+const MALFORMED_INLINE_REASONING_CONTENT: &[&str] = &[
+    "<think>private reasoning repeats Return a concise answer",
+    "prefix <think>private reasoning repeats Return a concise answer</think>bounded answer",
+    "<think>outer <think>private reasoning repeats Return a concise answer</think></think>bounded answer",
+    "<think>private reasoning repeats Return a concise answer</think>bounded answer<think>again</think>",
+    "</think>bounded answer",
+    "<think>private reasoning repeats Return a concise answer</think>",
+];
 const API_KEY_BINDING: &str = "OPENAI_API_KEY";
 const API_KEY_VALUE: &str = "secret-test-token";
 const API_KEY_REFERENCE: &str = "openai_test_key";

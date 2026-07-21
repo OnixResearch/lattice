@@ -55,7 +55,6 @@ use crate::replay::ReplayTimeline;
 use crate::store::RunDetailRecord;
 use crate::store::RunNodeDetail;
 use crate::store::RunNodeDetailStatus;
-use crate::store::RunOutputDetail;
 use crate::store::RunRecord;
 use crate::store::Store;
 use crate::tui::input;
@@ -469,67 +468,9 @@ fn append_output_value_records(
 }
 
 // r[impl n8nclone.tui_ux.run_history.details.persist]
+// r[impl lattice.workflow_execution.headless_run_details]
 pub fn run_detail_record_from_results(run_id: RunId, workflow: &Workflow, results: &[StepResult]) -> RunDetailRecord {
-    let nodes = results.iter().map(|step| run_node_detail_from_step(run_id, workflow, step)).collect::<Vec<_>>();
-    RunDetailRecord { run_id, nodes }
-}
-
-fn run_node_detail_from_step(run_id: RunId, workflow: &Workflow, step: &StepResult) -> RunNodeDetail {
-    let node_label =
-        workflow.graph.node(step.node_id).map(|node| node.label.clone()).unwrap_or_else(|| "?".to_string());
-    match &step.status {
-        NodeStatus::Completed { outputs, cached } => RunNodeDetail {
-            node_id: step.node_id,
-            node_label,
-            status: RunNodeDetailStatus::Completed,
-            cached: *cached,
-            outputs: completed_output_records(run_id, workflow, step.node_id, outputs)
-                .into_iter()
-                .map(run_output_line_to_detail)
-                .collect(),
-            error: None,
-        },
-        NodeStatus::Failed { error } => RunNodeDetail {
-            node_id: step.node_id,
-            node_label,
-            status: RunNodeDetailStatus::Failed,
-            cached: false,
-            outputs: Vec::new(),
-            error: Some(error.clone()),
-        },
-        NodeStatus::Skipped => RunNodeDetail {
-            node_id: step.node_id,
-            node_label,
-            status: RunNodeDetailStatus::Skipped,
-            cached: false,
-            outputs: Vec::new(),
-            error: None,
-        },
-        NodeStatus::Pending => RunNodeDetail {
-            node_id: step.node_id,
-            node_label,
-            status: RunNodeDetailStatus::Pending,
-            cached: false,
-            outputs: Vec::new(),
-            error: None,
-        },
-        NodeStatus::Running => RunNodeDetail {
-            node_id: step.node_id,
-            node_label,
-            status: RunNodeDetailStatus::Running,
-            cached: false,
-            outputs: Vec::new(),
-            error: None,
-        },
-    }
-}
-
-fn run_output_line_to_detail(line: RunOutputLine) -> RunOutputDetail {
-    RunOutputDetail {
-        port_id: line.port_id,
-        port_label: line.port_label,
-        text: line.text,
-    }
+    crate::run::history::detail_record_from_results(run_id, workflow, results)
 }
 
 fn canceled_run_detail_record(

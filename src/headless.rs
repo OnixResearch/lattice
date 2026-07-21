@@ -259,7 +259,12 @@ where
     let summary = summarize_run(run_id, &workflow, &results);
     let finished_epoch_ms = chrono::Utc::now().timestamp_millis();
     let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
+    let details = crate::run::history::detail_record_from_results(run_id, &workflow, &results);
+    debug_assert_eq!(details.run_id, run_id);
+    debug_assert_eq!(details.nodes.len(), results.len());
     store.save_run(&record)?;
+    // r[impl lattice.workflow_execution.headless_run_details]
+    store.save_run_details(&details)?;
     let replay_events =
         replay::replay_events_from_results(run_id, &workflow, &results, started_epoch_ms, Some(finished_epoch_ms));
     store.save_run_replay_events(run_id, &replay_events)?;

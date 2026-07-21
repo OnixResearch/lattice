@@ -30,7 +30,7 @@ lattice --config ./demo/config.ncl run daily-digest --output json
 
 [`examples/config/openai-compatible-agent.ncl`](examples/config/openai-compatible-agent.ncl) routes the existing adapter-neutral Pi and Clankers target labels directly to a bounded chat-completions endpoint. Set `agent_runtime.runtimes = {}` when using those native routes so transport selection remains unambiguous, then replace the example endpoint and model.
 
-The native adapter supports strict text and JSON outputs, disables redirects, bounds request/response bytes and time, and never falls back from missing content to hidden reasoning. Local HTTP endpoints are supported only without bearer credentials. For an authenticated HTTPS endpoint, set `api_key_env` to a binding name and provide that binding through each agent node's `secret_env` credential reference; do not put the key in Nickel.
+The native adapter supports strict text and JSON outputs, disables redirects, bounds request/response bytes and time, and never falls back from missing content to hidden reasoning. If a compatible endpoint embeds one exact leading `<think>...</think>` block in content, Lattice discards that block before output typing; unterminated, nested, repeated, or non-leading reasoning markers fail closed. Local HTTP endpoints are supported only without bearer credentials. For an authenticated HTTPS endpoint, set `api_key_env` to a binding name and provide that binding through each agent node's `secret_env` credential reference; do not put the key in Nickel.
 
 ```bash
 lattice --config examples/config/openai-compatible-agent.ncl import examples/workflows/llm-operating-graph.ncl
@@ -74,7 +74,7 @@ lattice --config ./demo/config.ncl orchestration abandon <instance-id> --actor o
 lattice --config ./demo/config.ncl orchestration replay <instance-id> --output json
 ```
 
-Run IDs are reserved atomically before effects, and orchestration records are bound to the exact instance and dispatch; foreign or legacy-unscoped records fail closed instead of satisfying recovery. Abandonment requires a prior authorized cancellation request and refuses to override an owned persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
+Run IDs are reserved atomically before effects, and orchestration records are bound to the exact instance and dispatch; foreign or legacy-unscoped records fail closed instead of satisfying recovery. Terminal headless runs persist the same node-detail and replay model used by run history, with sensitive values replaced by a fixed redaction marker before storage. Abandonment requires a prior authorized cancellation request and refuses to override an owned persisted run. An acknowledged dispatch consumes its complete reserved upper bound, clears local pending state, and terminates as failed with an explicit unknown-remote-outcome summary. It does not retry the effect or prove provider cancellation, provider failure, workflow success, billing truth, or remote exactly-once execution.
 
 A local event-chain head proves local sequence consistency only. It does not prove external anchoring, independently witnessed completeness, model truth, provider billing truth, or remote exactly-once effects.
 

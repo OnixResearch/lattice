@@ -153,6 +153,7 @@ fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstanc
 
 // r[verify lattice.agent_orchestration.rounds]
 // r[verify lattice.agent_orchestration.cli]
+// r[verify lattice.workflow_execution.headless_run_details.scenario.orchestration]
 #[tokio::test]
 async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     let (_directory, store) = store();
@@ -178,6 +179,11 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     };
     assert_eq!(instance_id, &instance.id);
     assert!(!dispatch_id.is_empty());
+    let details = store
+        .load_run_details(runs[0].run_id)
+        .expect("run details must load")
+        .expect("run details must persist");
+    assert_eq!(details.nodes.len(), FIRST_SEQUENCE as usize);
     let report = replay(&store, &instance.id).expect("side-effect-free replay must validate");
     assert!(report.valid);
     assert_eq!(report.instance, instance);

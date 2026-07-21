@@ -89,9 +89,10 @@ pub fn decode_response(
     let content = choice.message.content.as_deref().and_then(non_empty_trimmed).ok_or_else(|| {
         crate::agent_node::AgentError::Adapter("OpenAI-compatible response content is empty or missing".to_string())
     })?;
+    let final_content = super::reasoning::admit_final_content(content)?;
     debug_assert!((HTTP_SUCCESS_STATUS_MIN..HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE).contains(&response.status));
-    debug_assert!(!content.is_empty());
-    let output = decode_content(plan.output_mode, content)?;
+    debug_assert!(!final_content.text.is_empty());
+    let output = decode_content(plan.output_mode, final_content.text)?;
     Ok(crate::agent_node::AgentResponse {
         output,
         metadata: serde_json::json!({
@@ -101,6 +102,7 @@ pub fn decode_response(
             "status": response.status,
             "finish_reason": choice.finish_reason,
             "usage": envelope.usage,
+            "reasoning_suppressed": final_content.reasoning_suppressed,
         }),
     })
 }

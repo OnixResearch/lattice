@@ -1,6 +1,7 @@
 //! OpenAI-compatible chat-completions planning, bounded transport, and decoding.
 
 mod core;
+mod reasoning;
 mod transport;
 
 pub use core::decode_response;

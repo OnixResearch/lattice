@@ -1,0 +1,35 @@
+{
+  "budget_consumed": {
+    "agent_invocations": 1,
+    "duration_millis": 120000,
+    "monetary_microunits": 0,
+    "rounds": 1,
+    "tokens": 2048
+  },
+  "budget_reservations_remaining": 0,
+  "definition_id": "animus-live-idempotency-dogfood",
+  "duplicate_elapsed_millis": 0,
+  "duplicate_instance_id": "8af1b4a07d699d6aae32016738cf38166b4facce1d06e4d299ef320ed35dda37",
+  "duplicate_returned_while_first_in_flight": true,
+  "event_count": 3,
+  "event_head": "0cdda8923607d8b76d0ef156c9256c5d2ea91dd9b4c72a7e8dc3cd8c829eb4a7",
+  "first_elapsed_millis": 28100,
+  "idempotency_key": "live-event-2026-07-21",
+  "instance_id": "8af1b4a07d699d6aae32016738cf38166b4facce1d06e4d299ef320ed35dda37",
+  "node_detail_count": null,
+  "orchestration_count": 1,
+  "replay_valid": true,
+  "run_count": 1,
+  "run_details_present": false,
+  "run_failures": 0,
+  "run_id": 0,
+  "run_owner": {
+    "dispatch_id": "eb592e0ca73ad6f7b96b3a348edd421fcb63fbefb3d3b3a71d0448f193b269c1",
+    "instance_id": "8af1b4a07d699d6aae32016738cf38166b4facce1d06e4d299ef320ed35dda37",
+    "kind": "orchestration"
+  },
+  "status": "completed",
+  "terminal_summary": "workflow animus-bounded-agent run run:0 status Succeeded: 1 nodes, 0 failures, 0 cache hits",
+  "trigger_admission_count": 1,
+  "trigger_id": "live-duplicate"
+}

@@ -31,6 +31,7 @@ use lattice::headless::process_result_for_summary;
 use lattice::headless::render_run_summary_text;
 use lattice::headless::run_saved_workflow;
 use lattice::headless::run_saved_workflow_with_agent_runtime_config;
+use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -43,6 +44,7 @@ const IMAGE_WORKFLOW_NAME: &str = "headless-image";
 const AGENT_WORKFLOW_NAME: &str = "headless-agent";
 const SUCCESS_NODE_LABEL: &str = "say hello";
 const SUCCESS_COMMAND: &str = "printf hello";
+const SUCCESS_OUTPUT: &str = "hello";
 const BROKEN_NODE_LABEL: &str = "broken";
 const IMAGE_NODE_LABEL: &str = "load image";
 const PI_RUNTIME_KEY: &str = "pi";
@@ -303,6 +305,8 @@ fn string_output(outputs: &HashMap<PortId, Value>, port: PortId) -> &str {
 // r[verify n8nclone.workflow_execution.headless.exit_status]
 // r[verify n8nclone.workflow_execution.headless.history]
 // r[verify n8nclone.workflow_execution.replay.event_store]
+// r[verify lattice.workflow_execution.headless_run_details]
+// r[verify lattice.workflow_execution.headless_run_details.scenario.success]
 #[tokio::test]
 async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     let (store, _temp_dir) = temp_store();
@@ -326,6 +330,13 @@ async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     assert_eq!(records.len(), SINGLE_NODE_COUNT);
     assert_eq!(records[0].run_id, RunId(SUCCESS_RUN_ID));
     assert_eq!(records[0].failures, NO_FAILURES);
+    let details = store
+        .load_run_details(RunId(SUCCESS_RUN_ID))
+        .expect("run details load")
+        .expect("run details persist");
+    assert_eq!(details.nodes.len(), SINGLE_NODE_COUNT);
+    assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Completed);
+    assert!(details.nodes[0].outputs.iter().any(|output| output.text == SUCCESS_OUTPUT));
 
     let replay_events = store
         .load_run_replay_events(RunId(SUCCESS_RUN_ID))
@@ -529,10 +540,13 @@ async fn headless_run_missing_workflow_fails_without_history_record() {
     assert_eq!(error, HeadlessRunError::WorkflowNotFound(MISSING_WORKFLOW_NAME.to_string()));
     let records = store.list_runs(RECENT_RUN_LIMIT).expect("run history lists");
     assert!(records.is_empty());
+    assert!(store.load_run_details(RunId(MISSING_RUN_ID)).expect("run details lookup succeeds").is_none());
 }
 
 // r[verify n8nclone.workflow_execution.headless.exit_status]
 // r[verify n8nclone.workflow_execution.headless.errors]
+// r[verify lattice.workflow_execution.headless_run_details]
+// r[verify lattice.workflow_execution.headless_run_details.scenario.failure]
 #[tokio::test]
 async fn headless_run_failed_node_returns_failure_summary() {
     let (store, _temp_dir) = temp_store();
@@ -560,4 +574,12 @@ async fn headless_run_failed_node_returns_failure_summary() {
     assert_eq!(records.len(), SINGLE_NODE_COUNT);
     assert_eq!(records[0].run_id, RunId(FAILED_RUN_ID));
     assert_eq!(records[0].failures, ONE_FAILURE);
+    let details = store
+        .load_run_details(RunId(FAILED_RUN_ID))
+        .expect("failed details load")
+        .expect("failed details persist");
+    assert_eq!(details.nodes.len(), SINGLE_NODE_COUNT);
+    assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Failed);
+    assert!(details.nodes[0].outputs.is_empty());
+    assert!(details.nodes[0].error.is_some());
 }

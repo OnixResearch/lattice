@@ -2,10 +2,17 @@
 
 mod common;
 
+use std::collections::HashMap;
+
 use lattice::config::AppConfig;
 use lattice::engine::executor::Executor;
+use lattice::engine::executor::NodeStatus;
 use lattice::engine::executor::RunId;
+use lattice::engine::executor::StepResult;
+use lattice::engine::value::ContentHash;
+use lattice::engine::value::Value;
 use lattice::engine::workflow::Workflow;
+use lattice::run::history::detail_record_from_results;
 use lattice::store::RunDetailRecord;
 use lattice::store::RunNodeDetail;
 use lattice::store::RunNodeDetailStatus;
@@ -13,7 +20,7 @@ use lattice::store::RunOutputDetail;
 use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::tui::App;
-use lattice::tui::app::run_detail_record_from_results;
+use lattice::tui::app::run_detail_record_from_results as tui_run_detail_record_from_results;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
@@ -32,6 +39,9 @@ const FINISHED_EPOCH_MS: i64 = 2_000;
 const SINGLE_NODE_COUNT: usize = 1;
 const NO_CACHE_HITS: usize = 0;
 const NO_FAILURES: usize = 0;
+const SENSITIVE_OUTPUT: &str = "live-secret-output";
+const REDACTED_OUTPUT: &str = "[redacted]";
+const INPUT_HASH_SEED: &[u8] = b"run-history-detail-input";
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -104,12 +114,38 @@ async fn run_detail_record_captures_node_outputs() {
     let mut executor = Executor::new();
     let (_executor_run_id, results) = executor.run(&workflow, &std::collections::HashMap::new()).await;
 
-    let detail = run_detail_record_from_results(RunId(RUN_ID_VALUE), &workflow, &results);
+    let detail = detail_record_from_results(RunId(RUN_ID_VALUE), &workflow, &results);
+    let tui_detail = tui_run_detail_record_from_results(RunId(RUN_ID_VALUE), &workflow, &results);
 
+    assert_eq!(detail, tui_detail);
     assert_eq!(detail.nodes.len(), SINGLE_NODE_COUNT);
     assert_eq!(detail.nodes[0].node_id, node_id);
     assert_eq!(detail.nodes[0].status, RunNodeDetailStatus::Completed);
     assert!(detail.nodes[0].outputs.iter().any(|output| output.text == OUTPUT_TEXT));
+}
+
+// r[verify lattice.workflow_execution.headless_run_details]
+// r[verify lattice.workflow_execution.headless_run_details.scenario.redaction]
+#[test]
+fn run_detail_record_replaces_sensitive_values_before_persistence() {
+    let (workflow, node_id) = common::standalone_node(NODE_LABEL, NODE_COMMAND);
+    let output_port = workflow.graph.node(node_id).expect("node must exist").output_ports[0].id;
+    let results = vec![StepResult {
+        node_id,
+        status: NodeStatus::Completed {
+            outputs: HashMap::from([(output_port, Value::from_sensitive_string(SENSITIVE_OUTPUT.to_string()))]),
+            cached: false,
+        },
+        input_hash: ContentHash::from_bytes(INPUT_HASH_SEED),
+    }];
+
+    let detail = detail_record_from_results(RunId(RUN_ID_VALUE), &workflow, &results);
+    let rendered = serde_json::to_string(&detail).expect("detail must serialize");
+
+    assert_eq!(detail.nodes.len(), SINGLE_NODE_COUNT);
+    assert_eq!(detail.nodes[0].outputs.len(), SINGLE_NODE_COUNT);
+    assert_eq!(detail.nodes[0].outputs[0].text, REDACTED_OUTPUT);
+    assert!(!rendered.contains(SENSITIVE_OUTPUT));
 }
 
 // r[verify n8nclone.tui_ux.run_history.timeline]

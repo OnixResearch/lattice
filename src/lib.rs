@@ -16,6 +16,7 @@ pub mod node_kind_provider;
 pub mod openai;
 pub mod orchestration;
 pub mod replay;
+pub mod run;
 pub mod scheduler;
 pub mod store;
 pub mod triggers;

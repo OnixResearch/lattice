@@ -16,9 +16,55 @@ fn production_adapter_decodes_text_and_json_outputs() {
 
     assert_eq!(text.output, AgentOutput::Text(TEXT_CONTENT.to_string()));
     assert_eq!(text.metadata["provider"], "openai_compatible");
+    assert_eq!(text.metadata["reasoning_suppressed"], false);
     assert_eq!(json.output, AgentOutput::Json(serde_json::json!({"ok": true})));
     assert_eq!(text_transport.calls().len(), 1);
     assert_eq!(json_transport.calls().len(), 1);
+}
+
+// r[verify lattice.agent_runtime.inline_reasoning_boundary]
+// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.closed]
+// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.json]
+#[test]
+fn decoder_suppresses_one_leading_reasoning_block_before_output_typing() {
+    let text_plan =
+        plan_openai_chat(&runtime(), &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES).expect("valid text plan");
+    let text = decode_openai_chat_response(
+        &text_plan,
+        &response(Some(INLINE_REASONING_TEXT_CONTENT)),
+        &AgentExecutionContext::default(),
+    )
+    .expect("closed reasoning block must yield final text");
+    let json_plan =
+        plan_openai_chat(&runtime(), &request(AgentOutputMode::Json), MAX_RESPONSE_BYTES).expect("valid JSON plan");
+    let json = decode_openai_chat_response(
+        &json_plan,
+        &response(Some(INLINE_REASONING_JSON_CONTENT)),
+        &AgentExecutionContext::default(),
+    )
+    .expect("closed reasoning block must yield final JSON");
+
+    assert_eq!(text.output, AgentOutput::Text(TEXT_CONTENT.to_string()));
+    assert_eq!(text.metadata["reasoning_suppressed"], true);
+    assert_eq!(json.output, AgentOutput::Json(serde_json::json!({"ok": true})));
+    assert_eq!(json.metadata["reasoning_suppressed"], true);
+    assert!(!format!("{:?}", text.output).contains(INLINE_REASONING_PRIVATE));
+}
+
+// r[verify lattice.agent_runtime.inline_reasoning_boundary]
+// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.malformed]
+#[test]
+fn decoder_rejects_ambiguous_reasoning_without_echoing_private_content() {
+    let plan = plan_openai_chat(&runtime(), &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES).expect("valid plan");
+
+    for malformed_content in MALFORMED_INLINE_REASONING_CONTENT {
+        let error =
+            decode_openai_chat_response(&plan, &response(Some(malformed_content)), &AgentExecutionContext::default())
+                .expect_err("ambiguous reasoning markup must fail");
+        let diagnostic = error.to_string();
+        assert!(!diagnostic.contains(INLINE_REASONING_PRIVATE));
+        assert!(!diagnostic.contains(PROMPT));
+    }
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.credentials]
