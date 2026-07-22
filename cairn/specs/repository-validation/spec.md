@@ -785,3 +785,24 @@ r[lattice.repository_validation.agent_orchestration_audit.scenario.fail_closed]
 - GIVEN decision, evidence, marker, or coverage drift
 - WHEN validation runs
 - THEN the audit MUST reject it deterministically
+
+### Requirement: Agent-orchestration evidence completion
+r[lattice.repository_validation.agent_orchestration_completion] Lattice MUST maintain direct exact evidence for all 39 audited agent-orchestration rows before promotion.
+
+#### Scenario: Complete bounded orchestration behavior
+r[lattice.repository_validation.agent_orchestration_completion.scenario.behavior]
+- GIVEN the six explicit audit gaps
+- WHEN maintained pure-core tests run
+- THEN inert output, overage, status, non-claim, and cycle boundaries MUST be directly asserted
+
+#### Scenario: All agent-orchestration rows exact
+r[lattice.repository_validation.agent_orchestration_completion.scenario.exact]
+- GIVEN completed maintained evidence
+- WHEN inventory is generated
+- THEN all 39 rows MUST be exact, byte-bound, and unmarked while coverage remains unchanged
+
+#### Scenario: Agent-orchestration completion drift fails closed
+r[lattice.repository_validation.agent_orchestration_completion.scenario.fail_closed]
+- GIVEN evidence, classification, marker, or coverage drift
+- WHEN completion validation runs
+- THEN it MUST reject deterministically

@@ -37,6 +37,8 @@ pub const ABANDONED_ACKNOWLEDGED_SUMMARY: &str =
     "local dispatch abandoned after acknowledgement; remote outcome unknown";
 pub const ABANDONED_PENDING_SUMMARY: &str =
     "local dispatch abandoned before acknowledgement; workflow shell was not invoked";
+const LOCAL_CHAIN_EVIDENCE_SCOPE: &str = "local-sequence-consistency-only";
+const REMOTE_EFFECT_EVIDENCE_SCOPE: &str = "remote-effects-may-be-at-least-once";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1669,16 +1671,65 @@ pub fn is_terminal_status(status: OrchestrationStatus) -> bool {
 pub fn render_status_text(instance: &OrchestrationInstance) -> String {
     let active_run = instance.active_run_id.map_or_else(|| "-".to_string(), |run_id| run_id.to_string());
     let proposal = instance.pending_proposal.as_ref().map_or("-", |proposal| proposal.id.as_str());
+    let event_sequence = instance.last_event_sequence.map_or_else(|| "-".to_string(), |sequence| sequence.to_string());
+    let event_head = instance.event_head.as_deref().unwrap_or("-");
+    let remaining = remaining_budget(&instance.budgets);
     format!(
-        "{} | {:?} | revision {} | round {} | run {} | proposal {} | next {}",
+        "{} | {:?} | revision {} | round {} | run {} | proposal {} | remaining {}/{}/{}/{}/{} | breached {} | event {}/{} | next {} | evidence {},{}",
         instance.id,
         instance.status,
         instance.workflow_revision.content_hash,
         instance.round,
         active_run,
         proposal,
+        remaining.rounds,
+        remaining.agent_invocations,
+        remaining.tokens,
+        remaining.monetary_microunits,
+        remaining.duration_millis,
+        instance.budgets.breached,
+        event_sequence,
+        event_head,
         next_action(instance),
+        LOCAL_CHAIN_EVIDENCE_SCOPE,
+        REMOTE_EFFECT_EVIDENCE_SCOPE,
     )
+}
+
+fn remaining_budget(ledger: &BudgetLedger) -> BudgetCharge {
+    let reserved = ledger
+        .reservations
+        .values()
+        .fold(BudgetCharge::default(), |total, reservation| saturating_add_charge(total, reservation.charge));
+    BudgetCharge {
+        rounds: ledger.policy.limits.rounds.saturating_sub(ledger.consumed.rounds.saturating_add(reserved.rounds)),
+        agent_invocations: ledger
+            .policy
+            .limits
+            .agent_invocations
+            .saturating_sub(ledger.consumed.agent_invocations.saturating_add(reserved.agent_invocations)),
+        tokens: ledger.policy.limits.tokens.saturating_sub(ledger.consumed.tokens.saturating_add(reserved.tokens)),
+        monetary_microunits: ledger
+            .policy
+            .limits
+            .monetary_microunits
+            .saturating_sub(ledger.consumed.monetary_microunits.saturating_add(reserved.monetary_microunits)),
+        duration_millis: ledger
+            .policy
+            .limits
+            .duration_millis
+            .saturating_sub(ledger.consumed.duration_millis.saturating_add(reserved.duration_millis)),
+    }
+}
+
+fn saturating_add_charge(left: BudgetCharge, right: BudgetCharge) -> BudgetCharge {
+    BudgetCharge {
+        rounds: left.rounds.saturating_add(right.rounds),
+        agent_invocations: left.agent_invocations.saturating_add(right.agent_invocations),
+        tokens: left.tokens.saturating_add(right.tokens),
+        monetary_microunits: left.monetary_microunits.saturating_add(right.monetary_microunits),
+        duration_millis: left.duration_millis.saturating_add(right.duration_millis),
+    }
 }
 
 fn next_action(instance: &OrchestrationInstance) -> &'static str {

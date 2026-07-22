@@ -1,8 +1,8 @@
+#[allow(dead_code)]
 #[path = "traceability_review/core.rs"]
 mod core;
 
 use core::CoverageSnapshot;
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 const BASELINE: &str = include_str!("fixtures/traceability-workflow-validation-promotion-current.json");

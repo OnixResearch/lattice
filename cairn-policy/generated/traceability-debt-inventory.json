@@ -16,15 +16,14 @@
     "expected_missing_count": 261,
     "expected_missing_hash": "de87e38b8b3298301d5872c62c6dc887eba0a3bc2ce9f1556996a470fc3ac902",
     "reviewed_decisions": 39,
-    "policy_hash": "95dd1a7ae2e26c4529662263107cf685ba3bcf3f3111a1a3dd169e83e0bf48d9"
+    "policy_hash": "1d1dd28b3bce817fcec25594c722a3e32992d3221a9c72a31c3aa068a618ca71"
   },
   "summary": {
     "total": 261,
     "reviewed": 39,
     "unassessed": 222,
     "by_classification": {
-      "exact_maintained_evidence": 33,
-      "partial_evidence_only": 6,
+      "exact_maintained_evidence": 39,
       "unassessed": 222
     },
     "by_subsystem": {
@@ -38,14 +37,14 @@
     {
       "requirement_id": "lattice.agent_orchestration.authority.scenario.ambient-denied",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
-      "rationale_code": "gap.inert-authority-shaped-output-unasserted"
+      "rationale_code": "assertions.authority-shaped-output-inert"
     },
     {
       "requirement_id": "lattice.agent_orchestration.authority.scenario.approved",
@@ -54,7 +53,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_shell.rs",
@@ -70,7 +69,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.stale-approval-rejected"
@@ -82,7 +81,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.approval-cannot-bypass-validation"
@@ -94,7 +93,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.missing-and-exhausted-bounds-block"
@@ -114,14 +113,14 @@
     {
       "requirement_id": "lattice.agent_orchestration.budgets.scenario.overage",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
-      "rationale_code": "gap.overage-breach-and-nonclaim-unasserted"
+      "rationale_code": "assertions.overage-exhausts-and-preserves-usage"
     },
     {
       "requirement_id": "lattice.agent_orchestration.budgets.scenario.reserve",
@@ -130,7 +129,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_store.rs",
@@ -154,14 +153,22 @@
     {
       "requirement_id": "lattice.agent_orchestration.cli.scenario.status",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "src/orchestration/core.rs",
+          "blake3": "e69cfe91c09f5a15ad1cef95b554aa252d1398d94181b8eb064e3f9ab15a09a0"
+        },
         {
           "path": "tests/test_orchestration_cli.rs",
           "blake3": "a57e3674764e3fffa6b83f75169da51ba89c5ca16618d75bdbaee76f89eb4050"
+        },
+        {
+          "path": "tests/test_orchestration_core.rs",
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
-      "rationale_code": "gap.complete-actionable-safe-status-unasserted"
+      "rationale_code": "assertions.complete-actionable-safe-status"
     },
     {
       "requirement_id": "lattice.agent_orchestration.controls.scenario.cancel",
@@ -174,7 +181,7 @@
         },
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.cancel-request-separate-from-outcome"
@@ -190,7 +197,7 @@
         },
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.pause-blocks-until-resume"
@@ -202,7 +209,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.terminal-objective-completes"
@@ -214,7 +221,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.terminal-mutation-rejected"
@@ -226,7 +233,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.duplicate-fact-idempotent"
@@ -234,14 +241,22 @@
     {
       "requirement_id": "lattice.agent_orchestration.durability.scenario.external-effects",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "src/orchestration/core.rs",
+          "blake3": "e69cfe91c09f5a15ad1cef95b554aa252d1398d94181b8eb064e3f9ab15a09a0"
+        },
+        {
+          "path": "tests/test_orchestration_core.rs",
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
+        },
         {
           "path": "tests/test_orchestration_shell.rs",
           "blake3": "51074190b3ba190631e206776fbcb629b26e98ad672ff50a95188bb4b5a241e1"
         }
       ],
-      "rationale_code": "gap.remote-exactly-once-rendered-boundary-unasserted"
+      "rationale_code": "assertions.remote-at-least-once-boundary-rendered"
     },
     {
       "requirement_id": "lattice.agent_orchestration.durability.scenario.reconcile",
@@ -258,14 +273,18 @@
     {
       "requirement_id": "lattice.agent_orchestration.events.scenario.non-claim",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
+          "path": "src/orchestration/core.rs",
+          "blake3": "e69cfe91c09f5a15ad1cef95b554aa252d1398d94181b8eb064e3f9ab15a09a0"
+        },
+        {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
-      "rationale_code": "gap.rendered-local-chain-nonclaim-unasserted"
+      "rationale_code": "assertions.local-chain-nonclaim-rendered"
     },
     {
       "requirement_id": "lattice.agent_orchestration.events.scenario.replay",
@@ -274,7 +293,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.replay-reconstructs-without-effects"
@@ -286,7 +305,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_store.rs",
@@ -338,7 +357,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_shell.rs",
@@ -354,7 +373,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.valid-definition-binds-identities"
@@ -374,14 +393,18 @@
     {
       "requirement_id": "lattice.agent_orchestration.rounds.scenario.hidden-cycle",
       "subsystem": "agent-orchestration",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "tests/test_orchestration_core.rs",
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
+        },
         {
           "path": "tests/test_orchestration_shell.rs",
           "blake3": "51074190b3ba190631e206776fbcb629b26e98ad672ff50a95188bb4b5a241e1"
         }
       ],
-      "rationale_code": "gap.feedback-cycle-continuation-unasserted"
+      "rationale_code": "assertions.feedback-continuation-and-invalid-successor-rejected"
     },
     {
       "requirement_id": "lattice.agent_orchestration.run_identity.scenario.concurrent",
@@ -442,7 +465,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_shell.rs",
@@ -462,7 +485,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_shell.rs",
@@ -478,7 +501,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.acknowledged-abandon-consumes-bound"
@@ -490,7 +513,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         },
         {
           "path": "tests/test_orchestration_shell.rs",
@@ -506,7 +529,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.repeat-and-mismatch-fail-closed"
@@ -530,7 +553,7 @@
       "evidence": [
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.planned-abandon-releases-reservation"
@@ -546,7 +569,7 @@
         },
         {
           "path": "tests/test_orchestration_core.rs",
-          "blake3": "6213a979d7a99503cfecb5bdaf58bc8a0384310457bb505c498144c1936eac3b"
+          "blake3": "a36939b621d07e78caed50181ea0d5c7db703f8b4fb01dbfdbacf2c7d4a35f4c"
         }
       ],
       "rationale_code": "assertions.abandonment-replay-preserves-nonclaims"
@@ -2116,5 +2139,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "e2fb2e895aa42c2bb3c97ec08ac5ce362002f7b9a01d24ebb2b8a9a650c87f97"
+  "inventory_hash": "02ac5af738da463d7d7704106af98aabfad3bd64e80192389658907a6913f01b"
 }
