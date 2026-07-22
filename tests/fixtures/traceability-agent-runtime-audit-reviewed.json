@@ -1,0 +1,2274 @@
+{
+  "schema_version": "lattice.traceability-debt-inventory.v1",
+  "hash_algorithm": "BLAKE3",
+  "coverage": {
+    "profile_id": "cairn-default",
+    "requirements": 806,
+    "referenced": 502,
+    "missing": 304,
+    "dangling": 0,
+    "valid": false,
+    "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
+    "input_hash": "0f2ff59f6a9a97b1ec1cad435789e3c30fb52930c75516df1f35bd84bab3bd5a",
+    "receipt_hash": "3b0b1050225b000ad1c1ba98e6ac180edfb9dfe7a67ccce065ad72c09b68b9c9"
+  },
+  "review_policy": {
+    "expected_missing_count": 304,
+    "expected_missing_hash": "dcff4383f0a161102646ca402e01deb4dd684e68e21821c4131638eaa3180fc7",
+    "reviewed_decisions": 14,
+    "policy_hash": "5aff825a7d77c6e379c7e1304303ac8e2591c004daf1193d88ced6918546f2eb"
+  },
+  "summary": {
+    "total": 304,
+    "reviewed": 14,
+    "unassessed": 290,
+    "by_classification": {
+      "exact_maintained_evidence": 7,
+      "partial_evidence_only": 7,
+      "unassessed": 290
+    },
+    "by_subsystem": {
+      "agent-orchestration": 39,
+      "agent-runtime": 14,
+      "tui-ux": 98,
+      "workflow-execution": 83,
+      "workflow-format": 41,
+      "workflow-validation": 29
+    }
+  },
+  "rows": [
+    {
+      "requirement_id": "lattice.agent_orchestration.authority.scenario.ambient-denied",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.authority.scenario.approved",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.authority.scenario.stale",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.authority.scenario.validation",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.budgets.scenario.block",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.budgets.scenario.concurrent",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.budgets.scenario.overage",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.budgets.scenario.reserve",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.cli.scenario.invalid",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.cli.scenario.status",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.controls.scenario.cancel",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.controls.scenario.pause",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.core.scenario.complete",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.core.scenario.terminal-mutation",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.durability.scenario.duplicate",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.durability.scenario.external-effects",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.durability.scenario.reconcile",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.events.scenario.non-claim",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.events.scenario.replay",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.events.scenario.tampered",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.format.scenario.n8n-boundary",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.format.scenario.round-trip",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.format.scenario.secret",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.model.scenario.revision-drift",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.model.scenario.valid",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.rounds.scenario.execute",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.rounds.scenario.hidden-cycle",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.run_identity.scenario.concurrent",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.run_identity.scenario.duplicate",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.run_identity.scenario.foreign",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.run_identity.scenario.match",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.triggers.scenario.duplicate",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.triggers.scenario.start",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.acknowledged",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.authority",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.identity",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.observed",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.planned",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_orchestration.unobserved_abandon.scenario.replay",
+      "subsystem": "agent-orchestration",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_compatibility.scenario.missing",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.workflow-and-orchestration-state-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_compatibility.scenario.routes",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "assertions.existing-route-bypasses-animus"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.credential",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/shell.rs",
+          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+        },
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.events-and-output-credential-omission-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.provider-failure",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/shell.rs",
+          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+        },
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.redacted-no-fallback-failure-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.tool-denied",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/animus_agent/shell/tests.rs",
+          "blake3": "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b"
+        }
+      ],
+      "rationale_code": "assertions.absent-tool-adapter-fails-without-model-effect"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.complete",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "assertions.fixed-loop-dispatches-once-and-returns"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.exhaustion",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/animus_agent/shell/tests.rs",
+          "blake3": "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b"
+        }
+      ],
+      "rationale_code": "assertions.turn-ceiling-blocks-additional-dispatch"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.identity",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/core.rs",
+          "blake3": "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f"
+        },
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.identity-rejection-before-transport-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_leaf.scenario.authority",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/core.rs",
+          "blake3": "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f"
+        },
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.authority-bearing-output-inertness-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_leaf.scenario.execute",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "assertions.runner-executes-one-typed-animus-node"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_output.scenario.non-authoritative",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/shell.rs",
+          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+        },
+        {
+          "path": "src/animus_agent/shell/tests.rs",
+          "blake3": "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b"
+        }
+      ],
+      "rationale_code": "gap.incomplete-status-mapping-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_output.scenario.typed",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "assertions.text-json-values-and-safe-metadata"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.animus_output.scenario.unsupported",
+      "subsystem": "agent-runtime",
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/animus_agent/core.rs",
+          "blake3": "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f"
+        },
+        {
+          "path": "tests/test_animus_agent.rs",
+          "blake3": "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde"
+        }
+      ],
+      "rationale_code": "gap.unsupported-zero-dispatch-unasserted"
+    },
+    {
+      "requirement_id": "lattice.agent_runtime.inline_reasoning_boundary.scenario.plain",
+      "subsystem": "agent-runtime",
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/openai/execution.rs",
+          "blake3": "04f2e2225e80b0887cc9a553e4c7c2f6c1b8884f9b9f51c41dede25c5146f866"
+        }
+      ],
+      "rationale_code": "assertions.plain-text-and-json-preserved"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.cancel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.guided",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.shell_fields",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.template",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.cancel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.clankers",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.input",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.pi",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.adapter",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.invalid_target",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.missing_path",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.unsupported_format",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.image_path",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.invalid",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.prompt",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.target",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.cancel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.failure",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.long_running",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.responsive",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.status",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.escape",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.execute",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.interactive",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.no_match",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.control_flow.properties",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.credentials.providers.edit",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.credentials.providers.test",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.empty_state.next_actions",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.empty_state.tests",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.canvas",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.properties_output",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.truncate",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.wiring",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.canvas",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.no_raw_bytes",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.output_panel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.keyboard_first",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.keyboard_first.discoverable",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.drag_release",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.drag_release.compatible",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.invalid_release",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports.far_release",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports.release",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.complete",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.start",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.node_kind_provider",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.cancel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.canvas_command",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.no_selection",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.palette_command",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help.footer",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help.palette",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.edit_command",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.edit_shell",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry.cancel",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry.save_command",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.tests",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.validate_timeout",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.active_run.stream",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.redaction.secret",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.timeline.open",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.timeline.step",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.details.empty_error.storage",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.details.persist.nodes",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.empty_error",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.inspect",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.list",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.node_outputs.inspect",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.node_outputs.missing",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.persist",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.persist_record",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.rerun.unavailable",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.rerun.workflow",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.timeline.show",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.triggers.manage.error",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.triggers.manage.list",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.dirty_indicator",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.failed_save",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.mutation_marks_dirty",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.quit_confirm",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.save_clears",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.webhook_listener.cli.start",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.empty",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.load",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.load_failure",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.open",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workspace",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workspace.starts",
+      "subsystem": "tui-ux",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.image_edit",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.prompt_edit",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.target_edit",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.clankers_adapter.image_context",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.clankers_adapter.session_failure",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.command_runtimes",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.command_runtimes.compatibility",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.clankers",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.invalid",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.pi",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.adapter",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.credential",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.decode",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.image",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.text_json",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.type_mismatch",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.openai_compatible",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.real-graph",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.rejected",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.success",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.pi_adapter.image_prompt",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.pi_adapter.preflight_reject",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.production_adapters",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.artifact_references",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.durable_runner",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.expression_mapping.config",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.config.read",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.config.write",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.interface.memory",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.nested-io",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.read.content",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.read.missing",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.safety.outside_root",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.safety.overwrite",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.write_append.append",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.write_append.write",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.generic_pipeline_runner",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.errors.load_failure",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.exit_status.failure",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.exit_status.success",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.history.persist",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.run.missing",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.run.saved",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.summary.json",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.headless.summary.text",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.cache_key.url_edit",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.config.create",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.config.invalid",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.errors.timeout",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.execute.failure",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.execute.success",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.http_node.outputs.body",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.capability_read.scenario.success",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.local",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.missing",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.oversized",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.unsupported",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.production_io",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.incompatible",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.route",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.store",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.llm_operating_graph.scenario.feedback-boundary",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.cache_real_ports",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.cache_real_ports.routable",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.real_port_outputs",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.real_port_outputs.completed",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin.connected",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.rats_dependency",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.rats_dependency.scenario.source-completeness",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.replay.artifact_placeholders.missing",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.replay.core.fold",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.replay.core.no_side_effects",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.replay.event_store.completed",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.replay.event_store.partial",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.runner_events",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.runtime_registry",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.seaglass_graph_core.scenario.compatibility",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.seaglass_graph_core.scenario.provenance",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.subworkflows.events.correlation",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.subworkflows.invocation.outputs",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_execution.trait_boundaries",
+      "subsystem": "workflow-execution",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.image_format",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.missing_prompt",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.port_type",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.target",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.export",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.import",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.round_trip",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.control_flow",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.control_flow.compatibility",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.control_flow.compatibility.invalid",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.credentials.providers.export",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.credentials.providers.import",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.credentials.providers.reject_plaintext",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.generic_pipeline_ir",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.rejected",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.success",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.export.supported",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.export.unsupported",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.fixtures.supported",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.fixtures.unsupported",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.import.malformed",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.import.supported",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_json.import_cli.report",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_parity_fixture_pack",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.n8n_parity_mapping_reports",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.export.missing",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.export.saved",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.import.invalid",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.import.valid",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.invalid.missing_field",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.nickel.round_trip.preserve",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.node_kind_provider",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.replay_bundles.export",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.replay_bundles.import",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.replay_bundles.reject_unsafe",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.triggers.nickel.compatibility",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.triggers.nickel.export",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.triggers.nickel.import",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.webhook_cookbook_example",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_format.webhook_cookbook_example.drift",
+      "subsystem": "workflow-format",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.credentials.providers.config",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.credentials.providers.field",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.credentials.providers.key",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.diagnostics.core.empty_command",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.diagnostics.core.missing_config",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.diagnostics.core.valid",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.diagnostics.negative.invalid_edge",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.effects",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.graph",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.terminal_state",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_json.export_limits.node",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.connection",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.expression",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.node_kind",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.malformed_connection",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.plaintext_credential",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_expression",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_node",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.node_kind_provider",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.replay_records.artifact",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.replay_records.order",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.replay_records.terminal",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.run_gate.block",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.run_gate.warning",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.subworkflows.mapping",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.subworkflows.missing",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.subworkflows.recursive",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.tui.panel.empty",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    },
+    {
+      "requirement_id": "n8nclone.workflow_validation.tui.panel.open",
+      "subsystem": "workflow-validation",
+      "classification": "unassessed",
+      "evidence": [],
+      "rationale_code": "not-reviewed"
+    }
+  ],
+  "missing_set_hash": "dcff4383f0a161102646ca402e01deb4dd684e68e21821c4131638eaa3180fc7",
+  "non_claims": [
+    "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
+    "inventory rows do not satisfy requirements or create Tracey evidence",
+    "no exact evidence identified is bounded to the reviewed maintained roots and is not proof of global absence",
+    "partial evidence is not a near-complete correctness claim",
+    "unassessed does not mean behavior or evidence is absent"
+  ],
+  "issues": [],
+  "valid": true,
+  "inventory_hash": "95544f2893b8276963542cbfc38e2de8f6bc90792f83d8490ee46ef601c6d523"
+}
