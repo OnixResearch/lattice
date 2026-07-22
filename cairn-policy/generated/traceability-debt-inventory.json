@@ -3,27 +3,30 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 706,
-    "referenced": 345,
+    "requirements": 710,
+    "referenced": 349,
     "missing": 361,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "8e2f5b622c9fd99677e5187a71f8fcbdb3fa5ee763ae34bc053ffb8c731c9a02",
-    "receipt_hash": "22637d7584cc23085a3d40b992451e7b4d8622f989ddf2baeeb5c723cce269af"
+    "input_hash": "4aacd4fc05dbd5e6fd515e4b4b7e1515f4aca882058012cfcba4324465b4b00d",
+    "receipt_hash": "2d65d23ff28e90be6f93656d5e9a26a049f38038da486c2f13768e2adbf1e4cf"
   },
   "review_policy": {
     "expected_missing_count": 361,
     "expected_missing_hash": "df059bfa0b70e75996de6dc41990d0d744197b90bee9195bf1b873c505abaf3c",
-    "reviewed_decisions": 0,
-    "policy_hash": "07b29b6d3b14922c5867947cb034834355174cc70c975d54b1b11739699f4f66"
+    "reviewed_decisions": 8,
+    "policy_hash": "2ce38b700b3de64ce77c596a2c94c98da83018fef25bc2159a9ba14f5c289a71"
   },
   "summary": {
     "total": 361,
-    "reviewed": 0,
-    "unassessed": 361,
+    "reviewed": 8,
+    "unassessed": 353,
     "by_classification": {
-      "unassessed": 361
+      "exact_maintained_evidence": 2,
+      "no_exact_evidence_identified": 2,
+      "partial_evidence_only": 4,
+      "unassessed": 353
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -618,58 +621,104 @@
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_core",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        }
+      ],
+      "rationale_code": "source.pure-deterministic-evaluate"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_core.fatal",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        },
+        {
+          "path": "tests/test_doctor.rs",
+          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
+        }
+      ],
+      "rationale_code": "assertions.enumerated-failures-incomplete"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_core.healthy",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        },
+        {
+          "path": "tests/test_doctor.rs",
+          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
+        }
+      ],
+      "rationale_code": "assertions.healthy-findings-indirect"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_output",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        }
+      ],
+      "rationale_code": "source.deterministic-dual-renderers"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_output.json",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        },
+        {
+          "path": "tests/test_doctor.rs",
+          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
+        }
+      ],
+      "rationale_code": "assertions.mixed-json-output-missing"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_output.text",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
+        },
+        {
+          "path": "tests/test_doctor.rs",
+          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
+        }
+      ],
+      "rationale_code": "assertions.mixed-text-output-missing"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_redaction",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "behavior.redaction-inputs-unwired"
     },
     {
       "requirement_id": "n8nclone.operator_diagnostics.doctor_redaction.json",
       "subsystem": "operator-diagnostics",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "assertions.json-redaction-missing"
     },
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope",
@@ -2577,5 +2626,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "e42fa6b22c8f5b08c30a06d56e068043f7ae2953a8c90497d91d89d900a218cf"
+  "inventory_hash": "03e2d418ee7ded71db5cc629004da6fa0bbb6ca71e1ff4b35884722e962a40be"
 }
