@@ -97,6 +97,7 @@ fn replay_timeline_folds_events_and_moves_cursor() {
 }
 
 // r[verify n8nclone.workflow_validation.replay_records]
+// r[verify n8nclone.workflow_validation.replay_records.order]
 #[test]
 fn duplicate_and_out_of_order_events_are_rejected() {
     let events = vec![
@@ -111,6 +112,7 @@ fn duplicate_and_out_of_order_events_are_rejected() {
 }
 
 // r[verify n8nclone.workflow_validation.replay_records]
+// r[verify n8nclone.workflow_validation.replay_records.terminal]
 #[test]
 fn terminal_state_mutation_is_rejected() {
     let events = vec![
@@ -136,6 +138,7 @@ fn unknown_nodes_are_rejected_when_snapshot_ids_are_known() {
 }
 
 // r[verify n8nclone.workflow_execution.replay.artifact_placeholders]
+// r[verify n8nclone.workflow_validation.replay_records.artifact]
 #[test]
 fn missing_artifact_payload_renders_placeholder_without_validation_failure() {
     let mut events = ordered_events();

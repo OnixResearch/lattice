@@ -524,6 +524,7 @@ fn validate_edges(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>
 // r[impl n8nclone.workflow_validation.generic_runner_admission]
 // r[impl n8nclone.workflow_validation.node_kind_provider.runtime_binding]
 fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+    debug_assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message.is_empty()));
     let build = runner::build_runner_plan(workflow);
     let Some(plan) = build.plan else {
         return;
@@ -546,6 +547,7 @@ fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<Workflow
 }
 
 fn workflow_diagnostic_from_runner(diagnostic: runner::RunnerDiagnostic) -> Option<WorkflowDiagnostic> {
+    debug_assert!(!diagnostic.message.is_empty());
     let code = match diagnostic.code {
         runner::RunnerDiagnosticCode::CycleDetected => WorkflowDiagnosticCode::RunnerCycleDetected,
         runner::RunnerDiagnosticCode::MissingRuntimeBinding => WorkflowDiagnosticCode::RunnerMissingRuntimeBinding,

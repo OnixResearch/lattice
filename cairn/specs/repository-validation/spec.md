@@ -701,3 +701,66 @@ r[lattice.repository_validation.agent_runtime_promotion.scenario.fail_closed]
 - GIVEN duplicate, missing-binding, stale-policy, removal, addition, dangling, or successful-coverage drift
 - WHEN promotion validation runs
 - THEN it MUST return deterministic issue codes and MUST NOT accept promotion
+
+### Requirement: Workflow-validation traceability audit
+r[lattice.repository_validation.workflow_validation_audit] Lattice MUST maintain a byte-bound classification audit for every selected missing workflow-validation requirement without promoting Tracey coverage.
+
+#### Scenario: Complete workflow-validation classification
+r[lattice.repository_validation.workflow_validation_audit.scenario.complete]
+- GIVEN the current workflow-validation missing subset
+- WHEN the audit is checked
+- THEN every selected ID MUST have exactly one explicit exact, partial, or no-exact decision
+
+#### Scenario: Workflow-validation evidence identity
+r[lattice.repository_validation.workflow_validation_audit.scenario.evidence]
+- GIVEN a reviewed decision cites maintained evidence
+- WHEN the audit is checked
+- THEN every safe relative evidence path MUST match its recorded BLAKE3 file hash
+
+#### Scenario: Workflow-validation audit drift fails closed
+r[lattice.repository_validation.workflow_validation_audit.scenario.fail_closed]
+- GIVEN classification, evidence, marker, or coverage drift
+- WHEN the audit is checked
+- THEN deterministic validation MUST reject the drift
+
+### Requirement: Workflow-validation evidence completion
+r[lattice.repository_validation.workflow_validation_completion] Lattice MUST maintain direct assertions that close every gap identified by the workflow-validation audit before promotion.
+
+#### Scenario: Runtime policy behavior completion
+r[lattice.repository_validation.workflow_validation_completion.scenario.behavior]
+- GIVEN a runner declares an effect unsupported by its selected runtime
+- WHEN admission runs
+- THEN validation MUST report a deterministic fatal diagnostic before runtime execution
+
+#### Scenario: Complete workflow-validation evidence
+r[lattice.repository_validation.workflow_validation_completion.scenario.evidence]
+- GIVEN the audited evidence gaps
+- WHEN maintained tests run
+- THEN positive and negative assertions MUST cover every accepted clause
+
+#### Scenario: Exact workflow-validation classification
+r[lattice.repository_validation.workflow_validation_completion.scenario.classification]
+- GIVEN completed maintained evidence
+- WHEN inventory is checked
+- THEN all 29 reviewed workflow-validation rows MUST be exact while coverage remains unchanged and unmarked
+
+### Requirement: Workflow-validation evidence promotion
+r[lattice.repository_validation.workflow_validation_promotion] Lattice MUST promote the exact reviewed workflow-validation tranche only through assertion-local markers.
+
+#### Scenario: Exact workflow-validation bindings
+r[lattice.repository_validation.workflow_validation_promotion.scenario.bindings]
+- GIVEN 29 exact reviewed IDs
+- WHEN markers are added
+- THEN each selected ID MUST be bound directly to an allowlisted maintained test
+
+#### Scenario: Exact workflow-validation delta
+r[lattice.repository_validation.workflow_validation_promotion.scenario.delta]
+- GIVEN the immutable 290-gap baseline
+- WHEN current coverage is checked
+- THEN exactly the selected IDs MUST be removed, none added, zero markers dangling, and coverage MUST remain unsuccessful
+
+#### Scenario: Workflow-validation promotion drift fails closed
+r[lattice.repository_validation.workflow_validation_promotion.scenario.fail_closed]
+- GIVEN marker, policy, or coverage drift
+- WHEN promotion validation runs
+- THEN deterministic validation MUST reject the drift

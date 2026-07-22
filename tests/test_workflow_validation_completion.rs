@@ -104,6 +104,9 @@ fn serialized(workflow: &Workflow) -> Vec<u8> {
     serde_json::to_vec(workflow).expect("workflow serializes")
 }
 
+// r[verify n8nclone.workflow_validation.credentials.providers.config]
+// r[verify n8nclone.workflow_validation.credentials.providers.field]
+// r[verify n8nclone.workflow_validation.credentials.providers.key]
 #[test]
 fn credential_provider_errors_are_fatal_safe_and_pre_effect() {
     let registry = registry();
@@ -134,6 +137,7 @@ fn credential_provider_errors_are_fatal_safe_and_pre_effect() {
     assert_eq!(snapshots, [serialized(&unknown), serialized(&field), serialized(&malformed)]);
 }
 
+// r[verify n8nclone.workflow_validation.generic_runner_admission.graph]
 #[test]
 fn generic_graph_admission_rejects_all_bounded_invalid_classes_without_mutation() {
     let (valid, source, target) = common::two_node_pipeline();
@@ -170,6 +174,7 @@ fn generic_graph_admission_rejects_all_bounded_invalid_classes_without_mutation(
     }
 }
 
+// r[verify n8nclone.workflow_validation.generic_runner_admission.effects]
 #[test]
 fn selected_runtime_rejects_unsupported_effect_policy_and_accepts_its_own() {
     let mut rejected = Workflow::new(WORKFLOW_NAME);
@@ -199,6 +204,7 @@ fn selected_runtime_rejects_unsupported_effect_policy_and_accepts_its_own() {
     );
 }
 
+// r[verify n8nclone.workflow_validation.generic_runner_admission.terminal_state]
 #[test]
 fn terminal_runner_transition_is_rejected_without_workflow_mutation() {
     let mut workflow = Workflow::new(WORKFLOW_NAME);
@@ -211,6 +217,7 @@ fn terminal_runner_transition_is_rejected_without_workflow_mutation() {
     assert_eq!(serialized(&workflow), before);
 }
 
+// r[verify n8nclone.workflow_validation.node_kind_provider]
 #[test]
 fn every_builtin_node_kind_has_provider_validation_and_runtime_admission() {
     let mut workflow = Workflow::new(WORKFLOW_NAME);
@@ -252,6 +259,7 @@ fn every_builtin_node_kind_has_provider_validation_and_runtime_admission() {
     );
 }
 
+// r[verify n8nclone.workflow_validation.subworkflows.mapping]
 #[test]
 fn unknown_subworkflow_mapping_is_fatal_and_preserves_configuration() {
     let config = SubworkflowNodeConfig {
@@ -280,6 +288,8 @@ fn unknown_subworkflow_mapping_is_fatal_and_preserves_configuration() {
     assert_eq!(serialized(&workflow), before);
 }
 
+// r[verify n8nclone.workflow_validation.tui.panel.empty]
+// r[verify n8nclone.workflow_validation.tui.panel.open]
 #[test]
 fn tui_renders_ready_state_and_actionable_diagnostic_location() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");

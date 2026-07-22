@@ -72,6 +72,7 @@ fn workflow_with_cycle() -> Workflow {
 }
 
 // r[verify n8nclone.workflow_validation.diagnostics.core]
+// r[verify n8nclone.workflow_validation.diagnostics.core.valid]
 #[test]
 fn valid_workflow_has_no_fatal_diagnostics() {
     let mut workflow = Workflow::new(VALID_WORKFLOW_NAME);
@@ -83,6 +84,7 @@ fn valid_workflow_has_no_fatal_diagnostics() {
 }
 
 // r[verify n8nclone.workflow_validation.run_gate]
+// r[verify n8nclone.workflow_validation.run_gate.warning]
 #[test]
 fn warning_only_workflow_does_not_block_run_gate() {
     let workflow = Workflow::new(VALID_WORKFLOW_NAME);
@@ -95,6 +97,7 @@ fn warning_only_workflow_does_not_block_run_gate() {
 }
 
 // r[verify n8nclone.workflow_validation.diagnostics.core]
+// r[verify n8nclone.workflow_validation.diagnostics.core.empty_command]
 // r[verify n8nclone.workflow_validation.diagnostics.negative]
 // r[verify n8nclone.workflow_validation.node_kind_provider.fallback]
 #[test]
@@ -111,6 +114,7 @@ fn empty_shell_command_is_fatal() {
 }
 
 // r[verify n8nclone.workflow_validation.diagnostics.core]
+// r[verify n8nclone.workflow_validation.diagnostics.core.missing_config]
 // r[verify n8nclone.workflow_validation.diagnostics.negative]
 #[test]
 fn missing_node_config_is_fatal() {
@@ -123,6 +127,7 @@ fn missing_node_config_is_fatal() {
 }
 
 // r[verify n8nclone.workflow_validation.diagnostics.negative]
+// r[verify n8nclone.workflow_validation.diagnostics.negative.invalid_edge]
 #[test]
 fn invalid_edge_reference_is_fatal_and_does_not_panic() {
     let workflow = workflow_with_invalid_edge();
@@ -190,6 +195,7 @@ fn diagnostics_panel_opens_with_ready_state_for_valid_workflow() {
 }
 
 // r[verify n8nclone.workflow_validation.run_gate]
+// r[verify n8nclone.workflow_validation.run_gate.block]
 #[tokio::test]
 async fn headless_run_gate_rejects_invalid_workflow_without_history() {
     let temp_dir = tempfile::tempdir().expect("temporary store directory");

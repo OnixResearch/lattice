@@ -175,6 +175,10 @@ fn parity_supported_fixtures_import_validate_and_match_golden_reports() {
 
 // r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.unsupported]
 // r[verify n8nclone.workflow_validation.n8n_parity_diagnostics]
+// r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.malformed_connection]
+// r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.plaintext_credential]
+// r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_expression]
+// r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_node]
 // r[verify n8nclone.workflow_format.n8n_parity_mapping_reports.unsupported]
 // r[verify n8nclone.credentials.n8n_parity_secret_safety.plaintext_rejected]
 #[test]
@@ -264,6 +268,7 @@ fn supported_shell_workflow_exports_to_n8n_json() {
 }
 
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported]
+// r[verify n8nclone.workflow_validation.n8n_json.unsupported.node_kind]
 #[test]
 fn unsupported_node_fixture_reports_fatal_diagnostic() {
     let result = import_n8n_json_str(UNSUPPORTED_NODE_FIXTURE);
@@ -291,6 +296,7 @@ fn malformed_json_is_rejected() {
 }
 
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported]
+// r[verify n8nclone.workflow_validation.n8n_json.unsupported.connection]
 #[test]
 fn malformed_connections_are_rejected() {
     let result = import_n8n_json_str(MALFORMED_CONNECTION_FIXTURE);
@@ -300,6 +306,7 @@ fn malformed_connections_are_rejected() {
 }
 
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported]
+// r[verify n8nclone.workflow_validation.n8n_json.unsupported.expression]
 #[test]
 fn unsupported_expressions_are_rejected() {
     let result = import_n8n_json_str(UNSUPPORTED_EXPRESSION_FIXTURE);
@@ -309,6 +316,7 @@ fn unsupported_expressions_are_rejected() {
 }
 
 // r[verify n8nclone.workflow_validation.n8n_json.export_limits]
+// r[verify n8nclone.workflow_validation.n8n_json.export_limits.node]
 #[test]
 fn unsupported_export_node_reports_diagnostic() {
     let mut workflow = Workflow::new("unsupported-export");

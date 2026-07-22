@@ -185,6 +185,8 @@ fn merge_decision_waits_for_all_inputs_and_selects_first_deterministically() {
 }
 
 // r[verify n8nclone.workflow_validation.subworkflows]
+// r[verify n8nclone.workflow_validation.subworkflows.missing]
+// r[verify n8nclone.workflow_validation.subworkflows.recursive]
 // r[verify n8nclone.workflow_execution.subworkflows.invocation.recursive]
 #[test]
 fn subworkflow_reference_check_accepts_present_child_and_rejects_missing_or_recursive_child() {
