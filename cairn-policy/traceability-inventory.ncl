@@ -24,12 +24,13 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
     },
     {
       requirement_id = "n8nclone.node_templates.parameters.prompt.required",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/tui/app.rs", blake3 = "edc890f88bd0e8d5f76e66fc6ae2459b0330c94eb0116d0d85682a0a027c3984" },
         { path = "src/tui/panels.rs", blake3 = "1a66d29221790dbd366e0f517f9b0cb119b2061765567c0a290b65e7f2e83c09" },
+        { path = "tests/test_template_parameter_prompt_rendering.rs", blake3 = "b2305992b525b941818c5cf26e68f29327a916a68880a3d6be69cce2721d5039" },
       ],
-      rationale_code = "gap.rendered-required-prompt-unasserted",
+      rationale_code = "assertions.required-prompt-rendered-before-creation",
     },
     {
       requirement_id = "n8nclone.workflow_examples.image.invalid",
