@@ -8,43 +8,43 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
   reviewed = [
     {
       requirement_id = "lattice.agent_runtime.animus_compatibility.scenario.missing",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.workflow-and-orchestration-state-unasserted",
+      rationale_code = "assertions.missing-route-request-unchanged-zero-dispatch",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_compatibility.scenario.routes",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
       rationale_code = "assertions.existing-route-bypasses-animus",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_effects.scenario.credential",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/animus_agent/shell.rs", blake3 = "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693" },
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.events-and-output-credential-omission-unasserted",
+      rationale_code = "assertions.transport-only-credential-omission",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_effects.scenario.provider-failure",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/animus_agent/shell.rs", blake3 = "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693" },
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.redacted-no-fallback-failure-unasserted",
+      rationale_code = "assertions.redacted-single-provider-failure",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_effects.scenario.tool-denied",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "src/animus_agent/shell/tests.rs", blake3 = "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b" },
+        { path = "src/animus_agent/shell/tests.rs", blake3 = "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299" },
       ],
       rationale_code = "assertions.absent-tool-adapter-fails-without-model-effect",
     },
@@ -52,7 +52,7 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
       requirement_id = "lattice.agent_runtime.animus_fabric.scenario.complete",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
       rationale_code = "assertions.fixed-loop-dispatches-once-and-returns",
     },
@@ -60,61 +60,61 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
       requirement_id = "lattice.agent_runtime.animus_fabric.scenario.exhaustion",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "src/animus_agent/shell/tests.rs", blake3 = "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b" },
+        { path = "src/animus_agent/shell/tests.rs", blake3 = "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299" },
       ],
       rationale_code = "assertions.turn-ceiling-blocks-additional-dispatch",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_fabric.scenario.identity",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
-        { path = "src/animus_agent/core.rs", blake3 = "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f" },
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "src/animus_agent/core.rs", blake3 = "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.identity-rejection-before-transport-unasserted",
+      rationale_code = "assertions.identity-admission-rejects-before-shell",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_leaf.scenario.authority",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
-        { path = "src/animus_agent/core.rs", blake3 = "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f" },
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "src/animus_agent/core.rs", blake3 = "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.authority-bearing-output-inertness-unasserted",
+      rationale_code = "assertions.authority-content-remains-ordinary-output",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_leaf.scenario.execute",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
       rationale_code = "assertions.runner-executes-one-typed-animus-node",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_output.scenario.non-authoritative",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/animus_agent/shell.rs", blake3 = "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693" },
-        { path = "src/animus_agent/shell/tests.rs", blake3 = "78a2b50b3348ac0048edefa701fcce20bdf078ff33e41bca472a10ea804e0c7b" },
+        { path = "src/animus_agent/shell/tests.rs", blake3 = "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299" },
       ],
-      rationale_code = "gap.incomplete-status-mapping-unasserted",
+      rationale_code = "assertions.all-nonfinal-statuses-map-to-errors",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_output.scenario.typed",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
       rationale_code = "assertions.text-json-values-and-safe-metadata",
     },
     {
       requirement_id = "lattice.agent_runtime.animus_output.scenario.unsupported",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
-        { path = "src/animus_agent/core.rs", blake3 = "e0c21e66da438f45789ab0fa15c5215318d41a8ccd9611c64bfcea8bdd681f4f" },
-        { path = "tests/test_animus_agent.rs", blake3 = "a9be7dc27a67ee547d9282b1d5039f77f54e899c62d2fd1648b14fd5af87adde" },
+        { path = "src/animus_agent/core.rs", blake3 = "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8" },
+        { path = "tests/test_animus_agent.rs", blake3 = "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd" },
       ],
-      rationale_code = "gap.unsupported-zero-dispatch-unasserted",
+      rationale_code = "assertions.unsupported-preflight-zero-dispatch",
     },
     {
       requirement_id = "lattice.agent_runtime.inline_reasoning_boundary.scenario.plain",

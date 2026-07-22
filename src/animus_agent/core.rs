@@ -53,12 +53,14 @@ pub fn program_identity(program: &str) -> String {
 pub fn plan_execution(
     request: &crate::agent_node::AgentRequest,
 ) -> Result<ExecutionPlan, crate::agent_node::AgentError> {
-    validate_request(request)?;
-    validate_program_identity(ProgramIdentityCheck {
-        program: BUILTIN_PROGRAM,
-        expected_identity: BUILTIN_PROGRAM_IDENTITY,
-    })?;
-    validate_turn_limit(TURN_LIMIT)?;
+    validate_execution_admission(
+        request,
+        ProgramIdentityCheck {
+            program: BUILTIN_PROGRAM,
+            expected_identity: BUILTIN_PROGRAM_IDENTITY,
+        },
+        TURN_LIMIT,
+    )?;
 
     let mut summary_request = request.clone();
     summary_request.model_hint = None;
@@ -77,6 +79,16 @@ pub fn plan_execution(
         program_identity: BUILTIN_PROGRAM_IDENTITY,
         turn_limit: TURN_LIMIT,
     })
+}
+
+pub fn validate_execution_admission(
+    request: &crate::agent_node::AgentRequest,
+    identity: ProgramIdentityCheck<'_>,
+    turn_limit: u32,
+) -> Result<(), crate::agent_node::AgentError> {
+    validate_request(request)?;
+    validate_program_identity(identity)?;
+    validate_turn_limit(turn_limit)
 }
 
 pub fn validate_program_identity(check: ProgramIdentityCheck<'_>) -> Result<(), crate::agent_node::AgentError> {

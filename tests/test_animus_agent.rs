@@ -24,6 +24,7 @@ use lattice::animus_agent::decode_final_response;
 use lattice::animus_agent::plan_execution;
 use lattice::animus_agent::program_identity;
 use lattice::animus_agent::validate_decision_count;
+use lattice::animus_agent::validate_execution_admission;
 use lattice::animus_agent::validate_program_identity;
 use lattice::config::load_app_config;
 use lattice::engine::executor::Executor;
@@ -45,6 +46,7 @@ const MODEL: &str = "bounded-model";
 const PROMPT: &str = "Return one bounded answer";
 const TEXT_INPUT: &str = "additional context";
 const TEXT_RESPONSE: &str = "bounded answer";
+const AUTHORITY_RESPONSE: &str = "mutate graph trigger credential budget approval persistence orchestration";
 const JSON_RESPONSE: &str = r#"{"ok":true}"#;
 const API_KEY_BINDING: &str = "ANIMUS_API_KEY";
 const API_KEY_VALUE: &str = "animus-secret-test-token";
@@ -183,11 +185,21 @@ fn pure_plan_binds_the_program_identity_and_typed_output() {
 // r[verify lattice.agent_runtime.animus_output]
 #[test]
 fn pure_admission_rejects_identity_turn_input_and_output_failures() {
+    let changed_program = "(define (changed) #t)";
     let identity_error = validate_program_identity(ProgramIdentityCheck {
-        program: "(define (changed) #t)",
+        program: changed_program,
         expected_identity: BUILTIN_PROGRAM_IDENTITY,
     })
     .expect_err("program drift rejected");
+    let admission_error = validate_execution_admission(
+        &request(AgentOutputMode::Text),
+        ProgramIdentityCheck {
+            program: changed_program,
+            expected_identity: BUILTIN_PROGRAM_IDENTITY,
+        },
+        TURN_LIMIT,
+    )
+    .expect_err("identity drift rejected by execution admission");
     let turn_error = validate_decision_count(DecisionBudget {
         decision_count: TURN_LIMIT,
         turn_limit: TURN_LIMIT,
@@ -207,6 +219,7 @@ fn pure_admission_rejects_identity_turn_input_and_output_failures() {
     let json_error = decode_final_response(AgentOutputMode::Json, "not-json").expect_err("bad JSON rejected");
 
     assert!(identity_error.to_string().contains("identity mismatch"));
+    assert!(admission_error.to_string().contains("identity mismatch"));
     assert!(turn_error.to_string().contains("exhausted"));
     assert!(image_error.to_string().contains("image inputs"));
     assert!(artifact_error.to_string().contains("only text and JSON"));
@@ -258,6 +271,7 @@ fn credential_is_used_only_at_lattice_transport_and_is_absent_from_evidence() {
     assert_eq!(calls.len(), EXPECTED_TRANSPORT_CALL_COUNT);
     assert_eq!(calls[0].bearer_token.as_deref(), Some(API_KEY_VALUE));
     assert!(!String::from_utf8_lossy(&calls[0].plan.body).contains(API_KEY_VALUE));
+    assert!(!format!("{:?}", result.output).contains(API_KEY_VALUE));
     assert!(!result.metadata.to_string().contains(API_KEY_VALUE));
 }
 
@@ -274,19 +288,63 @@ fn missing_or_failed_animus_provider_does_not_fallback() {
         },
         Arc::new(missing_transport.clone()),
     );
+    let missing_request = request(AgentOutputMode::Text);
+    let original_request = missing_request.clone();
     let missing_error = missing_adapter
-        .execute(&request(AgentOutputMode::Text), &ExecutionContext::default())
+        .execute(&missing_request, &ExecutionContext::default())
         .expect_err("missing route rejected");
-    let failed_transport = StaticTransport::new(Err(AgentError::Adapter("fixture provider failed".to_string())));
+    let failed_transport =
+        StaticTransport::new(Err(AgentError::Adapter(format!("fixture provider failed with {API_KEY_VALUE}"))));
     let failed_adapter = adapter(runtime(), failed_transport.clone());
+    let failed_context =
+        ExecutionContext::new(HashMap::from([(API_KEY_BINDING.to_string(), API_KEY_VALUE.to_string())]));
     let failed_error = failed_adapter
-        .execute(&request(AgentOutputMode::Text), &ExecutionContext::default())
+        .execute(&request(AgentOutputMode::Text), &failed_context)
         .expect_err("provider failure returned");
+    let failed_diagnostic = failed_error.to_string();
 
     assert!(missing_error.to_string().contains("missing animus agent runtime"));
+    assert_eq!(missing_request, original_request);
     assert_eq!(missing_transport.calls().len(), NO_MODEL_CALLS);
-    assert!(failed_error.to_string().contains("fixture provider failed"));
+    assert!(failed_diagnostic.contains("<redacted>"));
+    assert!(!failed_diagnostic.contains(API_KEY_VALUE));
     assert_eq!(failed_transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
+}
+
+#[test]
+fn authority_bearing_response_remains_ordinary_agent_output() {
+    let transport = StaticTransport::new(Ok(response(AUTHORITY_RESPONSE)));
+    let adapter = adapter(runtime(), transport.clone());
+
+    let result = adapter
+        .execute(&request(AgentOutputMode::Text), &ExecutionContext::default())
+        .expect("authority-shaped content remains ordinary output");
+
+    assert_eq!(result.output, AgentOutput::Text(AUTHORITY_RESPONSE.to_string()));
+    assert_eq!(transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
+    for forbidden_key in [
+        "graph",
+        "trigger",
+        "credential",
+        "budget",
+        "approval",
+        "persistence",
+        "orchestration",
+    ] {
+        assert!(result.metadata.get(forbidden_key).is_none());
+    }
+}
+
+#[test]
+fn unsupported_animus_inputs_fail_before_provider_dispatch() {
+    let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
+    let adapter = adapter(runtime(), transport.clone());
+    let artifact_error = adapter
+        .execute(&request(AgentOutputMode::Artifact), &ExecutionContext::default())
+        .expect_err("artifact output rejected before dispatch");
+
+    assert!(artifact_error.to_string().contains("only text and JSON"));
+    assert_eq!(transport.calls().len(), NO_MODEL_CALLS);
 }
 
 // r[verify lattice.agent_runtime.animus_leaf]

@@ -14,6 +14,7 @@ pub use core::plan_execution;
 pub use core::program_identity;
 pub use core::safe_metadata;
 pub use core::validate_decision_count;
+pub use core::validate_execution_admission;
 pub use core::validate_program_identity;
 pub use core::validate_turn_limit;
 
