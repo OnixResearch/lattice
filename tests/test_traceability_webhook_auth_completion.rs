@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-provider-credential-promotion-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-webhook-auth-completion-current.json");
-const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
+const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-webhook-auth-completion-reviewed.json");
 const HEADLESS_SOURCE: &str = include_str!("../src/headless.rs");
 const STORE_SOURCE: &str = include_str!("../src/store/mod.rs");
 const TRIGGER_SOURCE: &str = include_str!("../src/triggers.rs");
@@ -40,6 +40,9 @@ const UNEXPECTED_REVIEW_ID: &str = concat!("n8n", "clone.credentials.unexpected.
 const REDACTION_ID: &str = concat!("n8n", "clone.credentials.webhook_auth.redaction");
 const VALID_ID: &str = concat!("n8n", "clone.credentials.webhook_auth.valid");
 const SELECTED_IDS: &[&str] = &[REDACTION_ID, VALID_ID];
+const REDACTION_MARKER: &str = concat!("// r[verify n8n", "clone.credentials.webhook_auth.redaction]\n");
+const VALID_MARKER: &str = concat!("// r[verify n8n", "clone.credentials.webhook_auth.valid]\n");
+const MARKER_COUNT: usize = 1;
 const REDACTION_EVIDENCE: &[&str] = &[
     STORE_SOURCE_PATH,
     TRIGGER_SOURCE_PATH,
@@ -138,14 +141,21 @@ fn issue_codes(issues: &[core::ReviewIssue]) -> BTreeSet<&str> {
     issues.iter().map(|issue| issue.code).collect()
 }
 
+fn historical_boundary_tests() -> String {
+    assert_eq!(BOUNDARY_TESTS.matches(REDACTION_MARKER).count(), MARKER_COUNT);
+    assert_eq!(BOUNDARY_TESTS.matches(VALID_MARKER).count(), MARKER_COUNT);
+    BOUNDARY_TESTS.replace(REDACTION_MARKER, "").replace(VALID_MARKER, "")
+}
+
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
+    let historical_boundary_tests = historical_boundary_tests();
     BTreeMap::from([
         (HEADLESS_SOURCE_PATH, blake3::hash(HEADLESS_SOURCE.as_bytes()).to_hex().to_string()),
         (STORE_SOURCE_PATH, blake3::hash(STORE_SOURCE.as_bytes()).to_hex().to_string()),
         (TRIGGER_SOURCE_PATH, blake3::hash(TRIGGER_SOURCE.as_bytes()).to_hex().to_string()),
         (WEBHOOK_CONTROLS_SOURCE_PATH, blake3::hash(WEBHOOK_CONTROLS_SOURCE.as_bytes()).to_hex().to_string()),
         (WEBHOOK_FLOW_SOURCE_PATH, blake3::hash(WEBHOOK_FLOW_SOURCE.as_bytes()).to_hex().to_string()),
-        (BOUNDARY_TESTS_PATH, blake3::hash(BOUNDARY_TESTS.as_bytes()).to_hex().to_string()),
+        (BOUNDARY_TESTS_PATH, blake3::hash(historical_boundary_tests.as_bytes()).to_hex().to_string()),
     ])
 }
 
@@ -154,8 +164,8 @@ fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
 // r[verify lattice.repository_validation.webhook_auth_completion.scenario.boundaries]
 // r[verify lattice.repository_validation.webhook_auth_completion.scenario.exact]
 #[test]
-fn two_webhook_auth_rows_are_exact_byte_bound_and_unpromoted() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+fn two_webhook_auth_rows_retain_their_historical_exact_review() {
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let rows = selected_review_rows(&report);
     let review_issues = validate_tranche(&rows, SUBSYSTEM, &expected_decisions());
     let baseline = coverage_snapshot(BASELINE_COVERAGE);
@@ -168,7 +178,7 @@ fn two_webhook_auth_rows_are_exact_byte_bound_and_unpromoted() {
             TRIGGER_SOURCE,
             WEBHOOK_CONTROLS_SOURCE,
             WEBHOOK_FLOW_SOURCE,
-            BOUNDARY_TESTS,
+            historical_boundary_tests().as_str(),
         ],
         SELECTED_IDS,
     );
@@ -199,7 +209,7 @@ fn two_webhook_auth_rows_are_exact_byte_bound_and_unpromoted() {
 // r[verify lattice.repository_validation.webhook_auth_completion.scenario.fail_closed]
 #[test]
 fn webhook_auth_classification_marker_and_coverage_drift_fail_closed() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let mut rows = selected_review_rows(&report);
     rows.retain(|row| row.requirement_id != REDACTION_ID);
     rows.iter_mut().find(|row| row.requirement_id == VALID_ID).expect("valid row").classification =

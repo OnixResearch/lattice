@@ -3,33 +3,31 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 749,
-    "referenced": 420,
-    "missing": 329,
+    "requirements": 753,
+    "referenced": 426,
+    "missing": 327,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "294b5c556891930daba26980b0921d29ef79841d009aafd05e6db9018d97a1db",
-    "receipt_hash": "af664a46ba90104150a082f59078ac51db482cd8cccfb24355e1ca7238978c22"
+    "input_hash": "d0ebe3708dcd39b728c8754360c883b145e051a3b6d0d672636ffaa0a5e5303b",
+    "receipt_hash": "351c0608aea1fb810581a04bdaebf2fc78c6e9e0275853a7a4f711b862becd92"
   },
   "review_policy": {
-    "expected_missing_count": 329,
-    "expected_missing_hash": "bc3aee4eda70b495ed76feaca0c3a981d97d385d2e733965cc3558282836ca36",
-    "reviewed_decisions": 2,
-    "policy_hash": "c5c0643db850af69a07761f3abb087b53b590732169b24e3174a002d2908bed9"
+    "expected_missing_count": 327,
+    "expected_missing_hash": "1c8d9ebc7d34a24365f332e8d386cc1d905601d6541faaa254e3f6d2cd4b8aa4",
+    "reviewed_decisions": 0,
+    "policy_hash": "6d4b04815ca97c996742832bb8020796ef73c1dca8baee2f06fc47674ea8052d"
   },
   "summary": {
-    "total": 329,
-    "reviewed": 2,
+    "total": 327,
+    "reviewed": 0,
     "unassessed": 327,
     "by_classification": {
-      "exact_maintained_evidence": 2,
       "unassessed": 327
     },
     "by_subsystem": {
       "agent-orchestration": 39,
       "agent-runtime": 14,
-      "credentials": 2,
       "node-templates": 3,
       "repository-validation": 11,
       "scheduling": 7,
@@ -411,62 +409,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.webhook_auth.redaction",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/store/mod.rs",
-          "blake3": "6f88954fc5b1028133524c5b49585e47f027e0aa3e2c93ad810dd11d0acf526f"
-        },
-        {
-          "path": "src/triggers.rs",
-          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
-        },
-        {
-          "path": "src/webhooks/controls.rs",
-          "blake3": "942f7286a689511ff37359bff729a8d21c2166235f7ab59a3f6d282d7ee7da76"
-        },
-        {
-          "path": "src/webhooks/flow.rs",
-          "blake3": "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922"
-        },
-        {
-          "path": "tests/test_webhook_credential_boundaries.rs",
-          "blake3": "373f5cb927029e468495609e6728c9d2f543ecc28a364d11820fc82a8e0243d9"
-        }
-      ],
-      "rationale_code": "assertions.fingerprinted-context-render-and-raw-store"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.webhook_auth.valid",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/headless.rs",
-          "blake3": "90f5deefe9ca359f845a4743b56ddc8b7ea36a3d9bd0a950193d88031782a34e"
-        },
-        {
-          "path": "src/store/mod.rs",
-          "blake3": "6f88954fc5b1028133524c5b49585e47f027e0aa3e2c93ad810dd11d0acf526f"
-        },
-        {
-          "path": "src/triggers.rs",
-          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
-        },
-        {
-          "path": "src/webhooks/flow.rs",
-          "blake3": "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922"
-        },
-        {
-          "path": "tests/test_webhook_credential_boundaries.rs",
-          "blake3": "373f5cb927029e468495609e6728c9d2f543ecc28a364d11820fc82a8e0243d9"
-        }
-      ],
-      "rationale_code": "assertions.valid-admission-history-and-raw-store"
     },
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt",
@@ -2387,7 +2329,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "bc3aee4eda70b495ed76feaca0c3a981d97d385d2e733965cc3558282836ca36",
+  "missing_set_hash": "1c8d9ebc7d34a24365f332e8d386cc1d905601d6541faaa254e3f6d2cd4b8aa4",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2397,5 +2339,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "81a2e33c91dbd8fc8f5bdcd43d2918ca51df628516b6312bf0393b6e27361833"
+  "inventory_hash": "e62eab3acbe105061dba1cf9f8a45e1139a8c7208a7cda62718a36917f25a083"
 }

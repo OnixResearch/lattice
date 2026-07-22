@@ -82,6 +82,7 @@ fn assert_bytes_omit(bytes: &[u8], value: &str) {
     assert!(!String::from_utf8_lossy(bytes).contains(value));
 }
 
+// r[verify n8nclone.credentials.webhook_auth.valid]
 #[tokio::test]
 async fn valid_webhook_auth_admits_and_persists_no_plaintext_credentials() {
     let temp_dir = tempfile::tempdir().expect("temporary valid webhook directory");
@@ -111,6 +112,7 @@ async fn valid_webhook_auth_admits_and_persists_no_plaintext_credentials() {
     }
 }
 
+// r[verify n8nclone.credentials.webhook_auth.redaction]
 #[test]
 fn rejected_webhook_auth_persists_only_safe_trigger_and_reference_context() {
     let temp_dir = tempfile::tempdir().expect("temporary rejected webhook directory");
