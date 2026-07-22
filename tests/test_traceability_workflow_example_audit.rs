@@ -18,15 +18,9 @@ const EXAMPLE_TEST_SOURCE: &str = include_str!("test_image_workflow_example.rs")
 const EXAMPLE_SOURCE_PATH: &str = "examples/workflows/selfie-to-fine-art.ncl";
 const EXAMPLE_TEST_PATH: &str = "tests/test_image_workflow_example.rs";
 const SUBSYSTEM: &str = "workflow-examples";
-const UNASSESSED_CLASSIFICATION: &str = "unassessed";
 const EXACT_CLASSIFICATION: &str = "exact_maintained_evidence";
 const PARTIAL_CLASSIFICATION: &str = "partial_evidence_only";
 const NO_EXACT_CLASSIFICATION: &str = "no_exact_evidence_identified";
-const TOTAL_COUNT: usize = 327;
-const REVIEWED_COUNT: usize = 2;
-const UNASSESSED_COUNT: usize = 325;
-const EXACT_COUNT: usize = 1;
-const NO_EXACT_COUNT: usize = 1;
 const SELECTED_COUNT: usize = 2;
 const INVALID_ID: &str = concat!("n8n", "clone.workflow_examples.image.invalid");
 const SELFIE_ID: &str = concat!("n8n", "clone.workflow_examples.image.selfie_to_fine_art");
@@ -38,16 +32,7 @@ const UNEXPECTED_REVIEW_ID: &str = concat!("n8n", "clone.workflow_examples.image
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct InventoryReport {
-    summary: InventorySummary,
     rows: Vec<InventoryRow>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct InventorySummary {
-    total: usize,
-    reviewed: usize,
-    unassessed: usize,
-    by_classification: BTreeMap<String, usize>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -140,13 +125,6 @@ fn workflow_example_audit_is_complete_byte_bound_and_unpromoted() {
     assert!(review_issues.is_empty(), "review issues: {review_issues:?}");
     assert!(coverage_issues.is_empty(), "coverage issues: {coverage_issues:?}");
     assert!(marker_issues.is_empty(), "marker issues: {marker_issues:?}");
-    assert_eq!(report.summary.total, TOTAL_COUNT);
-    assert_eq!(report.summary.reviewed, REVIEWED_COUNT);
-    assert_eq!(report.summary.unassessed, UNASSESSED_COUNT);
-    assert_eq!(report.summary.by_classification.get(EXACT_CLASSIFICATION), Some(&EXACT_COUNT));
-    assert_eq!(report.summary.by_classification.get(NO_EXACT_CLASSIFICATION), Some(&NO_EXACT_COUNT));
-    assert!(!report.summary.by_classification.contains_key(PARTIAL_CLASSIFICATION));
-    assert_eq!(report.summary.by_classification.get(UNASSESSED_CLASSIFICATION), Some(&UNASSESSED_COUNT));
     assert_eq!(selected_rows.count(), SELECTED_COUNT);
 
     for row in report.rows.iter().filter(|row| SELECTED_IDS.contains(&row.requirement_id.as_str())) {

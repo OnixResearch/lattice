@@ -3,29 +3,30 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 757,
-    "referenced": 430,
+    "requirements": 761,
+    "referenced": 434,
     "missing": 327,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "591b0385a73114ebd3bfdc298986fb35fe94488d4ac2677680f02dc46315649e",
-    "receipt_hash": "5e7d8eb8be8dbe6b21112ea3a105942b70b4726e2fef3d65478d9e4d86bd8469"
+    "input_hash": "c7e2b28da8de4014735786d0d0c9eb46bfc215618ce21b60849215dac4ba7129",
+    "receipt_hash": "52e712051091abfcf416456ba419e83de0f8e92f0c2fe7f8c5ead15f534f59dd"
   },
   "review_policy": {
     "expected_missing_count": 327,
     "expected_missing_hash": "1c8d9ebc7d34a24365f332e8d386cc1d905601d6541faaa254e3f6d2cd4b8aa4",
-    "reviewed_decisions": 2,
-    "policy_hash": "85dc8e286af21299136d92c713229d33059cf341c30dc26e389da8606293ddb4"
+    "reviewed_decisions": 5,
+    "policy_hash": "2297fe3766afcc4a27222f620783f09c3b6d6e66bb0975e8742c429ceb19b503"
   },
   "summary": {
     "total": 327,
-    "reviewed": 2,
-    "unassessed": 325,
+    "reviewed": 5,
+    "unassessed": 322,
     "by_classification": {
-      "exact_maintained_evidence": 1,
+      "exact_maintained_evidence": 3,
       "no_exact_evidence_identified": 1,
-      "unassessed": 325
+      "partial_evidence_only": 1,
+      "unassessed": 322
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -415,23 +416,42 @@
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt",
       "subsystem": "node-templates",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "edc890f88bd0e8d5f76e66fc6ae2459b0330c94eb0116d0d85682a0a027c3984"
+        }
+      ],
+      "rationale_code": "assertions.parameter-value-collected"
     },
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt.cancel",
       "subsystem": "node-templates",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "edc890f88bd0e8d5f76e66fc6ae2459b0330c94eb0116d0d85682a0a027c3984"
+        }
+      ],
+      "rationale_code": "assertions.cancel-preserves-workflow"
     },
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt.required",
       "subsystem": "node-templates",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "edc890f88bd0e8d5f76e66fc6ae2459b0330c94eb0116d0d85682a0a027c3984"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "1a66d29221790dbd366e0f517f9b0cb119b2061765567c0a290b65e7f2e83c09"
+        }
+      ],
+      "rationale_code": "gap.rendered-required-prompt-unasserted"
     },
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope",
@@ -2350,5 +2370,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "6929946be7a3a84ddfa653d78c44e3f51907d68da005029748ed8a634c60cee1"
+  "inventory_hash": "ed8f58b6bae4e02cd7930935402aa3a58715674568dbc0faddb47804411b75ce"
 }
