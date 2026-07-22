@@ -192,6 +192,9 @@ fn rustfmt_admission(source: &str) -> FormatAdmission {
     classify_rustfmt_status(status)
 }
 
+// r[verify n8nclone.repository_validation.flake_check]
+// r[verify n8nclone.repository_validation.flake_check.scenario.missing-signing-key]
+// r[verify n8nclone.repository_validation.flake_check.scenario.normal-signing]
 #[test]
 fn check_scoped_signing_override_leaves_flake_signing_external() {
     let issues = validate_contract(current_inputs());
@@ -202,6 +205,10 @@ fn check_scoped_signing_override_leaves_flake_signing_external() {
     assert!(!FLAKE_SOURCE.contains("secret-key-files"));
 }
 
+// r[verify n8nclone.repository_validation.vendor_snapshot]
+// r[verify n8nclone.repository_validation.vendor_snapshot.scenario.nested-output-name]
+// r[verify n8nclone.repository_validation.test_source]
+// r[verify n8nclone.repository_validation.test_source.scenario.json-fixture]
 #[test]
 fn filtered_nix_source_compiles_nested_vendor_and_json_fixtures() {
     let issues = validate_contract(current_inputs());
@@ -219,6 +226,8 @@ fn filtered_nix_source_compiles_nested_vendor_and_json_fixtures() {
     assert_eq!(git_ignore_admission(GITIGNORE_SOURCE, NESTED_VENDOR_PATH), IgnoreAdmission::Admitted);
 }
 
+// r[verify n8nclone.repository_validation.format_scope]
+// r[verify n8nclone.repository_validation.format_scope.scenario.vendor-format]
 #[test]
 fn format_check_is_scoped_away_from_nonconforming_vendor_fixture() {
     let issues = validate_contract(current_inputs());
@@ -227,6 +236,8 @@ fn format_check_is_scoped_away_from_nonconforming_vendor_fixture() {
     assert_eq!(rustfmt_admission(VENDOR_RESULT_SOURCE), FormatAdmission::Nonconforming);
 }
 
+// r[verify n8nclone.repository_validation.clippy_scope]
+// r[verify n8nclone.repository_validation.clippy_scope.scenario.vendor-lints]
 #[test]
 fn clippy_denies_owned_warnings_without_admitting_vendor_lints() {
     let issues = validate_contract(current_inputs());
