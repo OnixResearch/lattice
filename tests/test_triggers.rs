@@ -174,6 +174,7 @@ fn trigger_validation_accepts_saved_workflow_and_rejects_missing_workflow() {
 // r[verify n8nclone.workflow_execution.triggers.payload_binding.json]
 // r[verify n8nclone.workflow_execution.triggers.payload_binding.missing]
 // r[verify n8nclone.workflow_execution.triggers.payload_binding.type_mismatch]
+// r[verify n8nclone.scheduling.triggers.webhook.valid]
 #[test]
 fn payload_binding_supports_json_query_header_and_raw_body_failures() {
     let trigger = webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly);
@@ -226,6 +227,8 @@ fn admission_accepts_valid_event_and_rejects_idempotent_or_overlapping_events() 
 }
 
 // r[verify n8nclone.credentials.webhook_auth]
+// r[verify n8nclone.scheduling.triggers.webhook.invalid]
+// r[verify n8nclone.scheduling.triggers.webhook.valid]
 #[test]
 fn webhook_admission_checks_method_content_type_and_redacted_auth() {
     let trigger = webhook_trigger(WebhookAuthPolicy::Blake3Signature {
@@ -276,6 +279,7 @@ fn webhook_auth_resolves_secrets_through_credential_provider() {
 }
 
 // r[verify n8nclone.scheduling.triggers.scheduler_compat]
+// r[verify n8nclone.scheduling.triggers.scheduler_compat.due]
 #[test]
 fn schedule_trigger_preserves_schedule_semantics() {
     let schedule = ScheduleDefinition {
@@ -340,6 +344,8 @@ fn store_persists_triggers_and_trigger_history() {
 }
 
 // r[verify n8nclone.scheduling.triggers.history]
+// r[verify n8nclone.scheduling.triggers.history.persist]
+// r[verify n8nclone.scheduling.triggers.webhook.valid]
 #[tokio::test]
 async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
     let tempdir = tempfile::tempdir().expect("tempdir");

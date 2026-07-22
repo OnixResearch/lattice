@@ -365,6 +365,8 @@ fn auth_failure_response_and_history_omit_secrets_headers_and_raw_payloads() {
 }
 
 // r[verify n8nclone.scheduling.webhook_listener.process.missing]
+// r[verify n8nclone.scheduling.triggers.admission.disabled]
+// r[verify n8nclone.scheduling.triggers.webhook.invalid]
 #[test]
 fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_without_runs() {
     let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("webhooks.redb")).expect("store opens");
@@ -417,6 +419,7 @@ fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_withou
     assert!(history.is_empty());
 }
 
+// r[verify n8nclone.scheduling.webhook_listener.process.start]
 #[test]
 fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let temp_dir = tempfile::tempdir().expect("temporary live listener directory");
@@ -485,6 +488,7 @@ fn dry_run_reports_safe_status_and_redacted_credential_diagnostics() {
 }
 
 // r[verify n8nclone.workflow_format.webhook_cookbook_example.import]
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.dry_run]
 #[test]
 fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
@@ -519,6 +523,7 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
     assert_eq!(report.enabled_trigger_count, EXPECTED_TRIGGER_COUNT);
 }
 
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.accepted]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety]
 #[tokio::test]
@@ -544,6 +549,7 @@ async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history(
     assert!(!format!("{history:?}").contains(PAYLOAD_SECRET));
 }
 
+// r[verify n8nclone.scheduling.webhook_cookbook_operator_flow]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.rejected]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety.references]

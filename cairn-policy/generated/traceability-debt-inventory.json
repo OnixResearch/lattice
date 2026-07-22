@@ -3,27 +3,27 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 778,
-    "referenced": 454,
-    "missing": 324,
+    "requirements": 782,
+    "referenced": 465,
+    "missing": 317,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9d2a005d10f7b2f49c564b925923fc6443b2a9e758245bb7fd70abeb77e78351",
-    "receipt_hash": "e77ee3f3744ceef0a66a8b8ca7b74dca4438c01749832e5cf5e2a25a33190768"
+    "input_hash": "55f0c7925863fffbd5e0e031ed3046582ac0d6a0b2f728062640a515473c57ab",
+    "receipt_hash": "ffa6d4eadef48f1c463359d97bbf084360ba4a2987dfa733eb2965154304d907"
   },
   "review_policy": {
-    "expected_missing_count": 324,
-    "expected_missing_hash": "f33a71ef4aa5bb871a48a6d8214500238153898df53779d7706dc4a56433a7ee",
-    "reviewed_decisions": 9,
-    "policy_hash": "bc9e35896df0722b5d9b63f244b5665d6c09c4b7d0a2c8b095c379a80a4ae16e"
+    "expected_missing_count": 317,
+    "expected_missing_hash": "a4526fac7d7f14c594c1a900a74dd4fd118028c8855ce773b114587aa81bf3bd",
+    "reviewed_decisions": 2,
+    "policy_hash": "4919623bc51c5f39e99696381da2a4fae7b4c0337abbe34c568bf665e33dbf4b"
   },
   "summary": {
-    "total": 324,
-    "reviewed": 9,
+    "total": 317,
+    "reviewed": 2,
     "unassessed": 315,
     "by_classification": {
-      "exact_maintained_evidence": 8,
+      "exact_maintained_evidence": 1,
       "no_exact_evidence_identified": 1,
       "unassessed": 315
     },
@@ -31,7 +31,6 @@
       "agent-orchestration": 39,
       "agent-runtime": 14,
       "repository-validation": 11,
-      "scheduling": 7,
       "tui-ux": 98,
       "workflow-examples": 2,
       "workflow-execution": 83,
@@ -487,118 +486,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.triggers.admission.disabled",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d"
-        }
-      ],
-      "rationale_code": "assertions.disabled-rejected-without-run"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.triggers.history.persist",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/headless.rs",
-          "blake3": "90f5deefe9ca359f845a4743b56ddc8b7ea36a3d9bd0a950193d88031782a34e"
-        },
-        {
-          "path": "src/triggers.rs",
-          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
-        },
-        {
-          "path": "tests/test_triggers.rs",
-          "blake3": "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54"
-        }
-      ],
-      "rationale_code": "assertions.terminal-history-complete-and-safe"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.triggers.scheduler_compat.due",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_triggers.rs",
-          "blake3": "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54"
-        }
-      ],
-      "rationale_code": "assertions.full-legacy-adapted-plan-equality"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.triggers.webhook.invalid",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_triggers.rs",
-          "blake3": "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d"
-        }
-      ],
-      "rationale_code": "assertions.invalid-webhooks-reject-without-run"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.triggers.webhook.valid",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_triggers.rs",
-          "blake3": "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d"
-        }
-      ],
-      "rationale_code": "assertions.valid-webhook-binds-and-runs"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.webhook_cookbook_operator_flow",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "examples/README.md",
-          "blake3": "9ba2964ecb63eb81823898b1243d0c391e9b4772533ee0958b98cfdeb91e91bb"
-        },
-        {
-          "path": "examples/workflows/webhook-cookbook.ncl",
-          "blake3": "e449f943f0af5f6b2f49ce4dca45d9279ca2897410d63b57e3163bff86d03e95"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d"
-        }
-      ],
-      "rationale_code": "assertions.cookbook-import-dry-run-admit-reject-history"
-    },
-    {
-      "requirement_id": "n8nclone.scheduling.webhook_listener.process.start",
-      "subsystem": "scheduling",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d"
-        }
-      ],
-      "rationale_code": "assertions.live-listener-process-accepts-and-persists"
     },
     {
       "requirement_id": "n8nclone.tui_ux.add_node.cancel",
@@ -2381,7 +2268,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "f33a71ef4aa5bb871a48a6d8214500238153898df53779d7706dc4a56433a7ee",
+  "missing_set_hash": "a4526fac7d7f14c594c1a900a74dd4fd118028c8855ce773b114587aa81bf3bd",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2391,5 +2278,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "fcfbd654f2d674e9d5de98c935c57493a405d453f2b7573b2219eb8a992ed06b"
+  "inventory_hash": "c1a8604dcd3dfa8d61e75aeac7fc6c77d57ecc0eae81bb47472e1f975cbb8196"
 }

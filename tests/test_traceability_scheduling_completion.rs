@@ -7,6 +7,7 @@ use core::ReviewRow;
 use core::validate_no_selected_markers;
 use core::validate_tranche;
 use core::validate_unchanged_coverage;
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-scheduling-audit-current.json");
@@ -46,6 +47,16 @@ const SELECTED_IDS: &[&str] = &[
     COOKBOOK_ID,
     LISTENER_ID,
 ];
+const DISABLED_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.triggers.admission.disabled]\n");
+const HISTORY_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.triggers.history.persist]\n");
+const COMPAT_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.triggers.scheduler_compat.due]\n");
+const INVALID_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.triggers.webhook.invalid]\n");
+const VALID_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.triggers.webhook.valid]\n");
+const COOKBOOK_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.webhook_cookbook_operator_flow]\n");
+const LISTENER_MARKER: &str = concat!("// r[verify n8n", "clone.scheduling.webhook_listener.process.start]\n");
+const SINGLE_MARKER_COUNT: usize = 1;
+const VALID_TRIGGER_MARKER_COUNT: usize = 3;
+const COOKBOOK_MARKER_COUNT: usize = 3;
 const UNRELATED_MISSING_ID: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const UNEXPECTED_ADDED_ID: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING_ID: &str = "lattice.example.dangling.scenario.marker";
@@ -144,15 +155,39 @@ fn coverage(source: &str) -> CoverageSnapshot {
     }
 }
 
-fn source(path: &str) -> &'static str {
+fn historical_trigger_tests() -> String {
+    assert_eq!(TRIGGER_TESTS.matches(HISTORY_MARKER).count(), SINGLE_MARKER_COUNT);
+    assert_eq!(TRIGGER_TESTS.matches(COMPAT_MARKER).count(), SINGLE_MARKER_COUNT);
+    assert_eq!(TRIGGER_TESTS.matches(INVALID_MARKER).count(), SINGLE_MARKER_COUNT);
+    assert_eq!(TRIGGER_TESTS.matches(VALID_MARKER).count(), VALID_TRIGGER_MARKER_COUNT);
+    TRIGGER_TESTS
+        .replace(HISTORY_MARKER, "")
+        .replace(COMPAT_MARKER, "")
+        .replace(INVALID_MARKER, "")
+        .replace(VALID_MARKER, "")
+}
+
+fn historical_webhook_tests() -> String {
+    assert_eq!(WEBHOOK_TESTS.matches(DISABLED_MARKER).count(), SINGLE_MARKER_COUNT);
+    assert_eq!(WEBHOOK_TESTS.matches(INVALID_MARKER).count(), SINGLE_MARKER_COUNT);
+    assert_eq!(WEBHOOK_TESTS.matches(COOKBOOK_MARKER).count(), COOKBOOK_MARKER_COUNT);
+    assert_eq!(WEBHOOK_TESTS.matches(LISTENER_MARKER).count(), SINGLE_MARKER_COUNT);
+    WEBHOOK_TESTS
+        .replace(DISABLED_MARKER, "")
+        .replace(INVALID_MARKER, "")
+        .replace(COOKBOOK_MARKER, "")
+        .replace(LISTENER_MARKER, "")
+}
+
+fn source(path: &str) -> Cow<'static, str> {
     match path {
-        TRIGGER_TESTS_PATH => TRIGGER_TESTS,
-        WEBHOOK_TESTS_PATH => WEBHOOK_TESTS,
-        HEADLESS_SOURCE_PATH => HEADLESS_SOURCE,
-        TRIGGER_SOURCE_PATH => TRIGGER_SOURCE,
-        MAIN_SOURCE_PATH => MAIN_SOURCE,
-        EXAMPLES_README_PATH => EXAMPLES_README,
-        COOKBOOK_WORKFLOW_PATH => COOKBOOK_WORKFLOW,
+        TRIGGER_TESTS_PATH => Cow::Owned(historical_trigger_tests()),
+        WEBHOOK_TESTS_PATH => Cow::Owned(historical_webhook_tests()),
+        HEADLESS_SOURCE_PATH => Cow::Borrowed(HEADLESS_SOURCE),
+        TRIGGER_SOURCE_PATH => Cow::Borrowed(TRIGGER_SOURCE),
+        MAIN_SOURCE_PATH => Cow::Borrowed(MAIN_SOURCE),
+        EXAMPLES_README_PATH => Cow::Borrowed(EXAMPLES_README),
+        COOKBOOK_WORKFLOW_PATH => Cow::Borrowed(COOKBOOK_WORKFLOW),
         _ => panic!("unexpected evidence path: {path}"),
     }
 }
@@ -171,9 +206,11 @@ fn all_scheduling_rows_are_exact_byte_bound_and_unpromoted() {
     let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let review_issues = validate_tranche(&rows(&report), SUBSYSTEM, &expected_decisions());
     let coverage_issues = validate_unchanged_coverage(&coverage(BASELINE_COVERAGE), &coverage(CURRENT_COVERAGE));
+    let historical_trigger_tests = historical_trigger_tests();
+    let historical_webhook_tests = historical_webhook_tests();
     let sources = [
-        TRIGGER_TESTS,
-        WEBHOOK_TESTS,
+        historical_trigger_tests.as_str(),
+        historical_webhook_tests.as_str(),
         HEADLESS_SOURCE,
         TRIGGER_SOURCE,
         MAIN_SOURCE,
