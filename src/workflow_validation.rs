@@ -50,6 +50,7 @@ pub enum WorkflowDiagnosticCode {
     InvalidExpressionSyntax,
     RunnerCycleDetected,
     RunnerMissingRuntimeBinding,
+    RunnerUnsupportedRuntimePolicy,
     RunnerRuntimeOutputPortMissing,
     RunnerRuntimeOutputTypeMismatch,
     RunnerRuntimeFailure,
@@ -540,12 +541,17 @@ fn validate_runner_admission(workflow: &Workflow, diagnostics: &mut Vec<Workflow
             .into_iter()
             .filter_map(workflow_diagnostic_from_runner),
     );
+    diagnostics
+        .extend(runner::validate_runtime_policies(&plan).into_iter().filter_map(workflow_diagnostic_from_runner));
 }
 
 fn workflow_diagnostic_from_runner(diagnostic: runner::RunnerDiagnostic) -> Option<WorkflowDiagnostic> {
     let code = match diagnostic.code {
         runner::RunnerDiagnosticCode::CycleDetected => WorkflowDiagnosticCode::RunnerCycleDetected,
         runner::RunnerDiagnosticCode::MissingRuntimeBinding => WorkflowDiagnosticCode::RunnerMissingRuntimeBinding,
+        runner::RunnerDiagnosticCode::UnsupportedRuntimePolicy => {
+            WorkflowDiagnosticCode::RunnerUnsupportedRuntimePolicy
+        }
         runner::RunnerDiagnosticCode::RuntimeOutputPortMissing => {
             WorkflowDiagnosticCode::RunnerRuntimeOutputPortMissing
         }

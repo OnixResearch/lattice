@@ -41,6 +41,11 @@ const RUNTIME_KEY_DEFAULT: &str = "default";
 const RUNTIME_KEY_READ_FILE: &str = "read";
 const RUNTIME_KEY_WRITE_FILE: &str = "write";
 const RUNTIME_KEY_APPEND_FILE: &str = "append";
+const EFFECT_POLICY_AGENT: &str = "model";
+const EFFECT_POLICY_FILE: &str = "filesystem";
+const EFFECT_POLICY_HTTP: &str = "network";
+const EFFECT_POLICY_PROCESS: &str = "process";
+const EFFECT_POLICY_PURE: &str = "pure";
 const TYPE_TAG_ANY: &str = "any";
 const EMPTY_CREDENTIAL_REF_COUNT: usize = 0;
 const RUNNER_EVENT_INITIAL_SEQUENCE: u64 = 0;
@@ -117,6 +122,7 @@ pub enum RunnerDiagnosticCode {
     EdgeIncompatibleType,
     CycleDetected,
     MissingRuntimeBinding,
+    UnsupportedRuntimePolicy,
     RuntimeOutputPortMissing,
     RuntimeOutputTypeMismatch,
     RuntimeFailure,
@@ -632,6 +638,41 @@ pub fn validate_runtime_bindings(plan: &RunnerWorkflow, registry: &RuntimeRegist
             )
         })
         .collect()
+}
+
+pub fn validate_runtime_policies(plan: &RunnerWorkflow) -> Vec<RunnerDiagnostic> {
+    plan.nodes.iter().filter_map(unsupported_runtime_policy_diagnostic).collect()
+}
+
+fn unsupported_runtime_policy_diagnostic(node: &RunnerNode) -> Option<RunnerDiagnostic> {
+    let declared = node.policy.effect_policy.trim();
+    if declared.is_empty() {
+        return None;
+    }
+    let supported = runtime_effect_policy(&node.runtime);
+    if supported == Some(declared) {
+        return None;
+    }
+    Some(runner_diagnostic(
+        RunnerDiagnosticCode::UnsupportedRuntimePolicy,
+        Some(NodeId(node.id)),
+        None,
+        format!(
+            "node '{}' declares unsupported effect policy '{}' for runtime '{}:{}'",
+            node.label, declared, node.runtime.kind, node.runtime.key
+        ),
+    ))
+}
+
+fn runtime_effect_policy(binding: &RuntimeBinding) -> Option<&'static str> {
+    match binding.kind.as_str() {
+        RUNTIME_KIND_AGENT => Some(EFFECT_POLICY_AGENT),
+        RUNTIME_KIND_FILE | RUNTIME_KIND_IMAGE_INPUT => Some(EFFECT_POLICY_FILE),
+        RUNTIME_KIND_HTTP => Some(EFFECT_POLICY_HTTP),
+        RUNTIME_KIND_SHELL => Some(EFFECT_POLICY_PROCESS),
+        RUNTIME_KIND_CONDITION | RUNTIME_KIND_MERGE | RUNTIME_KIND_SUBWORKFLOW => Some(EFFECT_POLICY_PURE),
+        _ => None,
+    }
 }
 
 // r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
