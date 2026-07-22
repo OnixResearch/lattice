@@ -764,3 +764,24 @@ r[lattice.repository_validation.workflow_validation_promotion.scenario.fail_clos
 - GIVEN marker, policy, or coverage drift
 - WHEN promotion validation runs
 - THEN deterministic validation MUST reject the drift
+
+### Requirement: Agent-orchestration traceability audit
+r[lattice.repository_validation.agent_orchestration_audit] Lattice MUST maintain a byte-bound classification audit for all 39 selected missing agent-orchestration requirements without promotion.
+
+#### Scenario: Complete agent-orchestration classification
+r[lattice.repository_validation.agent_orchestration_audit.scenario.complete]
+- GIVEN the selected missing subset
+- WHEN audit validation runs
+- THEN every ID MUST have exactly one explicit exact or partial decision
+
+#### Scenario: Agent-orchestration evidence identity
+r[lattice.repository_validation.agent_orchestration_audit.scenario.evidence]
+- GIVEN reviewed maintained evidence
+- WHEN hashes are checked
+- THEN every safe path MUST match its current BLAKE3 bytes
+
+#### Scenario: Agent-orchestration audit drift fails closed
+r[lattice.repository_validation.agent_orchestration_audit.scenario.fail_closed]
+- GIVEN decision, evidence, marker, or coverage drift
+- WHEN validation runs
+- THEN the audit MUST reject it deterministically
