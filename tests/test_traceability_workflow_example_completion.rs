@@ -25,6 +25,9 @@ const PARTIAL: &str = "partial_evidence_only";
 const INVALID_ID: &str = concat!("n8n", "clone.workflow_examples.image.invalid");
 const SELFIE_ID: &str = concat!("n8n", "clone.workflow_examples.image.selfie_to_fine_art");
 const IDS: &[&str] = &[INVALID_ID, SELFIE_ID];
+const INVALID_MARKER: &str = concat!("// r[verify n8n", "clone.workflow_examples.image.invalid]\n");
+const SELFIE_MARKER: &str = concat!("// r[verify n8n", "clone.workflow_examples.image.selfie_to_fine_art]\n");
+const MARKER_COUNT: usize = 1;
 const UNRELATED: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const ADDED: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING: &str = "lattice.example.dangling.scenario.marker";
@@ -93,11 +96,18 @@ fn snapshot(source: &str) -> CoverageSnapshot {
 fn codes(issues: &[core::ReviewIssue]) -> BTreeSet<&str> {
     issues.iter().map(|issue| issue.code).collect()
 }
+fn historical_test_source() -> String {
+    assert_eq!(TEST_SOURCE.matches(INVALID_MARKER).count(), MARKER_COUNT);
+    assert_eq!(TEST_SOURCE.matches(SELFIE_MARKER).count(), MARKER_COUNT);
+    TEST_SOURCE.replace(INVALID_MARKER, "").replace(SELFIE_MARKER, "")
+}
+
 fn hashes() -> BTreeMap<&'static str, String> {
+    let historical_test = historical_test_source();
     BTreeMap::from([
         (POSITIVE_PATH, blake3::hash(POSITIVE_FIXTURE.as_bytes()).to_hex().to_string()),
         (NEGATIVE_PATH, blake3::hash(NEGATIVE_FIXTURE.as_bytes()).to_hex().to_string()),
-        (TEST_PATH, blake3::hash(TEST_SOURCE.as_bytes()).to_hex().to_string()),
+        (TEST_PATH, blake3::hash(historical_test.as_bytes()).to_hex().to_string()),
     ])
 }
 
@@ -109,7 +119,9 @@ fn both_workflow_example_rows_are_exact_byte_bound_and_unpromoted() {
     let report: Report = serde_json::from_str(REVIEWED).expect("inventory decodes");
     let review_issues = validate_tranche(&rows(&report), SUBSYSTEM, &expected());
     let coverage_issues = validate_unchanged_coverage(&snapshot(BASELINE), &snapshot(CURRENT));
-    let marker_issues = validate_no_selected_markers(&[POSITIVE_FIXTURE, NEGATIVE_FIXTURE, TEST_SOURCE], IDS);
+    let historical_test = historical_test_source();
+    let marker_issues =
+        validate_no_selected_markers(&[POSITIVE_FIXTURE, NEGATIVE_FIXTURE, historical_test.as_str()], IDS);
     let actual = hashes();
     assert!(review_issues.is_empty(), "review issues: {review_issues:?}");
     assert!(coverage_issues.is_empty(), "coverage issues: {coverage_issues:?}");

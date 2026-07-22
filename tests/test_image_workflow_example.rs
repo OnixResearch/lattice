@@ -88,6 +88,7 @@ fn invalid_image_io() -> MemoryImageIo {
 }
 
 // r[verify n8nclone.workflow_examples.image]
+// r[verify n8nclone.workflow_examples.image.selfie_to_fine_art]
 #[tokio::test]
 async fn selfie_to_fine_art_example_imports_and_runs_with_fake_clankers_adapter() {
     let workflow = load_workflow_nickel_file(&example_path()).expect("example imports");
@@ -114,6 +115,7 @@ async fn selfie_to_fine_art_example_imports_and_runs_with_fake_clankers_adapter(
     assert!(generated);
 }
 
+// r[verify n8nclone.workflow_examples.image.invalid]
 #[tokio::test]
 async fn invalid_image_example_reports_format_diagnostics_without_partial_completion() {
     let workflow = load_workflow_nickel_file(&invalid_example_path()).expect("negative example imports");

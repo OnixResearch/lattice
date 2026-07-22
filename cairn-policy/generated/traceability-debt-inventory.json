@@ -3,27 +3,26 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 785,
-    "referenced": 468,
-    "missing": 317,
+    "requirements": 788,
+    "referenced": 473,
+    "missing": 315,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9fb0165255ec3c3c2b64f54276865c34ca20778a77c6fd4a86f8d76f4bb56dec",
-    "receipt_hash": "08ff90e64e94ed91398a9407f4c670f601506628bad05cb1285a00e578d2d6a9"
+    "input_hash": "0fe133555764357b2a66478a0d5ba5704c0b6ec5ee91e6c4ee572bb0beb6feb9",
+    "receipt_hash": "306b7ecebe05a97bfcbf2cb4f9112e47638d3c57fc50a69d186c2068b4cac458"
   },
   "review_policy": {
-    "expected_missing_count": 317,
-    "expected_missing_hash": "a4526fac7d7f14c594c1a900a74dd4fd118028c8855ce773b114587aa81bf3bd",
-    "reviewed_decisions": 2,
-    "policy_hash": "e3797acb72009a761c9607e167a5439db9641bd549d8dd55029fdd51cdaa2afe"
+    "expected_missing_count": 315,
+    "expected_missing_hash": "2b7906ee39473996244bcfbf795e9ee984704c8bbfe2db9017309647c4d8373c",
+    "reviewed_decisions": 0,
+    "policy_hash": "851645cae3eaef6c26327dac47dcd66f3f98147423920f725f561de6f6dd4349"
   },
   "summary": {
-    "total": 317,
-    "reviewed": 2,
+    "total": 315,
+    "reviewed": 0,
     "unassessed": 315,
     "by_classification": {
-      "exact_maintained_evidence": 2,
       "unassessed": 315
     },
     "by_subsystem": {
@@ -31,7 +30,6 @@
       "agent-runtime": 14,
       "repository-validation": 11,
       "tui-ux": 98,
-      "workflow-examples": 2,
       "workflow-execution": 83,
       "workflow-format": 41,
       "workflow-validation": 29
@@ -1173,38 +1171,6 @@
       "rationale_code": "not-reviewed"
     },
     {
-      "requirement_id": "n8nclone.workflow_examples.image.invalid",
-      "subsystem": "workflow-examples",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "examples/workflows/invalid-unsupported-image-format.ncl",
-          "blake3": "8cca0881b68a2f3e9b7700c5e3be16e52d907b1ecc0177902c1d33bdda66cb7a"
-        },
-        {
-          "path": "tests/test_image_workflow_example.rs",
-          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
-        }
-      ],
-      "rationale_code": "assertions.unsupported-format-without-partial-completion"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_examples.image.selfie_to_fine_art",
-      "subsystem": "workflow-examples",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "examples/workflows/selfie-to-fine-art.ncl",
-          "blake3": "2efd38cfd5d615233f307983ce81baf1e0c61563185526e7b4ad00880854dd0e"
-        },
-        {
-          "path": "tests/test_image_workflow_example.rs",
-          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
-        }
-      ],
-      "rationale_code": "assertions.import-execute-and-image-output"
-    },
-    {
       "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.image_edit",
       "subsystem": "workflow-execution",
       "classification": "unassessed",
@@ -2276,7 +2242,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "a4526fac7d7f14c594c1a900a74dd4fd118028c8855ce773b114587aa81bf3bd",
+  "missing_set_hash": "2b7906ee39473996244bcfbf795e9ee984704c8bbfe2db9017309647c4d8373c",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2286,5 +2252,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "51077d90f824ec7180aa1937ff4828a86c418d0c5a2c35f75b51941bd4b1b402"
+  "inventory_hash": "8b9f95ae5448eeef8a4af1d968d813af13dba6cdaaa1a8791f81b8fc1616c5fa"
 }
