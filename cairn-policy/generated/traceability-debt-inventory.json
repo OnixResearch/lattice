@@ -3,29 +3,30 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 769,
-    "referenced": 445,
+    "requirements": 773,
+    "referenced": 449,
     "missing": 324,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "98d7096fa39a4c421b8e7411aa7d4dee9cc6f877599a0395f5af7286a8bc6f73",
-    "receipt_hash": "162f9430750682f7945877a22bf3814b0dc9408b8576a1d0b745ee51f0a165ca"
+    "input_hash": "46bf579a36c5afca67800f51a68ef35384500aabeed35a5de7195a51aba50b90",
+    "receipt_hash": "383096a30aa20b560e1e2ed603a87e8148432023c6f5db51e8ccdd0894778ca8"
   },
   "review_policy": {
     "expected_missing_count": 324,
     "expected_missing_hash": "f33a71ef4aa5bb871a48a6d8214500238153898df53779d7706dc4a56433a7ee",
-    "reviewed_decisions": 2,
-    "policy_hash": "70b2f7fdf29e23130a6c2613ec0f5396b581f05abeb024be33c72b2e836dd741"
+    "reviewed_decisions": 9,
+    "policy_hash": "077078b3d7d32964f4f09b151c2b127532ad4da52707e3e910c0f980d055e8ca"
   },
   "summary": {
     "total": 324,
-    "reviewed": 2,
-    "unassessed": 322,
+    "reviewed": 9,
+    "unassessed": 315,
     "by_classification": {
-      "exact_maintained_evidence": 1,
+      "exact_maintained_evidence": 5,
       "no_exact_evidence_identified": 1,
-      "unassessed": 322
+      "partial_evidence_only": 3,
+      "unassessed": 315
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -491,51 +492,114 @@
     {
       "requirement_id": "n8nclone.scheduling.triggers.admission.disabled",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+        }
+      ],
+      "rationale_code": "assertions.disabled-rejected-without-run"
     },
     {
       "requirement_id": "n8nclone.scheduling.triggers.history.persist",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/headless.rs",
+          "blake3": "90f5deefe9ca359f845a4743b56ddc8b7ea36a3d9bd0a950193d88031782a34e"
+        },
+        {
+          "path": "src/triggers.rs",
+          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
+        },
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
+        }
+      ],
+      "rationale_code": "gap.terminal-status-and-complete-fields-unasserted"
     },
     {
       "requirement_id": "n8nclone.scheduling.triggers.scheduler_compat.due",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
+        }
+      ],
+      "rationale_code": "gap.full-old-new-plan-comparison-absent"
     },
     {
       "requirement_id": "n8nclone.scheduling.triggers.webhook.invalid",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
+        },
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+        }
+      ],
+      "rationale_code": "assertions.invalid-webhooks-reject-without-run"
     },
     {
       "requirement_id": "n8nclone.scheduling.triggers.webhook.valid",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
+        },
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+        }
+      ],
+      "rationale_code": "assertions.valid-webhook-binds-and-runs"
     },
     {
       "requirement_id": "n8nclone.scheduling.webhook_cookbook_operator_flow",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "examples/README.md",
+          "blake3": "9ba2964ecb63eb81823898b1243d0c391e9b4772533ee0958b98cfdeb91e91bb"
+        },
+        {
+          "path": "examples/workflows/webhook-cookbook.ncl",
+          "blake3": "e449f943f0af5f6b2f49ce4dca45d9279ca2897410d63b57e3163bff86d03e95"
+        },
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+        }
+      ],
+      "rationale_code": "assertions.cookbook-import-dry-run-admit-reject-history"
     },
     {
       "requirement_id": "n8nclone.scheduling.webhook_listener.process.start",
       "subsystem": "scheduling",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e"
+        },
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+        }
+      ],
+      "rationale_code": "gap.live-process-socket-acceptance-unasserted"
     },
     {
       "requirement_id": "n8nclone.tui_ux.add_node.cancel",
@@ -2328,5 +2392,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "8b27f3cbf0d24448a1e78b090cad6da47a4a6d32b3a245a6f64e476d2c39030e"
+  "inventory_hash": "50d05927659f0abe8cb11cfdce387fc58f1c022ba49fc06bb31aaaedd5abe81c"
 }
