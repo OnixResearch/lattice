@@ -139,6 +139,7 @@ fn nickel_with_plaintext_value(workflow: &Workflow, value: &str) -> String {
 }
 
 // r[verify n8nclone.credentials.secret_refs.model]
+// r[verify n8nclone.credentials.secret_refs.model.store_ref]
 #[tokio::test]
 async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -166,7 +167,9 @@ async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
 }
 
 // r[verify n8nclone.credentials.provider_interface]
+// r[verify n8nclone.credentials.provider_interface.resolve]
 // r[verify n8nclone.credentials.redaction]
+// r[verify n8nclone.credentials.redaction.output]
 #[tokio::test]
 async fn credential_provider_redacts_output_logs_history_json_and_persistence() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -224,6 +227,7 @@ async fn credential_provider_redacts_output_logs_history_json_and_persistence() 
 }
 
 // r[verify n8nclone.credentials.provider_interface]
+// r[verify n8nclone.credentials.provider_interface.missing]
 #[tokio::test]
 async fn missing_secret_fails_before_shell_execution() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -254,6 +258,7 @@ fn redaction_masks_overlapping_duplicate_and_empty_secret_values() {
 }
 
 // r[verify n8nclone.credentials.validation]
+// r[verify n8nclone.credentials.validation.malformed]
 #[test]
 fn malformed_secret_reference_is_a_fatal_validation_diagnostic() {
     let mut workflow = Workflow::new(WORKFLOW_NAME);
@@ -266,6 +271,7 @@ fn malformed_secret_reference_is_a_fatal_validation_diagnostic() {
 }
 
 // r[verify n8nclone.credentials.redaction]
+// r[verify n8nclone.credentials.redaction.validation]
 #[test]
 fn validation_text_and_json_preserve_reference_identity_without_plaintext_value() {
     let field_ref = SecretRef::new(PROVIDER_NAME, SECRET_KEY, Some("field".to_string()));
@@ -299,6 +305,7 @@ fn validation_text_and_json_preserve_reference_identity_without_plaintext_value(
 }
 
 // r[verify n8nclone.credentials.cache_identity]
+// r[verify n8nclone.credentials.cache_identity.reference]
 #[test]
 fn cache_identity_uses_secret_reference_not_secret_value() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -341,6 +348,8 @@ fn command_output(status_code: Option<i32>, stdout: &str) -> ProcessOutput {
 }
 
 // r[verify n8nclone.credentials.provider_registry]
+// r[verify n8nclone.credentials.provider_registry.resolve]
+// r[verify n8nclone.credentials.provider_registry.unknown]
 // r[verify n8nclone.workflow_validation.credentials.providers]
 #[test]
 fn registry_resolves_registered_provider_and_validation_rejects_unknown_provider() {
@@ -395,6 +404,8 @@ fn registry_validation_rejects_unsupported_field_access() {
 }
 
 // r[verify n8nclone.credentials.providers.env]
+// r[verify n8nclone.credentials.providers.env.resolve]
+// r[verify n8nclone.credentials.providers.env.missing]
 #[test]
 fn environment_provider_resolves_present_secret_and_rejects_missing_or_empty_secret() {
     let provider = EnvironmentCredentialProvider::from_map(
@@ -519,6 +530,7 @@ fn provider_backed_cache_identity_excludes_resolved_secret_values() {
 }
 
 // r[verify n8nclone.credentials.secret_refs.model]
+// r[verify n8nclone.credentials.secret_refs.model.reject_plaintext]
 #[test]
 fn nickel_import_rejects_all_non_null_plaintext_credential_shapes_with_safe_error() {
     let (workflow, _node_id) = workflow_with_secret_ref();
@@ -554,6 +566,7 @@ fn nickel_import_rejects_all_non_null_plaintext_credential_shapes_with_safe_erro
     );
 }
 
+// r[verify n8nclone.credentials.secret_refs.model.reject_plaintext]
 #[test]
 fn cli_plaintext_credential_rejection_is_safe_and_precedes_store_creation() {
     let (workflow, _node_id) = workflow_with_secret_ref();

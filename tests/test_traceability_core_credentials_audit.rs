@@ -30,7 +30,6 @@ const TOTAL_COUNT: usize = 353;
 const REVIEWED_COUNT: usize = 12;
 const UNASSESSED_COUNT: usize = 341;
 const EXACT_COUNT: usize = 12;
-const EVIDENCE_SOURCE_COUNT: usize = 5;
 const UNRELATED_MISSING_ID: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const UNEXPECTED_ADDED_ID: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING_ID: &str = "lattice.example.dangling.scenario.marker";
@@ -220,21 +219,11 @@ fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
     ])
 }
 
-fn maintained_sources() -> [&'static str; EVIDENCE_SOURCE_COUNT] {
-    [
-        CREDENTIAL_SOURCE,
-        EXECUTOR_SOURCE,
-        WORKFLOW_FORMAT_SOURCE,
-        WORKFLOW_VALIDATION_SOURCE,
-        CREDENTIAL_TESTS,
-    ]
-}
-
 // r[verify lattice.repository_validation.credential_traceability_audit]
 // r[verify lattice.repository_validation.credential_traceability_audit.scenario.complete]
 // r[verify lattice.repository_validation.credential_traceability_audit.scenario.evidence]
 #[test]
-fn core_credential_review_is_complete_bound_and_non_promoting() {
+fn core_credential_review_is_complete_bound_and_exact() {
     let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let rows = review_rows(&report);
     let review_issues = validate_tranche(&rows, SUBSYSTEM, &expected_decisions());
@@ -259,10 +248,8 @@ fn core_credential_review_is_complete_bound_and_non_promoting() {
 
     for decision in expected_decisions() {
         assert!(current_missing.contains(decision.requirement_id));
-        let implementation_marker = format!("r[impl {}]", decision.requirement_id);
         let verification_marker = format!("r[verify {}]", decision.requirement_id);
-        assert!(maintained_sources().iter().all(|source| !source.contains(&implementation_marker)));
-        assert!(maintained_sources().iter().all(|source| !source.contains(&verification_marker)));
+        assert!(CREDENTIAL_TESTS.contains(&verification_marker));
     }
     for row in report.rows.iter().filter(|row| row.subsystem == SUBSYSTEM) {
         if reviewed_ids.contains(row.requirement_id.as_str()) {

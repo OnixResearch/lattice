@@ -62,8 +62,12 @@ pub fn validate_promotion(
 
 pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id: &str) -> bool {
     let signature = format!("fn {test_name}(");
+    let async_signature = format!("async {signature}");
     let lines = source.lines().collect::<Vec<_>>();
-    let Some(mut cursor) = lines.iter().position(|line| line.trim_start().starts_with(&signature)) else {
+    let Some(mut cursor) = lines.iter().position(|line| {
+        let line = line.trim_start();
+        line.starts_with(&signature) || line.starts_with(&async_signature)
+    }) else {
         return false;
     };
     let expected = format!("// r[verify {requirement_id}]");
@@ -73,7 +77,7 @@ pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id:
         if line == expected {
             return true;
         }
-        if line == "#[test]" || line.starts_with("// r[verify ") {
+        if line == "#[test]" || line == "#[tokio::test]" || line.starts_with("// r[verify ") {
             continue;
         }
         break;

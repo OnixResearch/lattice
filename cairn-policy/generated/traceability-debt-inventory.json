@@ -3,33 +3,32 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 714,
-    "referenced": 361,
-    "missing": 353,
+    "requirements": 718,
+    "referenced": 377,
+    "missing": 341,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9e1a9bc59d6fdb98fa41fc47c7e3e0218db086a6b95893078b2d0f861f683a9c",
-    "receipt_hash": "30d9362c2553184dc181ccd56c7f9fc4505ce6861162c027576674019dee7c19"
+    "input_hash": "a2f6bffdc624bc089900ca1372cf76f968746abec68fd25a14fc5a484cf7c19c",
+    "receipt_hash": "d581a3a5e5e6d4450502170d780c3988548bcaa4306c864592ec00326acdd344"
   },
   "review_policy": {
-    "expected_missing_count": 353,
-    "expected_missing_hash": "0e205e16faa2c958a0ba9f90bb64bbc8d09c81c16f8dd93f9798fd958a4835e1",
-    "reviewed_decisions": 12,
-    "policy_hash": "4a5618c793b05757edd1f4bf6327c97853591b32e9310745cfd507cd443d54f2"
+    "expected_missing_count": 341,
+    "expected_missing_hash": "0070258e8dbf77a97ca7d34a8880b297712733811cf6350b677301b617823e77",
+    "reviewed_decisions": 0,
+    "policy_hash": "e27f763824e3823ae585a337d52c94b2edfb7027a28f42861780a08d6bac07de"
   },
   "summary": {
-    "total": 353,
-    "reviewed": 12,
+    "total": 341,
+    "reviewed": 0,
     "unassessed": 341,
     "by_classification": {
-      "exact_maintained_evidence": 12,
       "unassessed": 341
     },
     "by_subsystem": {
       "agent-orchestration": 39,
       "agent-runtime": 14,
-      "credentials": 26,
+      "credentials": 14,
       "node-templates": 3,
       "repository-validation": 11,
       "scheduling": 7,
@@ -413,22 +412,6 @@
       "rationale_code": "not-reviewed"
     },
     {
-      "requirement_id": "n8nclone.credentials.cache_identity.reference",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.reference-only-cache-key"
-    },
-    {
       "requirement_id": "n8nclone.credentials.n8n_json.placeholders.export",
       "subsystem": "credentials",
       "classification": "unassessed",
@@ -478,82 +461,6 @@
       "rationale_code": "not-reviewed"
     },
     {
-      "requirement_id": "n8nclone.credentials.provider_interface.missing",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.pre-runtime-missing-secret"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.provider_interface.resolve",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.execution-boundary-resolution"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.provider_registry.resolve",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.registered-provider-resolution"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.provider_registry.unknown",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/workflow_validation.rs",
-          "blake3": "49402cc2ef8c47a1f83d778ee4606b43a639cd4cead99899239c9dc399dd6374"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.pre-runtime-unknown-provider"
-    },
-    {
       "requirement_id": "n8nclone.credentials.providers.command.resolve",
       "subsystem": "credentials",
       "classification": "unassessed",
@@ -568,46 +475,6 @@
       "rationale_code": "not-reviewed"
     },
     {
-      "requirement_id": "n8nclone.credentials.providers.env.missing",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.pre-runtime-missing-env"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.providers.env.resolve",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.environment-secret-resolution"
-    },
-    {
       "requirement_id": "n8nclone.credentials.providers.local_vault.resolve",
       "subsystem": "credentials",
       "classification": "unassessed",
@@ -620,102 +487,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.redaction.output",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/engine/executor.rs",
-          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.all-maintained-surfaces-redacted"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.redaction.validation",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/workflow_validation.rs",
-          "blake3": "49402cc2ef8c47a1f83d778ee4606b43a639cd4cead99899239c9dc399dd6374"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.validation-text-json-safe"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.secret_refs.model.reject_plaintext",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/workflow_format.rs",
-          "blake3": "083eccc368e65dd7f7378b20b7bdd62d6bf3dc11f712d3b5a57c99d48db4a276"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.typed-rejection-before-store"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.secret_refs.model.store_ref",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/workflow_format.rs",
-          "blake3": "083eccc368e65dd7f7378b20b7bdd62d6bf3dc11f712d3b5a57c99d48db4a276"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.post-resolution-save-export-safe"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.validation.malformed",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
-        },
-        {
-          "path": "src/workflow_validation.rs",
-          "blake3": "49402cc2ef8c47a1f83d778ee4606b43a639cd4cead99899239c9dc399dd6374"
-        },
-        {
-          "path": "tests/test_credentials.rs",
-          "blake3": "3b64eb9c03ac3f912e5735826df916d6a3b043cab4d6eb10192da58db3f1921e"
-        }
-      ],
-      "rationale_code": "assertions.fatal-malformed-reference"
     },
     {
       "requirement_id": "n8nclone.credentials.webhook_auth.redaction",
@@ -2657,7 +2428,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "0e205e16faa2c958a0ba9f90bb64bbc8d09c81c16f8dd93f9798fd958a4835e1",
+  "missing_set_hash": "0070258e8dbf77a97ca7d34a8880b297712733811cf6350b677301b617823e77",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2665,5 +2436,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "ef99b488a8eb41839be052b34b8a9d9e1ca7983791352ac999c0ada95e1f354f"
+  "inventory_hash": "6d9d91702caa17429117b6f9989e05332c0bbc6d5ebe0a440151c36efa5c4ad9"
 }
