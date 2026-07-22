@@ -23,6 +23,10 @@ const TYPE_TAG_JSON: &str = "json";
 const TYPE_TAG_ANY: &str = "any";
 const AUTH_HEADER_BEARER_PREFIX: &str = "Bearer ";
 const REDACTED_PAYLOAD_SUMMARY: &str = "[payload redacted]";
+const CREDENTIAL_REFERENCE_CONTEXT_DOMAIN: &[u8] = b"lattice-webhook-credential-reference-context-v1";
+const CREDENTIAL_REFERENCE_PROVIDER_TAG: &[u8] = b"provider";
+const CREDENTIAL_REFERENCE_KEY_TAG: &[u8] = b"key";
+const CREDENTIAL_REFERENCE_FIELD_TAG: &[u8] = b"field";
 // r[impl lattice.project_identity.stable-identities.scenario.webhook-domain]
 const TRIGGER_SIGNATURE_DOMAIN: &[u8] = b"n8nclone-webhook-signature:v1";
 
@@ -323,7 +327,7 @@ fn validate_webhook_admission(
         ));
     }
     if let Err(code) = validate_webhook_auth(&webhook.auth_policy, event) {
-        diagnostics.push(diagnostic(trigger, code, "webhook authentication failed"));
+        diagnostics.push(webhook_auth_diagnostic(trigger, webhook, code));
     }
     diagnostics
 }
@@ -336,6 +340,46 @@ fn content_type_allowed(webhook: &WebhookTrigger, content_type: Option<&str>) ->
         return false;
     };
     webhook.accepted_content_types.iter().any(|accepted| content_type.starts_with(accepted))
+}
+
+fn webhook_auth_diagnostic(
+    trigger: &TriggerDefinition,
+    webhook: &WebhookTrigger,
+    code: TriggerDiagnosticCode,
+) -> TriggerDiagnostic {
+    let context = webhook_auth_secret_ref(&webhook.auth_policy)
+        .map(credential_ref_fingerprint)
+        .map_or_else(String::new, |fingerprint| format!("; credential_ref={fingerprint}"));
+    diagnostic(trigger, code, &format!("webhook authentication failed{context}"))
+}
+
+fn webhook_auth_secret_ref(policy: &WebhookAuthPolicy) -> Option<&SecretRef> {
+    match policy {
+        WebhookAuthPolicy::NoAuthLocalOnly => None,
+        WebhookAuthPolicy::Bearer { secret_ref } | WebhookAuthPolicy::Blake3Signature { secret_ref, .. } => {
+            Some(secret_ref)
+        }
+    }
+}
+
+pub fn credential_ref_fingerprint(secret_ref: &SecretRef) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(CREDENTIAL_REFERENCE_CONTEXT_DOMAIN);
+    update_fingerprint_part(&mut hasher, CREDENTIAL_REFERENCE_PROVIDER_TAG, &secret_ref.provider);
+    update_fingerprint_part(&mut hasher, CREDENTIAL_REFERENCE_KEY_TAG, &secret_ref.key);
+    update_fingerprint_part(
+        &mut hasher,
+        CREDENTIAL_REFERENCE_FIELD_TAG,
+        secret_ref.field.as_deref().unwrap_or_default(),
+    );
+    format!("b3:{}", hasher.finalize().to_hex())
+}
+
+fn update_fingerprint_part(hasher: &mut blake3::Hasher, tag: &[u8], value: &str) {
+    let mut part_hasher = blake3::Hasher::new();
+    part_hasher.update(tag);
+    part_hasher.update(value.as_bytes());
+    hasher.update(part_hasher.finalize().as_bytes());
 }
 
 // r[impl n8nclone.credentials.webhook_auth]

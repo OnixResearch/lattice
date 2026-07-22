@@ -3,27 +3,27 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 744,
-    "referenced": 415,
+    "requirements": 749,
+    "referenced": 420,
     "missing": 329,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "8cf97a36054d42282e749282cf218164b2847bcfde13b234d0a025a3eaa7c769",
-    "receipt_hash": "3ae5e850122affcdb9abf5508aabf0a645a54932c3897e19205b0c77f1cf1df5"
+    "input_hash": "294b5c556891930daba26980b0921d29ef79841d009aafd05e6db9018d97a1db",
+    "receipt_hash": "af664a46ba90104150a082f59078ac51db482cd8cccfb24355e1ca7238978c22"
   },
   "review_policy": {
     "expected_missing_count": 329,
     "expected_missing_hash": "bc3aee4eda70b495ed76feaca0c3a981d97d385d2e733965cc3558282836ca36",
     "reviewed_decisions": 2,
-    "policy_hash": "2fa9e36f5b7649bb28564904a88a00e6f469b0838c421870bb3847af66700971"
+    "policy_hash": "c5c0643db850af69a07761f3abb087b53b590732169b24e3174a002d2908bed9"
   },
   "summary": {
     "total": 329,
     "reviewed": 2,
     "unassessed": 327,
     "by_classification": {
-      "partial_evidence_only": 2,
+      "exact_maintained_evidence": 2,
       "unassessed": 327
     },
     "by_subsystem": {
@@ -415,50 +415,58 @@
     {
       "requirement_id": "n8nclone.credentials.webhook_auth.redaction",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
+          "path": "src/store/mod.rs",
+          "blake3": "6f88954fc5b1028133524c5b49585e47f027e0aa3e2c93ad810dd11d0acf526f"
+        },
+        {
           "path": "src/triggers.rs",
-          "blake3": "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467"
+          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
+        },
+        {
+          "path": "src/webhooks/controls.rs",
+          "blake3": "942f7286a689511ff37359bff729a8d21c2166235f7ab59a3f6d282d7ee7da76"
         },
         {
           "path": "src/webhooks/flow.rs",
           "blake3": "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922"
         },
         {
-          "path": "tests/test_triggers.rs",
-          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+          "path": "tests/test_webhook_credential_boundaries.rs",
+          "blake3": "373f5cb927029e468495609e6728c9d2f543ecc28a364d11820fc82a8e0243d9"
         }
       ],
-      "rationale_code": "assertions.safe-reference-context-missing"
+      "rationale_code": "assertions.fingerprinted-context-render-and-raw-store"
     },
     {
       "requirement_id": "n8nclone.credentials.webhook_auth.valid",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
+          "path": "src/headless.rs",
+          "blake3": "90f5deefe9ca359f845a4743b56ddc8b7ea36a3d9bd0a950193d88031782a34e"
+        },
+        {
+          "path": "src/store/mod.rs",
+          "blake3": "6f88954fc5b1028133524c5b49585e47f027e0aa3e2c93ad810dd11d0acf526f"
+        },
+        {
           "path": "src/triggers.rs",
-          "blake3": "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467"
+          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
         },
         {
           "path": "src/webhooks/flow.rs",
           "blake3": "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922"
         },
         {
-          "path": "tests/test_triggers.rs",
-          "blake3": "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
+          "path": "tests/test_webhook_credential_boundaries.rs",
+          "blake3": "373f5cb927029e468495609e6728c9d2f543ecc28a364d11820fc82a8e0243d9"
         }
       ],
-      "rationale_code": "assertions.persistence-observation-missing"
+      "rationale_code": "assertions.valid-admission-history-and-raw-store"
     },
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt",
@@ -2389,5 +2397,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "ce7ca1a724b6b3f1c56c50fb1aa04b08847795831e38462e29f69dac277956b6"
+  "inventory_hash": "81a2e33c91dbd8fc8f5bdcd43d2918ca51df628516b6312bf0393b6e27361833"
 }
