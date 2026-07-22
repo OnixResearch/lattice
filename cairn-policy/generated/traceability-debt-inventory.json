@@ -3,28 +3,27 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 788,
-    "referenced": 473,
+    "requirements": 798,
+    "referenced": 483,
     "missing": 315,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "8602c4080f1b246f90ed7c7f74fb7ba2f7920659045f37e964ae76fc77a94190",
-    "receipt_hash": "731f62c6d8b9d24836784cf590c33d64c45ee0c4401b0800853a22f3ac87c075"
+    "input_hash": "8225bed1997a289bb62268b7ab6eab66c3963d47d4fdf4f606f5f6983f08b511",
+    "receipt_hash": "053b1ec799ed452cfbdd95cd7d912ad2be417c4a26f458a65b19d90db5897d94"
   },
   "review_policy": {
     "expected_missing_count": 315,
     "expected_missing_hash": "2b7906ee39473996244bcfbf795e9ee984704c8bbfe2db9017309647c4d8373c",
     "reviewed_decisions": 11,
-    "policy_hash": "788b365acb3fe4dbe38ab55c42829dff6d3a1d0cb00059527d094147a309af15"
+    "policy_hash": "aaefffa042f72808c2caeba51bb03ade618edd6fd07f86bb291d6cd57df876e0"
   },
   "summary": {
     "total": 315,
     "reviewed": 11,
     "unassessed": 304,
     "by_classification": {
-      "exact_maintained_evidence": 2,
-      "partial_evidence_only": 9,
+      "exact_maintained_evidence": 11,
       "unassessed": 304
     },
     "by_subsystem": {
@@ -412,39 +411,55 @@
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "blake3": "10e7b1591a94f5163b59f1d37963e0aa7de6b494a145bd2e0aea08c583d70137"
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
+        },
+        {
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
+          "blake3": "af923558b39ecfb1b88eeecf86211ccaf112680c98e1fd3ac2b5df94ef2fe456"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-direct-vendor-lint-fixture"
+      "rationale_code": "assertions.package-clippy-no-deps-with-deny-fixture"
     },
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope.scenario.vendor-lints",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "blake3": "10e7b1591a94f5163b59f1d37963e0aa7de6b494a145bd2e0aea08c583d70137"
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
+        },
+        {
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
+          "blake3": "af923558b39ecfb1b88eeecf86211ccaf112680c98e1fd3ac2b5df94ef2fe456"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-triggering-vendor-lint-fixture"
+      "rationale_code": "assertions.vendor-clippy-deny-excluded"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "README.md",
@@ -452,15 +467,19 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-hostile-host-signing-check"
+      "rationale_code": "assertions.check-only-signing-override-and-external-policy"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check.scenario.missing-signing-key",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "README.md",
@@ -468,15 +487,19 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-missing-key-process-check"
+      "rationale_code": "assertions.missing-key-overridden-for-full-check"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check.scenario.normal-signing",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "README.md",
@@ -484,42 +507,54 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-external-signing-policy-assertion"
+      "rationale_code": "assertions.flake-signing-policy-absent"
     },
     {
       "requirement_id": "n8nclone.repository_validation.format_scope",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
-          "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "path": "flake.nix",
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
-          "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
+          "blake3": "8b91c672aee50955e9bc64e92ea9718b924a62b696892e9e242c42520a810acf"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-direct-vendor-format-fixture"
+      "rationale_code": "assertions.package-format-excludes-vendor-fixture"
     },
     {
       "requirement_id": "n8nclone.repository_validation.format_scope.scenario.vendor-format",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
-          "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "path": "flake.nix",
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
-          "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
+          "blake3": "8b91c672aee50955e9bc64e92ea9718b924a62b696892e9e242c42520a810acf"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-upstream-format-difference-assertion"
+      "rationale_code": "assertions.nonconforming-vendor-format-excluded"
     },
     {
       "requirement_id": "n8nclone.repository_validation.test_source",
@@ -528,15 +563,15 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
           "path": "tests/fixtures/n8n/shell.json",
           "blake3": "f72d1067fa2a19983040d22454031baffd640068efcbb33617fc6853c02609d6"
         },
         {
-          "path": "tests/test_n8n_json.rs",
-          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
       "rationale_code": "assertions.nix-nextest-compiles-tracked-test-fixtures"
@@ -548,15 +583,15 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
           "path": "tests/fixtures/n8n/shell.json",
           "blake3": "f72d1067fa2a19983040d22454031baffd640068efcbb33617fc6853c02609d6"
         },
         {
-          "path": "tests/test_n8n_json.rs",
-          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
       "rationale_code": "assertions.filtered-json-fixture-compiles"
@@ -564,50 +599,58 @@
     {
       "requirement_id": "n8nclone.repository_validation.vendor_snapshot",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "blake3": "10e7b1591a94f5163b59f1d37963e0aa7de6b494a145bd2e0aea08c583d70137"
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
-          "path": "vendor-cargo-deps/animus/crates/animus-adapters/src/effect/result.rs",
-          "blake3": "45238434efc4b7035133d4eabcdfdc5eb64308c96f1c49ffcab9f1f0120346b6"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/Cargo.toml",
+          "blake3": "569835e588c912762f8c27c81a28801be2f9302ee9e03e525c093426e29ee1ae"
         },
         {
-          "path": "vendor-cargo-deps/rats/source/ratcore/src/ratatui/coverage/baseline.rs",
-          "blake3": "cd5972e5ba1d6feb7ce9f51b5d9fa9f05009dae30db90095b3617ac02dde693a"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
+          "blake3": "8b91c672aee50955e9bc64e92ea9718b924a62b696892e9e242c42520a810acf"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-nested-vendor-source-closure-assertion"
+      "rationale_code": "assertions.git-and-nix-nested-source-admission"
     },
     {
       "requirement_id": "n8nclone.repository_validation.vendor_snapshot.scenario.nested-output-name",
       "subsystem": "repository-validation",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+          "blake3": "10e7b1591a94f5163b59f1d37963e0aa7de6b494a145bd2e0aea08c583d70137"
         },
         {
           "path": "flake.nix",
-          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+          "blake3": "64a3b11138a008a3a088308f46c8aabcb695b01092372e86394e35612e4664fc"
         },
         {
-          "path": "vendor-cargo-deps/animus/crates/animus-adapters/src/effect/result.rs",
-          "blake3": "45238434efc4b7035133d4eabcdfdc5eb64308c96f1c49ffcab9f1f0120346b6"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/Cargo.toml",
+          "blake3": "569835e588c912762f8c27c81a28801be2f9302ee9e03e525c093426e29ee1ae"
         },
         {
-          "path": "vendor-cargo-deps/rats/source/ratcore/src/ratatui/coverage/baseline.rs",
-          "blake3": "cd5972e5ba1d6feb7ce9f51b5d9fa9f05009dae30db90095b3617ac02dde693a"
+          "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
+          "blake3": "8b91c672aee50955e9bc64e92ea9718b924a62b696892e9e242c42520a810acf"
+        },
+        {
+          "path": "tests/test_repository_validation.rs",
+          "blake3": "e99f6379ed945478fb024ca4b7b7a3d891a2497f8e02d85f75421a6e4bce5347"
         }
       ],
-      "rationale_code": "gap.no-git-and-nix-nested-path-assertion"
+      "rationale_code": "assertions.nested-output-name-admitted"
     },
     {
       "requirement_id": "n8nclone.tui_ux.add_node.cancel",
@@ -2377,5 +2420,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "38e3e4b76d5198805d9771fa37191a0f97eff5bda2d660f9a73e1f10cd15191b"
+  "inventory_hash": "2d73e5329ff6b44822c6cd64d14bed827609f723d5d8cd81d5069b96fac25971"
 }

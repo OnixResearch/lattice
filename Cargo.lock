@@ -2295,6 +2295,7 @@ dependencies = [
  "futures",
  "hex",
  "home",
+ "lattice-repository-validation-fixture",
  "madsim",
  "nickel-lang-core",
  "parking_lot",
@@ -2326,6 +2327,10 @@ dependencies = [
  "tracing-subscriber",
  "url",
 ]
+
+[[package]]
+name = "lattice-repository-validation-fixture"
+version = "0.0.0"
 
 [[package]]
 name = "lazy-regex"

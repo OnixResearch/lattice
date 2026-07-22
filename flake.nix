@@ -46,6 +46,8 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+        isRepositoryValidationAssetPath =
+          path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
           toString path == "${sourceRoot}/README.md"
@@ -61,6 +63,7 @@
             craneLib.filterCargoSources path type
             || isSourceFixturePath path
             || isAnimusCompileTimeAssetPath path
+            || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };
 
@@ -69,6 +72,7 @@
           pkg-config
           clang
           mold
+          git
         ];
 
         buildInputs =
