@@ -3,76 +3,9 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
 {
   schema_version = "lattice.traceability-debt-inventory.v1",
   hash_algorithm = "BLAKE3",
-  expected_missing_count = 336,
-  expected_missing_hash = "9013bbe478784e6cec07f744410b35c27dad79cdf6c0451b496fbdc1a3e3ce7d",
+  expected_missing_count = 329,
+  expected_missing_hash = "bc3aee4eda70b495ed76feaca0c3a981d97d385d2e733965cc3558282836ca36",
   reviewed = [
-    {
-      requirement_id = "n8nclone.credentials.provider_cache_identity.no_plaintext",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/engine/executor.rs", blake3 = "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.provider-key-field-and-value-independence",
-    },
-    {
-      requirement_id = "n8nclone.credentials.provider_diagnostics.redaction.error",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.fixed-category-safe-identity-render",
-    },
-    {
-      requirement_id = "n8nclone.credentials.provider_diagnostics.redaction.test",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.serialized-success-and-failure",
-    },
-    {
-      requirement_id = "n8nclone.credentials.providers.command.resolve",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "src/engine/executor.rs", blake3 = "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.executor-before-side-effect-and-output-omission",
-    },
-    {
-      requirement_id = "n8nclone.credentials.providers.command.timeout",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "src/engine/executor.rs", blake3 = "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.executor-timeout-blocks-side-effect",
-    },
-    {
-      requirement_id = "n8nclone.credentials.providers.local_vault.resolve",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "src/engine/executor.rs", blake3 = "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.workflow-file-executor-boundary",
-    },
-    {
-      requirement_id = "n8nclone.credentials.providers.local_vault.tamper",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "src/credentials.rs", blake3 = "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1" },
-        { path = "src/engine/executor.rs", blake3 = "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664" },
-        { path = "tests/test_provider_credential_boundaries.rs", blake3 = "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7" },
-      ],
-      rationale_code = "assertions.rendered-tamper-blocks-side-effect",
-    },
     {
       requirement_id = "n8nclone.credentials.webhook_auth.redaction",
       classification = "partial_evidence_only",

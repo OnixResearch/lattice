@@ -95,6 +95,7 @@ fn command_config() -> CommandCredentialProviderConfig {
     config
 }
 
+// r[verify n8nclone.credentials.provider_cache_identity.no_plaintext]
 #[test]
 fn cache_identity_includes_provider_key_and_field_but_not_resolved_values() {
     let temp_dir = tempfile::tempdir().expect("temporary cache directory");
@@ -142,6 +143,8 @@ fn cache_identity_includes_provider_key_and_field_but_not_resolved_values() {
     assert!(!format!("{base_key:?}").contains(OTHER_SECRET_VALUE));
 }
 
+// r[verify n8nclone.credentials.providers.command.resolve]
+// r[verify n8nclone.credentials.providers.command.timeout]
 #[tokio::test]
 async fn command_provider_reaches_execution_and_timeout_blocks_side_effects() {
     let success_dir = tempfile::tempdir().expect("temporary command success directory");
@@ -172,6 +175,8 @@ async fn command_provider_reaches_execution_and_timeout_blocks_side_effects() {
     assert!(!format!("{timeout:?}").contains(SECRET_VALUE));
 }
 
+// r[verify n8nclone.credentials.providers.local_vault.resolve]
+// r[verify n8nclone.credentials.providers.local_vault.tamper]
 #[tokio::test]
 async fn local_vault_keeps_workflow_opaque_and_tamper_diagnostics_safe() {
     let entry = seal_local_vault_entry(SECRET_KEY, SECRET_VALUE, VAULT_KEY_MATERIAL, VAULT_NONCE);
@@ -215,6 +220,8 @@ async fn local_vault_keeps_workflow_opaque_and_tamper_diagnostics_safe() {
     assert!(!rendered.contains(VAULT_KEY_MATERIAL));
 }
 
+// r[verify n8nclone.credentials.provider_diagnostics.redaction.error]
+// r[verify n8nclone.credentials.provider_diagnostics.redaction.test]
 #[test]
 fn provider_probe_rendering_uses_fixed_safe_messages_and_opaque_identity() {
     let reference = secret_ref(CACHE_PROVIDER, SECRET_KEY, Some(SECRET_FIELD));
