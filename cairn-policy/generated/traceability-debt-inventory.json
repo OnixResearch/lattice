@@ -3,27 +3,29 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 753,
-    "referenced": 426,
+    "requirements": 757,
+    "referenced": 430,
     "missing": 327,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "d0ebe3708dcd39b728c8754360c883b145e051a3b6d0d672636ffaa0a5e5303b",
-    "receipt_hash": "351c0608aea1fb810581a04bdaebf2fc78c6e9e0275853a7a4f711b862becd92"
+    "input_hash": "591b0385a73114ebd3bfdc298986fb35fe94488d4ac2677680f02dc46315649e",
+    "receipt_hash": "5e7d8eb8be8dbe6b21112ea3a105942b70b4726e2fef3d65478d9e4d86bd8469"
   },
   "review_policy": {
     "expected_missing_count": 327,
     "expected_missing_hash": "1c8d9ebc7d34a24365f332e8d386cc1d905601d6541faaa254e3f6d2cd4b8aa4",
-    "reviewed_decisions": 0,
-    "policy_hash": "6d4b04815ca97c996742832bb8020796ef73c1dca8baee2f06fc47674ea8052d"
+    "reviewed_decisions": 2,
+    "policy_hash": "85dc8e286af21299136d92c713229d33059cf341c30dc26e389da8606293ddb4"
   },
   "summary": {
     "total": 327,
-    "reviewed": 0,
-    "unassessed": 327,
+    "reviewed": 2,
+    "unassessed": 325,
     "by_classification": {
-      "unassessed": 327
+      "exact_maintained_evidence": 1,
+      "no_exact_evidence_identified": 1,
+      "unassessed": 325
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -1246,16 +1248,25 @@
     {
       "requirement_id": "n8nclone.workflow_examples.image.invalid",
       "subsystem": "workflow-examples",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "fixture.absent-from-maintained-roots"
     },
     {
       "requirement_id": "n8nclone.workflow_examples.image.selfie_to_fine_art",
       "subsystem": "workflow-examples",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "examples/workflows/selfie-to-fine-art.ncl",
+          "blake3": "2efd38cfd5d615233f307983ce81baf1e0c61563185526e7b4ad00880854dd0e"
+        },
+        {
+          "path": "tests/test_image_workflow_example.rs",
+          "blake3": "657bb2f91f7f1a2471d8bd7d9556c1cb87fd41916ea255ce645e757227f099c0"
+        }
+      ],
+      "rationale_code": "assertions.import-execute-and-image-output"
     },
     {
       "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.image_edit",
@@ -2339,5 +2350,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "e62eab3acbe105061dba1cf9f8a45e1139a8c7208a7cda62718a36917f25a083"
+  "inventory_hash": "6929946be7a3a84ddfa653d78c44e3f51907d68da005029748ed8a634c60cee1"
 }
