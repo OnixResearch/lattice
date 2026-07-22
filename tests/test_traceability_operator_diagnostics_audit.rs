@@ -11,10 +11,10 @@ use std::collections::BTreeSet;
 
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-candidate-promotion-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-operator-diagnostics-current.json");
-const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
-const MAIN_SOURCE: &str = include_str!("../src/main.rs");
+const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-operator-diagnostics-reviewed.json");
+const DOCTOR_CORE_SOURCE: &str = include_str!("../src/doctor/core.rs");
 const DOCTOR_TESTS: &str = include_str!("test_doctor.rs");
-const MAIN_SOURCE_PATH: &str = "src/main.rs";
+const DOCTOR_CORE_SOURCE_PATH: &str = "src/doctor/core.rs";
 const DOCTOR_TESTS_PATH: &str = "tests/test_doctor.rs";
 const SUBSYSTEM: &str = "operator-diagnostics";
 const UNASSESSED_CLASSIFICATION: &str = "unassessed";
@@ -24,9 +24,7 @@ const NO_EXACT_CLASSIFICATION: &str = "no_exact_evidence_identified";
 const TOTAL_COUNT: usize = 361;
 const REVIEWED_COUNT: usize = 8;
 const UNASSESSED_COUNT: usize = 353;
-const EXACT_COUNT: usize = 2;
-const PARTIAL_COUNT: usize = 4;
-const NO_EXACT_COUNT: usize = 2;
+const EXACT_COUNT: usize = 8;
 const UNRELATED_MISSING_ID: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const UNEXPECTED_ADDED_ID: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING_ID: &str = "lattice.example.dangling.scenario.marker";
@@ -81,50 +79,50 @@ fn expected_decisions() -> Vec<ExpectedDecision> {
         ExpectedDecision {
             requirement_id: DOCTOR_CORE_ID,
             classification: EXACT_CLASSIFICATION,
-            rationale_code: "source.pure-deterministic-evaluate",
-            evidence_paths: &[MAIN_SOURCE_PATH],
+            rationale_code: "assertions.pure-core-deterministic",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_CORE_FATAL_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "assertions.enumerated-failures-incomplete",
-            evidence_paths: &[MAIN_SOURCE_PATH, DOCTOR_TESTS_PATH],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.enumerated-failures-complete",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_CORE_HEALTHY_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "assertions.healthy-findings-indirect",
-            evidence_paths: &[MAIN_SOURCE_PATH, DOCTOR_TESTS_PATH],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.healthy-findings-complete",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_OUTPUT_ID,
             classification: EXACT_CLASSIFICATION,
-            rationale_code: "source.deterministic-dual-renderers",
-            evidence_paths: &[MAIN_SOURCE_PATH],
+            rationale_code: "assertions.deterministic-dual-renderers",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_OUTPUT_JSON_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "assertions.mixed-json-output-missing",
-            evidence_paths: &[MAIN_SOURCE_PATH, DOCTOR_TESTS_PATH],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.mixed-json-output-complete",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_OUTPUT_TEXT_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "assertions.mixed-text-output-missing",
-            evidence_paths: &[MAIN_SOURCE_PATH, DOCTOR_TESTS_PATH],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.mixed-text-output-complete",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_REDACTION_ID,
-            classification: NO_EXACT_CLASSIFICATION,
-            rationale_code: "behavior.redaction-inputs-unwired",
-            evidence_paths: &[],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.sensitive-values-redacted",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH, DOCTOR_TESTS_PATH],
         },
         ExpectedDecision {
             requirement_id: DOCTOR_REDACTION_JSON_ID,
-            classification: NO_EXACT_CLASSIFICATION,
-            rationale_code: "assertions.json-redaction-missing",
-            evidence_paths: &[],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.json-sensitive-values-redacted",
+            evidence_paths: &[DOCTOR_CORE_SOURCE_PATH],
         },
     ]
 }
@@ -158,7 +156,7 @@ fn issue_codes(issues: &[core::ReviewIssue]) -> BTreeSet<&str> {
 
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
     BTreeMap::from([
-        (MAIN_SOURCE_PATH, blake3::hash(MAIN_SOURCE.as_bytes()).to_hex().to_string()),
+        (DOCTOR_CORE_SOURCE_PATH, blake3::hash(DOCTOR_CORE_SOURCE.as_bytes()).to_hex().to_string()),
         (DOCTOR_TESTS_PATH, blake3::hash(DOCTOR_TESTS.as_bytes()).to_hex().to_string()),
     ])
 }
@@ -166,8 +164,8 @@ fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
 // r[verify lattice.repository_validation.traceability_tranche_review.scenario.complete]
 // r[verify lattice.repository_validation.traceability_tranche_review.scenario.evidence]
 #[test]
-fn operator_diagnostics_review_is_complete_bound_and_non_promoting() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+fn operator_diagnostics_review_is_complete_bound_and_exact() {
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let rows = review_rows(&report);
     let review_issues = validate_tranche(&rows, SUBSYSTEM, &expected_decisions());
     let baseline = coverage_snapshot(BASELINE_COVERAGE);
@@ -181,29 +179,28 @@ fn operator_diagnostics_review_is_complete_bound_and_non_promoting() {
     assert_eq!(report.summary.reviewed, REVIEWED_COUNT);
     assert_eq!(report.summary.unassessed, UNASSESSED_COUNT);
     assert_eq!(report.summary.by_classification.get(EXACT_CLASSIFICATION), Some(&EXACT_COUNT));
-    assert_eq!(report.summary.by_classification.get(PARTIAL_CLASSIFICATION), Some(&PARTIAL_COUNT));
-    assert_eq!(report.summary.by_classification.get(NO_EXACT_CLASSIFICATION), Some(&NO_EXACT_COUNT));
+    assert!(!report.summary.by_classification.contains_key(PARTIAL_CLASSIFICATION));
+    assert!(!report.summary.by_classification.contains_key(NO_EXACT_CLASSIFICATION));
     assert_eq!(report.summary.by_classification.get(UNASSESSED_CLASSIFICATION), Some(&UNASSESSED_COUNT));
 
     for row in report.rows.iter().filter(|row| row.subsystem == SUBSYSTEM) {
         for evidence in &row.evidence {
             assert_eq!(actual_hashes.get(evidence.path.as_str()), Some(&evidence.blake3));
         }
-        assert!(!MAIN_SOURCE.contains(&format!("r[impl {}]", row.requirement_id)));
-        assert!(!DOCTOR_TESTS.contains(&format!("r[verify {}]", row.requirement_id)));
+        assert!(DOCTOR_CORE_SOURCE.contains(&format!("r[verify {}]", row.requirement_id)));
     }
 }
 
 // r[verify lattice.repository_validation.traceability_tranche_review.scenario.fail_closed]
 #[test]
 fn classification_evidence_and_coverage_drift_fail_closed() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let mut rows = review_rows(&report);
     rows.retain(|row| row.requirement_id != DOCTOR_CORE_ID);
     rows.iter_mut()
         .find(|row| row.requirement_id == DOCTOR_CORE_FATAL_ID)
         .expect("fatal row")
-        .classification = EXACT_CLASSIFICATION.to_string();
+        .classification = PARTIAL_CLASSIFICATION.to_string();
     rows.iter_mut()
         .find(|row| row.requirement_id == DOCTOR_CORE_HEALTHY_ID)
         .expect("healthy row")

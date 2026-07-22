@@ -38,183 +38,8 @@ const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
 
-mod doctor {
-    const FATAL_SORT_RANK: u8 = 0;
-    const WARNING_SORT_RANK: u8 = 1;
-    const HEALTHY_SORT_RANK: u8 = 2;
-    const REDACTED_MARKER: &str = "[redacted]";
-
-    pub const CHECK_CONFIG: &str = "config";
-    pub const CHECK_STORE: &str = "store";
-    pub const CHECK_WORKFLOWS: &str = "workflows";
-    pub const CHECK_CREDENTIALS: &str = "credentials";
-    pub const CHECK_WEBHOOK_LISTENER: &str = "webhook_listener";
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Severity {
-        Healthy,
-        Warning,
-        Fatal,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Status {
-        Healthy,
-        Warning,
-        Fatal,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct Fact {
-        pub id: String,
-        pub severity: Severity,
-        pub message: String,
-        pub remediation: Option<String>,
-        pub redactions: Vec<String>,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct Facts {
-        pub checks: Vec<Fact>,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-    pub struct Finding {
-        pub id: String,
-        pub severity: Severity,
-        pub message: String,
-        pub remediation: Option<String>,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-    pub struct Report {
-        pub status: Status,
-        pub findings: Vec<Finding>,
-    }
-
-    impl Fact {
-        pub fn healthy(id: impl Into<String>, message: impl Into<String>) -> Self {
-            Self::new(id, Severity::Healthy, message)
-        }
-
-        pub fn fatal(id: impl Into<String>, message: impl Into<String>) -> Self {
-            Self::new(id, Severity::Fatal, message)
-        }
-
-        pub fn with_remediation(mut self, remediation: impl Into<String>) -> Self {
-            self.remediation = Some(remediation.into());
-            self
-        }
-
-        fn new(id: impl Into<String>, severity: Severity, message: impl Into<String>) -> Self {
-            Self {
-                id: id.into(),
-                severity,
-                message: message.into(),
-                remediation: None,
-                redactions: Vec::new(),
-            }
-        }
-    }
-
-    impl Facts {
-        pub fn new(checks: Vec<Fact>) -> Self {
-            Self { checks }
-        }
-    }
-
-    pub fn evaluate(facts: &Facts) -> Report {
-        let mut findings = facts.checks.iter().map(finding_from_fact).collect::<Vec<_>>();
-        findings.sort_by(|left, right| {
-            severity_sort_rank(left.severity)
-                .cmp(&severity_sort_rank(right.severity))
-                .then_with(|| left.id.cmp(&right.id))
-        });
-        Report {
-            status: report_status(&findings),
-            findings,
-        }
-    }
-
-    pub fn render_text(report: &Report) -> String {
-        let mut output = format!("doctor status={}\n", status_label(report.status));
-        for finding in &report.findings {
-            output.push_str(&format!("{} {}: {}\n", severity_label(finding.severity), finding.id, finding.message));
-            if let Some(remediation) = &finding.remediation {
-                output.push_str(&format!("  hint: {remediation}\n"));
-            }
-        }
-        output
-    }
-
-    pub fn render_json(report: &Report) -> String {
-        match serde_json::to_string_pretty(report) {
-            Ok(json) => json,
-            Err(error) => format!(
-                "{{\"status\":\"fatal\",\"findings\":[{{\"id\":\"doctor_output\",\"severity\":\"fatal\",\"message\":\"json render failed: {error}\",\"remediation\":null}}]}}"
-            ),
-        }
-    }
-
-    pub fn has_fatal(report: &Report) -> bool {
-        report.status == Status::Fatal
-    }
-
-    fn finding_from_fact(fact: &Fact) -> Finding {
-        Finding {
-            id: fact.id.clone(),
-            severity: fact.severity,
-            message: sanitize_text(&fact.message, &fact.redactions),
-            remediation: fact.remediation.as_ref().map(|remediation| sanitize_text(remediation, &fact.redactions)),
-        }
-    }
-
-    fn report_status(findings: &[Finding]) -> Status {
-        if findings.iter().any(|finding| finding.severity == Severity::Fatal) {
-            Status::Fatal
-        } else if findings.iter().any(|finding| finding.severity == Severity::Warning) {
-            Status::Warning
-        } else {
-            Status::Healthy
-        }
-    }
-
-    fn sanitize_text(input: &str, redactions: &[String]) -> String {
-        let mut output = input.to_string();
-        for redaction in redactions {
-            if !redaction.is_empty() {
-                output = output.replace(redaction, REDACTED_MARKER);
-            }
-        }
-        output
-    }
-
-    fn severity_sort_rank(severity: Severity) -> u8 {
-        match severity {
-            Severity::Fatal => FATAL_SORT_RANK,
-            Severity::Warning => WARNING_SORT_RANK,
-            Severity::Healthy => HEALTHY_SORT_RANK,
-        }
-    }
-
-    fn status_label(status: Status) -> &'static str {
-        match status {
-            Status::Healthy => "healthy",
-            Status::Warning => "warning",
-            Status::Fatal => "fatal",
-        }
-    }
-
-    fn severity_label(severity: Severity) -> &'static str {
-        match severity {
-            Severity::Healthy => "healthy",
-            Severity::Warning => "warning",
-            Severity::Fatal => "fatal",
-        }
-    }
-}
+#[path = "doctor/core.rs"]
+mod doctor;
 
 // r[impl lattice.project_identity.canonical]
 #[derive(Parser, Debug)]
@@ -610,16 +435,14 @@ fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppC
         std::io::sink(),
         nickel_lang_core::error::NullReporter {},
     )
-    .map_err(|error| format!("failed to load {}: {error:?}", config_path.display()))?;
-    let runtime = program
-        .eval_full_for_export()
-        .map_err(|error| format!("eval error in {}: {error:?}", config_path.display()))?;
+    .map_err(|_| "Nickel config could not be loaded".to_string())?;
+    let runtime = program.eval_full_for_export().map_err(|_| "Nickel config evaluation failed".to_string())?;
     nickel_lang_core::serialize::validate(nickel_lang_core::serialize::ExportFormat::Json, &runtime)
-        .map_err(|error| format!("validation error in {}: {error:?}", config_path.display()))?;
+        .map_err(|_| "Nickel config export validation failed".to_string())?;
     let mut json = Vec::new();
-    serde_json::to_writer(&mut json, &runtime).map_err(|error| format!("json serialize error: {error}"))?;
-    let value = serde_json::from_slice(&json).map_err(|error| format!("json parse error: {error}"))?;
-    serde_json::from_value(value).map_err(|error| format!("config JSON decode failed: {error}"))
+    serde_json::to_writer(&mut json, &runtime).map_err(|_| "Nickel config serialization failed".to_string())?;
+    let value = serde_json::from_slice(&json).map_err(|_| "Nickel config JSON parse failed".to_string())?;
+    serde_json::from_value(value).map_err(|_| "Nickel config schema decode failed".to_string())
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks]

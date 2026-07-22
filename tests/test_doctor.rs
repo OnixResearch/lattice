@@ -43,15 +43,21 @@ fn write_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path:
     (config_path, data_dir)
 }
 
+fn doctor_command(config_path: &Path, output: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lattice"));
+    command.arg("--config").arg(config_path).arg("doctor").arg("--output").arg(output);
+    command
+}
+
 fn run_doctor(config_path: &Path, output: &str) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_lattice"))
-        .arg("--config")
-        .arg(config_path)
-        .arg("doctor")
-        .arg("--output")
-        .arg(output)
+    doctor_command(config_path, output).output().expect("doctor command runs")
+}
+
+fn run_doctor_with_environment_secret(config_path: &Path, output: &str) -> std::process::Output {
+    doctor_command(config_path, output)
+        .env(MISSING_DOCTOR_SECRET_KEY, SECRET_SENTINEL)
         .output()
-        .expect("doctor command runs")
+        .expect("doctor command with environment secret runs")
 }
 
 fn doctor_trigger() -> TriggerDefinition {
@@ -108,21 +114,31 @@ fn doctor_cli_missing_config_fails_safely() {
 fn doctor_cli_bad_nickel_and_missing_store_fail_without_creating_store() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
     let bad_config_path = temp_dir.path().join("bad.ncl");
-    std::fs::write(&bad_config_path, "{ data_dir = ").expect("bad config written");
+    std::fs::write(&bad_config_path, format!("{{ data_dir = \"{SECRET_SENTINEL}\", broken = "))
+        .expect("bad config written");
     let (config_path, data_dir) = write_config(&temp_dir);
     let store_path = data_dir.join(STORE_FILE_NAME);
 
-    let bad_config_output = run_doctor(&bad_config_path, "text");
+    let bad_config_text_output = run_doctor(&bad_config_path, "text");
+    let bad_config_json_output = run_doctor(&bad_config_path, "json");
     let missing_store_output = run_doctor(&config_path, "text");
+    let bad_text_stdout = String::from_utf8(bad_config_text_output.stdout).expect("bad text stdout utf8");
+    let bad_text_stderr = String::from_utf8(bad_config_text_output.stderr).expect("bad text stderr utf8");
+    let bad_json_stdout = String::from_utf8(bad_config_json_output.stdout).expect("bad JSON stdout utf8");
+    let bad_json_stderr = String::from_utf8(bad_config_json_output.stderr).expect("bad JSON stderr utf8");
 
-    assert!(!bad_config_output.status.success());
+    assert!(!bad_config_text_output.status.success());
+    assert!(!bad_config_json_output.status.success());
     assert!(!missing_store_output.status.success());
+    assert!(!bad_text_stdout.contains(SECRET_SENTINEL));
+    assert!(!bad_text_stderr.contains(SECRET_SENTINEL));
+    assert!(!bad_json_stdout.contains(SECRET_SENTINEL));
+    assert!(!bad_json_stderr.contains(SECRET_SENTINEL));
     assert!(!store_path.exists());
 }
 
 // r[verify n8nclone.operator_diagnostics.doctor_checks.credentials]
 // r[verify n8nclone.operator_diagnostics.doctor_checks.webhook_listener]
-// r[verify n8nclone.operator_diagnostics.doctor_redaction.text]
 #[test]
 fn doctor_cli_reports_missing_credential_provider_without_secret_values() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
@@ -140,5 +156,34 @@ fn doctor_cli_reports_missing_credential_provider_without_secret_values() {
     assert!(!output.status.success());
     assert!(stdout.contains("credentials"));
     assert!(stdout.contains("webhook_listener"));
-    assert!(!stdout.contains(SECRET_SENTINEL));
+}
+
+#[test]
+fn doctor_cli_never_discloses_a_present_environment_secret() {
+    let temp_dir = tempfile::tempdir().expect("temp dir created");
+    let (config_path, data_dir) = write_config(&temp_dir);
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store created");
+    let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME);
+    workflow.triggers.push(doctor_trigger());
+    store.save_workflow(&workflow).expect("workflow with trigger saved");
+    store.save_trigger(&workflow.triggers[0]).expect("trigger saved");
+    drop(store);
+
+    let text_output = run_doctor_with_environment_secret(&config_path, "text");
+    let json_output = run_doctor_with_environment_secret(&config_path, "json");
+    let text_stdout = String::from_utf8(text_output.stdout).expect("text stdout utf8");
+    let text_stderr = String::from_utf8(text_output.stderr).expect("text stderr utf8");
+    let json_stdout = String::from_utf8(json_output.stdout).expect("JSON stdout utf8");
+    let json_stderr = String::from_utf8(json_output.stderr).expect("JSON stderr utf8");
+    let report: serde_json::Value = serde_json::from_str(&json_stdout).expect("doctor JSON parses");
+
+    assert!(text_output.status.success());
+    assert!(json_output.status.success());
+    assert_eq!(report["status"].as_str(), Some("healthy"));
+    assert!(text_stdout.contains("credentials"));
+    assert!(json_stdout.contains("credentials"));
+    assert!(!text_stdout.contains(SECRET_SENTINEL));
+    assert!(!text_stderr.contains(SECRET_SENTINEL));
+    assert!(!json_stdout.contains(SECRET_SENTINEL));
+    assert!(!json_stderr.contains(SECRET_SENTINEL));
 }

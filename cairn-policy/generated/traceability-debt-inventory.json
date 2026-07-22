@@ -4,28 +4,25 @@
   "coverage": {
     "profile_id": "cairn-default",
     "requirements": 710,
-    "referenced": 349,
-    "missing": 361,
+    "referenced": 357,
+    "missing": 353,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "4aacd4fc05dbd5e6fd515e4b4b7e1515f4aca882058012cfcba4324465b4b00d",
-    "receipt_hash": "2d65d23ff28e90be6f93656d5e9a26a049f38038da486c2f13768e2adbf1e4cf"
+    "input_hash": "8eac7421fbd9f64acda404ddf4936ce5268dbdad22ef876ac06392e293fcaaf5",
+    "receipt_hash": "72e6ac2a7fae5933c17631506f54d38f7016203054b3e619f66f739319e35c06"
   },
   "review_policy": {
-    "expected_missing_count": 361,
-    "expected_missing_hash": "df059bfa0b70e75996de6dc41990d0d744197b90bee9195bf1b873c505abaf3c",
-    "reviewed_decisions": 8,
-    "policy_hash": "2ce38b700b3de64ce77c596a2c94c98da83018fef25bc2159a9ba14f5c289a71"
+    "expected_missing_count": 353,
+    "expected_missing_hash": "0e205e16faa2c958a0ba9f90bb64bbc8d09c81c16f8dd93f9798fd958a4835e1",
+    "reviewed_decisions": 0,
+    "policy_hash": "d07125dc5aab4e510aecb7471e946514d39b3b995b6c248bf799fffe1868463f"
   },
   "summary": {
-    "total": 361,
-    "reviewed": 8,
+    "total": 353,
+    "reviewed": 0,
     "unassessed": 353,
     "by_classification": {
-      "exact_maintained_evidence": 2,
-      "no_exact_evidence_identified": 2,
-      "partial_evidence_only": 4,
       "unassessed": 353
     },
     "by_subsystem": {
@@ -33,7 +30,6 @@
       "agent-runtime": 14,
       "credentials": 26,
       "node-templates": 3,
-      "operator-diagnostics": 8,
       "repository-validation": 11,
       "scheduling": 7,
       "tui-ux": 98,
@@ -617,108 +613,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_core",
-      "subsystem": "operator-diagnostics",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        }
-      ],
-      "rationale_code": "source.pure-deterministic-evaluate"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_core.fatal",
-      "subsystem": "operator-diagnostics",
-      "classification": "partial_evidence_only",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        },
-        {
-          "path": "tests/test_doctor.rs",
-          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
-        }
-      ],
-      "rationale_code": "assertions.enumerated-failures-incomplete"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_core.healthy",
-      "subsystem": "operator-diagnostics",
-      "classification": "partial_evidence_only",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        },
-        {
-          "path": "tests/test_doctor.rs",
-          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
-        }
-      ],
-      "rationale_code": "assertions.healthy-findings-indirect"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_output",
-      "subsystem": "operator-diagnostics",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        }
-      ],
-      "rationale_code": "source.deterministic-dual-renderers"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_output.json",
-      "subsystem": "operator-diagnostics",
-      "classification": "partial_evidence_only",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        },
-        {
-          "path": "tests/test_doctor.rs",
-          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
-        }
-      ],
-      "rationale_code": "assertions.mixed-json-output-missing"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_output.text",
-      "subsystem": "operator-diagnostics",
-      "classification": "partial_evidence_only",
-      "evidence": [
-        {
-          "path": "src/main.rs",
-          "blake3": "e36262a8289e29d552560b429af2603456d32ca9766b32223caec2e5e4ed1a8d"
-        },
-        {
-          "path": "tests/test_doctor.rs",
-          "blake3": "12b75ea05dae3a639f4f024dce632ee853a345e2ddc9c13753ccdde41eb68086"
-        }
-      ],
-      "rationale_code": "assertions.mixed-text-output-missing"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_redaction",
-      "subsystem": "operator-diagnostics",
-      "classification": "no_exact_evidence_identified",
-      "evidence": [],
-      "rationale_code": "behavior.redaction-inputs-unwired"
-    },
-    {
-      "requirement_id": "n8nclone.operator_diagnostics.doctor_redaction.json",
-      "subsystem": "operator-diagnostics",
-      "classification": "no_exact_evidence_identified",
-      "evidence": [],
-      "rationale_code": "assertions.json-redaction-missing"
     },
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope",
@@ -2618,7 +2512,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "df059bfa0b70e75996de6dc41990d0d744197b90bee9195bf1b873c505abaf3c",
+  "missing_set_hash": "0e205e16faa2c958a0ba9f90bb64bbc8d09c81c16f8dd93f9798fd958a4835e1",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2626,5 +2520,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "03e2d418ee7ded71db5cc629004da6fa0bbb6ca71e1ff4b35884722e962a40be"
+  "inventory_hash": "75fc950452ef4c493fa4f9637de540d0ef160fd709bb95ef3921c10c4277537d"
 }
