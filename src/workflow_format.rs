@@ -211,6 +211,8 @@ pub struct PortableSecretEnvVar {
     pub key: String,
     #[serde(default)]
     pub field: Vec<String>,
+    #[serde(rename = "value")]
+    pub plaintext_value: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -293,6 +295,9 @@ pub enum WorkflowFormatError {
         node_id: u64,
         name: String,
     },
+    PlaintextCredentialMaterial {
+        node_id: u64,
+    },
     InvalidSecretField {
         node_id: u64,
         count: usize,
@@ -368,6 +373,9 @@ impl std::fmt::Display for WorkflowFormatError {
             Self::DuplicateEnvKey { node_id, key } => write!(f, "node {node_id} has duplicate env key: {key}"),
             Self::DuplicateSecretEnvName { node_id, name } => {
                 write!(f, "node {node_id} has duplicate secret env name: {name}")
+            }
+            Self::PlaintextCredentialMaterial { node_id } => {
+                write!(f, "credential diagnostic: node {node_id} contains forbidden plaintext secret material")
             }
             Self::InvalidSecretField { node_id, count } => {
                 write!(f, "node {node_id} has {count} secret field values; expected zero or one")
@@ -555,6 +563,7 @@ fn node_config_to_portable(
                             provider: secret_ref.provider.clone(),
                             key: secret_ref.key.clone(),
                             field: secret_ref.field.iter().cloned().collect(),
+                            plaintext_value: None,
                         })
                         .collect::<Vec<_>>()
                 })
@@ -1671,6 +1680,11 @@ fn non_empty_or_default(value: &str, default_value: String) -> String {
 fn portable_config_to_node_credentials(config: &PortableNodeConfig) -> Result<NodeCredentialRefs, WorkflowFormatError> {
     let mut env = HashMap::new();
     for secret_env in &config.secret_env {
+        if secret_env.plaintext_value.is_some() {
+            return Err(WorkflowFormatError::PlaintextCredentialMaterial {
+                node_id: config.node_id,
+            });
+        }
         if secret_env.field.len() > MAX_OPTIONAL_CWD_VALUES {
             return Err(WorkflowFormatError::InvalidSecretField {
                 node_id: config.node_id,
@@ -1690,6 +1704,8 @@ fn portable_config_to_node_credentials(config: &PortableNodeConfig) -> Result<No
             });
         }
     }
+    debug_assert!(config.secret_env.iter().all(|secret_env| secret_env.plaintext_value.is_none()));
+    debug_assert_eq!(env.len(), config.secret_env.len());
     Ok(NodeCredentialRefs { env })
 }
 
@@ -1716,7 +1732,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch = [], merge_policy | String = \"\", merge_required_inputs | Array String = [], subworkflow_name | String = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping = [], subworkflow_output_mappings | Array SubworkflowOutputMapping = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch = [], merge_policy | String = \"\", merge_required_inputs | Array String = [], subworkflow_name | String = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping = [], subworkflow_output_mappings | Array SubworkflowOutputMapping = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {

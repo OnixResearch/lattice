@@ -587,8 +587,13 @@ pub fn resolve_secret_env(
 
 // r[impl n8nclone.credentials.redaction]
 pub fn redact_text(text: &str, secret_values: &[String]) -> String {
+    let mut normalized =
+        secret_values.iter().map(String::as_str).filter(|secret| !secret.is_empty()).collect::<Vec<_>>();
+    normalized.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
+    normalized.dedup();
+
     let mut redacted = text.to_string();
-    for secret in secret_values.iter().filter(|secret| !secret.is_empty()) {
+    for secret in normalized {
         redacted = redacted.replace(secret, REDACTION_MARKER);
     }
     redacted

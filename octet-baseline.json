@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:ec5609b38db008f4145f4c38490b04290d8b52266e7b5a067d2cb29751ac208f",
+  "baseline_hash": "b3:1420c9a0b1e03612f4cec47bee348cbab937873c4b03fcae75d6d0d7a22257a2",
   "findings": [
     {
       "stable_id": "b3:02a1c82bab65b6c1",
@@ -1300,8 +1300,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:89dd760ba38a770f",
-      "semantic_id": "b3:89dd760ba38a770f",
+      "stable_id": "b3:ba3db39e4d4104db",
+      "semantic_id": "b3:ba3db39e4d4104db",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -1309,7 +1309,7 @@
       "file": "src/credentials.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 595 lines (limit: 300)",
+      "message": "source file is 600 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -13117,8 +13117,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1d324a6e565587d3",
-      "semantic_id": "b3:1d324a6e565587d3",
+      "stable_id": "b3:8b42e355acc3d372",
+      "semantic_id": "b3:8b42e355acc3d372",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "tigerstyle::naming",
@@ -13130,8 +13130,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:8c5cc5f0f75ac680",
-      "semantic_id": "b3:8c5cc5f0f75ac680",
+      "stable_id": "b3:fae970a39dccf654",
+      "semantic_id": "b3:fae970a39dccf654",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -13139,7 +13139,7 @@
       "file": "src/workflow_format.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 2084 lines (limit: 300)",
+      "message": "source file is 2100 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -14112,20 +14112,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 250,
+      "line": 252,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:09bf4440ac412549",
-      "semantic_id": "b3:09bf4440ac412549",
+      "stable_id": "b3:12241547ca6aac0a",
+      "semantic_id": "b3:12241547ca6aac0a",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 273,
+      "line": 275,
       "column": 1,
       "message": "item name `WorkflowFormatError` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14138,7 +14138,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 419,
+      "line": 427,
       "column": 1,
       "message": "item name `workflow_to_portable` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14151,7 +14151,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 419,
+      "line": 427,
       "column": 70,
       "message": "function `workflow_to_portable` has 0 assertion(s) in 47 lines (need 2+)",
       "crate_name": "lattice"
@@ -14164,7 +14164,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 489,
+      "line": 497,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -14177,35 +14177,35 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 504,
+      "line": 512,
       "column": 1,
       "message": "item name `workflow_for_config` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:bb3bac2c4b48a040",
-      "semantic_id": "b3:bb3bac2c4b48a040",
-      "identity_status": "computed",
-      "lint": "function_length",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/workflow_format.rs",
-      "line": 528,
-      "column": 25,
-      "message": "function `node_config_to_portable` is 414 lines (limit: 70)",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:bddd79e8de8719ae",
-      "semantic_id": "b3:bddd79e8de8719ae",
+      "stable_id": "b3:2972b9933407d71d",
+      "semantic_id": "b3:2972b9933407d71d",
       "identity_status": "computed",
       "lint": "assertion_density",
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 528,
+      "line": 536,
       "column": 25,
-      "message": "function `node_config_to_portable` has 0 assertion(s) in 414 lines (need 2+)",
+      "message": "function `node_config_to_portable` has 0 assertion(s) in 415 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:4da36e4ff44a51df",
+      "semantic_id": "b3:4da36e4ff44a51df",
+      "identity_status": "computed",
+      "lint": "function_length",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 536,
+      "column": 25,
+      "message": "function `node_config_to_portable` is 415 lines (limit: 70)",
       "crate_name": "lattice"
     },
     {
@@ -14216,7 +14216,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 529,
+      "line": 537,
       "column": 9,
       "message": "`portable_runner` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -14229,7 +14229,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 998,
+      "line": 1007,
       "column": 72,
       "message": "function `trigger_to_portable` has 0 assertion(s) in 35 lines (need 2+)",
       "crate_name": "lattice"
@@ -14242,7 +14242,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1058,
+      "line": 1067,
       "column": 107,
       "message": "function `portable_auth_parts` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -14255,7 +14255,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1155,
+      "line": 1164,
       "column": 55,
       "message": "function `portable_trigger_binding_to_binding` has 0 assertion(s) in 20 lines (need 2+)",
       "crate_name": "lattice"
@@ -14268,7 +14268,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1237,
+      "line": 1246,
       "column": 1,
       "message": "item name `portable_to_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14281,7 +14281,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1262,
+      "line": 1271,
       "column": 13,
       "message": "`port_id_map` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -14294,7 +14294,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1280,
+      "line": 1289,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -14307,7 +14307,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1286,
+      "line": 1295,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -14320,7 +14320,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1318,
+      "line": 1327,
       "column": 95,
       "message": "function `validate_portable_identity` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -14333,7 +14333,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1320,
+      "line": 1329,
       "column": 13,
       "message": "`port_ids` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -14346,7 +14346,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1365,
+      "line": 1374,
       "column": 113,
       "message": "function `portable_shell_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -14359,7 +14359,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1392,
+      "line": 1401,
       "column": 112,
       "message": "function `portable_http_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -14372,7 +14372,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1531,
+      "line": 1540,
       "column": 117,
       "message": "function `portable_condition_config_to_node_config` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "lattice"
@@ -14385,7 +14385,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1569,
+      "line": 1578,
       "column": 119,
       "message": "function `portable_subworkflow_config_to_node_config` has 0 assertion(s) in 28 lines (need 2+)",
       "crate_name": "lattice"
@@ -14398,22 +14398,9 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1646,
+      "line": 1655,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:7e68c4333e08f1b6",
-      "semantic_id": "b3:7e68c4333e08f1b6",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/workflow_format.rs",
-      "line": 1671,
-      "column": 120,
-      "message": "function `portable_config_to_node_credentials` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
     },
     {
@@ -14424,7 +14411,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1703,
+      "line": 1719,
       "column": 1,
       "message": "item name `workflow_to_nickel` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14437,7 +14424,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1722,
+      "line": 1738,
       "column": 1,
       "message": "item name `render_portable_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14450,7 +14437,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1722,
+      "line": 1738,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -14463,7 +14450,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1722,
+      "line": 1738,
       "column": 79,
       "message": "function `render_portable_workflow` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "lattice"
@@ -14476,7 +14463,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1753,
+      "line": 1769,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -14489,7 +14476,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1772,
+      "line": 1788,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -14502,7 +14489,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1781,
+      "line": 1797,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -14515,7 +14502,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1781,
+      "line": 1797,
       "column": 68,
       "message": "function `render_config` is 134 lines (limit: 70)",
       "crate_name": "lattice"
@@ -14528,7 +14515,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1781,
+      "line": 1797,
       "column": 68,
       "message": "function `render_config` has 0 assertion(s) in 134 lines (need 2+)",
       "crate_name": "lattice"
@@ -14541,7 +14528,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1916,
+      "line": 1932,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -14554,7 +14541,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1916,
+      "line": 1932,
       "column": 67,
       "message": "function `render_trigger` has 0 assertion(s) in 42 lines (need 2+)",
       "crate_name": "lattice"
@@ -14567,7 +14554,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1960,
+      "line": 1976,
       "column": 5,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -14580,7 +14567,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1965,
+      "line": 1981,
       "column": 1,
       "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -14593,7 +14580,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/workflow_format.rs",
-      "line": 1967,
+      "line": 1983,
       "column": 9,
       "message": "`portable` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"

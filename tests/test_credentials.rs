@@ -1,10 +1,14 @@
 //! Tests for credential references, providers, redaction, and cache identity.
 
 use std::collections::HashMap;
+use std::io::Write;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use lattice::agent_node::FakeProcessRunner;
 use lattice::agent_node::ProcessError;
 use lattice::agent_node::ProcessOutput;
+use lattice::config::store_path;
 use lattice::credentials::CommandCredentialProvider;
 use lattice::credentials::CommandCredentialProviderConfig;
 use lattice::credentials::CredentialError;
@@ -23,12 +27,17 @@ use lattice::credentials::seal_local_vault_entry;
 use lattice::credentials::test_provider_reference;
 use lattice::engine::executor::Executor;
 use lattice::engine::executor::NodeStatus;
+use lattice::engine::executor::RunId;
 use lattice::engine::executor::node_execution_cache_key_with_credentials;
 use lattice::engine::workflow::Workflow;
+use lattice::run::history::detail_record_from_results;
+use lattice::store::Store;
 use lattice::workflow_format::WorkflowFormatError;
 use lattice::workflow_format::load_workflow_nickel_file;
 use lattice::workflow_format::workflow_to_nickel;
+use lattice::workflow_validation::DiagnosticSeverity;
 use lattice::workflow_validation::WorkflowDiagnosticCode;
+use lattice::workflow_validation::format_diagnostic;
 use lattice::workflow_validation::validate_workflow;
 use lattice::workflow_validation::validate_workflow_with_credential_registry;
 use pretty_assertions::assert_eq;
@@ -42,12 +51,38 @@ const OTHER_SECRET_VALUE: &str = "other-secret-token";
 const REDACTED_VALUE: &str = "<redacted>";
 const WORKFLOW_NAME: &str = "credential-workflow";
 const NODE_LABEL: &str = "credential-node";
-const PRINT_TOKEN_COMMAND: &str = "printf \"$TOKEN\"";
-const SINGLE_RESULT_INDEX: usize = 0;
+const PRINT_TOKEN_COMMAND: &str = "printf \"$TOKEN\"; printf \"$TOKEN\" >&2";
+const STDOUT_LABEL: &str = "stdout";
+const STDERR_LABEL: &str = "stderr";
 const VAULT_KEY_MATERIAL: &str = "test-vault-key";
 const VAULT_NONCE: &[u8] = b"credential-nonce";
 const COMMAND_PROVIDER_PROGRAM: &str = "credential-command";
 const COMMAND_OUTPUT_LIMIT_BYTES: usize = 4;
+const OVERLAPPING_SECRET_VALUE: &str = "secret-token";
+const PLAINTEXT_IMPORT_VALUE: &str = "inline-plaintext-secret";
+const CONFIG_FILE_NAME: &str = "config.ncl";
+const WORKFLOW_FILE_NAME: &str = "credential.ncl";
+const CREDENTIAL_STORE_FILE_NAME: &str = "credential-evidence.redb";
+const RUN_ID_VALUE: u64 = 73;
+const DEFAULT_TIMEOUT_SECS: u64 = 60;
+const MAX_PARALLELISM: usize = 2;
+const PLAINTEXT_DIAGNOSTIC: &str = "contains forbidden plaintext secret material";
+
+#[derive(Clone)]
+struct CapturedLogWriter {
+    bytes: Arc<Mutex<Vec<u8>>>,
+}
+
+impl Write for CapturedLogWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.bytes.lock().expect("captured log lock").extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 fn secret_ref() -> SecretRef {
     SecretRef::new(PROVIDER_NAME, SECRET_KEY, None)
@@ -66,37 +101,126 @@ fn workflow_with_secret_ref() -> (Workflow, rat_nodegraph::model::NodeId) {
     (workflow, node_id)
 }
 
-// r[verify n8nclone.credentials.secret_refs.model]
-#[test]
-fn workflow_serializes_secret_reference_without_plaintext_secret() {
-    let (workflow, _node_id) = workflow_with_secret_ref();
+fn output_text(
+    workflow: &Workflow,
+    node_id: rat_nodegraph::model::NodeId,
+    outputs: &HashMap<rat_nodegraph::model::PortId, lattice::engine::Value>,
+    label: &str,
+) -> String {
+    let node = workflow.graph.node(node_id).expect("node exists");
+    let port = node.output_ports.iter().find(|port| port.label == label).expect("output port exists");
+    outputs.get(&port.id).expect("output value exists").as_display_string()
+}
 
-    let serialized = serde_json::to_string(&workflow).expect("workflow serializes");
+fn assert_text_omits_secret(surface: &str, value: &str) {
+    assert!(!surface.contains(value), "surface leaked sensitive value: {surface}");
+}
+
+fn assert_bytes_omit_secret(surface: &[u8], value: &str) {
+    assert!(!surface.windows(value.len()).any(|window| window == value.as_bytes()));
+}
+
+fn write_import_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
+    let data_dir = temp_dir.path().join("data");
+    let config_path = temp_dir.path().join(CONFIG_FILE_NAME);
+    std::fs::write(
+        &config_path,
+        format!(
+            "{{ data_dir = {:?}, default_timeout_secs = {DEFAULT_TIMEOUT_SECS}, shell = \"sh\", max_parallelism = {MAX_PARALLELISM} }}\n",
+            data_dir.display().to_string(),
+        ),
+    )
+    .expect("import config written");
+    (config_path, data_dir)
+}
+
+fn nickel_with_plaintext_value(workflow: &Workflow, value: &str) -> String {
+    workflow_to_nickel(workflow).replace("field = [] }", &format!("field = [], value = {value} }}"))
+}
+
+// r[verify n8nclone.credentials.secret_refs.model]
+#[tokio::test]
+async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
+    let (workflow, node_id) = workflow_with_secret_ref();
+    let provider = MapCredentialProvider::new([(secret_ref().identity(), SECRET_VALUE.to_string())].into());
+    let executor = Executor::new_with_credential_provider(Box::new(provider));
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+    assert!(matches!(result.status, NodeStatus::Completed { .. }));
+
+    let temp_dir = tempfile::tempdir().expect("temporary workflow store directory");
+    let database_path = temp_dir.path().join(CREDENTIAL_STORE_FILE_NAME);
+    let store = Store::new(&database_path).expect("workflow store opens");
+    store.save_workflow(&workflow).expect("workflow saves after secret resolution");
+    let loaded = store.load_workflow(WORKFLOW_NAME).expect("workflow loads").expect("workflow exists");
+    let serialized = serde_json::to_string(&loaded).expect("loaded workflow serializes");
+    let exported = workflow_to_nickel(&loaded);
+    let persisted = std::fs::read(&database_path).expect("workflow database reads");
 
     assert!(serialized.contains(PROVIDER_NAME));
     assert!(serialized.contains(SECRET_KEY));
-    assert!(!serialized.contains(SECRET_VALUE));
+    assert!(exported.contains(PROVIDER_NAME));
+    assert!(exported.contains(SECRET_KEY));
+    assert_text_omits_secret(&serialized, SECRET_VALUE);
+    assert_text_omits_secret(&exported, SECRET_VALUE);
+    assert_bytes_omit_secret(&persisted, SECRET_VALUE);
 }
 
 // r[verify n8nclone.credentials.provider_interface]
 // r[verify n8nclone.credentials.redaction]
 #[tokio::test]
-async fn credential_provider_resolves_secret_env_and_redacts_output() {
+async fn credential_provider_redacts_output_logs_history_json_and_persistence() {
     let (workflow, node_id) = workflow_with_secret_ref();
     let provider = MapCredentialProvider::new([(secret_ref().identity(), SECRET_VALUE.to_string())].into());
     let executor = Executor::new_with_credential_provider(Box::new(provider));
+    let captured_log_bytes = Arc::new(Mutex::new(Vec::new()));
+    let writer_bytes = Arc::clone(&captured_log_bytes);
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_target(false)
+        .with_writer(move || CapturedLogWriter {
+            bytes: Arc::clone(&writer_bytes),
+        })
+        .finish();
+    let subscriber_guard = tracing::subscriber::set_default(subscriber);
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+    drop(subscriber_guard);
 
-    match result.status {
-        NodeStatus::Completed { outputs, .. } => {
-            let node = workflow.graph.node(node_id).expect("node exists");
-            let stdout_port = node.output_ports[SINGLE_RESULT_INDEX].id;
-            let stdout = outputs.get(&stdout_port).expect("stdout exists");
-            assert_eq!(stdout.as_display_string(), REDACTED_VALUE);
-        }
-        other => panic!("expected completed node, got {other:?}"),
+    let NodeStatus::Completed { outputs, .. } = &result.status else {
+        panic!("expected completed node, got {:?}", result.status);
+    };
+    let stdout = output_text(&workflow, node_id, outputs, STDOUT_LABEL);
+    let stderr = output_text(&workflow, node_id, outputs, STDERR_LABEL);
+    let result_debug = format!("{result:?}");
+    let detail = detail_record_from_results(RunId(RUN_ID_VALUE), &workflow, std::slice::from_ref(&result));
+    let detail_json = serde_json::to_string(&detail).expect("run detail serializes");
+    let temp_dir = tempfile::tempdir().expect("temporary run detail directory");
+    let database_path = temp_dir.path().join(CREDENTIAL_STORE_FILE_NAME);
+    let store = Store::new(&database_path).expect("run detail store opens");
+    store.save_run_details(&detail).expect("run details save");
+    let loaded = store.load_run_details(RunId(RUN_ID_VALUE)).expect("run details load").expect("run details exist");
+    let loaded_json = serde_json::to_string(&loaded).expect("loaded details serialize");
+    let persisted = std::fs::read(&database_path).expect("run detail database reads");
+    let captured_logs = String::from_utf8(captured_log_bytes.lock().expect("captured log lock").clone())
+        .expect("captured logs are UTF-8");
+
+    assert_eq!(stdout, REDACTED_VALUE);
+    assert_eq!(stderr, REDACTED_VALUE);
+    assert!(detail_json.contains(REDACTED_VALUE));
+    assert!(loaded_json.contains(REDACTED_VALUE));
+    assert!(captured_logs.contains(NODE_LABEL));
+    for surface in [
+        &stdout,
+        &stderr,
+        &result_debug,
+        &detail_json,
+        &loaded_json,
+        &captured_logs,
+    ] {
+        assert_text_omits_secret(surface, SECRET_VALUE);
     }
+    assert_bytes_omit_secret(&persisted, SECRET_VALUE);
 }
 
 // r[verify n8nclone.credentials.provider_interface]
@@ -115,13 +239,18 @@ async fn missing_secret_fails_before_shell_execution() {
 
 // r[verify n8nclone.credentials.redaction]
 #[test]
-fn redaction_masks_secret_values() {
-    let redacted = redact_text("prefix super-secret-token suffix other-secret-token", &[
+fn redaction_masks_overlapping_duplicate_and_empty_secret_values() {
+    let redacted = redact_text("prefix super-secret-token suffix secret-token other-secret-token", &[
+        OVERLAPPING_SECRET_VALUE.to_string(),
+        SECRET_VALUE.to_string(),
+        String::new(),
         SECRET_VALUE.to_string(),
         OTHER_SECRET_VALUE.to_string(),
     ]);
 
-    assert_eq!(redacted, "prefix <redacted> suffix <redacted>");
+    assert_eq!(redacted, "prefix <redacted> suffix <redacted> <redacted>");
+    assert_text_omits_secret(&redacted, SECRET_VALUE);
+    assert_text_omits_secret(&redacted, OVERLAPPING_SECRET_VALUE);
 }
 
 // r[verify n8nclone.credentials.validation]
@@ -134,6 +263,39 @@ fn malformed_secret_reference_is_a_fatal_validation_diagnostic() {
     let diagnostics = validate_workflow(&workflow);
 
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::MalformedSecretRef));
+}
+
+// r[verify n8nclone.credentials.redaction]
+#[test]
+fn validation_text_and_json_preserve_reference_identity_without_plaintext_value() {
+    let field_ref = SecretRef::new(PROVIDER_NAME, SECRET_KEY, Some("field".to_string()));
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
+    workflow.set_node_credentials(node_id, credential_refs(field_ref.clone()));
+    let mut registry = CredentialProviderRegistry::new();
+    registry
+        .insert_provider(
+            provider_metadata(PROVIDER_NAME),
+            Box::new(EnvironmentCredentialProvider::from_map(
+                [(SECRET_KEY.to_string(), SECRET_VALUE.to_string())].into(),
+            )),
+        )
+        .expect("provider registered");
+
+    let diagnostics = validate_workflow_with_credential_registry(&workflow, &registry);
+    let diagnostic = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::UnsupportedCredentialField)
+        .expect("unsupported field diagnostic");
+    let text = format_diagnostic(diagnostic);
+    let json = serde_json::to_string(diagnostic).expect("credential diagnostic serializes");
+    let identity = field_ref.identity();
+
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Fatal);
+    assert!(text.contains(&identity));
+    assert!(json.contains(&identity));
+    assert_text_omits_secret(&text, SECRET_VALUE);
+    assert_text_omits_secret(&json, SECRET_VALUE);
 }
 
 // r[verify n8nclone.credentials.cache_identity]
@@ -358,14 +520,62 @@ fn provider_backed_cache_identity_excludes_resolved_secret_values() {
 
 // r[verify n8nclone.credentials.secret_refs.model]
 #[test]
-fn nickel_import_rejects_inline_plaintext_secret_field() {
+fn nickel_import_rejects_all_non_null_plaintext_credential_shapes_with_safe_error() {
     let (workflow, _node_id) = workflow_with_secret_ref();
     let temp_dir = tempfile::tempdir().expect("temporary credential directory");
-    let workflow_path = temp_dir.path().join("credential.ncl");
-    let nickel = workflow_to_nickel(&workflow).replace("field = [] }", "field = [], value = \"plaintext\" }");
-    std::fs::write(&workflow_path, nickel).expect("credential workflow written");
+    let workflow_path = temp_dir.path().join(WORKFLOW_FILE_NAME);
+    let plaintext_cases = [
+        format!("{PLAINTEXT_IMPORT_VALUE:?}"),
+        format!("{{ nested = {PLAINTEXT_IMPORT_VALUE:?} }}"),
+        format!("[{PLAINTEXT_IMPORT_VALUE:?}]"),
+        RUN_ID_VALUE.to_string(),
+    ];
 
-    let error = load_workflow_nickel_file(&workflow_path).expect_err("inline secret rejected");
+    for plaintext in plaintext_cases {
+        std::fs::write(&workflow_path, nickel_with_plaintext_value(&workflow, &plaintext))
+            .expect("credential workflow written");
+        let error = load_workflow_nickel_file(&workflow_path).expect_err("inline secret rejected");
+        let rendered = error.to_string();
 
-    assert!(matches!(error, WorkflowFormatError::Json(_) | WorkflowFormatError::Nickel(_)));
+        assert!(
+            matches!(&error, WorkflowFormatError::PlaintextCredentialMaterial { .. }),
+            "unexpected import error: {error:?}"
+        );
+        assert!(rendered.contains(PLAINTEXT_DIAGNOSTIC));
+        assert_text_omits_secret(&rendered, PLAINTEXT_IMPORT_VALUE);
+    }
+
+    std::fs::write(&workflow_path, nickel_with_plaintext_value(&workflow, "null"))
+        .expect("null credential compatibility workflow written");
+    let loaded = load_workflow_nickel_file(&workflow_path).expect("null compatibility value imports");
+    assert_eq!(
+        loaded.node_credentials(loaded.graph.nodes().next().expect("loaded node").id),
+        workflow.credentials.values().next()
+    );
+}
+
+#[test]
+fn cli_plaintext_credential_rejection_is_safe_and_precedes_store_creation() {
+    let (workflow, _node_id) = workflow_with_secret_ref();
+    let temp_dir = tempfile::tempdir().expect("temporary credential CLI directory");
+    let (config_path, data_dir) = write_import_config(&temp_dir);
+    let workflow_path = temp_dir.path().join(WORKFLOW_FILE_NAME);
+    std::fs::write(&workflow_path, nickel_with_plaintext_value(&workflow, &format!("{PLAINTEXT_IMPORT_VALUE:?}")))
+        .expect("plaintext workflow written");
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_lattice"))
+        .arg("--config")
+        .arg(&config_path)
+        .arg("import")
+        .arg(&workflow_path)
+        .output()
+        .expect("credential import command runs");
+    let stdout = String::from_utf8(output.stdout).expect("import stdout is UTF-8");
+    let stderr = String::from_utf8(output.stderr).expect("import stderr is UTF-8");
+
+    assert!(!output.status.success());
+    assert!(stderr.contains(PLAINTEXT_DIAGNOSTIC), "stderr: {stderr}");
+    assert_text_omits_secret(&stdout, PLAINTEXT_IMPORT_VALUE);
+    assert_text_omits_secret(&stderr, PLAINTEXT_IMPORT_VALUE);
+    assert!(!store_path(&data_dir).exists());
 }

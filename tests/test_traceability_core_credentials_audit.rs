@@ -29,8 +29,7 @@ const PARTIAL_CLASSIFICATION: &str = "partial_evidence_only";
 const TOTAL_COUNT: usize = 353;
 const REVIEWED_COUNT: usize = 12;
 const UNASSESSED_COUNT: usize = 341;
-const EXACT_COUNT: usize = 8;
-const PARTIAL_COUNT: usize = 4;
+const EXACT_COUNT: usize = 12;
 const EVIDENCE_SOURCE_COUNT: usize = 5;
 const UNRELATED_MISSING_ID: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const UNEXPECTED_ADDED_ID: &str = "lattice.example.unaccepted.scenario.added";
@@ -137,26 +136,30 @@ fn expected_decisions() -> Vec<ExpectedDecision> {
         },
         ExpectedDecision {
             requirement_id: REDACTION_OUTPUT_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "partial.output-surfaces-incomplete",
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.all-maintained-surfaces-redacted",
             evidence_paths: &[CREDENTIAL_SOURCE_PATH, EXECUTOR_SOURCE_PATH, CREDENTIAL_TESTS_PATH],
         },
         ExpectedDecision {
             requirement_id: REDACTION_VALIDATION_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "partial.validation-rendering-unasserted",
-            evidence_paths: &[CREDENTIAL_SOURCE_PATH, WORKFLOW_VALIDATION_SOURCE_PATH],
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.validation-text-json-safe",
+            evidence_paths: &[
+                CREDENTIAL_SOURCE_PATH,
+                WORKFLOW_VALIDATION_SOURCE_PATH,
+                CREDENTIAL_TESTS_PATH,
+            ],
         },
         ExpectedDecision {
             requirement_id: REJECT_PLAINTEXT_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "partial.import-diagnostic-no-save-unasserted",
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.typed-rejection-before-store",
             evidence_paths: &[WORKFLOW_FORMAT_SOURCE_PATH, CREDENTIAL_TESTS_PATH],
         },
         ExpectedDecision {
             requirement_id: STORE_REF_ID,
-            classification: PARTIAL_CLASSIFICATION,
-            rationale_code: "partial.serialization-not-save-export",
+            classification: EXACT_CLASSIFICATION,
+            rationale_code: "assertions.post-resolution-save-export-safe",
             evidence_paths: &[
                 CREDENTIAL_SOURCE_PATH,
                 WORKFLOW_FORMAT_SOURCE_PATH,
@@ -251,7 +254,7 @@ fn core_credential_review_is_complete_bound_and_non_promoting() {
     assert_eq!(report.summary.reviewed, REVIEWED_COUNT);
     assert_eq!(report.summary.unassessed, UNASSESSED_COUNT);
     assert_eq!(report.summary.by_classification.get(EXACT_CLASSIFICATION), Some(&EXACT_COUNT));
-    assert_eq!(report.summary.by_classification.get(PARTIAL_CLASSIFICATION), Some(&PARTIAL_COUNT));
+    assert!(!report.summary.by_classification.contains_key(PARTIAL_CLASSIFICATION));
     assert_eq!(report.summary.by_classification.get(UNASSESSED_CLASSIFICATION), Some(&UNASSESSED_COUNT));
 
     for decision in expected_decisions() {
