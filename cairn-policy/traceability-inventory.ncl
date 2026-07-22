@@ -10,34 +10,34 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
       requirement_id = "n8nclone.scheduling.triggers.admission.disabled",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
+        { path = "tests/webhooks.rs", blake3 = "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d" },
       ],
       rationale_code = "assertions.disabled-rejected-without-run",
     },
     {
       requirement_id = "n8nclone.scheduling.triggers.history.persist",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/headless.rs", blake3 = "90f5deefe9ca359f845a4743b56ddc8b7ea36a3d9bd0a950193d88031782a34e" },
         { path = "src/triggers.rs", blake3 = "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103" },
-        { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
+        { path = "tests/test_triggers.rs", blake3 = "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54" },
       ],
-      rationale_code = "gap.terminal-status-and-complete-fields-unasserted",
+      rationale_code = "assertions.terminal-history-complete-and-safe",
     },
     {
       requirement_id = "n8nclone.scheduling.triggers.scheduler_compat.due",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
+        { path = "tests/test_triggers.rs", blake3 = "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54" },
       ],
-      rationale_code = "gap.full-old-new-plan-comparison-absent",
+      rationale_code = "assertions.full-legacy-adapted-plan-equality",
     },
     {
       requirement_id = "n8nclone.scheduling.triggers.webhook.invalid",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
-        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
+        { path = "tests/test_triggers.rs", blake3 = "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54" },
+        { path = "tests/webhooks.rs", blake3 = "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d" },
       ],
       rationale_code = "assertions.invalid-webhooks-reject-without-run",
     },
@@ -45,8 +45,8 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
       requirement_id = "n8nclone.scheduling.triggers.webhook.valid",
       classification = "exact_maintained_evidence",
       evidence = [
-        { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
-        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
+        { path = "tests/test_triggers.rs", blake3 = "70b4de440c9d2da09ab03148553b6b3e029f8bdd21e9c9d6273b4e3fc1ff2c54" },
+        { path = "tests/webhooks.rs", blake3 = "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d" },
       ],
       rationale_code = "assertions.valid-webhook-binds-and-runs",
     },
@@ -56,18 +56,18 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
       evidence = [
         { path = "examples/README.md", blake3 = "9ba2964ecb63eb81823898b1243d0c391e9b4772533ee0958b98cfdeb91e91bb" },
         { path = "examples/workflows/webhook-cookbook.ncl", blake3 = "e449f943f0af5f6b2f49ce4dca45d9279ca2897410d63b57e3163bff86d03e95" },
-        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
+        { path = "tests/webhooks.rs", blake3 = "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d" },
       ],
       rationale_code = "assertions.cookbook-import-dry-run-admit-reject-history",
     },
     {
       requirement_id = "n8nclone.scheduling.webhook_listener.process.start",
-      classification = "partial_evidence_only",
+      classification = "exact_maintained_evidence",
       evidence = [
         { path = "src/main.rs", blake3 = "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e" },
-        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
+        { path = "tests/webhooks.rs", blake3 = "696ac9d227f8019ab527743752f6ac186fdd7c445aaf48dd5a7bcfb35e81e95d" },
       ],
-      rationale_code = "gap.live-process-socket-acceptance-unasserted",
+      rationale_code = "assertions.live-listener-process-accepts-and-persists",
     },
     {
       requirement_id = "n8nclone.workflow_examples.image.invalid",

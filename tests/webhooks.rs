@@ -1,7 +1,16 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::Read;
+use std::io::Write;
+use std::net::Shutdown;
+use std::net::SocketAddr;
+use std::net::TcpListener;
+use std::net::TcpStream;
 use std::path::Path;
+use std::process::Child;
 use std::process::Command;
+use std::process::Stdio;
+use std::time::Duration;
 
 use lattice::credentials::MapCredentialProvider;
 use lattice::credentials::SecretRef;
@@ -59,6 +68,39 @@ const COOKBOOK_WORKFLOW_NAME: &str = "webhook-cookbook";
 const COOKBOOK_TRIGGER_ID: &str = "cookbook-lead";
 const COOKBOOK_WEBHOOK_PATH: &str = "/hooks/cookbook-lead";
 const COOKBOOK_SECRET_KEY: &str = "LATTICE_WEBHOOK_TOKEN";
+const LISTENER_HOST: &str = "127.0.0.1";
+const LISTENER_START_ATTEMPTS: usize = 100;
+const LISTENER_POLL_DELAY_MS: u64 = 20;
+const LISTENER_IO_TIMEOUT_SECS: u64 = 5;
+const HTTP_ACCEPTED_STATUS: &str = "HTTP/1.1 202 Accepted";
+const HTTP_ACCEPTED_BODY: &str = "\"status\":\"accepted\"";
+
+struct ListenerChild {
+    child: Option<Child>,
+}
+
+impl ListenerChild {
+    fn new(child: Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn child_mut(&mut self) -> &mut Child {
+        self.child.as_mut().expect("listener child remains owned")
+    }
+
+    fn stop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+impl Drop for ListenerChild {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
 
 fn limits() -> webhooks::RequestLimits {
     webhooks::RequestLimits {
@@ -169,6 +211,33 @@ fn request_with_parts(
 
 fn bearer(token: &str) -> String {
     format!("Bearer {token}")
+}
+
+fn reserve_loopback_address() -> SocketAddr {
+    let listener = TcpListener::bind((LISTENER_HOST, 0)).expect("reserve listener test address");
+    listener.local_addr().expect("reserved listener address is available")
+}
+
+fn connect_to_started_listener(address: SocketAddr, child: &mut Child) -> TcpStream {
+    for _ in 0..LISTENER_START_ATTEMPTS {
+        if let Ok(stream) = TcpStream::connect(address) {
+            return stream;
+        }
+        if let Some(status) = child.try_wait().expect("inspect listener process") {
+            panic!("listener process exited before accepting requests: {status}");
+        }
+        std::thread::sleep(Duration::from_millis(LISTENER_POLL_DELAY_MS));
+    }
+    panic!("listener did not accept loopback connections within the bounded startup window");
+}
+
+fn valid_http_request_bytes() -> Vec<u8> {
+    let body = std::str::from_utf8(RAW_JSON_BODY).expect("JSON fixture is UTF-8");
+    format!(
+        "{WEBHOOK_METHOD} {WEBHOOK_PATH}?source={QUERY_SOURCE} HTTP/1.1\r\nHost: {LISTENER_HOST}\r\n{HEADER_CONTENT_TYPE}: {CONTENT_TYPE_JSON}\r\n{HEADER_IDEMPOTENCY_KEY}: {EVENT_KEY}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        RAW_JSON_BODY.len(),
+    )
+    .into_bytes()
 }
 
 fn empty_context() -> lattice::triggers::TriggerAdmissionContext {
@@ -346,6 +415,50 @@ fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_withou
         matches!(body_decision, webhooks::Decision::Rejected(rejection) if rejection.code == webhooks::RejectionCode::MalformedJson)
     );
     assert!(history.is_empty());
+}
+
+#[test]
+fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
+    let temp_dir = tempfile::tempdir().expect("temporary live listener directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    workflow.triggers.push(webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly));
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("live listener store opens");
+    save_workflow_with_triggers(&store, &workflow);
+    drop(store);
+
+    let address = reserve_loopback_address();
+    let child = Command::new(env!("CARGO_BIN_EXE_lattice"))
+        .arg("--config")
+        .arg(&config_path)
+        .arg("webhook-listen")
+        .arg("--bind")
+        .arg(address.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("operator listener process starts");
+    let mut listener = ListenerChild::new(child);
+    let mut stream = connect_to_started_listener(address, listener.child_mut());
+    let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
+    stream.set_read_timeout(timeout).expect("set listener response timeout");
+    stream.write_all(&valid_http_request_bytes()).expect("send bounded webhook request");
+    stream.shutdown(Shutdown::Write).expect("finish webhook request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read webhook response");
+    listener.stop();
+
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("reopen live listener store");
+    let runs = store.list_runs(HISTORY_LIMIT).expect("live listener runs list");
+    let history = store.list_trigger_runs(HISTORY_LIMIT).expect("live listener trigger history lists");
+
+    assert!(response.contains(HTTP_ACCEPTED_STATUS));
+    assert!(response.contains(HTTP_ACCEPTED_BODY));
+    assert!(response.contains(TRIGGER_ID));
+    assert_eq!(runs.len(), HISTORY_LIMIT);
+    assert_eq!(history.len(), HISTORY_LIMIT);
+    assert_eq!(history[0].trigger_id, TRIGGER_ID);
+    assert_eq!(history[0].status, TriggerRunStatus::Started);
 }
 
 // r[verify n8nclone.tui_ux.webhook_listener.cli.dry_run]

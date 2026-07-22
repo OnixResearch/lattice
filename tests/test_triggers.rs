@@ -15,6 +15,7 @@ use lattice::scheduler::MissedRunPolicy;
 use lattice::scheduler::OverlapPolicy;
 use lattice::scheduler::RecurrenceRule;
 use lattice::scheduler::ScheduleDefinition;
+use lattice::scheduler::evaluate_due_runs;
 use lattice::store::Store;
 use lattice::triggers::IdempotencyPolicy;
 use lattice::triggers::TriggerAdmissionContext;
@@ -289,10 +290,16 @@ fn schedule_trigger_preserves_schedule_semantics() {
         next_run_epoch_ms: NEXT_RUN_EPOCH_MS,
     };
     let trigger = schedule_trigger_from_schedule(&schedule);
-    let due = schedule_due_plan_from_trigger(&trigger, NEXT_RUN_EPOCH_MS, &HashSet::new()).expect("schedule due");
+    let legacy_due = evaluate_due_runs(std::slice::from_ref(&schedule), NEXT_RUN_EPOCH_MS, &HashSet::new())
+        .due_runs
+        .into_iter()
+        .next()
+        .expect("legacy schedule due");
+    let adapted_due =
+        schedule_due_plan_from_trigger(&trigger, NEXT_RUN_EPOCH_MS, &HashSet::new()).expect("adapted schedule due");
 
     assert_eq!(trigger.workflow_name, WORKFLOW_NAME);
-    assert_eq!(due.schedule_id, TRIGGER_ID);
+    assert_eq!(adapted_due, legacy_due);
 }
 
 // r[verify n8nclone.workflow_format.triggers.nickel]
@@ -347,8 +354,13 @@ async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
 
     assert_eq!(summary.workflow_name, WORKFLOW_NAME);
     assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
-    assert_eq!(history[0].status, TriggerRunStatus::Started);
+    assert_eq!(history[0].trigger_id, TRIGGER_ID);
+    assert_eq!(history[0].workflow_name, WORKFLOW_NAME);
     assert_eq!(history[0].run_id, Some(summary.run_id));
+    assert_eq!(history[0].idempotency_key.as_deref(), Some(EVENT_KEY));
+    assert_eq!(history[0].status, TriggerRunStatus::Started);
+    assert_eq!(history[0].payload_summary, plan.payload_summary);
+    assert!(history[0].payload_summary.contains("redacted"));
 }
 
 // r[verify n8nclone.tui_ux.triggers.manage]
