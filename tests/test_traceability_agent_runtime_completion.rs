@@ -26,6 +26,7 @@ const PARTIAL: &str = "partial_evidence_only";
 const SELECTED_COUNT: usize = 14;
 const ZERO: usize = 0;
 const ONE: usize = 1;
+const NON_AUTH_MARKER_COUNT: usize = 3;
 
 const COMPAT_MISSING: &str = "lattice.agent_runtime.animus_compatibility.scenario.missing";
 const COMPAT_ROUTES: &str = "lattice.agent_runtime.animus_compatibility.scenario.routes";
@@ -72,8 +73,9 @@ const ANIMUS_MARKERS: &[&str] = &[
 const SHELL_MARKERS: &[&str] = &[
     concat!("// r[verify lattice.agent_runtime.animus_effects.scenario.tool-denied", "]\n"),
     concat!("// r[verify lattice.agent_runtime.animus_fabric.scenario.exhaustion", "]\n"),
-    concat!("// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative", "]\n"),
 ];
+const NON_AUTH_MARKER: &str =
+    concat!("// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative", "]\n");
 const OPENAI_MARKERS: &[&str] = &[concat!(
     "// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.plain",
     "]\n"
@@ -226,11 +228,21 @@ fn historical(source: &'static str, markers: &[&str]) -> Cow<'static, str> {
     }
     Cow::Owned(value)
 }
+fn historical_shell_tests() -> Cow<'static, str> {
+    let value = historical(SHELL_TESTS, SHELL_MARKERS);
+    let count = value.matches(NON_AUTH_MARKER).count();
+    if count == ZERO {
+        return value;
+    }
+    assert_eq!(count, NON_AUTH_MARKER_COUNT);
+    Cow::Owned(value.replace(NON_AUTH_MARKER, ""))
+}
+
 fn source(path: &str) -> Cow<'static, str> {
     match path {
         CORE_PATH => Cow::Borrowed(CORE),
         SHELL_PATH => Cow::Borrowed(SHELL),
-        SHELL_TESTS_PATH => historical(SHELL_TESTS, SHELL_MARKERS),
+        SHELL_TESTS_PATH => historical_shell_tests(),
         ANIMUS_TESTS_PATH => historical(ANIMUS_TESTS, ANIMUS_MARKERS),
         OPENAI_TESTS_PATH => historical(OPENAI_TESTS, OPENAI_MARKERS),
         _ => panic!("unexpected path: {path}"),
@@ -250,7 +262,7 @@ fn all_agent_runtime_rows_are_exact_byte_bound_and_unpromoted() {
     let review = core::validate_tranche(&rows(&report), SUBSYSTEM, EXPECTED);
     let coverage = core::validate_unchanged_coverage(&coverage(BASELINE), &coverage(CURRENT));
     let animus = historical(ANIMUS_TESTS, ANIMUS_MARKERS);
-    let shell_tests = historical(SHELL_TESTS, SHELL_MARKERS);
+    let shell_tests = historical_shell_tests();
     let openai = historical(OPENAI_TESTS, OPENAI_MARKERS);
     let markers = core::validate_no_selected_markers(
         &[CORE, SHELL, animus.as_ref(), shell_tests.as_ref(), openai.as_ref()],

@@ -183,6 +183,7 @@ fn pure_plan_binds_the_program_identity_and_typed_output() {
 
 // r[verify lattice.agent_runtime.animus_fabric]
 // r[verify lattice.agent_runtime.animus_output]
+// r[verify lattice.agent_runtime.animus_fabric.scenario.identity]
 #[test]
 fn pure_admission_rejects_identity_turn_input_and_output_failures() {
     let changed_program = "(define (changed) #t)";
@@ -230,6 +231,8 @@ fn pure_admission_rejects_identity_turn_input_and_output_failures() {
 // r[verify lattice.agent_runtime.animus_leaf]
 // r[verify lattice.agent_runtime.animus_fabric]
 // r[verify lattice.agent_runtime.animus_output]
+// r[verify lattice.agent_runtime.animus_fabric.scenario.complete]
+// r[verify lattice.agent_runtime.animus_output.scenario.typed]
 #[test]
 fn production_animus_route_runs_one_model_call_for_text_and_json() {
     let text_transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
@@ -257,6 +260,7 @@ fn production_animus_route_runs_one_model_call_for_text_and_json() {
 }
 
 // r[verify lattice.agent_runtime.animus_effects]
+// r[verify lattice.agent_runtime.animus_effects.scenario.credential]
 #[test]
 fn credential_is_used_only_at_lattice_transport_and_is_absent_from_evidence() {
     let mut credential_runtime = runtime();
@@ -277,6 +281,8 @@ fn credential_is_used_only_at_lattice_transport_and_is_absent_from_evidence() {
 
 // r[verify lattice.agent_runtime.animus_effects]
 // r[verify lattice.agent_runtime.animus_compatibility]
+// r[verify lattice.agent_runtime.animus_compatibility.scenario.missing]
+// r[verify lattice.agent_runtime.animus_effects.scenario.provider-failure]
 #[test]
 fn missing_or_failed_animus_provider_does_not_fallback() {
     let missing_transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
@@ -311,6 +317,7 @@ fn missing_or_failed_animus_provider_does_not_fallback() {
     assert_eq!(failed_transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
 }
 
+// r[verify lattice.agent_runtime.animus_leaf.scenario.authority]
 #[test]
 fn authority_bearing_response_remains_ordinary_agent_output() {
     let transport = StaticTransport::new(Ok(response(AUTHORITY_RESPONSE)));
@@ -335,6 +342,7 @@ fn authority_bearing_response_remains_ordinary_agent_output() {
     }
 }
 
+// r[verify lattice.agent_runtime.animus_output.scenario.unsupported]
 #[test]
 fn unsupported_animus_inputs_fail_before_provider_dispatch() {
     let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
@@ -349,6 +357,7 @@ fn unsupported_animus_inputs_fail_before_provider_dispatch() {
 
 // r[verify lattice.agent_runtime.animus_leaf]
 // r[verify lattice.agent_runtime.animus_compatibility]
+// r[verify lattice.agent_runtime.animus_leaf.scenario.execute]
 #[tokio::test]
 async fn typed_examples_load_validate_and_execute_through_the_runner() {
     let config = load_app_config(Path::new(CONFIG_EXAMPLE_PATH));
@@ -371,6 +380,7 @@ async fn typed_examples_load_validate_and_execute_through_the_runner() {
 }
 
 // r[verify lattice.agent_runtime.animus_compatibility]
+// r[verify lattice.agent_runtime.animus_compatibility.scenario.routes]
 #[test]
 fn existing_direct_openai_route_does_not_invoke_animus() {
     let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));

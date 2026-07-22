@@ -1,6 +1,7 @@
 use super::*;
 
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.success]
+// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.plain]
 #[test]
 fn production_adapter_decodes_text_and_json_outputs() {
     let text_transport = StaticTransport::new(Ok(response(Some(TEXT_CONTENT))));

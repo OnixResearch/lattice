@@ -119,6 +119,8 @@ fn mapping_error(report: &animus_runtime::RunReport) -> crate::agent_node::Agent
 }
 
 // r[verify lattice.agent_runtime.animus_fabric]
+// r[verify lattice.agent_runtime.animus_fabric.scenario.exhaustion]
+// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative]
 #[test]
 fn bounded_fabric_prevents_a_model_dispatch_after_turn_exhaustion() {
     let runtime_input = animus_runtime::RuntimeInput::new(SUMMARY).expect("runtime input is valid");
@@ -145,6 +147,7 @@ fn bounded_fabric_prevents_a_model_dispatch_after_turn_exhaustion() {
     assert!(mapping_error(&run_report).to_string().contains("exhausted"));
 }
 
+// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative]
 #[test]
 fn stopped_and_max_turn_reports_map_to_node_failures() {
     let stopped = animus_runtime::RunReport::new(Vec::new(), animus_runtime::RuntimeStatus::Stopped);
@@ -157,6 +160,8 @@ fn stopped_and_max_turn_reports_map_to_node_failures() {
 }
 
 // r[verify lattice.agent_runtime.animus_effects]
+// r[verify lattice.agent_runtime.animus_effects.scenario.tool-denied]
+// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative]
 #[test]
 fn absent_tool_service_fails_before_a_product_tool_effect() {
     let runtime_input = animus_runtime::RuntimeInput::new(SUMMARY).expect("runtime input is valid");

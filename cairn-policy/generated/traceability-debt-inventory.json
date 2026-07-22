@@ -3,32 +3,30 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 811,
-    "referenced": 507,
-    "missing": 304,
+    "requirements": 815,
+    "referenced": 525,
+    "missing": 290,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9b2d6856b05cc4a88eefb1c4e06a009f781e0ff090aa1e3e1236e7179ec5ba60",
-    "receipt_hash": "9f3641399ad7fb0d5873c717be5e6623cb28d5e07c5dc4797110612d47d8a2a2"
+    "input_hash": "1748effdc89c6870ec594a5fa1cea97e86594453854e5ba345612513baef3630",
+    "receipt_hash": "176cd7c6929ec281e53f99f27cefb5c1653c1174fab78adfeaad3126c71f8a75"
   },
   "review_policy": {
-    "expected_missing_count": 304,
-    "expected_missing_hash": "dcff4383f0a161102646ca402e01deb4dd684e68e21821c4131638eaa3180fc7",
-    "reviewed_decisions": 14,
-    "policy_hash": "6777da57c05f002d85b137c11b01e9d46c167eaf6cddab5a5b60895c39b4d615"
+    "expected_missing_count": 290,
+    "expected_missing_hash": "ba797fa2f3f60697a1941f1b61927af134df835f8f6454bb1febda85ebcfcc7d",
+    "reviewed_decisions": 0,
+    "policy_hash": "809558e543a0e5e8be4e4a31b7b4c0b3370dc2d26cbcb97eeafcd34c58854757"
   },
   "summary": {
-    "total": 304,
-    "reviewed": 14,
+    "total": 290,
+    "reviewed": 0,
     "unassessed": 290,
     "by_classification": {
-      "exact_maintained_evidence": 14,
       "unassessed": 290
     },
     "by_subsystem": {
       "agent-orchestration": 39,
-      "agent-runtime": 14,
       "tui-ux": 98,
       "workflow-execution": 83,
       "workflow-format": 41,
@@ -308,198 +306,6 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_compatibility.scenario.missing",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.missing-route-request-unchanged-zero-dispatch"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_compatibility.scenario.routes",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.existing-route-bypasses-animus"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.credential",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
-        },
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.transport-only-credential-omission"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.provider-failure",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
-        },
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.redacted-single-provider-failure"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_effects.scenario.tool-denied",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
-        }
-      ],
-      "rationale_code": "assertions.absent-tool-adapter-fails-without-model-effect"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.complete",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.fixed-loop-dispatches-once-and-returns"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.exhaustion",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
-        }
-      ],
-      "rationale_code": "assertions.turn-ceiling-blocks-additional-dispatch"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_fabric.scenario.identity",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
-        },
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.identity-admission-rejects-before-shell"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_leaf.scenario.authority",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
-        },
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.authority-content-remains-ordinary-output"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_leaf.scenario.execute",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.runner-executes-one-typed-animus-node"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_output.scenario.non-authoritative",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
-        },
-        {
-          "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
-        }
-      ],
-      "rationale_code": "assertions.all-nonfinal-statuses-map-to-errors"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_output.scenario.typed",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.text-json-values-and-safe-metadata"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.animus_output.scenario.unsupported",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
-        },
-        {
-          "path": "tests/test_animus_agent.rs",
-          "blake3": "58ffe36017a6b8fd27f357f338c3d2f2f8d861afeb9668a2a9f3f910a1b4eafd"
-        }
-      ],
-      "rationale_code": "assertions.unsupported-preflight-zero-dispatch"
-    },
-    {
-      "requirement_id": "lattice.agent_runtime.inline_reasoning_boundary.scenario.plain",
-      "subsystem": "agent-runtime",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "tests/openai/execution.rs",
-          "blake3": "04f2e2225e80b0887cc9a553e4c7c2f6c1b8884f9b9f51c41dede25c5146f866"
-        }
-      ],
-      "rationale_code": "assertions.plain-text-and-json-preserved"
     },
     {
       "requirement_id": "n8nclone.tui_ux.add_node.cancel",
@@ -2259,7 +2065,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "dcff4383f0a161102646ca402e01deb4dd684e68e21821c4131638eaa3180fc7",
+  "missing_set_hash": "ba797fa2f3f60697a1941f1b61927af134df835f8f6454bb1febda85ebcfcc7d",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2269,5 +2075,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "015ad13f18f599b46e899dc85d00de25d75c980e9d6d5b886b5401345da4a69b"
+  "inventory_hash": "60086021e3024bfaafc1827a7d8559151984243aece790986622e48d89ad3e88"
 }

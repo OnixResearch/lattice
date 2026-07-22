@@ -28,10 +28,10 @@ const SAMPLE_REFERENCED: usize = 1;
 const SAMPLE_MISSING_COUNT: usize = 2;
 const REVIEWED_COUNT: usize = 1;
 const SAMPLE_UNASSESSED_COUNT: usize = 1;
-const CURRENT_MISSING_COUNT: usize = 304;
+const CURRENT_MISSING_COUNT: usize = 290;
 const CURRENT_REVIEWED_COUNT: usize = 0;
-const CURRENT_UNASSESSED_COUNT: usize = 304;
-const CURRENT_MISSING_HASH: &str = "dcff4383f0a161102646ca402e01deb4dd684e68e21821c4131638eaa3180fc7";
+const CURRENT_UNASSESSED_COUNT: usize = 290;
+const CURRENT_MISSING_HASH: &str = "ba797fa2f3f60697a1941f1b61927af134df835f8f6454bb1febda85ebcfcc7d";
 const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
 const REQUIRED_UNASSESSED_NON_CLAIM: &str = "unassessed does not mean behavior or evidence is absent";
 
