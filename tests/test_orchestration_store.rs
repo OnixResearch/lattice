@@ -125,6 +125,7 @@ fn store_persists_instance_and_event_atomically() {
 }
 
 // r[verify lattice.agent_orchestration.budgets]
+// r[verify lattice.agent_orchestration.budgets.scenario.concurrent]
 // r[verify lattice.agent_orchestration.durability]
 #[test]
 fn stale_concurrent_transition_cannot_overwrite_newer_state() {

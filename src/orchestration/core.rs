@@ -1669,6 +1669,8 @@ pub fn is_terminal_status(status: OrchestrationStatus) -> bool {
 }
 
 pub fn render_status_text(instance: &OrchestrationInstance) -> String {
+    debug_assert!(!instance.id.is_empty());
+    debug_assert!(!instance.workflow_revision.content_hash.is_empty());
     let active_run = instance.active_run_id.map_or_else(|| "-".to_string(), |run_id| run_id.to_string());
     let proposal = instance.pending_proposal.as_ref().map_or("-", |proposal| proposal.id.as_str());
     let event_sequence = instance.last_event_sequence.map_or_else(|| "-".to_string(), |sequence| sequence.to_string());
@@ -1697,6 +1699,7 @@ pub fn render_status_text(instance: &OrchestrationInstance) -> String {
 }
 
 fn remaining_budget(ledger: &BudgetLedger) -> BudgetCharge {
+    debug_assert!(ledger.reservations.values().all(|reservation| !reservation.reservation_id.is_empty()));
     let reserved = ledger
         .reservations
         .values()

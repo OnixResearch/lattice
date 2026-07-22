@@ -374,6 +374,7 @@ fn next_run_id_follows_highest_saved_run() {
 }
 
 // r[verify lattice.agent_orchestration.run_identity]
+// r[verify lattice.agent_orchestration.run_identity.scenario.concurrent]
 #[test]
 fn concurrent_run_id_allocations_are_unique_before_any_run_is_saved() {
     let (store, _dir) = common::temp_store();
@@ -397,6 +398,7 @@ fn concurrent_run_id_allocations_are_unique_before_any_run_is_saved() {
 }
 
 // r[verify lattice.agent_orchestration.run_identity]
+// r[verify lattice.agent_orchestration.run_identity.scenario.duplicate]
 #[test]
 fn duplicate_run_record_identity_is_rejected_without_overwrite() {
     let (store, _dir) = common::temp_store();

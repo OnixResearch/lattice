@@ -211,6 +211,7 @@ fn finish_transition(
 }
 
 // r[verify lattice.agent_orchestration.model]
+// r[verify lattice.agent_orchestration.model.scenario.valid]
 #[test]
 fn valid_definition_binds_exact_workflow_revision() {
     let definition = definition(CompletionPolicy::RunSucceeded);
@@ -239,6 +240,8 @@ fn workflow_revision_drift_is_rejected() {
 }
 
 // r[verify lattice.agent_orchestration.core]
+// r[verify lattice.agent_orchestration.core.scenario.complete]
+// r[verify lattice.agent_orchestration.core.scenario.terminal-mutation]
 #[test]
 fn successful_terminal_round_completes_and_cannot_reopen() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -401,6 +404,7 @@ fn retry_policy_rejects_zero_and_disabled_defaults_remain_canonical() {
 }
 
 // r[verify lattice.agent_orchestration.authority]
+// r[verify lattice.agent_orchestration.authority.scenario.validation]
 #[test]
 fn proposal_requires_current_authority_and_successor_validation() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
@@ -455,6 +459,7 @@ fn proposal_requires_current_authority_and_successor_validation() {
 }
 
 // r[verify lattice.agent_orchestration.authority]
+// r[verify lattice.agent_orchestration.authority.scenario.stale]
 #[test]
 fn stale_approval_is_rejected() {
     let mut instance = base_instance(CompletionPolicy::AwaitProposal);
@@ -479,6 +484,8 @@ fn stale_approval_is_rejected() {
 }
 
 // r[verify lattice.agent_orchestration.budgets]
+// r[verify lattice.agent_orchestration.budgets.scenario.block]
+// r[verify lattice.agent_orchestration.budgets.scenario.reserve]
 #[test]
 fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
     let policy = definition(CompletionPolicy::RunSucceeded).budgets;
@@ -503,6 +510,7 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
 }
 
 // r[verify lattice.agent_orchestration.durability]
+// r[verify lattice.agent_orchestration.durability.scenario.duplicate]
 #[test]
 fn duplicate_fact_is_idempotent() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -528,6 +536,8 @@ fn duplicate_fact_is_idempotent() {
 }
 
 // r[verify lattice.agent_orchestration.events]
+// r[verify lattice.agent_orchestration.events.scenario.replay]
+// r[verify lattice.agent_orchestration.events.scenario.tampered]
 #[test]
 fn replay_reconstructs_state_and_rejects_tampering() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -615,6 +625,8 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
 }
 
 // r[verify lattice.agent_orchestration.controls]
+// r[verify lattice.agent_orchestration.controls.scenario.cancel]
+// r[verify lattice.agent_orchestration.controls.scenario.pause]
 #[test]
 fn pause_and_cancel_preserve_observed_runner_boundary() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
@@ -652,6 +664,8 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
 }
 
 // r[verify lattice.agent_orchestration.unobserved_abandon]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.acknowledged]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.replay]
 #[test]
 fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_claim() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -704,6 +718,7 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
 }
 
 // r[verify lattice.agent_orchestration.unobserved_abandon]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.planned]
 #[test]
 fn planned_abandonment_releases_reservation_without_consumption() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -732,6 +747,8 @@ fn planned_abandonment_releases_reservation_without_consumption() {
 }
 
 // r[verify lattice.agent_orchestration.unobserved_abandon]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.authority]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.identity]
 #[test]
 fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -791,6 +808,7 @@ fn approval_identity_binds_authority_policy() {
     let _: RevisionProposal = proposal;
 }
 
+// r[verify lattice.agent_orchestration.authority.scenario.ambient-denied]
 #[test]
 fn authority_shaped_round_output_remains_inert_without_an_approval_fact() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
@@ -818,6 +836,7 @@ fn authority_shaped_round_output_remains_inert_without_an_approval_fact() {
     assert_eq!(waiting.budgets.policy, base.budgets.policy);
 }
 
+// r[verify lattice.agent_orchestration.budgets.scenario.overage]
 #[test]
 fn observed_budget_overage_exhausts_new_work_without_reversing_usage() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -852,6 +871,9 @@ fn observed_budget_overage_exhausts_new_work_without_reversing_usage() {
     assert_eq!(restart.code, OrchestrationDiagnosticCode::TerminalStateMutation);
 }
 
+// r[verify lattice.agent_orchestration.cli.scenario.status]
+// r[verify lattice.agent_orchestration.durability.scenario.external-effects]
+// r[verify lattice.agent_orchestration.events.scenario.non-claim]
 #[test]
 fn status_text_is_actionable_safe_and_explicitly_local_and_at_least_once() {
     let mut base = base_instance(CompletionPolicy::RunSucceeded);
@@ -875,6 +897,7 @@ fn status_text_is_actionable_safe_and_explicitly_local_and_at_least_once() {
     assert!(!rendered.contains(ACTOR));
 }
 
+// r[verify lattice.agent_orchestration.rounds.scenario.hidden-cycle]
 #[test]
 fn feedback_cannot_continue_a_running_round_or_bypass_successor_validation() {
     let base = base_instance(CompletionPolicy::AwaitProposal);

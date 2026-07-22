@@ -806,3 +806,24 @@ r[lattice.repository_validation.agent_orchestration_completion.scenario.fail_clo
 - GIVEN evidence, classification, marker, or coverage drift
 - WHEN completion validation runs
 - THEN it MUST reject deterministically
+
+### Requirement: Agent-orchestration evidence promotion
+r[lattice.repository_validation.agent_orchestration_promotion] Lattice MUST promote exactly the 39 completed agent-orchestration rows through assertion-local markers.
+
+#### Scenario: Exact agent-orchestration bindings
+r[lattice.repository_validation.agent_orchestration_promotion.scenario.bindings]
+- GIVEN exact maintained tests
+- WHEN markers are promoted
+- THEN every selected ID MUST be bound to an allowlisted test
+
+#### Scenario: Exact agent-orchestration delta
+r[lattice.repository_validation.agent_orchestration_promotion.scenario.delta]
+- GIVEN the immutable 261-gap baseline
+- WHEN coverage is compared
+- THEN exactly 39 selected IDs MUST be removed, none added, zero dangling remain, and coverage MUST stay unsuccessful
+
+#### Scenario: Agent-orchestration promotion drift fails closed
+r[lattice.repository_validation.agent_orchestration_promotion.scenario.fail_closed]
+- GIVEN binding, policy, or set drift
+- WHEN promotion validation runs
+- THEN it MUST reject deterministically

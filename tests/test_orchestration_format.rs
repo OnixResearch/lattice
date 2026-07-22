@@ -72,6 +72,7 @@ fn definition() -> OrchestrationDefinition {
 }
 
 // r[verify lattice.agent_orchestration.format]
+// r[verify lattice.agent_orchestration.format.scenario.round-trip]
 #[test]
 fn typed_nickel_definition_round_trip_preserves_meaning() {
     let directory = tempdir().expect("temporary directory must exist");
@@ -118,6 +119,7 @@ fn proposal_nickel_round_trip_preserves_hash_bound_identity() {
 }
 
 // r[verify lattice.agent_orchestration.format]
+// r[verify lattice.agent_orchestration.format.scenario.secret]
 #[test]
 fn plaintext_credential_field_is_rejected() {
     let directory = tempdir().expect("temporary directory must exist");
@@ -132,6 +134,7 @@ fn plaintext_credential_field_is_rejected() {
 }
 
 // r[verify lattice.agent_orchestration.format]
+// r[verify lattice.agent_orchestration.format.scenario.n8n-boundary]
 #[test]
 fn default_n8n_export_rejects_unmapped_orchestration_semantics() {
     let error = reject_default_n8n_orchestration_export().expect_err("unmapped orchestration must not export");

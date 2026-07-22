@@ -229,6 +229,7 @@ fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstanc
 }
 
 // r[verify lattice.agent_orchestration.rounds]
+// r[verify lattice.agent_orchestration.rounds.scenario.execute]
 // r[verify lattice.agent_orchestration.cli]
 // r[verify lattice.workflow_execution.headless_run_details.scenario.orchestration]
 #[tokio::test]
@@ -267,6 +268,7 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
 }
 
 // r[verify lattice.agent_orchestration.model]
+// r[verify lattice.agent_orchestration.model.scenario.revision-drift]
 #[test]
 fn definition_validation_rejects_stale_workflow_revision() {
     let (_directory, store) = store();
@@ -282,6 +284,7 @@ fn definition_validation_rejects_stale_workflow_revision() {
 }
 
 // r[verify lattice.agent_orchestration.authority]
+// r[verify lattice.agent_orchestration.authority.scenario.approved]
 // r[verify lattice.agent_orchestration.rounds]
 #[tokio::test]
 async fn approved_successor_runs_as_a_new_immutable_round() {
@@ -313,6 +316,8 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
 }
 
 // r[verify lattice.agent_orchestration.triggers]
+// r[verify lattice.agent_orchestration.triggers.scenario.duplicate]
+// r[verify lattice.agent_orchestration.triggers.scenario.start]
 #[tokio::test]
 async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     let (_directory, store) = store();
@@ -677,6 +682,8 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
 }
 
 // r[verify lattice.agent_orchestration.durability]
+// r[verify lattice.agent_orchestration.durability.scenario.reconcile]
+// r[verify lattice.agent_orchestration.run_identity.scenario.match]
 #[test]
 fn recovery_reconciles_persisted_run_without_redispatch() {
     let (_directory, store) = store();
@@ -787,6 +794,7 @@ fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry(
 }
 
 // r[verify lattice.agent_orchestration.unobserved_abandon]
+// r[verify lattice.agent_orchestration.unobserved_abandon.scenario.observed]
 #[test]
 fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
     let (_directory, store) = store();
@@ -827,6 +835,7 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
 }
 
 // r[verify lattice.agent_orchestration.run_identity]
+// r[verify lattice.agent_orchestration.run_identity.scenario.foreign]
 #[test]
 fn foreign_run_record_cannot_satisfy_or_abandon_a_pending_dispatch() {
     let (_directory, store) = store();

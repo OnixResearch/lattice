@@ -525,6 +525,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 }
 
 // r[verify lattice.agent_orchestration.cli]
+// r[verify lattice.agent_orchestration.cli.scenario.invalid]
 #[test]
 fn unauthorized_start_fails_without_persisting_an_instance() {
     let (_directory, config_path, definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
@@ -546,6 +547,7 @@ fn unauthorized_start_fails_without_persisting_an_instance() {
 }
 
 // r[verify lattice.agent_orchestration.cli]
+// r[verify lattice.agent_orchestration.cli.scenario.invalid]
 #[test]
 fn missing_instance_command_fails_without_creating_state() {
     let (_directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
