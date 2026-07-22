@@ -15,15 +15,18 @@
   "review_policy": {
     "expected_missing_count": 290,
     "expected_missing_hash": "ba797fa2f3f60697a1941f1b61927af134df835f8f6454bb1febda85ebcfcc7d",
-    "reviewed_decisions": 0,
-    "policy_hash": "809558e543a0e5e8be4e4a31b7b4c0b3370dc2d26cbcb97eeafcd34c58854757"
+    "reviewed_decisions": 29,
+    "policy_hash": "d683bee392efd84fe479694c880304c6fba5dd0ddbd3fd309616abc9fd023162"
   },
   "summary": {
     "total": 290,
-    "reviewed": 0,
-    "unassessed": 290,
+    "reviewed": 29,
+    "unassessed": 261,
     "by_classification": {
-      "unassessed": 290
+      "exact_maintained_evidence": 19,
+      "no_exact_evidence_identified": 3,
+      "partial_evidence_only": 7,
+      "unassessed": 261
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -1864,205 +1867,335 @@
     {
       "requirement_id": "n8nclone.workflow_validation.credentials.providers.config",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_credentials.rs",
+          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+        }
+      ],
+      "rationale_code": "gap.pre-effect-blocking-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.credentials.providers.field",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_credentials.rs",
+          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+        }
+      ],
+      "rationale_code": "gap.fatal-severity-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.credentials.providers.key",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "gap.malformed-provider-key-evidence-absent"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.diagnostics.core.empty_command",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.empty-command-fatal-code"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.diagnostics.core.missing_config",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.missing-config-fatal-code"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.diagnostics.core.valid",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.valid-workflow-no-fatal"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.diagnostics.negative.invalid_edge",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.invalid-edge-stable-code"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.effects",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "gap.effect-resource-admission-evidence-absent"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.graph",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "gap.complete-graph-cases-and-zero-effects-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.generic_runner_admission.terminal_state",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_runner_core.rs",
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36"
+        }
+      ],
+      "rationale_code": "gap.persisted-config-immutability-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_json.export_limits.node",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.unsupported-export-refused"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.connection",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.malformed-connection-refused"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.expression",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.unsupported-expression-refused"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_json.unsupported.node_kind",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.unsupported-node-refused"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.malformed_connection",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.parity-malformed-golden-diagnostic"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.plaintext_credential",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.parity-plaintext-safe-diagnostic"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_expression",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.parity-expression-golden-diagnostic"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.n8n_parity_diagnostics.unsupported_node",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.parity-node-golden-diagnostic"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.node_kind_provider",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_node_kind_provider.rs",
+          "blake3": "8b0f312b594587ddc129760ed053cf79db1667fcdd50c7c22f3743a840bab975"
+        }
+      ],
+      "rationale_code": "gap.all-builtins-and-runtime-provider-contract-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.replay_records.artifact",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "e964d72cb04cf1664274c5ae6a1ccc3e2812987a48bdba29987aa7b1463bd6f7"
+        }
+      ],
+      "rationale_code": "assertions.missing-artifact-recoverable-placeholder"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.replay_records.order",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "e964d72cb04cf1664274c5ae6a1ccc3e2812987a48bdba29987aa7b1463bd6f7"
+        }
+      ],
+      "rationale_code": "assertions.duplicate-out-of-order-fatal-codes"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.replay_records.terminal",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "e964d72cb04cf1664274c5ae6a1ccc3e2812987a48bdba29987aa7b1463bd6f7"
+        }
+      ],
+      "rationale_code": "assertions.terminal-replay-mutation-rejected"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.run_gate.block",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.fatal-blocks-tui-and-headless-effects"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.run_gate.warning",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "assertions.warning-allows-run-gate"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.subworkflows.mapping",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
+      "classification": "no_exact_evidence_identified",
       "evidence": [],
-      "rationale_code": "not-reviewed"
+      "rationale_code": "gap.subworkflow-mapping-evidence-absent"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.subworkflows.missing",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_control_flow.rs",
+          "blake3": "608b027f0450f7956b728a1e9779479ce4948182cca155b3d721866df2497e75"
+        }
+      ],
+      "rationale_code": "assertions.missing-subworkflow-rejected"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.subworkflows.recursive",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "tests/test_control_flow.rs",
+          "blake3": "608b027f0450f7956b728a1e9779479ce4948182cca155b3d721866df2497e75"
+        }
+      ],
+      "rationale_code": "assertions.recursive-subworkflow-rejected"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.tui.panel.empty",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "gap.ready-message-unasserted"
     },
     {
       "requirement_id": "n8nclone.workflow_validation.tui.panel.open",
       "subsystem": "workflow-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "tests/test_workflow_validation.rs",
+          "blake3": "2fe0adea9d5b36d2d09d57fd511ecfe1479f16667ff3fe4a5fd964d0496e4add"
+        }
+      ],
+      "rationale_code": "gap.location-and-actionable-text-unasserted"
     }
   ],
   "missing_set_hash": "ba797fa2f3f60697a1941f1b61927af134df835f8f6454bb1febda85ebcfcc7d",
@@ -2075,5 +2208,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "60086021e3024bfaafc1827a7d8559151984243aece790986622e48d89ad3e88"
+  "inventory_hash": "c1b484a34cd871d0e7fa49f8a643e1a960161cd15839464dd7c26af2e3269da7"
 }
