@@ -1,0 +1,93 @@
+[package]
+name = "lattice"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[workspace]
+members = ["."]
+default-members = ["."]
+exclude = ["vendor-cargo-deps/animus"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+blake3 = "1.8.3"
+ratatui = { version = "0.30", default-features = false }
+ratcore = { path = "vendor-cargo-deps/rats/source/ratcore" }
+unicode-width = "0.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.metadata.octet]
+default_scope = ["-p", "lattice"]
+cargo_check_args = ["--lib"]
+
+[[bin]]
+name = "lattice"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.50", features = ["full"] }
+futures = "0.3.32"
+async-trait = "0.1.89"
+serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde_json = "1.0.149"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+clap = { version = "4.6", features = ["derive", "env"] }
+thiserror = "2.0.18"
+snafu = "0.9"
+bytes = "1.11"
+chrono = { version = "0.4.44", features = ["serde"] }
+rand = "0.10"
+hex = "0.4.3"
+url = "2.5"
+parking_lot = "0.12.5"
+reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+
+# Optional simulation testing
+madsim = { version = "0.2.34", features = ["macros"], optional = true }
+
+# Optional property-based testing
+bolero = { version = "0.13.4", optional = true }
+bolero-generator = { version = "0.13.5", optional = true }
+proptest = { version = "1.11", optional = true }
+redb = "3.1.1"
+nickel-lang-core = "0.17.0"
+blake3 = "1.8.3"
+crossterm = "0.29.0"
+ratatui = "0.30.0"
+seaglass-execution-graph = { path = "vendor-cargo-deps/seaglass-execution-graph" }
+rat-nodegraph = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
+rat-widgets = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-widgets" }
+rat-keymap = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-keymap" }
+rat-fuzzy = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-fuzzy" }
+rat-streaming = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-streaming" }
+rat-layers = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-layers" }
+rat-canvas = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-canvas" }
+rat-tree = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-tree" }
+rat-table = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-table" }
+rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor" }
+home = "0.5.12"
+dirs-next = "2.0.0"
+cap-std = "4.0.2"
+animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
+animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
+animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
+
+[dev-dependencies]
+pretty_assertions = "1.4"
+tempfile = "3.27"
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
+tokio-test = "0.4.5"
+
+[features]
+default = []
+simulation = ["dep:madsim"]
+property-testing = ["dep:bolero", "dep:bolero-generator", "dep:proptest"]

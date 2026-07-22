@@ -9,21 +9,23 @@
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "0fe133555764357b2a66478a0d5ba5704c0b6ec5ee91e6c4ee572bb0beb6feb9",
-    "receipt_hash": "306b7ecebe05a97bfcbf2cb4f9112e47638d3c57fc50a69d186c2068b4cac458"
+    "input_hash": "8602c4080f1b246f90ed7c7f74fb7ba2f7920659045f37e964ae76fc77a94190",
+    "receipt_hash": "731f62c6d8b9d24836784cf590c33d64c45ee0c4401b0800853a22f3ac87c075"
   },
   "review_policy": {
     "expected_missing_count": 315,
     "expected_missing_hash": "2b7906ee39473996244bcfbf795e9ee984704c8bbfe2db9017309647c4d8373c",
-    "reviewed_decisions": 0,
-    "policy_hash": "851645cae3eaef6c26327dac47dcd66f3f98147423920f725f561de6f6dd4349"
+    "reviewed_decisions": 11,
+    "policy_hash": "788b365acb3fe4dbe38ab55c42829dff6d3a1d0cb00059527d094147a309af15"
   },
   "summary": {
     "total": 315,
-    "reviewed": 0,
-    "unassessed": 315,
+    "reviewed": 11,
+    "unassessed": 304,
     "by_classification": {
-      "unassessed": 315
+      "exact_maintained_evidence": 2,
+      "partial_evidence_only": 9,
+      "unassessed": 304
     },
     "by_subsystem": {
       "agent-orchestration": 39,
@@ -410,79 +412,202 @@
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-direct-vendor-lint-fixture"
     },
     {
       "requirement_id": "n8nclone.repository_validation.clippy_scope.scenario.vendor-lints",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-triggering-vendor-lint-fixture"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "README.md",
+          "blake3": "be65d085648a01ff0ff925d4b0ad1eae5c77ce3a0ae0a03c907ec4789d5adacc"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-hostile-host-signing-check"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check.scenario.missing-signing-key",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "README.md",
+          "blake3": "be65d085648a01ff0ff925d4b0ad1eae5c77ce3a0ae0a03c907ec4789d5adacc"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-missing-key-process-check"
     },
     {
       "requirement_id": "n8nclone.repository_validation.flake_check.scenario.normal-signing",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "README.md",
+          "blake3": "be65d085648a01ff0ff925d4b0ad1eae5c77ce3a0ae0a03c907ec4789d5adacc"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-external-signing-policy-assertion"
     },
     {
       "requirement_id": "n8nclone.repository_validation.format_scope",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-direct-vendor-format-fixture"
     },
     {
       "requirement_id": "n8nclone.repository_validation.format_scope.scenario.vendor-format",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        }
+      ],
+      "rationale_code": "gap.no-upstream-format-difference-assertion"
     },
     {
       "requirement_id": "n8nclone.repository_validation.test_source",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        },
+        {
+          "path": "tests/fixtures/n8n/shell.json",
+          "blake3": "f72d1067fa2a19983040d22454031baffd640068efcbb33617fc6853c02609d6"
+        },
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.nix-nextest-compiles-tracked-test-fixtures"
     },
     {
       "requirement_id": "n8nclone.repository_validation.test_source.scenario.json-fixture",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        },
+        {
+          "path": "tests/fixtures/n8n/shell.json",
+          "blake3": "f72d1067fa2a19983040d22454031baffd640068efcbb33617fc6853c02609d6"
+        },
+        {
+          "path": "tests/test_n8n_json.rs",
+          "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
+        }
+      ],
+      "rationale_code": "assertions.filtered-json-fixture-compiles"
     },
     {
       "requirement_id": "n8nclone.repository_validation.vendor_snapshot",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        },
+        {
+          "path": "vendor-cargo-deps/animus/crates/animus-adapters/src/effect/result.rs",
+          "blake3": "45238434efc4b7035133d4eabcdfdc5eb64308c96f1c49ffcab9f1f0120346b6"
+        },
+        {
+          "path": "vendor-cargo-deps/rats/source/ratcore/src/ratatui/coverage/baseline.rs",
+          "blake3": "cd5972e5ba1d6feb7ce9f51b5d9fa9f05009dae30db90095b3617ac02dde693a"
+        }
+      ],
+      "rationale_code": "gap.no-nested-vendor-source-closure-assertion"
     },
     {
       "requirement_id": "n8nclone.repository_validation.vendor_snapshot.scenario.nested-output-name",
       "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "blake3": "ae4d9a5744f9c07e2091ad48fae45862c6559488e5492a8cec0054b99cba11fa"
+        },
+        {
+          "path": "flake.nix",
+          "blake3": "1b56551be094d259763966e52ab5a67e25f54f6a9846421b2c94a36ee2bfd7a8"
+        },
+        {
+          "path": "vendor-cargo-deps/animus/crates/animus-adapters/src/effect/result.rs",
+          "blake3": "45238434efc4b7035133d4eabcdfdc5eb64308c96f1c49ffcab9f1f0120346b6"
+        },
+        {
+          "path": "vendor-cargo-deps/rats/source/ratcore/src/ratatui/coverage/baseline.rs",
+          "blake3": "cd5972e5ba1d6feb7ce9f51b5d9fa9f05009dae30db90095b3617ac02dde693a"
+        }
+      ],
+      "rationale_code": "gap.no-git-and-nix-nested-path-assertion"
     },
     {
       "requirement_id": "n8nclone.tui_ux.add_node.cancel",
@@ -2252,5 +2377,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "8b9f95ae5448eeef8a4af1d968d813af13dba6cdaaa1a8791f81b8fc1616c5fa"
+  "inventory_hash": "38e3e4b76d5198805d9771fa37191a0f97eff5bda2d660f9a73e1f10cd15191b"
 }

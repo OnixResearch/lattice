@@ -1,0 +1,15 @@
+{
+  "name": "n8n-shell-fixture",
+  "nodes": [
+    {
+      "id": "shell-1",
+      "name": "Echo",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [10, 20],
+      "parameters": {
+        "command": "printf hello"
+      }
+    }
+  ],
+  "connections": {}
+}
