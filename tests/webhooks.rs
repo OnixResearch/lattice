@@ -407,6 +407,7 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
 }
 
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.accepted]
+// r[verify n8nclone.credentials.webhook_cookbook_secret_safety]
 #[tokio::test]
 async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history() {
     let store = Store::new(tempfile::tempdir().expect("tempdir").path().join("cookbook.redb")).expect("store opens");
@@ -431,6 +432,7 @@ async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history(
 }
 
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.rejected]
+// r[verify n8nclone.credentials.webhook_cookbook_secret_safety]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety.references]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety.redaction]
 #[test]

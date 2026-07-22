@@ -3,8 +3,8 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
 {
   schema_version = "lattice.traceability-debt-inventory.v1",
   hash_algorithm = "BLAKE3",
-  expected_missing_count = 341,
-  expected_missing_hash = "0070258e8dbf77a97ca7d34a8880b297712733811cf6350b677301b617823e77",
+  expected_missing_count = 340,
+  expected_missing_hash = "e0ce72fe7f22dfe1fb007d33d93d6bc0b61b9efbc389339e9a0ed8656bc6f13b",
   reviewed = [
     {
       requirement_id = "n8nclone.credentials.n8n_json.placeholders.export",
@@ -115,7 +115,7 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
         { path = "src/triggers.rs", blake3 = "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467" },
         { path = "src/webhooks/flow.rs", blake3 = "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922" },
         { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
-        { path = "tests/webhooks.rs", blake3 = "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011" },
+        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
       ],
       rationale_code = "assertions.safe-reference-context-missing",
     },
@@ -126,22 +126,9 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
         { path = "src/triggers.rs", blake3 = "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467" },
         { path = "src/webhooks/flow.rs", blake3 = "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922" },
         { path = "tests/test_triggers.rs", blake3 = "1c3a189b10748ebc1d0d5e6884ee96f9b5cb98107b65798a279752251898848a" },
-        { path = "tests/webhooks.rs", blake3 = "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011" },
+        { path = "tests/webhooks.rs", blake3 = "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424" },
       ],
       rationale_code = "assertions.persistence-observation-missing",
-    },
-    {
-      requirement_id = "n8nclone.credentials.webhook_cookbook_secret_safety",
-      classification = "exact_maintained_evidence",
-      evidence = [
-        { path = "examples/README.md", blake3 = "9ba2964ecb63eb81823898b1243d0c391e9b4772533ee0958b98cfdeb91e91bb" },
-        { path = "examples/workflows/webhook-cookbook.ncl", blake3 = "e449f943f0af5f6b2f49ce4dca45d9279ca2897410d63b57e3163bff86d03e95" },
-        { path = "src/triggers.rs", blake3 = "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467" },
-        { path = "src/webhooks/controls.rs", blake3 = "942f7286a689511ff37359bff729a8d21c2166235f7ab59a3f6d282d7ee7da76" },
-        { path = "src/webhooks/flow.rs", blake3 = "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922" },
-        { path = "tests/webhooks.rs", blake3 = "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011" },
-      ],
-      rationale_code = "assertions.cookbook-artifacts-and-smoke-surfaces",
     },
   ],
   non_claims = [

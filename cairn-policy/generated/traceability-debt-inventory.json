@@ -3,34 +3,33 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 722,
-    "referenced": 381,
-    "missing": 341,
+    "requirements": 726,
+    "referenced": 386,
+    "missing": 340,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "b8e4756bbdcfcaff5eca23b23c48dff5713b43ccb14a5fb3c6bb60c2fd2cac10",
-    "receipt_hash": "bbbbf2471c6a176208e3fe05c334027fd74f6a4f65fc6ddd6e0d02e48bd6e9c5"
+    "input_hash": "e5b7f725f24d0dedc06209f65a6e0cfc04b6b960b436ed59ff930140a8cf31d3",
+    "receipt_hash": "7a9ef4ae04d59511bcb285922138c827017dd04e75fe7b4dbd8421a87134059a"
   },
   "review_policy": {
-    "expected_missing_count": 341,
-    "expected_missing_hash": "0070258e8dbf77a97ca7d34a8880b297712733811cf6350b677301b617823e77",
-    "reviewed_decisions": 14,
-    "policy_hash": "267299b9a354362efd005e13e6b21326901c5ab4159b95ee3de2df0016dee82b"
+    "expected_missing_count": 340,
+    "expected_missing_hash": "e0ce72fe7f22dfe1fb007d33d93d6bc0b61b9efbc389339e9a0ed8656bc6f13b",
+    "reviewed_decisions": 13,
+    "policy_hash": "28f6d4190587ec345d019f53b851f1f02b0598acee4b3c01e187a01ecd440c37"
   },
   "summary": {
-    "total": 341,
-    "reviewed": 14,
+    "total": 340,
+    "reviewed": 13,
     "unassessed": 327,
     "by_classification": {
-      "exact_maintained_evidence": 1,
       "partial_evidence_only": 13,
       "unassessed": 327
     },
     "by_subsystem": {
       "agent-orchestration": 39,
       "agent-runtime": 14,
-      "credentials": 14,
+      "credentials": 13,
       "node-templates": 3,
       "repository-validation": 11,
       "scheduling": 7,
@@ -620,7 +619,7 @@
         },
         {
           "path": "tests/webhooks.rs",
-          "blake3": "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011"
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
         }
       ],
       "rationale_code": "assertions.safe-reference-context-missing"
@@ -644,42 +643,10 @@
         },
         {
           "path": "tests/webhooks.rs",
-          "blake3": "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011"
+          "blake3": "8e918ea1c6b729049703077d7cadecd23acf4cee326ad48c9e0271017e5db424"
         }
       ],
       "rationale_code": "assertions.persistence-observation-missing"
-    },
-    {
-      "requirement_id": "n8nclone.credentials.webhook_cookbook_secret_safety",
-      "subsystem": "credentials",
-      "classification": "exact_maintained_evidence",
-      "evidence": [
-        {
-          "path": "examples/README.md",
-          "blake3": "9ba2964ecb63eb81823898b1243d0c391e9b4772533ee0958b98cfdeb91e91bb"
-        },
-        {
-          "path": "examples/workflows/webhook-cookbook.ncl",
-          "blake3": "e449f943f0af5f6b2f49ce4dca45d9279ca2897410d63b57e3163bff86d03e95"
-        },
-        {
-          "path": "src/triggers.rs",
-          "blake3": "329343ff4685dbac1c6ace1872c22ad280d23958111d68d9a17f4fa06195e467"
-        },
-        {
-          "path": "src/webhooks/controls.rs",
-          "blake3": "942f7286a689511ff37359bff729a8d21c2166235f7ab59a3f6d282d7ee7da76"
-        },
-        {
-          "path": "src/webhooks/flow.rs",
-          "blake3": "a6c4b933b7c15c4e1adbb2d3a246b3d056bddb51f20aecd5faa0ce1a6ae36922"
-        },
-        {
-          "path": "tests/webhooks.rs",
-          "blake3": "52270b64ffbd19fb46b229107049998df30d49bec3bf8b7c724f698e435b5011"
-        }
-      ],
-      "rationale_code": "assertions.cookbook-artifacts-and-smoke-surfaces"
     },
     {
       "requirement_id": "n8nclone.node_templates.parameters.prompt",
@@ -2600,7 +2567,7 @@
       "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "0070258e8dbf77a97ca7d34a8880b297712733811cf6350b677301b617823e77",
+  "missing_set_hash": "e0ce72fe7f22dfe1fb007d33d93d6bc0b61b9efbc389339e9a0ed8656bc6f13b",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -2610,5 +2577,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "2f0454bd877acac89f54b8972864d70b8d76371b4f965f21a06ab4341107d851"
+  "inventory_hash": "29fd52ee16d35b5503ee31045e2ad75aa73c972df78cbec32228729392bf15f9"
 }

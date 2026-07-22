@@ -70,6 +70,9 @@ const VAULT_TAMPER_ID: &str = concat!("n8n", "clone.credentials.providers.local_
 const WEBHOOK_REDACTION_ID: &str = concat!("n8n", "clone.credentials.webhook_auth.redaction");
 const WEBHOOK_VALID_ID: &str = concat!("n8n", "clone.credentials.webhook_auth.valid");
 const COOKBOOK_SAFETY_ID: &str = concat!("n8n", "clone.credentials.webhook_cookbook_secret_safety");
+const PROMOTED_COOKBOOK_MARKER: &str =
+    concat!("// r[verify n8n", "clone.credentials.webhook_cookbook_secret_safety]\n",);
+const PROMOTED_COOKBOOK_MARKER_COUNT: usize = 2;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct InventoryReport {
@@ -262,7 +265,13 @@ fn evidence_sources() -> Vec<&'static str> {
     ]
 }
 
+fn historical_webhook_tests() -> String {
+    assert_eq!(WEBHOOK_TESTS.matches(PROMOTED_COOKBOOK_MARKER).count(), PROMOTED_COOKBOOK_MARKER_COUNT);
+    WEBHOOK_TESTS.replace(PROMOTED_COOKBOOK_MARKER, "")
+}
+
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
+    let historical_webhook_tests = historical_webhook_tests();
     BTreeMap::from([
         (CREDENTIAL_SOURCE_PATH, blake3::hash(CREDENTIAL_SOURCE.as_bytes()).to_hex().to_string()),
         (EXECUTOR_SOURCE_PATH, blake3::hash(EXECUTOR_SOURCE.as_bytes()).to_hex().to_string()),
@@ -273,7 +282,7 @@ fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
         (CREDENTIAL_TESTS_PATH, blake3::hash(CREDENTIAL_TESTS.as_bytes()).to_hex().to_string()),
         (N8N_TESTS_PATH, blake3::hash(N8N_TESTS.as_bytes()).to_hex().to_string()),
         (TRIGGER_TESTS_PATH, blake3::hash(TRIGGER_TESTS.as_bytes()).to_hex().to_string()),
-        (WEBHOOK_TESTS_PATH, blake3::hash(WEBHOOK_TESTS.as_bytes()).to_hex().to_string()),
+        (WEBHOOK_TESTS_PATH, blake3::hash(historical_webhook_tests.as_bytes()).to_hex().to_string()),
         (PLAINTEXT_N8N_FIXTURE_PATH, blake3::hash(PLAINTEXT_N8N_FIXTURE.as_bytes()).to_hex().to_string()),
         (
             PARITY_PLAINTEXT_FIXTURE_PATH,
@@ -317,7 +326,12 @@ fn remaining_credential_review_is_complete_bound_and_non_promoting() {
         let implementation_marker = format!("r[impl {}]", decision.requirement_id);
         let verification_marker = format!("r[verify {}]", decision.requirement_id);
         assert!(evidence_sources().iter().all(|source| !source.contains(&implementation_marker)));
-        assert!(evidence_sources().iter().all(|source| !source.contains(&verification_marker)));
+        if decision.requirement_id == COOKBOOK_SAFETY_ID {
+            assert_eq!(WEBHOOK_TESTS.matches(&verification_marker).count(), PROMOTED_COOKBOOK_MARKER_COUNT);
+            assert!(!historical_webhook_tests().contains(&verification_marker));
+        } else {
+            assert!(evidence_sources().iter().all(|source| !source.contains(&verification_marker)));
+        }
     }
     for row in &report.rows {
         if reviewed_ids.contains(row.requirement_id.as_str()) {
