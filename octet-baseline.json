@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:1420c9a0b1e03612f4cec47bee348cbab937873c4b03fcae75d6d0d7a22257a2",
+  "baseline_hash": "b3:ea92641c01ac711b141fa496ae1ef82caa9b606445695dc8d06d19886d620b68",
   "findings": [
     {
       "stable_id": "b3:02a1c82bab65b6c1",
@@ -1300,8 +1300,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:ba3db39e4d4104db",
-      "semantic_id": "b3:ba3db39e4d4104db",
+      "stable_id": "b3:cfe1a229d121686a",
+      "semantic_id": "b3:cfe1a229d121686a",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -1309,7 +1309,7 @@
       "file": "src/credentials.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 600 lines (limit: 300)",
+      "message": "source file is 604 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -1489,7 +1489,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 543,
+      "line": 547,
       "column": 83,
       "message": "function `validate_secret_ref` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -1502,7 +1502,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 578,
+      "line": 582,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -1515,7 +1515,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/credentials.rs",
-      "line": 579,
+      "line": 583,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"

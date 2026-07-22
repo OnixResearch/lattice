@@ -3,27 +3,28 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 735,
-    "referenced": 399,
+    "requirements": 740,
+    "referenced": 404,
     "missing": 336,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "6a64f687c3f8248cfa667c9080f2174549a70af88c68f4e21faa89e03847a415",
-    "receipt_hash": "87869188ce937a58e769a5673b4f8463a63567264280c70382f8eecee2e7357c"
+    "input_hash": "782a71d1bc01f4cc3fd3275795b379c0be832e554551a1ff8cceae6b9b955188",
+    "receipt_hash": "40563e15250ee489d872888ae6ea0204946c9759746ff43a1017f2ed0786dddc"
   },
   "review_policy": {
     "expected_missing_count": 336,
     "expected_missing_hash": "9013bbe478784e6cec07f744410b35c27dad79cdf6c0451b496fbdc1a3e3ce7d",
     "reviewed_decisions": 9,
-    "policy_hash": "5c65366e8948058bc0db5dcb469d2ab925178cf28b95ef38f2aa7342db04119c"
+    "policy_hash": "68760eb9309a4851ae49029c3c1ca897424417435a14b48c294f3746f5541e72"
   },
   "summary": {
     "total": 336,
     "reviewed": 9,
     "unassessed": 327,
     "by_classification": {
-      "partial_evidence_only": 9,
+      "exact_maintained_evidence": 7,
+      "partial_evidence_only": 2,
       "unassessed": 327
     },
     "by_subsystem": {
@@ -415,114 +416,130 @@
     {
       "requirement_id": "n8nclone.credentials.provider_cache_identity.no_plaintext",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/engine/executor.rs",
           "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.reference-dimensions-incomplete"
+      "rationale_code": "assertions.provider-key-field-and-value-independence"
     },
     {
       "requirement_id": "n8nclone.credentials.provider_diagnostics.redaction.error",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.error-fragment-source-missing"
+      "rationale_code": "assertions.fixed-category-safe-identity-render"
     },
     {
       "requirement_id": "n8nclone.credentials.provider_diagnostics.redaction.test",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.render-persist-observation-missing"
+      "rationale_code": "assertions.serialized-success-and-failure"
     },
     {
       "requirement_id": "n8nclone.credentials.providers.command.resolve",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "src/engine/executor.rs",
+          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
+        },
+        {
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.executor-boundary-missing"
+      "rationale_code": "assertions.executor-before-side-effect-and-output-omission"
     },
     {
       "requirement_id": "n8nclone.credentials.providers.command.timeout",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "src/engine/executor.rs",
+          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
+        },
+        {
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.no-runtime-observation-missing"
+      "rationale_code": "assertions.executor-timeout-blocks-side-effect"
     },
     {
       "requirement_id": "n8nclone.credentials.providers.local_vault.resolve",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "src/engine/executor.rs",
+          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
+        },
+        {
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.workflow-file-observation-missing"
+      "rationale_code": "assertions.workflow-file-executor-boundary"
     },
     {
       "requirement_id": "n8nclone.credentials.providers.local_vault.tamper",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/credentials.rs",
-          "blake3": "fc74f4d7c14a7079b43711680a05a32fd07a750396fb7a0ba3738b658ead839a"
+          "blake3": "98fe0cfb08938d8b503c8852b8d4f4a770008cdbcf9da642ee963dfbde9f7fb1"
         },
         {
-          "path": "tests/test_credentials.rs",
-          "blake3": "cc2675977f742a1dfda395e00379b22e41a5f50c3858eb8b1e0153ddc5f17835"
+          "path": "src/engine/executor.rs",
+          "blake3": "d50f7b97fbd39999a80163aa8e5037d80d277dd52c6741b8cab67fae1dc09664"
+        },
+        {
+          "path": "tests/test_provider_credential_boundaries.rs",
+          "blake3": "a388a72dca1eeb437fbe7b3d4576120bf9f681e7ac442b4549045bd1fc5aafe7"
         }
       ],
-      "rationale_code": "assertions.rendered-tamper-diagnostic-missing"
+      "rationale_code": "assertions.rendered-tamper-blocks-side-effect"
     },
     {
       "requirement_id": "n8nclone.credentials.webhook_auth.redaction",
@@ -2501,5 +2518,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "afc25cd14e9f1cdb7343488863fa5b2b921b898c08885196dcccf5fb1088a523"
+  "inventory_hash": "cdef9ef16e79591be05ebaa796677c91ed7cb4d1ac85de12781db2a027ade860"
 }

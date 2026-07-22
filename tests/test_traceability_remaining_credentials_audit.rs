@@ -13,6 +13,7 @@ const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-core-credent
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-remaining-credentials-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-remaining-credentials-reviewed.json");
 const CREDENTIAL_SOURCE: &str = include_str!("../src/credentials.rs");
+const REVIEWED_CREDENTIAL_SOURCE_HEX: &str = include_str!("fixtures/traceability-reviewed-credentials-source.hex");
 const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
 const N8N_SOURCE: &str = include_str!("../src/n8n_json.rs");
 const TRIGGER_SOURCE: &str = include_str!("../src/triggers.rs");
@@ -272,8 +273,10 @@ fn historical_webhook_tests() -> String {
 
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
     let historical_webhook_tests = historical_webhook_tests();
+    let reviewed_credential_source =
+        hex::decode(REVIEWED_CREDENTIAL_SOURCE_HEX.trim()).expect("reviewed source hex decodes");
     BTreeMap::from([
-        (CREDENTIAL_SOURCE_PATH, blake3::hash(CREDENTIAL_SOURCE.as_bytes()).to_hex().to_string()),
+        (CREDENTIAL_SOURCE_PATH, blake3::hash(&reviewed_credential_source).to_hex().to_string()),
         (EXECUTOR_SOURCE_PATH, blake3::hash(EXECUTOR_SOURCE.as_bytes()).to_hex().to_string()),
         (N8N_SOURCE_PATH, blake3::hash(N8N_SOURCE.as_bytes()).to_hex().to_string()),
         (TRIGGER_SOURCE_PATH, blake3::hash(TRIGGER_SOURCE.as_bytes()).to_hex().to_string()),

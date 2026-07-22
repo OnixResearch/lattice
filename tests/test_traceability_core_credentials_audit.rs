@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-operator-diagnostics-promotion-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-core-credentials-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-core-credentials-reviewed.json");
-const CREDENTIAL_SOURCE: &str = include_str!("../src/credentials.rs");
+const CREDENTIAL_SOURCE_HEX: &str = include_str!("fixtures/traceability-reviewed-credentials-source.hex");
 const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
 const WORKFLOW_FORMAT_SOURCE: &str = include_str!("../src/workflow_format.rs");
 const WORKFLOW_VALIDATION_SOURCE: &str = include_str!("../src/workflow_validation.rs");
@@ -207,8 +207,9 @@ fn issue_codes(issues: &[core::ReviewIssue]) -> BTreeSet<&str> {
 }
 
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
+    let reviewed_credential_source = hex::decode(CREDENTIAL_SOURCE_HEX.trim()).expect("reviewed source hex decodes");
     BTreeMap::from([
-        (CREDENTIAL_SOURCE_PATH, blake3::hash(CREDENTIAL_SOURCE.as_bytes()).to_hex().to_string()),
+        (CREDENTIAL_SOURCE_PATH, blake3::hash(&reviewed_credential_source).to_hex().to_string()),
         (EXECUTOR_SOURCE_PATH, blake3::hash(EXECUTOR_SOURCE.as_bytes()).to_hex().to_string()),
         (WORKFLOW_FORMAT_SOURCE_PATH, blake3::hash(WORKFLOW_FORMAT_SOURCE.as_bytes()).to_hex().to_string()),
         (

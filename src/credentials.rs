@@ -510,27 +510,31 @@ fn parse_command_secret_stdout(secret_ref: &SecretRef, stdout: &str) -> Result<S
     Ok(stdout.to_string())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialProbeResult {
     pub identity: String,
     pub reachable: bool,
     pub message: String,
 }
 
+fn credential_probe_result(secret_ref: &SecretRef, is_reachable: bool) -> CredentialProbeResult {
+    // Probe output never carries backend-provided text.
+    let message = if is_reachable {
+        "secret resolved"
+    } else {
+        "provider resolution failed"
+    };
+    CredentialProbeResult {
+        identity: secret_ref.identity(),
+        reachable: is_reachable,
+        message: message.to_string(),
+    }
+}
+
 // r[impl n8nclone.credentials.provider_diagnostics.redaction]
 pub fn test_provider_reference(provider: &dyn CredentialProvider, secret_ref: &SecretRef) -> CredentialProbeResult {
-    match provider.resolve(secret_ref) {
-        Ok(_value) => CredentialProbeResult {
-            identity: secret_ref.identity(),
-            reachable: true,
-            message: "secret resolved".to_string(),
-        },
-        Err(error) => CredentialProbeResult {
-            identity: secret_ref.identity(),
-            reachable: false,
-            message: redact_text(&error.to_string(), std::slice::from_ref(&secret_ref.key)),
-        },
-    }
+    let is_reachable = provider.resolve(secret_ref).is_ok();
+    credential_probe_result(secret_ref, is_reachable)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
