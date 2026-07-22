@@ -60,6 +60,32 @@ pub fn validate_promotion(
     issues
 }
 
+#[allow(dead_code)]
+pub fn validate_marker_bindings(source: &str, bindings: &[(&str, &str)]) -> Vec<PromotionIssue> {
+    let mut issues = Vec::new();
+    for (requirement_id, test_name) in bindings {
+        if !marker_is_attached_to_test(source, test_name, requirement_id) {
+            issues.push(PromotionIssue::new("binding.missing", format!("{requirement_id}:{test_name}")));
+        }
+    }
+    issues.sort();
+    issues.dedup();
+    issues
+}
+
+#[allow(dead_code)]
+pub fn validate_policy_excludes_promoted_ids(policy: &str, promoted_ids: &[&str]) -> Vec<PromotionIssue> {
+    let mut issues = Vec::new();
+    for identifier in promoted_ids {
+        if policy.contains(identifier) {
+            issues.push(PromotionIssue::new("policy.promoted_present", *identifier));
+        }
+    }
+    issues.sort();
+    issues.dedup();
+    issues
+}
+
 pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id: &str) -> bool {
     let signature = format!("fn {test_name}(");
     let async_signature = format!("async {signature}");

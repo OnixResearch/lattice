@@ -119,6 +119,7 @@ fn designated_plaintext_diagnostic_is_safe() {
     assert!(!report.contains(PLAINTEXT_SECRET_SENTINEL));
 }
 
+// r[verify n8nclone.credentials.n8n_json.placeholders.reference]
 // r[verify lattice.repository_validation.n8n_credential_completion]
 // r[verify lattice.repository_validation.n8n_credential_completion.scenario.boundaries]
 #[tokio::test]
@@ -151,6 +152,7 @@ async fn imported_placeholder_resolves_before_execution_and_missing_value_blocks
     assert!(!side_effect_path.exists());
 }
 
+// r[verify n8nclone.credentials.n8n_json.placeholders.export]
 // r[verify lattice.repository_validation.n8n_credential_completion.scenario.boundaries]
 #[tokio::test]
 async fn resolved_reference_stays_opaque_across_save_raw_store_and_cli_export() {
@@ -195,6 +197,8 @@ async fn resolved_reference_stays_opaque_across_save_raw_store_and_cli_export() 
     }
 }
 
+// r[verify n8nclone.credentials.n8n_json.placeholders.plaintext]
+// r[verify n8nclone.credentials.n8n_parity_secret_safety]
 // r[verify lattice.repository_validation.n8n_credential_completion.scenario.boundaries]
 // r[verify lattice.repository_validation.n8n_credential_completion.scenario.parity]
 #[test]
@@ -225,6 +229,7 @@ fn plaintext_cli_import_reports_safe_guidance_without_creating_store() {
     assert!(!command_output.contains(PLAINTEXT_SECRET_SENTINEL));
 }
 
+// r[verify n8nclone.credentials.n8n_parity_secret_safety]
 // r[verify lattice.repository_validation.n8n_credential_completion.scenario.parity]
 #[test]
 fn parity_sentinel_is_bounded_to_one_negative_input_and_all_outputs_are_safe() {
