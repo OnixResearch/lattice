@@ -3,28 +3,27 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 782,
-    "referenced": 465,
+    "requirements": 785,
+    "referenced": 468,
     "missing": 317,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "55f0c7925863fffbd5e0e031ed3046582ac0d6a0b2f728062640a515473c57ab",
-    "receipt_hash": "ffa6d4eadef48f1c463359d97bbf084360ba4a2987dfa733eb2965154304d907"
+    "input_hash": "9fb0165255ec3c3c2b64f54276865c34ca20778a77c6fd4a86f8d76f4bb56dec",
+    "receipt_hash": "08ff90e64e94ed91398a9407f4c670f601506628bad05cb1285a00e578d2d6a9"
   },
   "review_policy": {
     "expected_missing_count": 317,
     "expected_missing_hash": "a4526fac7d7f14c594c1a900a74dd4fd118028c8855ce773b114587aa81bf3bd",
     "reviewed_decisions": 2,
-    "policy_hash": "4919623bc51c5f39e99696381da2a4fae7b4c0337abbe34c568bf665e33dbf4b"
+    "policy_hash": "e3797acb72009a761c9607e167a5439db9641bd549d8dd55029fdd51cdaa2afe"
   },
   "summary": {
     "total": 317,
     "reviewed": 2,
     "unassessed": 315,
     "by_classification": {
-      "exact_maintained_evidence": 1,
-      "no_exact_evidence_identified": 1,
+      "exact_maintained_evidence": 2,
       "unassessed": 315
     },
     "by_subsystem": {
@@ -1176,9 +1175,18 @@
     {
       "requirement_id": "n8nclone.workflow_examples.image.invalid",
       "subsystem": "workflow-examples",
-      "classification": "no_exact_evidence_identified",
-      "evidence": [],
-      "rationale_code": "fixture.absent-from-maintained-roots"
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "path": "examples/workflows/invalid-unsupported-image-format.ncl",
+          "blake3": "8cca0881b68a2f3e9b7700c5e3be16e52d907b1ecc0177902c1d33bdda66cb7a"
+        },
+        {
+          "path": "tests/test_image_workflow_example.rs",
+          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
+        }
+      ],
+      "rationale_code": "assertions.unsupported-format-without-partial-completion"
     },
     {
       "requirement_id": "n8nclone.workflow_examples.image.selfie_to_fine_art",
@@ -1191,7 +1199,7 @@
         },
         {
           "path": "tests/test_image_workflow_example.rs",
-          "blake3": "657bb2f91f7f1a2471d8bd7d9556c1cb87fd41916ea255ce645e757227f099c0"
+          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
         }
       ],
       "rationale_code": "assertions.import-execute-and-image-output"
@@ -2278,5 +2286,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "c1a8604dcd3dfa8d61e75aeac7fc6c77d57ecc0eae81bb47472e1f975cbb8196"
+  "inventory_hash": "51077d90f824ec7180aa1937ff4828a86c418d0c5a2c35f75b51941bd4b1b402"
 }

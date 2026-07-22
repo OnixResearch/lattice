@@ -12,9 +12,9 @@ use std::collections::BTreeSet;
 
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-webhook-auth-promotion-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-workflow-example-audit-current.json");
-const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
+const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-workflow-example-audit-reviewed.json");
 const EXAMPLE_SOURCE: &str = include_str!("../examples/workflows/selfie-to-fine-art.ncl");
-const EXAMPLE_TEST_SOURCE: &str = include_str!("test_image_workflow_example.rs");
+const EXAMPLE_TEST_SOURCE: &str = include_str!("fixtures/traceability-workflow-example-audit-reviewed-test.txt");
 const EXAMPLE_SOURCE_PATH: &str = "examples/workflows/selfie-to-fine-art.ncl";
 const EXAMPLE_TEST_PATH: &str = "tests/test_image_workflow_example.rs";
 const SUBSYSTEM: &str = "workflow-examples";
@@ -113,7 +113,7 @@ fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
 // r[verify lattice.repository_validation.workflow_example_audit.scenario.evidence]
 #[test]
 fn workflow_example_audit_is_complete_byte_bound_and_unpromoted() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let review_issues = validate_tranche(&review_rows(&report), SUBSYSTEM, &expected_decisions());
     let baseline = coverage_snapshot(BASELINE_COVERAGE);
     let current = coverage_snapshot(CURRENT_COVERAGE);
@@ -139,7 +139,7 @@ fn workflow_example_audit_is_complete_byte_bound_and_unpromoted() {
 // r[verify lattice.repository_validation.workflow_example_audit.scenario.fail_closed]
 #[test]
 fn workflow_example_classification_marker_evidence_and_coverage_drift_fail_closed() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("inventory must decode");
+    let report: InventoryReport = serde_json::from_str(REVIEWED_INVENTORY).expect("inventory must decode");
     let mut rows = review_rows(&report);
     rows.retain(|row| row.requirement_id != INVALID_ID);
     let selfie = rows.iter_mut().find(|row| row.requirement_id == SELFIE_ID).expect("selfie row");

@@ -8,16 +8,19 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
   reviewed = [
     {
       requirement_id = "n8nclone.workflow_examples.image.invalid",
-      classification = "no_exact_evidence_identified",
-      evidence = [],
-      rationale_code = "fixture.absent-from-maintained-roots",
+      classification = "exact_maintained_evidence",
+      evidence = [
+        { path = "examples/workflows/invalid-unsupported-image-format.ncl", blake3 = "8cca0881b68a2f3e9b7700c5e3be16e52d907b1ecc0177902c1d33bdda66cb7a" },
+        { path = "tests/test_image_workflow_example.rs", blake3 = "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd" },
+      ],
+      rationale_code = "assertions.unsupported-format-without-partial-completion",
     },
     {
       requirement_id = "n8nclone.workflow_examples.image.selfie_to_fine_art",
       classification = "exact_maintained_evidence",
       evidence = [
         { path = "examples/workflows/selfie-to-fine-art.ncl", blake3 = "2efd38cfd5d615233f307983ce81baf1e0c61563185526e7b4ad00880854dd0e" },
-        { path = "tests/test_image_workflow_example.rs", blake3 = "657bb2f91f7f1a2471d8bd7d9556c1cb87fd41916ea255ce645e757227f099c0" },
+        { path = "tests/test_image_workflow_example.rs", blake3 = "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd" },
       ],
       rationale_code = "assertions.import-execute-and-image-output",
     },

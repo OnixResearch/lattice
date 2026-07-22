@@ -20,13 +20,19 @@ use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
 
 const SELFIE_TO_FINE_ART_EXAMPLE: &str = "examples/workflows/selfie-to-fine-art.ncl";
+const INVALID_IMAGE_EXAMPLE: &str = "examples/workflows/invalid-unsupported-image-format.ncl";
 const SELFIE_WORKFLOW_NAME: &str = "selfie-to-fine-art";
+const INVALID_WORKFLOW_NAME: &str = "invalid-unsupported-image-format";
 const SELFIE_PATH: &str = "/fixtures/selfie.png";
 const PORTRAIT_PATH: &str = "/fixtures/inspiration-portrait.jpg";
 const LIGHTING_PATH: &str = "/fixtures/inspiration-lighting.png";
+const INVALID_SELFIE_PATH: &str = "/fixtures/unsupported-selfie.gif";
+const INVALID_PORTRAIT_PATH: &str = "/fixtures/unsupported-portrait.gif";
+const INVALID_LIGHTING_PATH: &str = "/fixtures/unsupported-lighting.gif";
 const PNG_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\nexample";
 const JPEG_FIXTURE: &[u8] = b"\xff\xd8example\xff\xd9";
 const GENERATED_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\ngenerated";
+const UNSUPPORTED_GIF_FIXTURE: &[u8] = b"GIF89a-invalid-example";
 const EXPECTED_IMAGE_INPUT_COUNT: usize = 3;
 const EXPECTED_COMPLETED_NODE_COUNT: usize = 4;
 
@@ -55,12 +61,27 @@ fn example_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(SELFIE_TO_FINE_ART_EXAMPLE)
 }
 
+fn invalid_example_path() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(INVALID_IMAGE_EXAMPLE)
+}
+
 fn image_io() -> MemoryImageIo {
     MemoryImageIo::new(
         [
             (SELFIE_PATH.to_string(), PNG_FIXTURE.to_vec()),
             (PORTRAIT_PATH.to_string(), JPEG_FIXTURE.to_vec()),
             (LIGHTING_PATH.to_string(), PNG_FIXTURE.to_vec()),
+        ]
+        .into(),
+    )
+}
+
+fn invalid_image_io() -> MemoryImageIo {
+    MemoryImageIo::new(
+        [
+            (INVALID_SELFIE_PATH.to_string(), UNSUPPORTED_GIF_FIXTURE.to_vec()),
+            (INVALID_PORTRAIT_PATH.to_string(), UNSUPPORTED_GIF_FIXTURE.to_vec()),
+            (INVALID_LIGHTING_PATH.to_string(), UNSUPPORTED_GIF_FIXTURE.to_vec()),
         ]
         .into(),
     )
@@ -91,4 +112,26 @@ async fn selfie_to_fine_art_example_imports_and_runs_with_fake_clankers_adapter(
         })
         .any(|value| value.as_display_string().contains("image/png"));
     assert!(generated);
+}
+
+#[tokio::test]
+async fn invalid_image_example_reports_format_diagnostics_without_partial_completion() {
+    let workflow = load_workflow_nickel_file(&invalid_example_path()).expect("negative example imports");
+    assert_eq!(workflow.meta.name, INVALID_WORKFLOW_NAME);
+    let mut executor = Executor::new_with_runtime_clients(
+        Box::<EmptyCredentialProvider>::default(),
+        Box::<NoopHttpClient>::default(),
+        Box::<NoopFileSystem>::default(),
+        Box::new(invalid_image_io()),
+        Box::new(ExampleAgentAdapter),
+    );
+
+    let (_run_id, results) = executor.run(&workflow, &HashMap::new()).await;
+
+    assert_eq!(results.len(), EXPECTED_COMPLETED_NODE_COUNT);
+    assert!(results.iter().all(|step| matches!(step.status, NodeStatus::Failed { .. } | NodeStatus::Skipped)));
+    assert!(results.iter().any(|step| {
+        matches!(&step.status, NodeStatus::Failed { error } if error.contains("unsupported image format"))
+    }));
+    assert!(!results.iter().any(|step| matches!(step.status, NodeStatus::Completed { .. })));
 }
