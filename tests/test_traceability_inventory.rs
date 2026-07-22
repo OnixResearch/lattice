@@ -31,7 +31,8 @@ const SAMPLE_UNASSESSED_COUNT: usize = 1;
 const CURRENT_MISSING_COUNT: usize = 340;
 const CURRENT_REVIEWED_COUNT: usize = 13;
 const CURRENT_UNASSESSED_COUNT: usize = 327;
-const CURRENT_PARTIAL_COUNT: usize = 13;
+const CURRENT_EXACT_COUNT: usize = 4;
+const CURRENT_PARTIAL_COUNT: usize = 9;
 const CURRENT_MISSING_HASH: &str = "e0ce72fe7f22dfe1fb007d33d93d6bc0b61b9efbc389339e9a0ed8656bc6f13b";
 const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
 const REQUIRED_UNASSESSED_NON_CLAIM: &str = "unassessed does not mean behavior or evidence is absent";
@@ -193,7 +194,7 @@ fn checked_inventory_pins_current_debt_without_promoting_it() {
     assert_eq!(report.summary.reviewed, CURRENT_REVIEWED_COUNT);
     assert_eq!(report.summary.unassessed, CURRENT_UNASSESSED_COUNT);
     assert_eq!(report.missing_set_hash, CURRENT_MISSING_HASH);
-    assert!(!report.summary.by_classification.contains_key("exact_maintained_evidence"));
+    assert_eq!(report.summary.by_classification.get("exact_maintained_evidence"), Some(&CURRENT_EXACT_COUNT));
     assert_eq!(report.summary.by_classification.get("partial_evidence_only"), Some(&CURRENT_PARTIAL_COUNT));
     assert!(!report.summary.by_classification.contains_key("no_exact_evidence_identified"));
     assert_eq!(report.summary.by_classification.get("unassessed"), Some(&CURRENT_UNASSESSED_COUNT));

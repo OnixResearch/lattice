@@ -3,27 +3,28 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 726,
-    "referenced": 386,
+    "requirements": 731,
+    "referenced": 391,
     "missing": 340,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "e5b7f725f24d0dedc06209f65a6e0cfc04b6b960b436ed59ff930140a8cf31d3",
-    "receipt_hash": "7a9ef4ae04d59511bcb285922138c827017dd04e75fe7b4dbd8421a87134059a"
+    "input_hash": "a5f2db4132bac5c731b080329db2ca855cedde7c54c26ddfef5a088552ec6523",
+    "receipt_hash": "8391cb39ece3a8d814207114df934aa46c4107a98bcf430d52fb747a6cae2403"
   },
   "review_policy": {
     "expected_missing_count": 340,
     "expected_missing_hash": "e0ce72fe7f22dfe1fb007d33d93d6bc0b61b9efbc389339e9a0ed8656bc6f13b",
     "reviewed_decisions": 13,
-    "policy_hash": "28f6d4190587ec345d019f53b851f1f02b0598acee4b3c01e187a01ecd440c37"
+    "policy_hash": "5d4ba383454de50a58ce41d3ba1503985b53aba70b3cfbc2bad3f629b92a3709"
   },
   "summary": {
     "total": 340,
     "reviewed": 13,
     "unassessed": 327,
     "by_classification": {
-      "partial_evidence_only": 13,
+      "exact_maintained_evidence": 4,
+      "partial_evidence_only": 9,
       "unassessed": 327
     },
     "by_subsystem": {
@@ -415,43 +416,59 @@
     {
       "requirement_id": "n8nclone.credentials.n8n_json.placeholders.export",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e"
+        },
         {
           "path": "src/n8n_json.rs",
           "blake3": "668c5adac6f449dfc597108af1ff57fea2e1cacfa3d443a1807a50c16db4f8e3"
+        },
+        {
+          "path": "tests/test_n8n_credential_boundaries.rs",
+          "blake3": "d029eec7b4060e71848cb485f158f3275bcdfeb2fa3fb0995976b01568cb715d"
         },
         {
           "path": "tests/test_n8n_json.rs",
           "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
         }
       ],
-      "rationale_code": "assertions.credential-export-observation-missing"
+      "rationale_code": "assertions.execution-save-raw-store-cli-export"
     },
     {
       "requirement_id": "n8nclone.credentials.n8n_json.placeholders.plaintext",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e"
+        },
         {
           "path": "src/n8n_json.rs",
           "blake3": "668c5adac6f449dfc597108af1ff57fea2e1cacfa3d443a1807a50c16db4f8e3"
         },
         {
-          "path": "tests/fixtures/n8n/plaintext-credentials.json",
-          "blake3": "2cf81f633764559cf062cb15d188543947e875fff946a4da3050ac8c12cd8cc3"
+          "path": "tests/fixtures/n8n/parity/unsupported/plaintext-node-credential.json",
+          "blake3": "343a47bab676d60d3df80b43c45b5f062c8b004bcf4792705017f8055017f8ff"
+        },
+        {
+          "path": "tests/test_n8n_credential_boundaries.rs",
+          "blake3": "d029eec7b4060e71848cb485f158f3275bcdfeb2fa3fb0995976b01568cb715d"
         },
         {
           "path": "tests/test_n8n_json.rs",
           "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
         }
       ],
-      "rationale_code": "assertions.plaintext-save-boundary-missing"
+      "rationale_code": "assertions.cli-rejection-precedes-store"
     },
     {
       "requirement_id": "n8nclone.credentials.n8n_json.placeholders.reference",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
         {
           "path": "src/engine/executor.rs",
@@ -462,31 +479,83 @@
           "blake3": "668c5adac6f449dfc597108af1ff57fea2e1cacfa3d443a1807a50c16db4f8e3"
         },
         {
+          "path": "tests/test_n8n_credential_boundaries.rs",
+          "blake3": "d029eec7b4060e71848cb485f158f3275bcdfeb2fa3fb0995976b01568cb715d"
+        },
+        {
           "path": "tests/test_n8n_json.rs",
           "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
         }
       ],
-      "rationale_code": "assertions.imported-placeholder-resolution-missing"
+      "rationale_code": "assertions.imported-provider-execution-boundary"
     },
     {
       "requirement_id": "n8nclone.credentials.n8n_parity_secret_safety",
       "subsystem": "credentials",
-      "classification": "partial_evidence_only",
+      "classification": "exact_maintained_evidence",
       "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e676a71694763d30b16182759eec2cee5eb4fb4dbaa9fd4bee2ba85c16173d5e"
+        },
         {
           "path": "src/n8n_json.rs",
           "blake3": "668c5adac6f449dfc597108af1ff57fea2e1cacfa3d443a1807a50c16db4f8e3"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/supported/command-pipeline.json",
+          "blake3": "fa36b003d21abbd60d2164f45c793a08d920085a613fa660fdc7f5d52eefb4cb"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/supported/command-pipeline.report.json",
+          "blake3": "65c19b05a3a473a7beafc4936815095a48b37acee066c649602c3b9bd3b5af28"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/supported/default-http-method.json",
+          "blake3": "dbc05636f34aef3fb8e6c89110e5e575a1e14d5753bba62dc744b6eb7cceb9bd"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/supported/http-credential-chain.json",
+          "blake3": "98b673c47142822d6929559240c31c9c234a370c6768a029d0271c31a82dde5b"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/supported/http-credential-chain.report.json",
+          "blake3": "d8130d062520f2c9772a2754be4b628efe1944e88d7fc31254a3cec633aa0c74"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/unsupported/expression-url.json",
+          "blake3": "1c3d9326248b3b47e14e42bf921248864fed01be737860acfecce27c07b43fdd"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/unsupported/malformed-connection.json",
+          "blake3": "0bc228254029f0d711ae65667289f585920ff8e75e07ba022b599bc68e37ee04"
         },
         {
           "path": "tests/fixtures/n8n/parity/unsupported/plaintext-node-credential.json",
           "blake3": "343a47bab676d60d3df80b43c45b5f062c8b004bcf4792705017f8055017f8ff"
         },
         {
+          "path": "tests/fixtures/n8n/parity/unsupported/schedule-trigger.json",
+          "blake3": "fb55a34ab4b89db4434caab084bd035d2695dc992e364a98b0b3f1cd787f8a02"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/unsupported/webhook-trigger.json",
+          "blake3": "4f6b45c79fdb49201c2a8277aeeecf77d45662ff67772c469043c18ef2b05992"
+        },
+        {
+          "path": "tests/fixtures/n8n/parity/unsupported/webhook-trigger.report.json",
+          "blake3": "fa05397b0203671fcd86b8d38149e2339bd58794efc1b12e87f7e6162090f232"
+        },
+        {
+          "path": "tests/test_n8n_credential_boundaries.rs",
+          "blake3": "d029eec7b4060e71848cb485f158f3275bcdfeb2fa3fb0995976b01568cb715d"
+        },
+        {
           "path": "tests/test_n8n_json.rs",
           "blake3": "fb156b96a063f69f111be98be294e4bd6557f9c971540dbae2b45d2daa3ba776"
         }
       ],
-      "rationale_code": "contract.fixture-sentinel-and-output-gaps"
+      "rationale_code": "assertions.bounded-negative-input-output-omission"
     },
     {
       "requirement_id": "n8nclone.credentials.provider_cache_identity.no_plaintext",
@@ -2577,5 +2646,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "29fd52ee16d35b5503ee31045e2ad75aa73c972df78cbec32228729392bf15f9"
+  "inventory_hash": "029ce36ef9f30cb78672b64bb0204e851468af539c1e4b2f2ada017b1209f55e"
 }

@@ -211,7 +211,7 @@ r[n8nclone.credentials.webhook_cookbook_secret_safety.redaction]
 - THEN authorization headers, bearer values, signature values, raw sensitive payload fields, and credential provider values are absent
 
 ### Requirement: n8n parity secret safety
-r[n8nclone.credentials.n8n_parity_secret_safety] The system MUST keep n8n parity fixtures, reports, diagnostics, and test output free of plaintext credential material.
+r[n8nclone.credentials.n8n_parity_secret_safety] The system MUST keep supported n8n parity fixtures, checked-in reports, rendered diagnostics, and test output free of plaintext credential material; one designated unsupported rejection fixture MAY contain one bounded plaintext sentinel solely as import-validation input.
 
 #### Scenario: Credential placeholders stay opaque
 r[n8nclone.credentials.n8n_parity_secret_safety.placeholders]

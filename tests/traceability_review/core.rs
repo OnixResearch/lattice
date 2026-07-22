@@ -84,6 +84,27 @@ pub fn validate_tranche(rows: &[ReviewRow], subsystem: &str, expected: &[Expecte
     issues
 }
 
+#[allow(dead_code)]
+pub fn validate_no_selected_markers(sources: &[&str], selected_ids: &[&str]) -> Vec<ReviewIssue> {
+    let mut issues = Vec::new();
+    let mut unique = BTreeSet::new();
+    for identifier in selected_ids {
+        if !unique.insert(*identifier) {
+            issues.push(ReviewIssue::new("marker.duplicate_selected", *identifier));
+        }
+        let implementation_marker = format!("r[impl {identifier}]");
+        let verification_marker = format!("r[verify {identifier}]");
+        if sources
+            .iter()
+            .any(|source| source.contains(&implementation_marker) || source.contains(&verification_marker))
+        {
+            issues.push(ReviewIssue::new("marker.promoted", *identifier));
+        }
+    }
+    sort_issues(&mut issues);
+    issues
+}
+
 pub fn validate_unchanged_coverage(baseline: &CoverageSnapshot, current: &CoverageSnapshot) -> Vec<ReviewIssue> {
     let mut issues = Vec::new();
     validate_snapshot("baseline", baseline, &mut issues);
