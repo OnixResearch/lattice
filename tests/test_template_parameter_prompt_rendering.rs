@@ -65,6 +65,7 @@ fn rendered_frame_text(app: &mut App) -> String {
     buffer.content().iter().map(|cell| cell.symbol()).collect()
 }
 
+// r[verify n8nclone.node_templates.parameters.prompt.required]
 #[test]
 fn required_template_parameter_prompt_is_visible_before_node_creation() {
     let temp_dir = tempfile::tempdir().expect("temporary prompt rendering directory");

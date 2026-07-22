@@ -2777,6 +2777,7 @@ mod tests {
         assert!(!app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.node_templates.parameters.prompt]
     #[test]
     fn add_node_flow_prompts_and_renders_template_parameters() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2801,6 +2802,7 @@ mod tests {
         assert!(!app.is_add_node_flow_open());
     }
 
+    // r[verify n8nclone.node_templates.parameters.prompt.cancel]
     #[test]
     fn cancel_template_parameter_entry_preserves_workflow() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");

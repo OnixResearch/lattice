@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:d5e10724e6dad828c224621686ac378f98dd2a592b35dc3091bd26ba6cd7ebcd",
+  "baseline_hash": "b3:4c4af2654b0a9650fcdd0da7a70b5a9a46c12da60970a9fb92424f1e43bb223c",
   "findings": [
     {
       "stable_id": "b3:02a1c82bab65b6c1",
@@ -9074,8 +9074,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:744d0ad32c7cdc75",
-      "semantic_id": "b3:744d0ad32c7cdc75",
+      "stable_id": "b3:84a3de636a5e0179",
+      "semantic_id": "b3:84a3de636a5e0179",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -9083,7 +9083,7 @@
       "file": "src/tui/app.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 3214 lines (limit: 300)",
+      "message": "source file is 3216 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {

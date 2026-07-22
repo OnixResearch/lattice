@@ -28,6 +28,10 @@ const PROMPT_ID: &str = concat!("n8n", "clone.node_templates.parameters.prompt")
 const CANCEL_ID: &str = concat!("n8n", "clone.node_templates.parameters.prompt.cancel");
 const REQUIRED_ID: &str = concat!("n8n", "clone.node_templates.parameters.prompt.required");
 const SELECTED_IDS: &[&str] = &[PROMPT_ID, CANCEL_ID, REQUIRED_ID];
+const PROMPT_MARKER: &str = concat!("    // r[verify n8n", "clone.node_templates.parameters.prompt]\n");
+const CANCEL_MARKER: &str = concat!("    // r[verify n8n", "clone.node_templates.parameters.prompt.cancel]\n");
+const REQUIRED_MARKER: &str = concat!("// r[verify n8n", "clone.node_templates.parameters.prompt.required]\n");
+const MARKER_COUNT: usize = 1;
 const UNRELATED_MISSING_ID: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const UNEXPECTED_ADDED_ID: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING_ID: &str = "lattice.example.dangling.scenario.marker";
@@ -110,11 +114,25 @@ fn issue_codes(issues: &[core::ReviewIssue]) -> BTreeSet<&str> {
     issues.iter().map(|issue| issue.code).collect()
 }
 
+fn historical_app_source() -> String {
+    for marker in [PROMPT_MARKER, CANCEL_MARKER] {
+        assert_eq!(APP_SOURCE.matches(marker).count(), MARKER_COUNT);
+    }
+    APP_SOURCE.replace(PROMPT_MARKER, "").replace(CANCEL_MARKER, "")
+}
+
+fn historical_render_test_source() -> String {
+    assert_eq!(RENDER_TEST_SOURCE.matches(REQUIRED_MARKER).count(), MARKER_COUNT);
+    RENDER_TEST_SOURCE.replace(REQUIRED_MARKER, "")
+}
+
 fn actual_evidence_hashes() -> BTreeMap<&'static str, String> {
+    let historical_app = historical_app_source();
+    let historical_render_test = historical_render_test_source();
     BTreeMap::from([
-        (APP_SOURCE_PATH, blake3::hash(APP_SOURCE.as_bytes()).to_hex().to_string()),
+        (APP_SOURCE_PATH, blake3::hash(historical_app.as_bytes()).to_hex().to_string()),
         (PANELS_SOURCE_PATH, blake3::hash(PANELS_SOURCE.as_bytes()).to_hex().to_string()),
-        (RENDER_TEST_PATH, blake3::hash(RENDER_TEST_SOURCE.as_bytes()).to_hex().to_string()),
+        (RENDER_TEST_PATH, blake3::hash(historical_render_test.as_bytes()).to_hex().to_string()),
     ])
 }
 
@@ -128,7 +146,12 @@ fn all_node_template_prompt_rows_are_exact_byte_bound_and_unpromoted() {
     let baseline = coverage_snapshot(BASELINE_COVERAGE);
     let current = coverage_snapshot(CURRENT_COVERAGE);
     let coverage_issues = validate_unchanged_coverage(&baseline, &current);
-    let marker_issues = validate_no_selected_markers(&[APP_SOURCE, PANELS_SOURCE, RENDER_TEST_SOURCE], SELECTED_IDS);
+    let historical_app = historical_app_source();
+    let historical_render_test = historical_render_test_source();
+    let marker_issues = validate_no_selected_markers(
+        &[historical_app.as_str(), PANELS_SOURCE, historical_render_test.as_str()],
+        SELECTED_IDS,
+    );
     let actual_hashes = actual_evidence_hashes();
     let selected_rows = report.rows.iter().filter(|row| SELECTED_IDS.contains(&row.requirement_id.as_str()));
 
