@@ -25,7 +25,7 @@ const OPERATOR_E2E_CASES: &[OperatorE2eCase] = &[
         exact_filter: false,
     },
     OperatorE2eCase {
-        name: "webhook listener loopback, duplicate-delivery, and post-effect crash boundaries",
+        name: "webhook atomic admission, concurrent delivery, failure, and restart boundaries",
         test_target: "webhooks",
         test_filter: "operator_listener_",
         exact_filter: false,

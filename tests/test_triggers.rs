@@ -367,7 +367,8 @@ async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
     assert_eq!(history[0].trigger_id, TRIGGER_ID);
     assert_eq!(history[0].workflow_name, WORKFLOW_NAME);
     assert_eq!(history[0].run_id, Some(summary.run_id));
-    assert_eq!(history[0].idempotency_key.as_deref(), Some(EVENT_KEY));
+    assert_eq!(history[0].idempotency_key, None);
+    assert!(history[0].claim_identity.as_deref().is_some_and(|identity| identity.starts_with("b3:")));
     assert_eq!(history[0].status, TriggerRunStatus::Started);
     assert_eq!(history[0].payload_summary, plan.payload_summary);
     assert!(history[0].payload_summary.contains("redacted"));
@@ -404,6 +405,7 @@ fn tui_trigger_error_summary_reports_status_without_raw_message_or_payload() {
         workflow_name: WORKFLOW_NAME.to_string(),
         run_id: None,
         idempotency_key: None,
+        claim_identity: None,
         status: TriggerRunStatus::Failed,
         payload_summary: format!("payload={SECRET_VALUE}"),
         message: format!("authorization={SECRET_VALUE}"),

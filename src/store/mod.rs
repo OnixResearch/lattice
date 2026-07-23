@@ -42,6 +42,7 @@ const RUN_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("run_count
 const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
 const TRIGGERS: TableDefinition<&str, &[u8]> = TableDefinition::new("triggers");
 const TRIGGER_RUNS: TableDefinition<&str, &[u8]> = TableDefinition::new("trigger_runs");
+const WEBHOOK_CLAIMS: TableDefinition<&str, &[u8]> = TableDefinition::new("webhook_claims_v1");
 const ORCHESTRATION_DEFINITIONS: TableDefinition<&str, &[u8]> = TableDefinition::new("orchestration_definitions");
 const ORCHESTRATION_INSTANCES: TableDefinition<&str, &[u8]> = TableDefinition::new("orchestration_instances");
 const ORCHESTRATION_EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("orchestration_events");
@@ -226,6 +227,7 @@ impl Store {
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(WEBHOOK_CLAIMS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(ORCHESTRATION_INSTANCES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(ORCHESTRATION_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
@@ -436,6 +438,64 @@ impl Store {
         Ok(records)
     }
 
+    // r[impl lattice.scheduling.webhook_atomic_idempotency]
+    pub fn claim_webhook(
+        &self,
+        request: &crate::triggers::WebhookClaimRequest,
+    ) -> Result<crate::triggers::WebhookClaimResolution, StoreError> {
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let claims = txn.open_table(WEBHOOK_CLAIMS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) =
+                claims.get(request.identity.as_str()).map_err(|error| StoreError::Db(error.to_string()))?
+            {
+                let claim: crate::triggers::WebhookClaim = deserialize(existing.value())?;
+                return Ok(crate::triggers::WebhookClaimResolution::Duplicate {
+                    existing_run_id: claim.run_id,
+                });
+            }
+        }
+
+        let run_id = reserve_run_id(&txn)?;
+        let claim = request.claim(run_id);
+        let record = request.started_record(run_id);
+        let claim_data = serialize(&claim)?;
+        let record_data = serialize(&record)?;
+        let record_key = trigger_run_record_key(&record);
+        {
+            let mut claims = txn.open_table(WEBHOOK_CLAIMS).map_err(|error| StoreError::Table(error.to_string()))?;
+            claims
+                .insert(request.identity.as_str(), claim_data.as_slice())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        {
+            let mut history = txn.open_table(TRIGGER_RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
+            history
+                .insert(record_key.as_str(), record_data.as_slice())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(crate::triggers::WebhookClaimResolution::Inserted { run_id })
+    }
+
+    pub fn list_webhook_claims(&self, max_claim_count: u64) -> Result<Vec<crate::triggers::WebhookClaim>, StoreError> {
+        let max_claim_count = usize::try_from(max_claim_count)
+            .map_err(|error| StoreError::Conflict(format!("webhook claim limit is unsupported: {error}")))?;
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(WEBHOOK_CLAIMS).map_err(|error| StoreError::Table(error.to_string()))?;
+        let mut claims = Vec::with_capacity(max_claim_count);
+        let iter = table.iter().map_err(|error| StoreError::Db(error.to_string()))?;
+        for entry in iter {
+            if claims.len() >= max_claim_count {
+                break;
+            }
+            let (_identity, data) = entry.map_err(|error| StoreError::Db(error.to_string()))?;
+            claims.push(deserialize(data.value())?);
+        }
+        assert!(claims.len() <= max_claim_count);
+        Ok(claims)
+    }
+
     // -- value store (content-addressed) ------------------------------------
 
     /// Store a value by its content hash.
@@ -610,40 +670,10 @@ impl Store {
     /// Atomically reserve and return one globally unique run id.
     // r[impl lattice.agent_orchestration.run_identity]
     pub fn next_run_id(&self) -> Result<RunId, StoreError> {
-        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
-        let stored_next = {
-            let counters = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
-            counters
-                .get(RUN_ID_COUNTER_KEY)
-                .map_err(|e| StoreError::Db(e.to_string()))?
-                .map(|value| value.value())
-        };
-        let next_id = match stored_next {
-            Some(next_id) => next_id,
-            None => {
-                let table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
-                let mut seeded_next = INITIAL_RUN_ID_VALUE;
-                let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
-                for entry in iter {
-                    let (key, _data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
-                    let candidate = key
-                        .value()
-                        .checked_add(NEXT_RUN_ID_INCREMENT)
-                        .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
-                    seeded_next = seeded_next.max(candidate);
-                }
-                seeded_next
-            }
-        };
-        let following_id = next_id
-            .checked_add(NEXT_RUN_ID_INCREMENT)
-            .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
-        {
-            let mut counters = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
-            counters.insert(RUN_ID_COUNTER_KEY, following_id).map_err(|e| StoreError::Db(e.to_string()))?;
-        }
-        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
-        Ok(RunId(next_id))
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        let run_id = reserve_run_id(&txn)?;
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(run_id)
     }
 
     // -- durable orchestration ---------------------------------------------
@@ -950,6 +980,45 @@ fn validate_next_event(
         return Err(StoreError::Conflict("orchestration event sequence is not contiguous".to_string()));
     }
     Ok(())
+}
+
+fn reserve_run_id(txn: &redb::WriteTransaction) -> Result<RunId, StoreError> {
+    let stored_next = {
+        let counters = txn.open_table(RUN_COUNTERS).map_err(|error| StoreError::Table(error.to_string()))?;
+        counters
+            .get(RUN_ID_COUNTER_KEY)
+            .map_err(|error| StoreError::Db(error.to_string()))?
+            .map(|value| value.value())
+    };
+    let next_id = match stored_next {
+        Some(next_id) => next_id,
+        None => {
+            let table = txn.open_table(RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let mut seeded_next = INITIAL_RUN_ID_VALUE;
+            let iter = table.iter().map_err(|error| StoreError::Db(error.to_string()))?;
+            for entry in iter {
+                let (key, _data) = entry.map_err(|error| StoreError::Db(error.to_string()))?;
+                let candidate = key
+                    .value()
+                    .checked_add(NEXT_RUN_ID_INCREMENT)
+                    .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
+                seeded_next = seeded_next.max(candidate);
+            }
+            seeded_next
+        }
+    };
+    let following_id = next_id
+        .checked_add(NEXT_RUN_ID_INCREMENT)
+        .ok_or_else(|| StoreError::Conflict(RUN_ID_EXHAUSTED_MESSAGE.to_string()))?;
+    debug_assert!(following_id > next_id);
+    debug_assert_eq!(following_id.checked_sub(next_id), Some(NEXT_RUN_ID_INCREMENT));
+    {
+        let mut counters = txn.open_table(RUN_COUNTERS).map_err(|error| StoreError::Table(error.to_string()))?;
+        counters
+            .insert(RUN_ID_COUNTER_KEY, following_id)
+            .map_err(|error| StoreError::Db(error.to_string()))?;
+    }
+    Ok(RunId(next_id))
 }
 
 fn trigger_run_record_key(record: &TriggerRunRecord) -> String {

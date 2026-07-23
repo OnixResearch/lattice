@@ -205,6 +205,15 @@ pub async fn run_admitted_trigger_plan(
     Ok(summary)
 }
 
+// r[impl lattice.scheduling.webhook_atomic_idempotency]
+pub async fn run_claimed_trigger_plan(
+    store: &Store,
+    plan: &TriggerRunPlan,
+    run_id: RunId,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    run_saved_workflow(store, &plan.workflow_name, run_id).await
+}
+
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
 pub async fn run_saved_workflow_with_agent_runtime_config(
     store: &Store,

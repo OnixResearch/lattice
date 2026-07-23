@@ -22,6 +22,7 @@ pub const PROCESS_GATE_READY_CONTENT: &str = "ready";
 #[cfg(unix)]
 const PROCESS_GATE_POLL_INTERVAL_SECONDS: &str = "0.01";
 const POST_EFFECT_EXPECTED_ATTEMPT_COUNT: usize = 2;
+const POST_EFFECT_CLAIMED_ATTEMPT_COUNT: usize = 1;
 
 pub struct ChildGuard {
     child: Option<std::process::Child>,
@@ -144,6 +145,15 @@ pub fn gated_write_command(
     )
 }
 
+/// Append one identified effect for concurrent execution-count assertions.
+#[cfg(unix)]
+pub fn append_effect_command(effect_path: &std::path::Path, effect: &str) -> String {
+    assert!(!effect.is_empty(), "appended effect must be observable");
+    let effect_path = quote_path_for_posix_shell(effect_path);
+    let effect = quote_for_posix_shell(effect);
+    format!("printf '%s\\n' {effect} >> {effect_path}")
+}
+
 /// Record one effect attempt on every invocation and kill the first Lattice
 /// parent only after the attempt and checkpoint are observable.
 #[cfg(unix)]
@@ -236,7 +246,7 @@ pub enum PostEffectIngress {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostEffectHttpOutcome {
     NotApplicable,
-    FirstIncompleteThenAccepted,
+    FirstIncompleteThenConflict,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -288,15 +298,15 @@ pub const SCHEDULER_POST_EFFECT_PROFILE: PostEffectCrashProfile = PostEffectCras
     http_outcome: PostEffectHttpOutcome::NotApplicable,
 };
 
-pub const WEBHOOK_POST_EFFECT_DUPLICATE_RISK_PROFILE: PostEffectCrashProfile = PostEffectCrashProfile {
+pub const WEBHOOK_POST_EFFECT_CLAIM_PROFILE: PostEffectCrashProfile = PostEffectCrashProfile {
     ingress: PostEffectIngress::Webhook,
     pre_restart_run_count: 0,
     schedule_remains_due: None,
-    final_attempt_count: POST_EFFECT_EXPECTED_ATTEMPT_COUNT,
-    final_run_count: 1,
+    final_attempt_count: POST_EFFECT_CLAIMED_ATTEMPT_COUNT,
+    final_run_count: 0,
     final_started_history_count: 1,
     final_rejected_history_count: 0,
-    http_outcome: PostEffectHttpOutcome::FirstIncompleteThenAccepted,
+    http_outcome: PostEffectHttpOutcome::FirstIncompleteThenConflict,
 };
 
 pub fn classify_post_effect_crash(

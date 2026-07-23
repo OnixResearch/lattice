@@ -512,7 +512,7 @@
         },
         {
           "path": "src/triggers.rs",
-          "blake3": "644c9eed53394e4cc9ae0d7e4c21e8f5400ff833073ce790333c1c65273d8103"
+          "blake3": "4407ab3c9ee17bc24e617a79c19e441d33ca8cbecfa827bae730e4c17e36dda8"
         },
         {
           "path": "tests/test_triggers.rs",

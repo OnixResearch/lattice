@@ -15,6 +15,8 @@ use std::process::Child;
 use std::process::ChildStdout;
 use std::process::Command;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::Barrier;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -65,7 +67,16 @@ const RUN_ID_VALUE: u64 = 42;
 const CURRENT_EPOCH_MS: i64 = 1_000;
 const HISTORY_LIMIT: usize = 1;
 const OPERATOR_HISTORY_LIMIT: usize = 10;
-const EXPECTED_OPERATOR_TRIGGER_HISTORY: usize = 2;
+const EXPECTED_OPERATOR_TRIGGER_HISTORY: usize = 1;
+const SIMULTANEOUS_REQUEST_COUNT: usize = 2;
+const EXPECTED_SINGLE_EFFECT_COUNT: usize = 1;
+const EXPECTED_UNCLAIMED_EFFECT_COUNT: usize = 2;
+const SIMULTANEOUS_READY_FILE_NAME: &str = "webhook-simultaneous-ready";
+const SIMULTANEOUS_RELEASE_FILE_NAME: &str = "webhook-simultaneous-release";
+const SIMULTANEOUS_EFFECT_FILE_NAME: &str = "webhook-simultaneous-effect";
+const SIMULTANEOUS_EFFECT: &str = "one-admitted-effect";
+const NO_IDEMPOTENCY_EFFECT_FILE_NAME: &str = "webhook-no-idempotency-effects";
+const NO_IDEMPOTENCY_EFFECT: &str = "unclaimed-effect";
 const EXPECTED_TRIGGER_COUNT: u64 = 1;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
@@ -86,6 +97,7 @@ const HTTP_ACCEPTED_BODY: &str = "\"status\":\"accepted\"";
 const HTTP_NOT_FOUND_STATUS: &str = "HTTP/1.1 404 Not Found";
 const HTTP_NOT_FOUND_BODY: &str = "\"code\":\"not_found\"";
 const HTTP_CONFLICT_STATUS: &str = "HTTP/1.1 409 Conflict";
+const HTTP_INTERNAL_SERVER_ERROR_STATUS: &str = "HTTP/1.1 500 Internal Server Error";
 const HTTP_DUPLICATE_BODY: &str = "\"code\":\"duplicate_idempotency_key\"";
 #[cfg(unix)]
 const POST_EFFECT_CHECKPOINT_FILE_NAME: &str = "webhook-post-effect-checkpoint";
@@ -145,6 +157,10 @@ fn limits() -> webhooks::RequestLimits {
     webhooks::RequestLimits {
         max_body_bytes: LIMIT_BYTES,
     }
+}
+
+fn operator_claim_limit() -> u64 {
+    u64::try_from(OPERATOR_HISTORY_LIMIT).expect("operator claim limit fits u64")
 }
 
 fn secret_ref() -> SecretRef {
@@ -211,6 +227,13 @@ fn webhook_trigger(enabled: bool, auth_policy: WebhookAuthPolicy) -> TriggerDefi
         overlap_policy: OverlapPolicy::Forbid,
         idempotency_policy: IdempotencyPolicy::EventKey,
     }
+}
+
+fn unclaimed_webhook_trigger() -> TriggerDefinition {
+    let mut trigger = webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly);
+    trigger.overlap_policy = OverlapPolicy::Allow;
+    trigger.idempotency_policy = IdempotencyPolicy::None;
+    trigger
 }
 
 fn valid_request() -> webhooks::RawRequest {
@@ -309,7 +332,11 @@ fn http_request_bytes(path: &str) -> Vec<u8> {
 }
 
 fn send_http_request(address: SocketAddr, child: &mut Child, request: &[u8]) -> String {
-    let mut stream = connect_to_started_listener(address, child);
+    let stream = connect_to_started_listener(address, child);
+    send_connected_http_request(stream, request)
+}
+
+fn send_connected_http_request(mut stream: TcpStream, request: &[u8]) -> String {
     let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
     stream.set_read_timeout(timeout).expect("set listener response timeout");
     stream.write_all(request).expect("send bounded webhook request");
@@ -317,6 +344,11 @@ fn send_http_request(address: SocketAddr, child: &mut Child, request: &[u8]) -> 
     let mut response = String::new();
     stream.read_to_string(&mut response).expect("read webhook response");
     response
+}
+
+fn send_barrier_http_request(stream: TcpStream, barrier: &Barrier, request: &[u8]) -> String {
+    barrier.wait();
+    send_connected_http_request(stream, request)
 }
 
 #[cfg(unix)]
@@ -356,6 +388,7 @@ fn started_record() -> TriggerRunRecord {
         workflow_name: WORKFLOW_NAME.to_string(),
         run_id: Some(RunId(RUN_ID_VALUE)),
         idempotency_key: Some(EVENT_KEY.to_string()),
+        claim_identity: None,
         status: TriggerRunStatus::Started,
         payload_summary: "[payload redacted]".to_string(),
         message: "trigger accepted".to_string(),
@@ -527,6 +560,7 @@ fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_withou
 
 // r[verify n8nclone.scheduling.webhook_listener.process.start]
 // r[verify n8nclone.tui_ux.webhook_listener.cli.start]
+// r[verify lattice.scheduling.webhook_atomic_idempotency]
 #[test]
 fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let temp_dir = tempfile::tempdir().expect("temporary live listener directory");
@@ -549,6 +583,7 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("reopen live listener store");
     let runs = store.list_runs(OPERATOR_HISTORY_LIMIT).expect("live listener runs list");
     let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("live listener trigger history lists");
+    let claims = store.list_webhook_claims(operator_claim_limit()).expect("live listener claims list");
 
     assert!(status.contains(&format!("bind={address}")), "status: {status}");
     assert!(status.contains("loaded_triggers=1"), "status: {status}");
@@ -566,21 +601,178 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     assert!(!duplicate_response.contains(HTTP_ACCEPTED_BODY));
     assert_eq!(runs.len(), HISTORY_LIMIT);
     assert_eq!(history.len(), EXPECTED_OPERATOR_TRIGGER_HISTORY);
+    assert_eq!(claims.len(), HISTORY_LIMIT);
     assert!(history.iter().all(|record| record.trigger_id == TRIGGER_ID));
     assert_eq!(history.iter().filter(|record| record.status == TriggerRunStatus::Started).count(), HISTORY_LIMIT,);
-    let duplicate = history
-        .iter()
-        .find(|record| record.status == TriggerRunStatus::Rejected)
-        .expect("duplicate listener request persists one rejected history record");
-    assert_eq!(duplicate.idempotency_key.as_deref(), Some(EVENT_KEY));
+    assert_eq!(history[0].idempotency_key, None);
+    assert_eq!(history[0].claim_identity.as_deref(), Some(claims[0].identity.as_str()));
+    assert_eq!(claims[0].run_id, runs[0].run_id);
+}
+
+// r[verify lattice.scheduling.webhook_atomic_idempotency]
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.concurrent]
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.ordering]
+#[cfg(unix)]
+#[test]
+fn operator_listener_simultaneous_requests_select_one_claim_before_the_gated_effect() {
+    let temp_dir = tempfile::tempdir().expect("temporary simultaneous webhook directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let ready_path = temp_dir.path().join(SIMULTANEOUS_READY_FILE_NAME);
+    let release_path = temp_dir.path().join(SIMULTANEOUS_RELEASE_FILE_NAME);
+    let effect_path = temp_dir.path().join(SIMULTANEOUS_EFFECT_FILE_NAME);
+    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node(
+        "gated-webhook-effect",
+        common::gated_write_command(&ready_path, &release_path, &effect_path, SIMULTANEOUS_EFFECT),
+    );
+    workflow.triggers.push(webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly));
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("simultaneous webhook store opens");
+    save_workflow_with_triggers(&store, &workflow);
+    drop(store);
+
+    let address = reserve_loopback_address();
+    let mut listener = start_listener(&config_path, address);
+    let stdout = listener.child_mut().stdout.take().expect("simultaneous listener stdout is piped");
+    let status = read_listener_status(stdout);
+    let streams = (0..SIMULTANEOUS_REQUEST_COUNT)
+        .map(|_| connect_to_started_listener(address, listener.child_mut()))
+        .collect::<Vec<_>>();
+    let barrier = Arc::new(Barrier::new(SIMULTANEOUS_REQUEST_COUNT + 1));
+    let request = Arc::new(http_request_bytes(WEBHOOK_PATH));
+    let (sender, receiver) = mpsc::channel();
+    let mut clients = Vec::with_capacity(SIMULTANEOUS_REQUEST_COUNT);
+    for stream in streams {
+        let barrier = Arc::clone(&barrier);
+        let request = Arc::clone(&request);
+        let sender = sender.clone();
+        clients.push(thread::spawn(move || {
+            let response = send_barrier_http_request(stream, &barrier, &request);
+            sender.send(response).expect("simultaneous response sends");
+        }));
+    }
+    drop(sender);
+    barrier.wait();
+    common::wait_for_path(&ready_path, POST_EFFECT_WAIT_ATTEMPTS, Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS));
+    let losing_response = receiver
+        .recv_timeout(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS))
+        .expect("duplicate response arrives while the winning effect remains gated");
+    assert!(losing_response.contains(HTTP_CONFLICT_STATUS), "response: {losing_response}");
+    assert!(losing_response.contains(HTTP_DUPLICATE_BODY), "response: {losing_response}");
+    assert!(!effect_path.exists(), "winning effect must remain behind the release gate");
+    std::fs::write(&release_path, "release").expect("simultaneous effect gate releases");
+    let winning_response = receiver
+        .recv_timeout(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS))
+        .expect("winning response arrives after gate release");
+    for client in clients {
+        client.join().expect("simultaneous client joins");
+    }
+    listener.stop();
+
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("simultaneous webhook store reopens");
+    let claims = store.list_webhook_claims(operator_claim_limit()).expect("simultaneous claims list");
+    let runs = store.list_runs(OPERATOR_HISTORY_LIMIT).expect("simultaneous runs list");
+    let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("simultaneous history lists");
+    assert!(status.contains("status=listening"), "status: {status}");
+    assert!(winning_response.contains(HTTP_ACCEPTED_STATUS), "response: {winning_response}");
+    assert!(winning_response.contains(HTTP_ACCEPTED_BODY), "response: {winning_response}");
+    assert_eq!(claims.len(), EXPECTED_SINGLE_EFFECT_COUNT);
+    assert_eq!(runs.len(), EXPECTED_SINGLE_EFFECT_COUNT);
+    assert_eq!(history.len(), EXPECTED_SINGLE_EFFECT_COUNT);
+    assert_eq!(claims[0].run_id, runs[0].run_id);
+    assert_eq!(history[0].claim_identity.as_deref(), Some(claims[0].identity.as_str()));
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("simultaneous effect reads"), SIMULTANEOUS_EFFECT);
+}
+
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.failure]
+#[test]
+fn operator_listener_failed_winner_retains_claim_and_rejects_implicit_retry() {
+    let temp_dir = tempfile::tempdir().expect("temporary failed webhook directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node("invalid-webhook-effect", "");
+    workflow.triggers.push(webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly));
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("failed webhook store opens");
+    save_workflow_with_triggers(&store, &workflow);
+    drop(store);
+
+    let address = reserve_loopback_address();
+    let mut listener = start_listener(&config_path, address);
+    let stdout = listener.child_mut().stdout.take().expect("failed listener stdout is piped");
+    let _status = read_listener_status(stdout);
+    let failed_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
+    let duplicate_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
+    listener.stop();
+
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("failed webhook store reopens");
+    let claims = store.list_webhook_claims(operator_claim_limit()).expect("failed claims list");
+    let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("failed history lists");
+    assert!(failed_response.contains(HTTP_INTERNAL_SERVER_ERROR_STATUS), "response: {failed_response}");
+    assert!(duplicate_response.contains(HTTP_CONFLICT_STATUS), "response: {duplicate_response}");
+    assert!(duplicate_response.contains(HTTP_DUPLICATE_BODY), "response: {duplicate_response}");
+    assert_eq!(claims.len(), HISTORY_LIMIT);
+    assert_eq!(history.len(), HISTORY_LIMIT);
+    assert_eq!(history[0].status, TriggerRunStatus::Failed);
+    assert_eq!(history[0].claim_identity.as_deref(), Some(claims[0].identity.as_str()));
+    assert!(store.list_runs(OPERATOR_HISTORY_LIMIT).expect("failed terminal runs list").is_empty());
+}
+
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.disabled]
+#[cfg(unix)]
+#[test]
+fn operator_listener_idempotency_disabled_allows_concurrent_distinct_runs_without_claims() {
+    let temp_dir = tempfile::tempdir().expect("temporary unclaimed webhook directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let effect_path = temp_dir.path().join(NO_IDEMPOTENCY_EFFECT_FILE_NAME);
+    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    workflow
+        .add_shell_node("unclaimed-webhook-effect", common::append_effect_command(&effect_path, NO_IDEMPOTENCY_EFFECT));
+    workflow.triggers.push(unclaimed_webhook_trigger());
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("unclaimed webhook store opens");
+    save_workflow_with_triggers(&store, &workflow);
+    drop(store);
+
+    let address = reserve_loopback_address();
+    let mut listener = start_listener(&config_path, address);
+    let stdout = listener.child_mut().stdout.take().expect("unclaimed listener stdout is piped");
+    let _status = read_listener_status(stdout);
+    let streams = (0..SIMULTANEOUS_REQUEST_COUNT)
+        .map(|_| connect_to_started_listener(address, listener.child_mut()))
+        .collect::<Vec<_>>();
+    let barrier = Arc::new(Barrier::new(SIMULTANEOUS_REQUEST_COUNT + 1));
+    let request = Arc::new(http_request_bytes(WEBHOOK_PATH));
+    let mut clients = Vec::with_capacity(SIMULTANEOUS_REQUEST_COUNT);
+    for stream in streams {
+        let barrier = Arc::clone(&barrier);
+        let request = Arc::clone(&request);
+        clients.push(thread::spawn(move || send_barrier_http_request(stream, &barrier, &request)));
+    }
+    barrier.wait();
+    let responses =
+        clients.into_iter().map(|client| client.join().expect("unclaimed client joins")).collect::<Vec<_>>();
+    listener.stop();
+
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("unclaimed webhook store reopens");
+    let runs = store.list_runs(OPERATOR_HISTORY_LIMIT).expect("unclaimed runs list");
+    let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("unclaimed history lists");
+    assert!(responses.iter().all(|response| response.contains(HTTP_ACCEPTED_STATUS)));
+    assert!(store.list_webhook_claims(operator_claim_limit()).expect("unclaimed claims list").is_empty());
+    assert_eq!(runs.len(), EXPECTED_UNCLAIMED_EFFECT_COUNT);
+    assert_eq!(history.len(), EXPECTED_UNCLAIMED_EFFECT_COUNT);
+    assert_ne!(runs[0].run_id, runs[1].run_id);
+    assert_eq!(
+        common::identified_effect_attempt_count(&effect_path, NO_IDEMPOTENCY_EFFECT),
+        EXPECTED_UNCLAIMED_EFFECT_COUNT,
+    );
 }
 
 // r[verify lattice.repository_validation.post_effect_crash_boundaries]
 // r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.webhook]
 // r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.non-claim]
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.restart]
+// r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.non-claim]
 #[cfg(unix)]
 #[test]
-fn operator_listener_post_effect_death_matches_duplicate_risk_profile_on_redelivery() {
+fn operator_listener_post_effect_death_preserves_claim_and_rejects_redelivery() {
     let temp_dir = tempfile::tempdir().expect("temporary webhook post-effect directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let checkpoint_path = temp_dir.path().join(POST_EFFECT_CHECKPOINT_FILE_NAME);
@@ -630,25 +822,28 @@ fn operator_listener_post_effect_death_matches_duplicate_risk_profile_on_redeliv
     let pre_restart_runs = after_crash.list_runs(OPERATOR_HISTORY_LIMIT).expect("crash snapshot runs list");
     let pre_restart_history =
         after_crash.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("crash snapshot trigger history lists");
+    let pre_restart_claims =
+        after_crash.list_webhook_claims(operator_claim_limit()).expect("crash snapshot claims list");
     drop(after_crash);
 
     let restart_address = reserve_loopback_address();
     let mut restarted_listener = start_listener(&config_path, restart_address);
     let stdout = restarted_listener.child_mut().stdout.take().expect("restart listener stdout is piped");
     let restart_status = read_listener_status(stdout);
-    let accepted_response =
+    let duplicate_response =
         send_http_request(restart_address, restarted_listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
     restarted_listener.stop();
 
     let recovered = Store::new(&store_path).expect("webhook post-effect store reopens");
     let final_runs = recovered.list_runs(OPERATOR_HISTORY_LIMIT).expect("webhook post-effect runs list");
     let final_history = recovered.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("webhook post-effect history lists");
+    let final_claims = recovered.list_webhook_claims(operator_claim_limit()).expect("webhook post-effect claims list");
     let started_history_count =
         final_history.iter().filter(|record| record.status == TriggerRunStatus::Started).count();
     let rejected_history_count =
         final_history.iter().filter(|record| record.status == TriggerRunStatus::Rejected).count();
-    let http_outcome = if first_response.is_none() && accepted_response.contains(HTTP_ACCEPTED_STATUS) {
-        common::PostEffectHttpOutcome::FirstIncompleteThenAccepted
+    let http_outcome = if first_response.is_none() && duplicate_response.contains(HTTP_CONFLICT_STATUS) {
+        common::PostEffectHttpOutcome::FirstIncompleteThenConflict
     } else {
         common::PostEffectHttpOutcome::NotApplicable
     };
@@ -666,13 +861,16 @@ fn operator_listener_post_effect_death_matches_duplicate_risk_profile_on_redeliv
 
     assert!(restart_status.contains("status=listening"), "status: {restart_status}");
     assert!(pre_restart_runs.is_empty());
-    assert!(pre_restart_history.is_empty());
-    assert!(accepted_response.contains(HTTP_ACCEPTED_STATUS), "response: {accepted_response}");
-    assert!(accepted_response.contains(HTTP_ACCEPTED_BODY), "response: {accepted_response}");
-    assert_eq!(
-        common::classify_post_effect_crash(common::WEBHOOK_POST_EFFECT_DUPLICATE_RISK_PROFILE, observation),
-        Ok(()),
-    );
+    assert_eq!(pre_restart_history.len(), HISTORY_LIMIT);
+    assert_eq!(pre_restart_claims.len(), HISTORY_LIMIT);
+    assert_eq!(pre_restart_history[0].status, TriggerRunStatus::Started);
+    assert_eq!(pre_restart_history[0].claim_identity.as_deref(), Some(pre_restart_claims[0].identity.as_str()));
+    assert!(duplicate_response.contains(HTTP_CONFLICT_STATUS), "response: {duplicate_response}");
+    assert!(duplicate_response.contains(HTTP_DUPLICATE_BODY), "response: {duplicate_response}");
+    assert!(final_runs.is_empty());
+    assert_eq!(final_claims, pre_restart_claims);
+    assert_eq!(final_history, pre_restart_history);
+    assert_eq!(common::classify_post_effect_crash(common::WEBHOOK_POST_EFFECT_CLAIM_PROFILE, observation), Ok(()),);
 }
 
 // r[verify n8nclone.tui_ux.webhook_listener.cli.dry_run]

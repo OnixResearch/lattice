@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:a5e743d2dd339cab9640423749bc85d44c2f23c9efa061b78ed5e10b781162d0",
+  "baseline_hash": "b3:2fd78ab932fd13a705c8e70aebc1ae6130760f1eccce40181d8198d4ed8f8fab",
   "findings": [
     {
       "stable_id": "b3:06c897a2695ce0ef",
@@ -4284,7 +4284,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 253,
+      "line": 262,
       "column": 28,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -4297,7 +4297,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 262,
+      "line": 271,
       "column": 29,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -4310,7 +4310,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 280,
+      "line": 289,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "lattice"
@@ -8242,8 +8242,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:537e3616b85b4778",
-      "semantic_id": "b3:537e3616b85b4778",
+      "stable_id": "b3:30a5ceb94d447659",
+      "semantic_id": "b3:30a5ceb94d447659",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -8251,7 +8251,7 @@
       "file": "src/store/mod.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1172 lines (limit: 300)",
+      "message": "source file is 1241 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -8509,7 +8509,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 129,
+      "line": 130,
       "column": 1,
       "message": "trait has 8 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8522,7 +8522,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 175,
+      "line": 176,
       "column": 1,
       "message": "trait has 11 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8535,7 +8535,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 207,
+      "line": 208,
       "column": 1,
       "message": "item name `Store` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -8548,7 +8548,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 286,
+      "line": 288,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8561,7 +8561,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 342,
+      "line": 344,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8574,7 +8574,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 394,
+      "line": 396,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8587,7 +8587,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 422,
+      "line": 424,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8600,7 +8600,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 594,
+      "line": 654,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8613,7 +8613,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 603,
+      "line": 663,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8626,7 +8626,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 848,
+      "line": 878,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8639,7 +8639,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 892,
+      "line": 922,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8652,7 +8652,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 912,
+      "line": 942,
       "column": 116,
       "message": "function `validate_event_batch` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -8665,7 +8665,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 949,
+      "line": 979,
       "column": 63,
       "message": "`as usize` from `u64` is platform-dependent",
       "crate_name": "lattice"
@@ -8678,14 +8678,14 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 966,
+      "line": 1035,
       "column": 1,
       "message": "item name `StoreError` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:2ee18ec8755621dd",
-      "semantic_id": "b3:2ee18ec8755621dd",
+      "stable_id": "b3:1089c97d9ead3037",
+      "semantic_id": "b3:1089c97d9ead3037",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -8693,7 +8693,7 @@
       "file": "src/triggers.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 587 lines (limit: 300)",
+      "message": "source file is 766 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -8873,7 +8873,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 176,
+      "line": 238,
       "column": 29,
       "message": "function `validate_trigger_definition` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -8886,7 +8886,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 217,
+      "line": 279,
       "column": 61,
       "message": "function `bind_trigger_payload` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -8899,7 +8899,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 223,
+      "line": 285,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8912,7 +8912,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 225,
+      "line": 287,
       "column": 24,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8925,7 +8925,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 272,
+      "line": 334,
       "column": 53,
       "message": "function `admit_trigger_event` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "lattice"
@@ -8938,7 +8938,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 314,
+      "line": 376,
       "column": 29,
       "message": "function `validate_webhook_admission` has 0 assertion(s) in 20 lines (need 2+)",
       "crate_name": "lattice"
@@ -8951,7 +8951,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 451,
+      "line": 623,
       "column": 29,
       "message": "function `validate_idempotency` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -8964,7 +8964,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/triggers.rs",
-      "line": 473,
+      "line": 645,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"

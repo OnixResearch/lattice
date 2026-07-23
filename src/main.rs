@@ -37,6 +37,7 @@ const LOG_FILE_PATH: &str = "/tmp/lattice.log";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
+const WEBHOOK_MAX_IN_FLIGHT_CONNECTIONS: usize = 32;
 
 #[path = "doctor/core.rs"]
 mod doctor;
@@ -1050,9 +1051,10 @@ fn render_trigger_history(records: &[TriggerRunRecord]) -> String {
     let mut output = String::new();
     for record in records {
         let run_id = record.run_id.map(|run_id| run_id.to_string()).unwrap_or_else(|| "-".to_string());
+        let claim_identity = record.claim_identity.as_deref().unwrap_or("-");
         output.push_str(&format!(
-            "{} | {} | {} | {:?} | {}\n",
-            record.trigger_id, record.workflow_name, run_id, record.status, record.message,
+            "{} | {} | {} | {:?} | claim={} | {}\n",
+            record.trigger_id, record.workflow_name, run_id, record.status, claim_identity, record.message,
         ));
     }
     output
@@ -1114,18 +1116,46 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
     let limits = webhooks::RequestLimits {
         max_body_bytes: args.max_body_bytes,
     };
+    let store = std::sync::Arc::new(store);
+    let triggers = std::sync::Arc::new(triggers);
+    let provider = std::sync::Arc::new(provider);
+    let mut handlers = tokio::task::JoinSet::new();
     loop {
+        while let Some(result) = handlers.try_join_next() {
+            observe_webhook_handler(result);
+        }
+        while handlers.len() >= WEBHOOK_MAX_IN_FLIGHT_CONNECTIONS {
+            join_webhook_handler(&mut handlers).await;
+        }
         let (mut stream, _peer_addr) = match listener.accept().await {
             Ok(connection) => connection,
             Err(error) => {
+                handlers.shutdown().await;
                 eprintln!("Webhook listener failed: {error}");
                 return ExitCode::FAILURE;
             }
         };
-        let response = handle_webhook_connection(&mut stream, &store, &triggers, &provider, limits).await;
-        if let Err(error) = stream.write_all(&webhooks::render(&response)).await {
-            tracing::warn!(error = %error, "failed to write webhook listener response");
-        }
+        let store = std::sync::Arc::clone(&store);
+        let triggers = std::sync::Arc::clone(&triggers);
+        let provider = std::sync::Arc::clone(&provider);
+        handlers.spawn(async move {
+            let response = handle_webhook_connection(&mut stream, &store, &triggers, &provider, limits).await;
+            if let Err(error) = stream.write_all(&webhooks::render(&response)).await {
+                tracing::warn!(error = %error, "failed to write webhook listener response");
+            }
+        });
+    }
+}
+
+async fn join_webhook_handler(handlers: &mut tokio::task::JoinSet<()>) {
+    if let Some(result) = handlers.join_next().await {
+        observe_webhook_handler(result);
+    }
+}
+
+fn observe_webhook_handler(result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result {
+        tracing::warn!(error = %error, "webhook listener handler failed");
     }
 }
 
@@ -1171,23 +1201,11 @@ async fn handle_webhook_connection(
             return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
         }
     };
-    let records = match store.list_trigger_runs(webhooks::DEFAULT_HISTORY_LOOKBACK_RECORDS) {
-        Ok(records) => records,
-        Err(error) => {
-            tracing::warn!(error = %error, "failed to load webhook trigger history");
-            Vec::new()
-        }
-    };
-    let context = webhooks::admission_context(&records, chrono::Utc::now().timestamp_millis());
+    let accepted_epoch_ms = chrono::Utc::now().timestamp_millis();
+    let context = webhooks::admission_context(&[], accepted_epoch_ms);
 
     match webhooks::decide_request(&request, triggers, provider, &context, limits) {
-        webhooks::Decision::Admitted(plan) => match headless::run_admitted_trigger_plan(store, &plan).await {
-            Ok(summary) => webhooks::accepted(&plan.trigger_id, summary.run_id),
-            Err(error) => {
-                tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook trigger execution failed");
-                webhooks::execution_failed(&plan.trigger_id)
-            }
-        },
+        webhooks::Decision::Admitted(plan) => execute_webhook_plan(store, triggers, plan, accepted_epoch_ms).await,
         webhooks::Decision::Rejected(rejection) => {
             if let Some(record) = webhooks::run_record_for_rejection(&rejection)
                 && let Err(error) = store.save_trigger_run(&record)
@@ -1196,6 +1214,93 @@ async fn handle_webhook_connection(
             }
             webhooks::rejected(&rejection)
         }
+    }
+}
+
+async fn execute_webhook_plan(
+    store: &Store,
+    triggers: &[TriggerDefinition],
+    plan: lattice::triggers::TriggerRunPlan,
+    accepted_epoch_ms: i64,
+) -> webhooks::Reply {
+    let Some(trigger) = triggers.iter().find(|trigger| trigger.id == plan.trigger_id) else {
+        return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
+    };
+    let claim_plan = match lattice::triggers::plan_webhook_claim(trigger, &plan, accepted_epoch_ms) {
+        Ok(claim_plan) => claim_plan,
+        Err(error) => {
+            tracing::warn!(trigger_id = %plan.trigger_id, error = ?error, "webhook claim planning failed");
+            return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
+        }
+    };
+    let resolution = match &claim_plan {
+        lattice::triggers::WebhookClaimPlan::NotRequired => None,
+        lattice::triggers::WebhookClaimPlan::Required(request) => match store.claim_webhook(request) {
+            Ok(resolution) => Some(resolution),
+            Err(error) => {
+                tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook claim transaction failed");
+                return webhooks::execution_failed(&plan.trigger_id);
+            }
+        },
+    };
+    let decision = match lattice::triggers::decide_webhook_admission(&claim_plan, resolution) {
+        Ok(decision) => decision,
+        Err(error) => {
+            tracing::warn!(trigger_id = %plan.trigger_id, error = ?error, "webhook claim decision failed");
+            return webhooks::execution_failed(&plan.trigger_id);
+        }
+    };
+    match decision {
+        lattice::triggers::WebhookAdmissionDecision::ExecuteUnclaimed => {
+            match headless::run_admitted_trigger_plan(store, &plan).await {
+                Ok(summary) => webhooks::accepted(&plan.trigger_id, summary.run_id),
+                Err(error) => {
+                    tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook trigger execution failed");
+                    webhooks::execution_failed(&plan.trigger_id)
+                }
+            }
+        }
+        lattice::triggers::WebhookAdmissionDecision::ExecuteClaimed { run_id } => {
+            execute_claimed_webhook_plan(store, &plan, &claim_plan, run_id).await
+        }
+        lattice::triggers::WebhookAdmissionDecision::RejectDuplicate { .. } => {
+            webhooks::rejected_for_code(webhooks::RejectionCode::DuplicateIdempotencyKey)
+        }
+    }
+}
+
+async fn execute_claimed_webhook_plan(
+    store: &Store,
+    plan: &lattice::triggers::TriggerRunPlan,
+    claim_plan: &lattice::triggers::WebhookClaimPlan,
+    run_id: lattice::engine::RunId,
+) -> webhooks::Reply {
+    let lattice::triggers::WebhookClaimPlan::Required(request) = claim_plan else {
+        return webhooks::execution_failed(&plan.trigger_id);
+    };
+    match headless::run_claimed_trigger_plan(store, plan, run_id).await {
+        Ok(summary) if summary.status == lattice::headless::HeadlessRunStatus::Succeeded => {
+            webhooks::accepted(&plan.trigger_id, summary.run_id)
+        }
+        Ok(_) => {
+            persist_failed_webhook_claim(store, request, run_id);
+            webhooks::execution_failed(&plan.trigger_id)
+        }
+        Err(error) => {
+            tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "claimed webhook execution failed");
+            persist_failed_webhook_claim(store, request, run_id);
+            webhooks::execution_failed(&plan.trigger_id)
+        }
+    }
+}
+
+fn persist_failed_webhook_claim(
+    store: &Store,
+    request: &lattice::triggers::WebhookClaimRequest,
+    run_id: lattice::engine::RunId,
+) {
+    if let Err(error) = store.save_trigger_run(&request.failed_record(run_id)) {
+        tracing::warn!(trigger_id = %request.trigger_id, error = %error, "failed to persist webhook claim failure");
     }
 }
 

@@ -27,6 +27,9 @@ const CREDENTIAL_REFERENCE_CONTEXT_DOMAIN: &[u8] = b"lattice-webhook-credential-
 const CREDENTIAL_REFERENCE_PROVIDER_TAG: &[u8] = b"provider";
 const CREDENTIAL_REFERENCE_KEY_TAG: &[u8] = b"key";
 const CREDENTIAL_REFERENCE_FIELD_TAG: &[u8] = b"field";
+const WEBHOOK_CLAIM_DOMAIN: &[u8] = b"lattice-webhook-idempotency-claim-v1";
+const WEBHOOK_CLAIM_TRIGGER_TAG: &[u8] = b"trigger";
+const WEBHOOK_CLAIM_KEY_TAG: &[u8] = b"idempotency-key";
 // r[impl lattice.project_identity.stable-identities.scenario.webhook-domain]
 const TRIGGER_SIGNATURE_DOMAIN: &[u8] = b"n8nclone-webhook-signature:v1";
 
@@ -123,6 +126,59 @@ pub struct TriggerRunPlan {
     pub payload_summary: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WebhookClaimPlan {
+    NotRequired,
+    Required(WebhookClaimRequest),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookClaimRequest {
+    pub identity: String,
+    pub trigger_id: String,
+    pub workflow_name: String,
+    pub accepted_epoch_ms: i64,
+    pub payload_summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookClaim {
+    pub identity: String,
+    pub trigger_id: String,
+    pub workflow_name: String,
+    pub run_id: RunId,
+    pub accepted_epoch_ms: i64,
+    pub payload_summary: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookClaimPlanError {
+    EmptyTriggerId,
+    TriggerMismatch,
+    EmptyWorkflowName,
+    MissingIdempotencyKey,
+    EmptyIdempotencyKey,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookClaimResolution {
+    Inserted { run_id: RunId },
+    Duplicate { existing_run_id: RunId },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookAdmissionDecision {
+    ExecuteUnclaimed,
+    ExecuteClaimed { run_id: RunId },
+    RejectDuplicate { existing_run_id: RunId },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookAdmissionDecisionError {
+    MissingClaimResolution,
+    UnexpectedClaimResolution,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TriggerDiagnostic {
     pub trigger_id: String,
@@ -156,9 +212,15 @@ pub struct TriggerRunRecord {
     pub workflow_name: String,
     pub run_id: Option<RunId>,
     pub idempotency_key: Option<String>,
+    #[serde(default = "missing_claim_identity")]
+    pub claim_identity: Option<String>,
     pub status: TriggerRunStatus,
     pub payload_summary: String,
     pub message: String,
+}
+
+fn missing_claim_identity() -> Option<String> {
+    None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -382,6 +444,116 @@ fn update_fingerprint_part(hasher: &mut blake3::Hasher, tag: &[u8], value: &str)
     hasher.update(part_hasher.finalize().as_bytes());
 }
 
+struct ClaimIdentityInput<'a> {
+    trigger_id: &'a str,
+    key: &'a str,
+}
+
+fn webhook_claim_identity(input: ClaimIdentityInput<'_>) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(WEBHOOK_CLAIM_DOMAIN);
+    update_fingerprint_part(&mut hasher, WEBHOOK_CLAIM_TRIGGER_TAG, input.trigger_id);
+    update_fingerprint_part(&mut hasher, WEBHOOK_CLAIM_KEY_TAG, input.key);
+    format!("b3:{}", hasher.finalize().to_hex())
+}
+
+// r[impl lattice.scheduling.webhook_atomic_idempotency]
+pub fn plan_webhook_claim(
+    trigger: &TriggerDefinition,
+    plan: &TriggerRunPlan,
+    accepted_epoch_ms: i64,
+) -> Result<WebhookClaimPlan, WebhookClaimPlanError> {
+    if matches!(trigger.idempotency_policy, IdempotencyPolicy::None) {
+        return Ok(WebhookClaimPlan::NotRequired);
+    }
+    if trigger.id.trim().is_empty() {
+        return Err(WebhookClaimPlanError::EmptyTriggerId);
+    }
+    if trigger.id != plan.trigger_id {
+        return Err(WebhookClaimPlanError::TriggerMismatch);
+    }
+    if plan.workflow_name.trim().is_empty() {
+        return Err(WebhookClaimPlanError::EmptyWorkflowName);
+    }
+    let key = plan.idempotency_key.as_deref().ok_or(WebhookClaimPlanError::MissingIdempotencyKey)?;
+    if key.trim().is_empty() {
+        return Err(WebhookClaimPlanError::EmptyIdempotencyKey);
+    }
+    debug_assert_eq!(trigger.id, plan.trigger_id);
+    debug_assert!(!key.trim().is_empty());
+    let identity = webhook_claim_identity(ClaimIdentityInput {
+        trigger_id: &trigger.id,
+        key,
+    });
+    Ok(WebhookClaimPlan::Required(WebhookClaimRequest {
+        identity,
+        trigger_id: trigger.id.clone(),
+        workflow_name: plan.workflow_name.clone(),
+        accepted_epoch_ms,
+        payload_summary: plan.payload_summary.clone(),
+    }))
+}
+
+// r[impl lattice.scheduling.webhook_atomic_idempotency]
+pub fn decide_webhook_admission(
+    plan: &WebhookClaimPlan,
+    resolution: Option<WebhookClaimResolution>,
+) -> Result<WebhookAdmissionDecision, WebhookAdmissionDecisionError> {
+    match (plan, resolution) {
+        (WebhookClaimPlan::NotRequired, None) => Ok(WebhookAdmissionDecision::ExecuteUnclaimed),
+        (WebhookClaimPlan::Required(_), Some(WebhookClaimResolution::Inserted { run_id })) => {
+            Ok(WebhookAdmissionDecision::ExecuteClaimed { run_id })
+        }
+        (WebhookClaimPlan::Required(_), Some(WebhookClaimResolution::Duplicate { existing_run_id })) => {
+            Ok(WebhookAdmissionDecision::RejectDuplicate { existing_run_id })
+        }
+        (WebhookClaimPlan::Required(_), None) => Err(WebhookAdmissionDecisionError::MissingClaimResolution),
+        (WebhookClaimPlan::NotRequired, Some(_)) => Err(WebhookAdmissionDecisionError::UnexpectedClaimResolution),
+    }
+}
+
+impl WebhookClaimRequest {
+    #[must_use]
+    pub fn claim(&self, run_id: RunId) -> WebhookClaim {
+        WebhookClaim {
+            identity: self.identity.clone(),
+            trigger_id: self.trigger_id.clone(),
+            workflow_name: self.workflow_name.clone(),
+            run_id,
+            accepted_epoch_ms: self.accepted_epoch_ms,
+            payload_summary: self.payload_summary.clone(),
+        }
+    }
+
+    #[must_use]
+    pub fn started_record(&self, run_id: RunId) -> TriggerRunRecord {
+        TriggerRunRecord {
+            trigger_id: self.trigger_id.clone(),
+            workflow_name: self.workflow_name.clone(),
+            run_id: Some(run_id),
+            idempotency_key: None,
+            claim_identity: Some(self.identity.clone()),
+            status: TriggerRunStatus::Started,
+            payload_summary: self.payload_summary.clone(),
+            message: "trigger accepted".to_string(),
+        }
+    }
+
+    #[must_use]
+    pub fn failed_record(&self, run_id: RunId) -> TriggerRunRecord {
+        TriggerRunRecord {
+            trigger_id: self.trigger_id.clone(),
+            workflow_name: self.workflow_name.clone(),
+            run_id: Some(run_id),
+            idempotency_key: None,
+            claim_identity: Some(self.identity.clone()),
+            status: TriggerRunStatus::Failed,
+            payload_summary: self.payload_summary.clone(),
+            message: "trigger execution failed".to_string(),
+        }
+    }
+}
+
 // r[impl n8nclone.credentials.webhook_auth]
 pub fn validate_webhook_auth(policy: &WebhookAuthPolicy, event: &TriggerEvent) -> Result<(), TriggerDiagnosticCode> {
     match policy {
@@ -559,7 +731,13 @@ pub fn trigger_run_record_started(plan: &TriggerRunPlan, run_id: RunId) -> Trigg
         trigger_id: plan.trigger_id.clone(),
         workflow_name: plan.workflow_name.clone(),
         run_id: Some(run_id),
-        idempotency_key: plan.idempotency_key.clone(),
+        idempotency_key: None,
+        claim_identity: plan.idempotency_key.as_deref().map(|key| {
+            webhook_claim_identity(ClaimIdentityInput {
+                trigger_id: &plan.trigger_id,
+                key,
+            })
+        }),
         status: TriggerRunStatus::Started,
         payload_summary: plan.payload_summary.clone(),
         message: "trigger accepted".to_string(),
@@ -579,7 +757,8 @@ pub fn trigger_run_record_rejected(
         trigger_id: trigger.id.clone(),
         workflow_name: trigger.workflow_name.clone(),
         run_id: None,
-        idempotency_key: idempotency_key(trigger, event),
+        idempotency_key: None,
+        claim_identity: None,
         status: TriggerRunStatus::Rejected,
         payload_summary: safe_payload_summary(event),
         message,
