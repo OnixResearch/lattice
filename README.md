@@ -5,8 +5,9 @@
 ```bash
 nix develop          # enter devshell
 pre-commit install   # install the Octet pre-commit hook
-scripts/check.rs     # run fmt, tests, and clippy with repo-local target artifacts
-octet-precommit-check # run Octet at deny/error level against octet-baseline.json
+scripts/check.rs        # run operator E2E, fmt, tests, and clippy with repo-local target artifacts
+scripts/operator-e2e.rs # exercise TUI PTY, webhook TCP, scheduler process, and orchestration recovery boundaries
+octet-precommit-check  # run Octet at deny/error level against octet-baseline.json
 cargo octet check    # inspect raw Octet output
 cargo check          # quick compile check
 nix flake check -L --option secret-key-files '' # full CI; check outputs do not require a host signing secret

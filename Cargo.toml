@@ -89,6 +89,7 @@ tempfile = "3.27"
 criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 tokio-test = "0.4.5"
 lattice-repository-validation-fixture = { path = "tests/fixtures/repository-validation/vendor-dependency" }
+portable-pty = "0.9.0"
 
 [features]
 default = []

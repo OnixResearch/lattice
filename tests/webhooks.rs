@@ -10,8 +10,11 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::path::Path;
 use std::process::Child;
+use std::process::ChildStdout;
 use std::process::Command;
 use std::process::Stdio;
+use std::sync::mpsc;
+use std::thread;
 use std::time::Duration;
 
 use lattice::credentials::MapCredentialProvider;
@@ -76,6 +79,8 @@ const LISTENER_POLL_DELAY_MS: u64 = 20;
 const LISTENER_IO_TIMEOUT_SECS: u64 = 5;
 const HTTP_ACCEPTED_STATUS: &str = "HTTP/1.1 202 Accepted";
 const HTTP_ACCEPTED_BODY: &str = "\"status\":\"accepted\"";
+const HTTP_NOT_FOUND_STATUS: &str = "HTTP/1.1 404 Not Found";
+const HTTP_NOT_FOUND_BODY: &str = "\"code\":\"not_found\"";
 
 struct ListenerChild {
     child: Option<Child>,
@@ -233,13 +238,39 @@ fn connect_to_started_listener(address: SocketAddr, child: &mut Child) -> TcpStr
     panic!("listener did not accept loopback connections within the bounded startup window");
 }
 
-fn valid_http_request_bytes() -> Vec<u8> {
+fn read_listener_status(stdout: ChildStdout) -> String {
+    let (sender, receiver) = mpsc::channel();
+    let reader = thread::spawn(move || {
+        let mut status = String::new();
+        let result = BufReader::new(stdout).read_line(&mut status).map(|_| status);
+        let _ = sender.send(result);
+    });
+    let status = receiver
+        .recv_timeout(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS))
+        .expect("listener status arrives within the bounded startup window")
+        .expect("listener status line reads");
+    reader.join().expect("listener status reader joins");
+    status
+}
+
+fn http_request_bytes(path: &str) -> Vec<u8> {
     let body = std::str::from_utf8(RAW_JSON_BODY).expect("JSON fixture is UTF-8");
     format!(
-        "{WEBHOOK_METHOD} {WEBHOOK_PATH}?source={QUERY_SOURCE} HTTP/1.1\r\nHost: {LISTENER_HOST}\r\n{HEADER_CONTENT_TYPE}: {CONTENT_TYPE_JSON}\r\n{HEADER_IDEMPOTENCY_KEY}: {EVENT_KEY}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{WEBHOOK_METHOD} {path}?source={QUERY_SOURCE} HTTP/1.1\r\nHost: {LISTENER_HOST}\r\n{HEADER_CONTENT_TYPE}: {CONTENT_TYPE_JSON}\r\n{HEADER_IDEMPOTENCY_KEY}: {EVENT_KEY}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         RAW_JSON_BODY.len(),
     )
     .into_bytes()
+}
+
+fn send_http_request(address: SocketAddr, child: &mut Child, request: &[u8]) -> String {
+    let mut stream = connect_to_started_listener(address, child);
+    let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
+    stream.set_read_timeout(timeout).expect("set listener response timeout");
+    stream.write_all(request).expect("send bounded webhook request");
+    stream.shutdown(Shutdown::Write).expect("finish webhook request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read webhook response");
+    response
 }
 
 fn empty_context() -> lattice::triggers::TriggerAdmissionContext {
@@ -445,16 +476,10 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
         .spawn()
         .expect("operator listener process starts");
     let mut listener = ListenerChild::new(child);
-    let mut stream = connect_to_started_listener(address, listener.child_mut());
     let stdout = listener.child_mut().stdout.take().expect("listener stdout is piped");
-    let mut status = String::new();
-    BufReader::new(stdout).read_line(&mut status).expect("listener status line reads");
-    let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
-    stream.set_read_timeout(timeout).expect("set listener response timeout");
-    stream.write_all(&valid_http_request_bytes()).expect("send bounded webhook request");
-    stream.shutdown(Shutdown::Write).expect("finish webhook request");
-    let mut response = String::new();
-    stream.read_to_string(&mut response).expect("read webhook response");
+    let status = read_listener_status(stdout);
+    let rejected_response = send_http_request(address, listener.child_mut(), &http_request_bytes(MISSING_PATH));
+    let accepted_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
     listener.stop();
 
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("reopen live listener store");
@@ -466,9 +491,12 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     assert!(status.contains("enabled_webhook_triggers=1"), "status: {status}");
     assert!(status.contains("status=listening"), "status: {status}");
     assert!(!status.contains(SECRET_VALUE), "status leaked secret: {status}");
-    assert!(response.contains(HTTP_ACCEPTED_STATUS));
-    assert!(response.contains(HTTP_ACCEPTED_BODY));
-    assert!(response.contains(TRIGGER_ID));
+    assert!(rejected_response.contains(HTTP_NOT_FOUND_STATUS));
+    assert!(rejected_response.contains(HTTP_NOT_FOUND_BODY));
+    assert!(!rejected_response.contains(HTTP_ACCEPTED_BODY));
+    assert!(accepted_response.contains(HTTP_ACCEPTED_STATUS));
+    assert!(accepted_response.contains(HTTP_ACCEPTED_BODY));
+    assert!(accepted_response.contains(TRIGGER_ID));
     assert_eq!(runs.len(), HISTORY_LIMIT);
     assert_eq!(history.len(), HISTORY_LIMIT);
     assert_eq!(history[0].trigger_id, TRIGGER_ID);

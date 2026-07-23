@@ -1,6 +1,7 @@
 //! Tests for schedule persistence, pure due-run evaluation, and daemon run planning.
 
 use std::collections::HashSet;
+use std::process::Command;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
@@ -35,6 +36,16 @@ const SUMMARY_STEPS_RUN: usize = 1;
 const SUMMARY_COMPLETED: usize = 1;
 const SUMMARY_FAILURES: usize = 0;
 const SUMMARY_CACHE_HITS: usize = 0;
+const CLI_CONFIG_FILE_NAME: &str = "config.ncl";
+const CLI_DATA_DIR_NAME: &str = "data";
+const STORE_FILE_NAME: &str = "lattice.redb";
+const CLI_DEFAULT_TIMEOUT_SECS: u64 = 60;
+const CLI_MAX_PARALLELISM: usize = 1;
+const OPERATOR_E2E_SHELL_COMMAND: &str = "printf scheduler-e2e";
+const FUTURE_SCHEDULE_ID: &str = "future";
+const MISSING_SCHEDULE_ID: &str = "missing-workflow";
+const RUN_HISTORY_LIMIT: usize = 10;
+const EXPECTED_PERSISTED_RUNS: usize = 1;
 
 #[derive(Default)]
 struct FakeRunner {
@@ -73,6 +84,91 @@ fn schedule(next_run_epoch_ms: i64) -> ScheduleDefinition {
         missed_run_policy: MissedRunPolicy::RunOnce,
         next_run_epoch_ms,
     }
+}
+
+fn write_cli_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
+    let data_dir = temp_dir.path().join(CLI_DATA_DIR_NAME);
+    std::fs::create_dir_all(&data_dir).expect("operator E2E data directory creates");
+    let config_path = temp_dir.path().join(CLI_CONFIG_FILE_NAME);
+    std::fs::write(
+        &config_path,
+        format!(
+            "{{\n  data_dir = {:?},\n  default_timeout_secs = {CLI_DEFAULT_TIMEOUT_SECS},\n  shell = \"sh\",\n  max_parallelism = {CLI_MAX_PARALLELISM},\n}}\n",
+            data_dir.display().to_string(),
+        ),
+    )
+    .expect("operator E2E config writes");
+    (config_path, data_dir)
+}
+
+fn scheduler_command(config_path: &std::path::Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lattice"));
+    command
+        .arg("--config")
+        .arg(config_path)
+        .arg("scheduler-daemon")
+        .arg("--now-epoch-ms")
+        .arg(DUE_EPOCH_MS.to_string());
+    command
+}
+
+#[test]
+fn operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_schedules() {
+    let temp_dir = tempfile::tempdir().expect("temporary operator E2E directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("operator E2E store opens");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node("scheduler", OPERATOR_E2E_SHELL_COMMAND);
+    store.save_workflow(&workflow).expect("operator E2E workflow saves");
+    let due = schedule(START_EPOCH_MS);
+    let missing = ScheduleDefinition {
+        id: MISSING_SCHEDULE_ID.to_string(),
+        workflow_name: MISSING_WORKFLOW_NAME.to_string(),
+        ..schedule(START_EPOCH_MS)
+    };
+    let future = ScheduleDefinition {
+        id: FUTURE_SCHEDULE_ID.to_string(),
+        next_run_epoch_ms: FUTURE_EPOCH_MS,
+        ..schedule(FUTURE_EPOCH_MS)
+    };
+    for candidate in [&due, &missing, &future] {
+        store.save_schedule(candidate).expect("operator E2E schedule saves");
+    }
+    drop(store);
+
+    let output = scheduler_command(&config_path).output().expect("scheduler daemon process returns");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(
+        stdout.contains(&format!("started schedule {SCHEDULE_ID} workflow {WORKFLOW_NAME}")),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("schedule {MISSING_SCHEDULE_ID} workflow {MISSING_WORKFLOW_NAME} failed")),
+        "stdout: {stdout}"
+    );
+    assert!(!stdout.contains(FUTURE_SCHEDULE_ID), "future schedule unexpectedly ran: {stdout}");
+
+    let reopened = Store::new(data_dir.join(STORE_FILE_NAME)).expect("operator E2E store reopens");
+    let runs = reopened.list_runs(RUN_HISTORY_LIMIT).expect("operator E2E run history lists");
+    let advanced_due = reopened.load_schedule(SCHEDULE_ID).expect("due schedule loads").expect("due schedule exists");
+    let advanced_missing = reopened
+        .load_schedule(MISSING_SCHEDULE_ID)
+        .expect("missing-workflow schedule loads")
+        .expect("missing-workflow schedule exists");
+    let unchanged_future = reopened
+        .load_schedule(FUTURE_SCHEDULE_ID)
+        .expect("future schedule loads")
+        .expect("future schedule exists");
+
+    assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
+    assert_eq!(runs[0].workflow_name, WORKFLOW_NAME);
+    assert_eq!(runs[0].failures, SUMMARY_FAILURES);
+    assert!(advanced_due.next_run_epoch_ms > DUE_EPOCH_MS);
+    assert!(advanced_missing.next_run_epoch_ms > DUE_EPOCH_MS);
+    assert_eq!(unchanged_future.next_run_epoch_ms, FUTURE_EPOCH_MS);
 }
 
 // r[verify n8nclone.scheduling.schedule_model]

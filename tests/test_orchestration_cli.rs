@@ -47,6 +47,13 @@ const ROUND_CHARGE: u64 = 1;
 const RETRY_LIMIT: u64 = 1;
 const PENDING_INSTANCE_SEQUENCE: u64 = 1;
 const PENDING_RUN_ID: u64 = 77;
+const OBSERVED_RUN_STARTED_EPOCH_MS: i64 = 1_000;
+const OBSERVED_RUN_FINISHED_EPOCH_MS: i64 = 2_000;
+const OBSERVED_RUN_NODE_COUNT: usize = 1;
+const OBSERVED_RUN_CACHE_HITS: usize = 0;
+const OBSERVED_RUN_FAILURES: usize = 0;
+const OPERATOR_E2E_RUN_HISTORY_LIMIT: usize = 10;
+const EXPECTED_OBSERVED_RUN_COUNT: usize = 1;
 
 fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
     let directory = tempdir().expect("temporary directory must exist");
@@ -286,6 +293,22 @@ fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Orchestra
     acknowledged.instance
 }
 
+fn persist_pending_run_record(store: &Store, instance: &OrchestrationInstance, owner: RunOwner) {
+    let intent = instance.pending_dispatch.as_ref().expect("pending dispatch must exist");
+    store
+        .save_run(&RunRecord {
+            run_id: intent.run_id,
+            owner,
+            workflow_name: WORKFLOW_NAME.to_string(),
+            started_epoch_ms: OBSERVED_RUN_STARTED_EPOCH_MS,
+            finished_epoch_ms: Some(OBSERVED_RUN_FINISHED_EPOCH_MS),
+            node_count: OBSERVED_RUN_NODE_COUNT,
+            cache_hits: OBSERVED_RUN_CACHE_HITS,
+            failures: OBSERVED_RUN_FAILURES,
+        })
+        .expect("pending run record must persist");
+}
+
 // r[verify lattice.agent_orchestration.cli]
 #[test]
 fn cli_validates_starts_and_reports_json_status() {
@@ -522,6 +545,91 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
         .expect("repeated abandon command must execute");
     assert!(!repeated.status.success());
     assert!(String::from_utf8_lossy(&repeated.stderr).contains("no pending dispatch"));
+}
+
+#[test]
+fn operator_e2e_orchestration_recovery_reconciles_exact_observed_run_without_redispatch() {
+    let (_directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    let workflow = store
+        .load_workflow(WORKFLOW_NAME)
+        .expect("workflow lookup must succeed")
+        .expect("workflow must exist");
+    let pending = persist_acknowledged_pending(&store, &workflow);
+    let intent = pending.pending_dispatch.as_ref().expect("pending dispatch must exist");
+    persist_pending_run_record(&store, &pending, RunOwner::Orchestration {
+        instance_id: pending.id.clone(),
+        dispatch_id: intent.id.clone(),
+    });
+    drop(store);
+
+    let recovery = command(&config_path)
+        .arg("recover")
+        .arg(&pending.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("recover command must execute");
+    assert!(recovery.status.success(), "stderr: {}", String::from_utf8_lossy(&recovery.stderr));
+    assert!(String::from_utf8_lossy(&recovery.stdout).contains("\"Reconciled\""));
+
+    let reopened = Store::new(config_path.parent().expect("config has parent").join("data").join(STORE_FILE_NAME))
+        .expect("store must reopen");
+    let reconciled = reopened
+        .load_orchestration(&pending.id)
+        .expect("reconciled instance lookup must succeed")
+        .expect("reconciled instance must exist");
+    let runs = reopened.list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT).expect("reconciled run history must list");
+
+    assert_eq!(reconciled.status, OrchestrationStatus::Completed);
+    assert!(reconciled.pending_dispatch.is_none());
+    assert_eq!(runs.len(), EXPECTED_OBSERVED_RUN_COUNT);
+    assert_eq!(runs[0].run_id, RunId(PENDING_RUN_ID));
+    drop(reopened);
+
+    let replay = command(&config_path)
+        .arg("replay")
+        .arg(&pending.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("replay command must execute");
+    assert!(replay.status.success(), "stderr: {}", String::from_utf8_lossy(&replay.stderr));
+    let report: lattice::orchestration::ReplayReport =
+        serde_json::from_slice(&replay.stdout).expect("replay JSON must parse");
+    assert!(report.valid);
+    assert_eq!(report.instance, reconciled);
+}
+
+#[test]
+fn operator_e2e_orchestration_recovery_rejects_unscoped_run_without_mutating_pending_state() {
+    let (_directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    let workflow = store
+        .load_workflow(WORKFLOW_NAME)
+        .expect("workflow lookup must succeed")
+        .expect("workflow must exist");
+    let pending = persist_acknowledged_pending(&store, &workflow);
+    persist_pending_run_record(&store, &pending, RunOwner::Unscoped);
+    drop(store);
+
+    let recovery = command(&config_path)
+        .arg("recover")
+        .arg(&pending.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("recover command must execute");
+    assert!(!recovery.status.success());
+    assert!(String::from_utf8_lossy(&recovery.stderr).contains("not owned by the pending orchestration dispatch"));
+
+    let reopened = Store::new(config_path.parent().expect("config has parent").join("data").join(STORE_FILE_NAME))
+        .expect("store must reopen");
+    let unchanged = reopened
+        .load_orchestration(&pending.id)
+        .expect("pending instance lookup must succeed")
+        .expect("pending instance must remain");
+
+    assert_eq!(unchanged, pending);
+    assert!(unchanged.pending_dispatch.is_some());
 }
 
 // r[verify lattice.agent_orchestration.cli]

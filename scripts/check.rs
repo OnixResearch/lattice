@@ -17,6 +17,7 @@ const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
+const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
@@ -25,6 +26,7 @@ const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "hash",
     "tests/fixtures/traceability-inventory-coverage.json",
 ];
+const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
 const TEST_ARGS: &[&str] = &["test"];
@@ -56,6 +58,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "operator E2E script format",
+        program: RUSTFMT_PROGRAM,
+        args: OPERATOR_E2E_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "inventory script format",
         program: RUSTFMT_PROGRAM,
         args: INVENTORY_SCRIPT_FORMAT_ARGS,
@@ -65,6 +73,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "inventory script smoke",
         program: CARGO_PROGRAM,
         args: INVENTORY_SCRIPT_SMOKE_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "operator E2E",
+        program: CARGO_PROGRAM,
+        args: OPERATOR_E2E_SCRIPT_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
