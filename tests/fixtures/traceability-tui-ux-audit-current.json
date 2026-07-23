@@ -1,0 +1,182 @@
+{
+  "command": "traceability coverage",
+  "dangling": [],
+  "input_hash": "76d38819f1644b1df084a66c4bbeb681dba3cd13441b279acbf29ee9f0e82549",
+  "missing": [
+    "n8nclone.tui_ux.add_node.cancel",
+    "n8nclone.tui_ux.add_node.guided",
+    "n8nclone.tui_ux.add_node.shell_fields",
+    "n8nclone.tui_ux.add_node.template",
+    "n8nclone.tui_ux.agent_nodes.add_flow",
+    "n8nclone.tui_ux.agent_nodes.add_flow.cancel",
+    "n8nclone.tui_ux.agent_nodes.add_flow.clankers",
+    "n8nclone.tui_ux.agent_nodes.add_flow.input",
+    "n8nclone.tui_ux.agent_nodes.add_flow.pi",
+    "n8nclone.tui_ux.agent_nodes.errors",
+    "n8nclone.tui_ux.agent_nodes.errors.adapter",
+    "n8nclone.tui_ux.agent_nodes.errors.invalid_target",
+    "n8nclone.tui_ux.agent_nodes.errors.missing_path",
+    "n8nclone.tui_ux.agent_nodes.errors.unsupported_format",
+    "n8nclone.tui_ux.agent_nodes.properties",
+    "n8nclone.tui_ux.agent_nodes.properties.image_path",
+    "n8nclone.tui_ux.agent_nodes.properties.invalid",
+    "n8nclone.tui_ux.agent_nodes.properties.prompt",
+    "n8nclone.tui_ux.agent_nodes.properties.target",
+    "n8nclone.tui_ux.background_runs.cancel",
+    "n8nclone.tui_ux.background_runs.failure",
+    "n8nclone.tui_ux.background_runs.long_running",
+    "n8nclone.tui_ux.background_runs.responsive",
+    "n8nclone.tui_ux.background_runs.status",
+    "n8nclone.tui_ux.command_palette.escape",
+    "n8nclone.tui_ux.command_palette.execute",
+    "n8nclone.tui_ux.command_palette.interactive",
+    "n8nclone.tui_ux.command_palette.no_match",
+    "n8nclone.tui_ux.control_flow.properties",
+    "n8nclone.tui_ux.credentials.providers.edit",
+    "n8nclone.tui_ux.credentials.providers.test",
+    "n8nclone.tui_ux.empty_state.next_actions",
+    "n8nclone.tui_ux.empty_state.tests",
+    "n8nclone.tui_ux.help_footer.canvas",
+    "n8nclone.tui_ux.help_footer.properties_output",
+    "n8nclone.tui_ux.help_footer.truncate",
+    "n8nclone.tui_ux.help_footer.wiring",
+    "n8nclone.tui_ux.image_nodes.preview",
+    "n8nclone.tui_ux.image_nodes.preview.canvas",
+    "n8nclone.tui_ux.image_nodes.preview.no_raw_bytes",
+    "n8nclone.tui_ux.image_nodes.preview.output_panel",
+    "n8nclone.tui_ux.keyboard_first",
+    "n8nclone.tui_ux.keyboard_first.discoverable",
+    "n8nclone.tui_ux.mouse_wiring.drag_release",
+    "n8nclone.tui_ux.mouse_wiring.drag_release.compatible",
+    "n8nclone.tui_ux.mouse_wiring.invalid_release",
+    "n8nclone.tui_ux.mouse_wiring.snap_near_ports",
+    "n8nclone.tui_ux.mouse_wiring.snap_near_ports.far_release",
+    "n8nclone.tui_ux.mouse_wiring.snap_near_ports.release",
+    "n8nclone.tui_ux.mouse_wiring.visible_port_clicks",
+    "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.complete",
+    "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.start",
+    "n8nclone.tui_ux.node_kind_provider",
+    "n8nclone.tui_ux.properties.cancel",
+    "n8nclone.tui_ux.properties.discoverable_entrypoints",
+    "n8nclone.tui_ux.properties.discoverable_entrypoints.canvas_command",
+    "n8nclone.tui_ux.properties.discoverable_entrypoints.no_selection",
+    "n8nclone.tui_ux.properties.discoverable_entrypoints.palette_command",
+    "n8nclone.tui_ux.properties.discoverable_help",
+    "n8nclone.tui_ux.properties.discoverable_help.footer",
+    "n8nclone.tui_ux.properties.discoverable_help.palette",
+    "n8nclone.tui_ux.properties.edit_command",
+    "n8nclone.tui_ux.properties.edit_shell",
+    "n8nclone.tui_ux.properties.modal_text_entry",
+    "n8nclone.tui_ux.properties.modal_text_entry.cancel",
+    "n8nclone.tui_ux.properties.modal_text_entry.save_command",
+    "n8nclone.tui_ux.properties.tests",
+    "n8nclone.tui_ux.properties.validate_timeout",
+    "n8nclone.tui_ux.replay_debugger.active_run.stream",
+    "n8nclone.tui_ux.replay_debugger.redaction.secret",
+    "n8nclone.tui_ux.replay_debugger.timeline.open",
+    "n8nclone.tui_ux.replay_debugger.timeline.step",
+    "n8nclone.tui_ux.run_history.details.empty_error.storage",
+    "n8nclone.tui_ux.run_history.details.persist.nodes",
+    "n8nclone.tui_ux.run_history.empty_error",
+    "n8nclone.tui_ux.run_history.inspect",
+    "n8nclone.tui_ux.run_history.list",
+    "n8nclone.tui_ux.run_history.node_outputs.inspect",
+    "n8nclone.tui_ux.run_history.node_outputs.missing",
+    "n8nclone.tui_ux.run_history.persist",
+    "n8nclone.tui_ux.run_history.persist_record",
+    "n8nclone.tui_ux.run_history.rerun.unavailable",
+    "n8nclone.tui_ux.run_history.rerun.workflow",
+    "n8nclone.tui_ux.run_history.timeline.show",
+    "n8nclone.tui_ux.triggers.manage.error",
+    "n8nclone.tui_ux.triggers.manage.list",
+    "n8nclone.tui_ux.unsaved.dirty_indicator",
+    "n8nclone.tui_ux.unsaved.failed_save",
+    "n8nclone.tui_ux.unsaved.mutation_marks_dirty",
+    "n8nclone.tui_ux.unsaved.quit_confirm",
+    "n8nclone.tui_ux.unsaved.save_clears",
+    "n8nclone.tui_ux.webhook_listener.cli.start",
+    "n8nclone.tui_ux.workflow_browser.empty",
+    "n8nclone.tui_ux.workflow_browser.load",
+    "n8nclone.tui_ux.workflow_browser.load_failure",
+    "n8nclone.tui_ux.workflow_browser.open",
+    "n8nclone.tui_ux.workspace",
+    "n8nclone.tui_ux.workspace.starts"
+  ],
+  "policy": "cairn-default",
+  "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
+  "profile": {
+    "evidence_sources": [
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "src",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "tests",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "examples",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "ncl"
+        ],
+        "root": "examples",
+        "source_kind": "nickel_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "scripts",
+        "source_kind": "tool_source"
+      },
+      {
+        "extensions": [
+          "ncl"
+        ],
+        "root": "cairn-policy",
+        "source_kind": "nickel_source"
+      }
+    ],
+    "id": "cairn-default",
+    "marker_verbs": [
+      "impl",
+      "verify",
+      "depends",
+      "related"
+    ],
+    "requirement_sources": [
+      {
+        "extensions": [
+          "md"
+        ],
+        "root": "cairn/specs",
+        "source_kind": "accepted_specs"
+      }
+    ]
+  },
+  "profile_id": "cairn-default",
+  "receipt_hash": "94fd61af90f12f05c83cd3cf7e9fa60da17ae0020c7f76ccf1eb4d89bfa58cb7",
+  "referenced": 774,
+  "requirements": 872,
+  "root": ".",
+  "source_summary": {
+    "evidence_files": 196,
+    "evidence_manifest_hash": "078387f47530529086529001eb7273ff105b191e1e5d8f24bcf826b3318cb9a4",
+    "requirement_files": 12,
+    "requirement_manifest_hash": "c7e13641228a64be512a7c2b500902de763b268ff3d085c64e9117e5732a744b"
+  },
+  "valid": false,
+  "verdict": "fail"
+}
