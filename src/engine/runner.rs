@@ -649,8 +649,8 @@ fn unsupported_runtime_policy_diagnostic(node: &RunnerNode) -> Option<RunnerDiag
     if declared.is_empty() {
         return None;
     }
-    let supported = runtime_effect_policy(&node.runtime);
-    if supported == Some(declared) {
+    let compatible_policy = runtime_effect_policy(&node.runtime);
+    if compatible_policy == Some(declared) {
         return None;
     }
     Some(runner_diagnostic(

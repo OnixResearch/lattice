@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::io::ErrorKind;
-use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -138,8 +137,8 @@ pub fn validate_image_path_allowed(path: &str, allowed_roots: &[String]) -> Resu
     file_node::validate_path_allowed(path, allowed_roots).map_err(|_| ImageError::UnsafePath(path.to_string()))
 }
 
-pub fn validate_declared_image_format(path: &str) -> Result<(), ImageError> {
-    let Some(extension) = Path::new(path).extension().and_then(|value| value.to_str()) else {
+pub fn validate_declared_format(path: &str) -> Result<(), ImageError> {
+    let Some(extension) = std::path::Path::new(path).extension().and_then(|value| value.to_str()) else {
         return Ok(());
     };
     if SUPPORTED_DECLARED_IMAGE_EXTENSIONS

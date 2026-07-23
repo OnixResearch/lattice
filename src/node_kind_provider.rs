@@ -272,7 +272,7 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
             if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
                 issues.push(issue(NodeKindValidationCode::UnsafeImagePath, error.to_string()));
             }
-            if let Err(error) = image_node::validate_declared_image_format(path) {
+            if let Err(error) = image_node::validate_declared_format(path) {
                 issues.push(issue(NodeKindValidationCode::UnsupportedImageFormat, error.to_string()));
             }
             if *max_bytes < MIN_IMAGE_BYTE_BUDGET {

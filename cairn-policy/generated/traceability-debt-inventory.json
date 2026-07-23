@@ -3,14 +3,14 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 851,
-    "referenced": 670,
+    "requirements": 855,
+    "referenced": 674,
     "missing": 181,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "a7d39f59800766a5bbd93187806ba75898990d12ea2d106a76b39e5dfcee302f",
-    "receipt_hash": "50c7dad21b28f4ba794a4504843008346ae2716009592fd1b227b3ebea265743"
+    "input_hash": "cfa3a4efd168658f97e6a10ecdc4e022e9307913dc550e860ff0b05c6a6ae367",
+    "receipt_hash": "3eb98b14c6d05bdf9577f332daa2984b6ea87eebc84caa5ab8b5bc1412efc337"
   },
   "review_policy": {
     "expected_missing_count": 181,
@@ -1309,5 +1309,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "68c5009df66b3adca4a3a4b9e7f3f6449b650efa0f78b6de4b6e6741d781091c"
+  "inventory_hash": "0b385660eb11d40d651179b2e4fedd77c5ac003b6affbc5de12a94d067e4b5ea"
 }
