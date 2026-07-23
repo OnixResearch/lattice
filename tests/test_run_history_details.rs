@@ -12,6 +12,7 @@ use lattice::engine::executor::StepResult;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::Workflow;
+use lattice::replay::active_events;
 use lattice::run::history::detail_record_from_results;
 use lattice::store::RunDetailRecord;
 use lattice::store::RunNodeDetail;
@@ -21,9 +22,12 @@ use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::tui::App;
 use lattice::tui::app::run_detail_record_from_results as tui_run_detail_record_from_results;
+use lattice::tui::panels;
 use pretty_assertions::assert_eq;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use tempfile::TempDir;
 
 const RUN_ID_VALUE: u64 = 31;
@@ -42,6 +46,9 @@ const NO_FAILURES: usize = 0;
 const SENSITIVE_OUTPUT: &str = "live-secret-output";
 const REDACTED_OUTPUT: &str = "[redacted]";
 const INPUT_HASH_SEED: &[u8] = b"run-history-detail-input";
+const FRAME_WIDTH: u16 = 120;
+const FRAME_HEIGHT: u16 = 40;
+const REPLAY_TIMESTAMP_EPOCH_MS: i64 = 3_000;
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -63,6 +70,13 @@ fn run_record(run_id: RunId, workflow_name: &str) -> RunRecord {
         cache_hits: NO_CACHE_HITS,
         failures: NO_FAILURES,
     }
+}
+
+fn rendered_frame_text(app: &mut App) -> String {
+    let area = Rect::new(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+    let mut buffer = Buffer::empty(area);
+    panels::render(app, area, &mut buffer);
+    buffer.content().iter().map(|cell| cell.symbol()).collect()
 }
 
 fn detail_record(run_id: RunId) -> RunDetailRecord {
@@ -208,4 +222,67 @@ async fn app_reruns_history_workflow_without_replacing_current_workflow() {
     assert!(app.has_unsaved_changes());
     assert!(app.run_state.active);
     assert!(app.cancel_active_run());
+}
+
+#[test]
+fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let mut app = App::new(test_config(&temp_dir));
+    let run_id = RunId(RUN_ID_VALUE);
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node(NODE_LABEL, NODE_COMMAND);
+    {
+        let store = app.store.as_ref().expect("app store available");
+        store.save_run(&run_record(run_id, WORKFLOW_NAME)).expect("run saves");
+        store.save_run_details(&detail_record(run_id)).expect("details save");
+        store
+            .save_run_replay_events(run_id, &active_events(run_id, &workflow, REPLAY_TIMESTAMP_EPOCH_MS))
+            .expect("replay events save");
+    }
+
+    app.open_run_history();
+    app.inspect_selected_run_history();
+    let rendered = rendered_frame_text(&mut app);
+
+    assert!(app.run_history.replay_timeline.is_some());
+    assert!(rendered.contains("Replay Timeline"), "rendered: {rendered}");
+    assert!(rendered.contains("RunStarted"), "rendered: {rendered}");
+    assert!(rendered.contains(NODE_LABEL), "rendered: {rendered}");
+    assert!(rendered.contains(OUTPUT_LABEL), "rendered: {rendered}");
+    assert!(rendered.contains(OUTPUT_TEXT), "rendered: {rendered}");
+}
+
+#[test]
+fn app_renders_empty_node_output_and_unavailable_rerun_as_recoverable() {
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let mut app = App::new(test_config(&temp_dir));
+    let run_id = RunId(RUN_ID_VALUE);
+    let empty_detail = RunDetailRecord {
+        run_id,
+        nodes: vec![RunNodeDetail {
+            node_id: NodeId(RUN_ID_VALUE),
+            node_label: NODE_LABEL.to_string(),
+            status: RunNodeDetailStatus::Completed,
+            cached: false,
+            outputs: Vec::new(),
+            error: None,
+        }],
+    };
+    {
+        let store = app.store.as_ref().expect("app store available");
+        store.save_run(&run_record(run_id, WORKFLOW_NAME)).expect("run saves");
+        store.save_run_details(&empty_detail).expect("empty details save");
+    }
+    app.workflow = Workflow::new(CURRENT_WORKFLOW_NAME);
+
+    app.open_run_history();
+    app.inspect_selected_run_history();
+    let empty_rendered = rendered_frame_text(&mut app);
+    assert!(empty_rendered.contains("No output details"), "rendered: {empty_rendered}");
+
+    assert!(!app.rerun_selected_run_history());
+    let rerun_rendered = rendered_frame_text(&mut app);
+    assert_eq!(app.workflow.meta.name, CURRENT_WORKFLOW_NAME);
+    assert!(rerun_rendered.contains("Workflow not found"), "rendered: {rerun_rendered}");
+    assert!(app.is_run_history_open());
 }

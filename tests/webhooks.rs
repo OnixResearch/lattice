@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::net::Shutdown;
@@ -437,12 +439,15 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
         .arg("webhook-listen")
         .arg("--bind")
         .arg(address.to_string())
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .expect("operator listener process starts");
     let mut listener = ListenerChild::new(child);
     let mut stream = connect_to_started_listener(address, listener.child_mut());
+    let stdout = listener.child_mut().stdout.take().expect("listener stdout is piped");
+    let mut status = String::new();
+    BufReader::new(stdout).read_line(&mut status).expect("listener status line reads");
     let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
     stream.set_read_timeout(timeout).expect("set listener response timeout");
     stream.write_all(&valid_http_request_bytes()).expect("send bounded webhook request");
@@ -455,6 +460,11 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let runs = store.list_runs(HISTORY_LIMIT).expect("live listener runs list");
     let history = store.list_trigger_runs(HISTORY_LIMIT).expect("live listener trigger history lists");
 
+    assert!(status.contains(&format!("bind={address}")), "status: {status}");
+    assert!(status.contains("loaded_triggers=1"), "status: {status}");
+    assert!(status.contains("enabled_webhook_triggers=1"), "status: {status}");
+    assert!(status.contains("status=listening"), "status: {status}");
+    assert!(!status.contains(SECRET_VALUE), "status leaked secret: {status}");
     assert!(response.contains(HTTP_ACCEPTED_STATUS));
     assert!(response.contains(HTTP_ACCEPTED_BODY));
     assert!(response.contains(TRIGGER_ID));

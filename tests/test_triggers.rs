@@ -25,6 +25,7 @@ use lattice::triggers::TriggerEvent;
 use lattice::triggers::TriggerInputBinding;
 use lattice::triggers::TriggerKind;
 use lattice::triggers::TriggerPayloadSource;
+use lattice::triggers::TriggerRunRecord;
 use lattice::triggers::TriggerRunStatus;
 use lattice::triggers::WebhookAuthPolicy;
 use lattice::triggers::WebhookTrigger;
@@ -38,6 +39,7 @@ use lattice::triggers::trigger_run_record_started;
 use lattice::triggers::validate_trigger_definition;
 use lattice::triggers::webhook_signature;
 use lattice::tui::App;
+use lattice::tui::app::trigger_status_lines_from_history;
 use lattice::workflow_format::load_workflow_nickel_file;
 use lattice::workflow_format::workflow_to_nickel;
 use lattice::workflow_format::workflow_to_portable;
@@ -376,11 +378,40 @@ async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
 fn tui_exposes_minimal_trigger_status_lines() {
     let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());
     workflow.triggers.push(webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly));
-    let mut app = App::new(AppConfig::default());
+    let temp_dir = tempfile::tempdir().expect("temporary trigger status directory");
+    let data_dir = temp_dir.path().join("data");
+    std::fs::create_dir_all(&data_dir).expect("create trigger status data directory");
+    let mut app = App::new(AppConfig {
+        data_dir,
+        ..AppConfig::default()
+    });
     app.workflow = workflow;
     let lines = app.trigger_status_lines();
 
     assert_eq!(lines.len(), 1);
     assert!(lines[0].contains(TRIGGER_ID));
     assert!(lines[0].contains("enabled"));
+    assert!(lines[0].contains("last=none"));
+}
+
+#[test]
+fn tui_trigger_error_summary_reports_status_without_raw_message_or_payload() {
+    let trigger = webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly);
+    let failed = TriggerRunRecord {
+        trigger_id: TRIGGER_ID.to_string(),
+        workflow_name: WORKFLOW_NAME.to_string(),
+        run_id: None,
+        idempotency_key: None,
+        status: TriggerRunStatus::Failed,
+        payload_summary: format!("payload={SECRET_VALUE}"),
+        message: format!("authorization={SECRET_VALUE}"),
+    };
+
+    let lines = trigger_status_lines_from_history(&[trigger], &[failed]);
+
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("last=failed"));
+    assert!(!lines[0].contains(SECRET_VALUE));
+    assert!(!lines[0].contains("authorization"));
+    assert!(!lines[0].contains("payload"));
 }

@@ -13,9 +13,10 @@ use std::collections::BTreeSet;
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-node-template-prompt-audit-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-node-template-prompt-completion-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-node-template-prompt-completion-reviewed.json");
-const APP_SOURCE: &str = include_str!("../src/tui/app.rs");
-const PANELS_SOURCE: &str = include_str!("../src/tui/panels.rs");
-const RENDER_TEST_SOURCE: &str = include_str!("test_template_parameter_prompt_rendering.rs");
+const APP_SOURCE: &str = include_str!("fixtures/traceability-node-template-prompt-reviewed-src-tui-app.rs.txt");
+const PANELS_SOURCE: &str = include_str!("fixtures/traceability-node-template-prompt-reviewed-src-tui-panels.rs.txt");
+const RENDER_TEST_SOURCE: &str =
+    include_str!("fixtures/traceability-node-template-prompt-reviewed-test-template-parameter-prompt-rendering.rs.txt");
 const APP_SOURCE_PATH: &str = "src/tui/app.rs";
 const PANELS_SOURCE_PATH: &str = "src/tui/panels.rs";
 const RENDER_TEST_PATH: &str = "tests/test_template_parameter_prompt_rendering.rs";

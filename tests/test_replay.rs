@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use lattice::engine::RunId;
 use lattice::engine::Value;
+use lattice::engine::Workflow;
 use lattice::engine::runner::RunnerEventKind;
 use lattice::replay::ReplayArtifactPayloadState;
 use lattice::replay::ReplayArtifactReference;
@@ -11,6 +12,7 @@ use lattice::replay::ReplayBundleError;
 use lattice::replay::ReplayDiagnosticCode;
 use lattice::replay::ReplayEventRecord;
 use lattice::replay::ReplayNodeState;
+use lattice::replay::active_events;
 use lattice::replay::artifact_view;
 use lattice::replay::build_replay_timeline;
 use lattice::replay::export_replay_bundle;
@@ -65,6 +67,30 @@ fn ordered_events() -> Vec<ReplayEventRecord> {
 
 fn known_nodes() -> BTreeSet<u64> {
     BTreeSet::from([NODE_ID, SECOND_NODE_ID])
+}
+
+#[test]
+fn active_replay_events_expose_run_start_and_ready_nodes_without_terminal_claims() {
+    let mut workflow = Workflow::new("active-replay");
+    let node_id = workflow.add_shell_node("ready", "sleep 1");
+
+    let events = active_events(RUN_ID, &workflow, 0);
+    let timeline = build_replay_timeline(RUN_ID, &events, None);
+
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].kind, RunnerEventKind::RunStarted);
+    assert_eq!(events[1].kind, RunnerEventKind::NodeReady);
+    assert_eq!(events[1].node_id, Some(node_id.0));
+    assert!(!events.iter().any(|event| event.kind == RunnerEventKind::RunCompleted));
+    assert!(timeline.diagnostics.iter().all(|diagnostic| !diagnostic.fatal));
+    assert_eq!(
+        timeline.frames.last().expect("ready frame").node_states.get(&node_id.0),
+        Some(&ReplayNodeState::Ready)
+    );
+
+    let empty_events = active_events(RUN_ID, &Workflow::new("empty-active-replay"), 0);
+    assert_eq!(empty_events.len(), 1);
+    assert_eq!(empty_events[0].kind, RunnerEventKind::RunStarted);
 }
 
 fn artifact_reference() -> ReplayArtifactReference {

@@ -1,0 +1,1568 @@
+{
+  "rows": [
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.cancel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.guided",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.shell_fields",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.add_node.template",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.cancel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.clankers",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.input",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.add_flow.pi",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.adapter",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.invalid_target",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.missing_path",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.errors.unsupported_format",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.image_path",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.invalid",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.prompt",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.agent_nodes.properties.target",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.cancel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.failure",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.long_running",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.responsive",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.background_runs.status",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.escape",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.execute",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.interactive",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.command_palette.no_match",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.control_flow.properties",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "tests/test_control_flow.rs",
+          "blake3": "57cd0eb8653f9019d0fc20ea8d675d8d2640cc1b652d1ee98fe4d59fc09e80f6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.credentials.providers.edit",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.credentials.providers.test",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "tests/test_credentials.rs",
+          "blake3": "1700f558dd39430f9122ffd816c71aad090b9a5124a390ec862ffa4595be7fdf"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.empty_state.next_actions",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.empty_state.tests",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.canvas",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.properties_output",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.truncate",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.help_footer.wiring",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.canvas",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.no_raw_bytes",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.image_nodes.preview.output_panel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.keyboard_first",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.keyboard_first.discoverable",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.drag_release",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.drag_release.compatible",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.invalid_release",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports.far_release",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.snap_near_ports.release",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.complete",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.mouse_wiring.visible_port_clicks.start",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.node_kind_provider",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_node_kind_provider.rs",
+          "blake3": "7658a01457c24582b9223abd77ba21e600fdcb90e83c4b6d54990073b4550fc4"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.cancel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.canvas_command",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.no_selection",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_entrypoints.palette_command",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help.footer",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.discoverable_help.palette",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.edit_command",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.edit_shell",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry.cancel",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.modal_text_entry.save_command",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.tests",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.properties.validate_timeout",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/input.rs",
+          "blake3": "ce546b4f0629426407c2e8e71ce1964978a3dfdcd25a2cf18b053a810c99f6a6"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.active_run.stream",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "ffd8e2f640107b0369a279807eb19dd2bef39189e7f1be45cc4543629396cc02"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.redaction.secret",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "ffd8e2f640107b0369a279807eb19dd2bef39189e7f1be45cc4543629396cc02"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.timeline.open",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "ffd8e2f640107b0369a279807eb19dd2bef39189e7f1be45cc4543629396cc02"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.replay_debugger.timeline.step",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_replay.rs",
+          "blake3": "ffd8e2f640107b0369a279807eb19dd2bef39189e7f1be45cc4543629396cc02"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.details.empty_error.storage",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.details.persist.nodes",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.empty_error",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.inspect",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.list",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.node_outputs.inspect",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.node_outputs.missing",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.persist",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.persist_record",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.rerun.unavailable",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.rerun.workflow",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.run_history.timeline.show",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_run_history_details.rs",
+          "blake3": "9ec98bf244953d04a2429697028d1d17d4f9bc976adfb4a5f2ab9289994028b0"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.triggers.manage.error",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "eeb7ce198b33219c20dd654c309d907a95b2d881e9eb9052750c5b5a3aa8c241"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.triggers.manage.list",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "tests/test_triggers.rs",
+          "blake3": "eeb7ce198b33219c20dd654c309d907a95b2d881e9eb9052750c5b5a3aa8c241"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.dirty_indicator",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.failed_save",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.mutation_marks_dirty",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.quit_confirm",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.unsaved.save_clears",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.webhook_listener.cli.start",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/main.rs",
+          "blake3": "e5fc2b5825f343b196be5bc8fb2241ae34e6cdba2ecf3fa7e0918a472126c286"
+        },
+        {
+          "path": "tests/webhooks.rs",
+          "blake3": "a245a71edcc757cb2ba6919080530ecbbb8f665c01204a5483522ad377705b17"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.empty",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.load",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.load_failure",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workflow_browser.open",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.direct-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workspace",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    },
+    {
+      "requirement_id": "n8nclone.tui_ux.workspace.starts",
+      "subsystem": "tui-ux",
+      "classification": "exact_maintained_evidence",
+      "rationale_code": "assertions.completed-maintained-tui-evidence",
+      "evidence": [
+        {
+          "path": "src/tui/app.rs",
+          "blake3": "56cd6baa61726d45eb507078cd04d65488e73f63e694375c10267501301a6101"
+        },
+        {
+          "path": "src/tui/panels.rs",
+          "blake3": "eb3406ee104279396fd6f49072e66a4ce5dbf635279a3ee1155992944e00db50"
+        },
+        {
+          "path": "tests/test_tui_ux_completion.rs",
+          "blake3": "1471501f9c5599a5bad93e6b95e1c1888073dd49933c0f7e615e4295ca0e0e0b"
+        }
+      ]
+    }
+  ]
+}

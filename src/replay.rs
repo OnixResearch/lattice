@@ -398,6 +398,41 @@ pub fn move_replay_cursor(cursor: ReplayCursor, delta: i32) -> ReplayCursor {
     ReplayCursor { position, ..cursor }
 }
 
+// r[impl n8nclone.tui_ux.replay_debugger.active_run]
+pub fn active_events(run_id: RunId, workflow: &Workflow, timestamp_epoch_ms: i64) -> Vec<ReplayEventRecord> {
+    let run_boundary_event_count = 1;
+    let mut events = Vec::with_capacity(workflow.graph.node_count().saturating_add(run_boundary_event_count));
+    events.push(replay_event_record(
+        run_id,
+        next_sequence(&events),
+        Some(timestamp_epoch_ms),
+        None,
+        None,
+        RunnerEventKind::RunStarted,
+        format!("run {} started", run_id.0),
+        None,
+        None,
+        false,
+    ));
+    for node in workflow.graph.nodes() {
+        events.push(replay_event_record(
+            run_id,
+            next_sequence(&events),
+            Some(timestamp_epoch_ms),
+            Some(node.id.0),
+            None,
+            RunnerEventKind::NodeReady,
+            format!("node {} ready", node.label),
+            None,
+            None,
+            false,
+        ));
+    }
+    debug_assert_eq!(events.len(), workflow.graph.node_count().saturating_add(run_boundary_event_count));
+    debug_assert!(events.iter().all(|event| event.run_id == run_id));
+    events
+}
+
 // r[impl n8nclone.workflow_execution.replay.event_store]
 // r[impl n8nclone.tui_ux.replay_debugger.active_run]
 pub fn cancelled_replay_events(run_id: RunId, workflow: &Workflow, timestamp_epoch_ms: i64) -> Vec<ReplayEventRecord> {

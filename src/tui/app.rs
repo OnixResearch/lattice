@@ -66,7 +66,9 @@ const INITIAL_VIEWPORT_WIDTH: u16 = 80;
 const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
 const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
 const RUN_HISTORY_LIMIT: usize = 20;
+const TRIGGER_STATUS_HISTORY_LIMIT: usize = 100;
 const INITIAL_TUI_RUN_ID: u64 = 0;
+const ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS: i64 = 0;
 const CREDENTIAL_ENTRY_SEPARATOR: &str = ",";
 const CREDENTIAL_BINDING_SEPARATOR: &str = "=";
 const SECRET_IDENTITY_SEPARATOR: &str = ":";
@@ -121,6 +123,7 @@ pub enum NodeRunStatus {
 pub struct AppRunState {
     pub active: bool,
     pub node_statuses: HashMap<u64, NodeRunStatus>,
+    pub active_replay_timeline: Option<ReplayTimeline>,
 }
 
 impl AppRunState {
@@ -128,6 +131,7 @@ impl AppRunState {
         Self {
             active: false,
             node_statuses: HashMap::new(),
+            active_replay_timeline: None,
         }
     }
 }
@@ -141,9 +145,13 @@ struct ActiveRun {
 
 #[derive(Debug)]
 enum RunEvent {
+    ReplayStarted {
+        run_id: RunId,
+        events: Vec<replay::ReplayEventRecord>,
+    },
     Completed {
         run_id: RunId,
-        workflow: Workflow,
+        workflow: Box<Workflow>,
         results: Vec<StepResult>,
     },
 }
@@ -372,6 +380,37 @@ pub fn format_run_record(record: &RunRecord) -> String {
         "{} │ {} nodes │ {} failures │ {} cache hits",
         record.run_id, record.node_count, record.failures, record.cache_hits,
     )
+}
+
+pub fn trigger_status_lines_from_history(
+    triggers: &[crate::triggers::TriggerDefinition],
+    records: &[crate::triggers::TriggerRunRecord],
+) -> Vec<String> {
+    let mut latest_by_trigger = HashMap::new();
+    for record in records {
+        latest_by_trigger.entry(record.trigger_id.as_str()).or_insert(record.status);
+    }
+    let lines = triggers
+        .iter()
+        .map(|trigger| {
+            let status = latest_by_trigger
+                .get(trigger.id.as_str())
+                .map(|status| match status {
+                    crate::triggers::TriggerRunStatus::Started => "started",
+                    crate::triggers::TriggerRunStatus::Rejected => "rejected",
+                    crate::triggers::TriggerRunStatus::Failed => "failed",
+                })
+                .unwrap_or("none");
+            format!(
+                "{} │ {:?} │ {} │ last={status}",
+                trigger.id,
+                trigger.kind,
+                if trigger.enabled { "enabled" } else { "disabled" },
+            )
+        })
+        .collect::<Vec<_>>();
+    debug_assert_eq!(lines.len(), triggers.len());
+    lines
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -694,6 +733,21 @@ impl RunHistoryState {
             replay_cursor: replay::replay_cursor(0),
             message,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum RunDetailLoad {
+    Loaded(RunDetailRecord),
+    Missing,
+    Failed(String),
+}
+
+fn classify_run_detail_load(result: Result<Option<RunDetailRecord>, String>) -> RunDetailLoad {
+    match result {
+        Ok(Some(record)) => RunDetailLoad::Loaded(record),
+        Ok(None) => RunDetailLoad::Missing,
+        Err(error) => RunDetailLoad::Failed(error),
     }
 }
 
@@ -1312,6 +1366,7 @@ impl App {
         let Some(record) = self.run_history.records.get(self.run_history.selected) else {
             return;
         };
+        let run_id = record.run_id;
         self.run_history.detail = Some(format_run_record(record));
         self.run_history.selected_detail_node = 0;
 
@@ -1322,15 +1377,24 @@ impl App {
             self.output.push_line("No database available");
             return;
         };
-        match store.load_run_details(record.run_id) {
-            Ok(Some(detail_record)) => self.run_history.detail_record = Some(detail_record),
-            Ok(None) => {
+        let load = classify_run_detail_load(store.load_run_details(run_id).map_err(|error| error.to_string()));
+        self.apply_run_detail_load(load);
+        self.load_selected_run_replay(run_id);
+    }
+
+    fn apply_run_detail_load(&mut self, load: RunDetailLoad) {
+        match load {
+            RunDetailLoad::Loaded(record) => {
+                self.run_history.detail_record = Some(record);
+                self.run_history.message = None;
+            }
+            RunDetailLoad::Missing => {
                 let message = "No run details available".to_string();
                 self.run_history.detail_record = None;
                 self.run_history.detail = Some(message.clone());
                 self.run_history.message = Some(message);
             }
-            Err(error) => {
+            RunDetailLoad::Failed(error) => {
                 let message = format!("Run details failed: {error}");
                 self.output.push_line(&message);
                 self.run_history.detail_record = None;
@@ -1338,7 +1402,6 @@ impl App {
                 self.run_history.message = Some(message);
             }
         }
-        self.load_selected_run_replay(record.run_id);
     }
 
     // r[impl n8nclone.tui_ux.replay_debugger.timeline]
@@ -1827,18 +1890,12 @@ impl App {
 
     // r[impl n8nclone.tui_ux.triggers.manage]
     pub fn trigger_status_lines(&self) -> Vec<String> {
-        self.workflow
-            .triggers
-            .iter()
-            .map(|trigger| {
-                format!(
-                    "{} │ {:?} │ {}",
-                    trigger.id,
-                    trigger.kind,
-                    if trigger.enabled { "enabled" } else { "disabled" },
-                )
-            })
-            .collect()
+        let records = self
+            .store
+            .as_ref()
+            .and_then(|store| store.list_trigger_runs(TRIGGER_STATUS_HISTORY_LIMIT).ok())
+            .unwrap_or_default();
+        trigger_status_lines_from_history(&self.workflow.triggers, &records)
     }
 
     /// Add a new shell node to the workflow.
@@ -1985,20 +2042,35 @@ impl App {
         self.run_state = AppRunState {
             active: true,
             node_statuses,
+            active_replay_timeline: None,
         };
         self.output.push_line(message);
 
         let active_workflow = workflow.clone();
         let executor_factory = self.executor_factory.clone();
         let handle = tokio::spawn(async move {
+            if sender
+                .send(RunEvent::ReplayStarted {
+                    run_id,
+                    events: replay::active_events(run_id, &workflow, ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS),
+                })
+                .is_err()
+            {
+                return;
+            }
             let mut executor = executor_factory();
             let cache = HashMap::new();
             let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
-            let _ = sender.send(RunEvent::Completed {
-                run_id,
-                workflow,
-                results,
-            });
+            if sender
+                .send(RunEvent::Completed {
+                    run_id,
+                    workflow: Box::new(workflow),
+                    results,
+                })
+                .is_err()
+            {
+                info!(run_id = run_id.0, "background run receiver dropped before completion");
+            }
         });
         self.active_run = Some(ActiveRun {
             run_id,
@@ -2025,16 +2097,17 @@ impl App {
         self.run_state.active = false;
         let workflow_name = active_run.workflow.meta.name.clone();
         let replay_timestamp_epoch_ms = chrono::Utc::now().timestamp_millis();
+        let replay_events =
+            replay::cancelled_replay_events(active_run.run_id, &active_run.workflow, replay_timestamp_epoch_ms);
+        self.run_state.active_replay_timeline =
+            Some(replay::build_replay_timeline(active_run.run_id, &replay_events, None));
         self.save_run_record(active_run.run_id, &workflow_name, 0, 0, self.run_state.node_statuses.len());
         self.save_run_detail_record(canceled_run_detail_record(
             active_run.run_id,
             &active_run.workflow,
             &self.run_state.node_statuses,
         ));
-        self.save_run_replay_events(
-            active_run.run_id,
-            replay::cancelled_replay_events(active_run.run_id, &active_run.workflow, replay_timestamp_epoch_ms),
-        );
+        self.save_run_replay_events(active_run.run_id, replay_events);
         self.output.push_line("Workflow run canceled");
         true
     }
@@ -2050,6 +2123,13 @@ impl App {
 
         for event in completed {
             match event {
+                RunEvent::ReplayStarted { run_id, events } => {
+                    if self.run_state.active {
+                        let timeline = replay::build_replay_timeline(run_id, &events, None);
+                        debug_assert!(timeline.diagnostics.iter().all(|diagnostic| !diagnostic.fatal));
+                        self.run_state.active_replay_timeline = Some(timeline);
+                    }
+                }
                 RunEvent::Completed {
                     run_id,
                     workflow,
@@ -2100,18 +2180,17 @@ impl App {
             .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
             .count();
         let replay_finished_epoch_ms = chrono::Utc::now().timestamp_millis();
+        let replay_events = replay::replay_events_from_results(
+            run_id,
+            run_workflow,
+            &results,
+            replay_finished_epoch_ms,
+            Some(replay_finished_epoch_ms),
+        );
+        self.run_state.active_replay_timeline = Some(replay::build_replay_timeline(run_id, &replay_events, None));
         self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
         self.save_run_detail_record(run_detail_record_from_results(run_id, run_workflow, &results));
-        self.save_run_replay_events(
-            run_id,
-            replay::replay_events_from_results(
-                run_id,
-                run_workflow,
-                &results,
-                replay_finished_epoch_ms,
-                Some(replay_finished_epoch_ms),
-            ),
-        );
+        self.save_run_replay_events(run_id, replay_events);
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
 
@@ -2324,6 +2403,7 @@ mod tests {
     const TUI_MISSING_IMAGE_PATH: &str = "/tui/missing.png";
     const TUI_BAD_IMAGE_PATH: &str = "/tui/bad.png";
     const TUI_BAD_IMAGE_BYTES: &[u8] = b"not an image";
+    const RUN_DETAIL_STORAGE_ERROR: &str = "storage offline";
 
     #[derive(Debug)]
     struct TuiErrorAgentAdapter {
@@ -2719,6 +2799,7 @@ mod tests {
         app.property_edit.as_mut().expect("bad target edit").draft = "bad-target".to_string();
         assert!(!app.save_property_edit());
         assert!(app.property_edit.is_some());
+        assert!(output_text_lines(&app).iter().any(|line| line.contains("Invalid agent target")));
         app.cancel_property_edit();
 
         assert!(app.start_property_edit(PropertyEditField::AgentCredentials));
@@ -3212,5 +3293,30 @@ mod tests {
 
         assert_eq!(app.run_history.detail.as_deref(), Some("No run details available"));
         assert!(app.run_history.detail_record.is_none());
+    }
+
+    #[test]
+    fn run_detail_storage_failure_keeps_history_open_and_reports_safe_error() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        let record = RunRecord {
+            run_id: RunId(SNAPSHOT_RUN_ID),
+            owner: crate::store::RunOwner::Unscoped,
+            workflow_name: SNAPSHOT_WORKFLOW_NAME.to_string(),
+            started_epoch_ms: 0,
+            finished_epoch_ms: Some(0),
+            node_count: TEMPLATE_PARAMETER_COUNT,
+            cache_hits: 0,
+            failures: 0,
+        };
+        app.run_history = RunHistoryState::open(vec![record], None);
+
+        app.apply_run_detail_load(classify_run_detail_load(Err(RUN_DETAIL_STORAGE_ERROR.to_string())));
+
+        assert!(app.run_history.open);
+        assert_eq!(app.run_history.records.len(), TEMPLATE_PARAMETER_COUNT);
+        assert!(app.run_history.detail_record.is_none());
+        assert_eq!(app.run_history.message.as_deref(), Some("Run details failed: storage offline"));
+        assert!(output_text_lines(&app).iter().any(|line| line.contains(RUN_DETAIL_STORAGE_ERROR)));
     }
 }

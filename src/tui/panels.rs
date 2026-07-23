@@ -45,6 +45,8 @@ use crate::workflow_validation::DiagnosticSeverity;
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
 const FULL_EMPTY_STATE_MIN_WIDTH: u16 = 48;
 const FULL_EMPTY_STATE_MIN_HEIGHT: u16 = 7;
+const CANVAS_IMAGE_PREVIEW_MAX_CHARS: usize = 80;
+const CANVAS_PREVIEW_HEIGHT: u16 = 1;
 const QUIT_CONFIRM_WIDTH: u16 = 62;
 const QUIT_CONFIRM_HEIGHT: u16 = 5;
 const QUIT_CONFIRM_TOP_OFFSET: u16 = 3;
@@ -125,6 +127,8 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
     let block = Block::default().borders(Borders::ALL).title(" Canvas ").border_style(border_style);
 
     let inner = block.inner(area);
+    debug_assert!(inner.width <= area.width);
+    debug_assert!(inner.height <= area.height);
     block.render(area, buf);
 
     if should_show_empty_state(app.graph_state.graph.node_count(), app.show_palette) {
@@ -134,6 +138,31 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
 
     let widget = NodeGraphWidget::default();
     widget.render(inner, buf, &mut app.graph_state);
+    if let Some(summary) = canvas_image_preview_summary(app) {
+        let preview_y = inner.y.saturating_add(inner.height.saturating_sub(CANVAS_PREVIEW_HEIGHT));
+        let preview_area = Rect::new(inner.x, preview_y, inner.width, CANVAS_PREVIEW_HEIGHT);
+        Paragraph::new(summary).style(Style::new().fg(Color::Cyan)).render(preview_area, buf);
+    }
+}
+
+fn canvas_image_preview_summary(app: &App) -> Option<String> {
+    let node_id = app.graph_state.focused?;
+    crate::tui::app::latest_node_output_records(&app.run_output_lines, &app.workflow, node_id)
+        .into_iter()
+        .rev()
+        .find(|record| record.text.starts_with("image/") && record.text.contains(" image "))
+        .map(|record| bounded_canvas_preview(&format!("Image preview: {}", record.text)))
+}
+
+fn bounded_canvas_preview(summary: &str) -> String {
+    let mut chars = summary.chars();
+    let bounded = chars.by_ref().take(CANVAS_IMAGE_PREVIEW_MAX_CHARS).collect::<String>();
+    if chars.next().is_none() {
+        return bounded;
+    }
+    let mut truncated = bounded.chars().take(CANVAS_IMAGE_PREVIEW_MAX_CHARS.saturating_sub(1)).collect::<String>();
+    truncated.push('…');
+    truncated
 }
 
 fn render_empty_canvas_state(area: Rect, buf: &mut Buffer) {
@@ -961,6 +990,7 @@ mod tests {
 
     const WIDE_STATUS_WIDTH: u16 = COMPACT_STATUS_HELP_WIDTH;
     const NARROW_STATUS_WIDTH: u16 = COMPACT_STATUS_HELP_WIDTH - 1;
+    const LONG_IMAGE_SUMMARY: &str = "image/png image 4000x3000 hash abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz";
 
     fn context(focus: FocusPanel) -> FooterHelpContext {
         FooterHelpContext {
@@ -1037,6 +1067,16 @@ mod tests {
             ..narrow
         };
         assert_eq!(contextual_help_text(narrow_wiring), " Click target │ Esc ");
+    }
+
+    #[test]
+    fn canvas_image_preview_is_bounded_without_changing_short_metadata() {
+        let short = "image/png image 10x10 hash abc";
+        assert_eq!(bounded_canvas_preview(short), short);
+        let long = bounded_canvas_preview(LONG_IMAGE_SUMMARY);
+        assert!(long.chars().count() <= CANVAS_IMAGE_PREVIEW_MAX_CHARS);
+        assert!(long.ends_with('…'));
+        assert!(!long.contains("raw-image-bytes"));
     }
 
     #[test]
