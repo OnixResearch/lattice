@@ -2,11 +2,21 @@ const INLINE_REASONING_OPEN: &str = "<think>";
 const INLINE_REASONING_CLOSE: &str = "</think>";
 const INLINE_REASONING_DIAGNOSTIC: &str = "OpenAI-compatible response contains ambiguous inline reasoning markup";
 const EMPTY_FINAL_CONTENT_DIAGNOSTIC: &str = "OpenAI-compatible response has no final content after inline reasoning";
+const TOKEN_LIMIT_FINISH_REASON: &str = "length";
+const TOKEN_LIMIT_DIAGNOSTIC: &str = "OpenAI-compatible response exhausted max_tokens before complete final content; increase the configured max_tokens bound";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct FinalContent<'a> {
     pub(super) text: &'a str,
     pub(super) reasoning_suppressed: bool,
+}
+
+// r[impl lattice.agent_runtime.inline_reasoning_boundary]
+pub(super) fn admit_finish_reason(finish_reason: Option<&str>) -> Result<(), crate::agent_node::AgentError> {
+    if finish_reason == Some(TOKEN_LIMIT_FINISH_REASON) {
+        return Err(crate::agent_node::AgentError::Adapter(TOKEN_LIMIT_DIAGNOSTIC.to_string()));
+    }
+    Ok(())
 }
 
 // r[impl lattice.agent_runtime.inline_reasoning_boundary]

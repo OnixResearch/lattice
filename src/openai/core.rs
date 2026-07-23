@@ -86,6 +86,7 @@ pub fn decode_response(
     let choice = envelope.choices.first().ok_or_else(|| {
         crate::agent_node::AgentError::Adapter("OpenAI-compatible response has no choices".to_string())
     })?;
+    super::reasoning::admit_finish_reason(choice.finish_reason.as_deref())?;
     let content = choice.message.content.as_deref().and_then(non_empty_trimmed).ok_or_else(|| {
         crate::agent_node::AgentError::Adapter("OpenAI-compatible response content is empty or missing".to_string())
     })?;

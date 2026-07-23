@@ -30,15 +30,16 @@ let AppConfig = {
   agent_runtime | AgentRuntime,
 } in
 let local_chat_completions_endpoint = "http://127.0.0.1:13305/v1/chat/completions" in
-let agent_timeout_secs = 120 in
-let agent_max_tokens = 2048 in
+let local_model_name = "VibeThinker-3B" in
+let agent_timeout_secs = 600 in
+let agent_max_tokens = 8192 in
 let one_mebibyte = 1048576 in
 let global_output_budget_bytes = 67108864 in
 let shell_timeout_secs = 60 in
 let workflow_parallelism = 4 in
 let local_runtime = {
   endpoint = local_chat_completions_endpoint,
-  model = "local-model",
+  model = local_model_name,
   api_key_env = null,
   timeout_secs = agent_timeout_secs,
   max_tokens = agent_max_tokens,

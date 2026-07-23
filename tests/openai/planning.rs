@@ -7,7 +7,10 @@ fn typed_nickel_example_loads_native_runtime_routes() {
 
     assert!(config.agent_runtime.runtimes.is_empty());
     assert_eq!(config.agent_runtime.openai_compatible.len(), CONFIGURED_RUNTIME_COUNT);
-    assert!(config.agent_runtime.openai_compatible.contains_key(PI_RUNTIME_KEY));
+    let runtime = config.agent_runtime.openai_compatible.get(PI_RUNTIME_KEY).expect("Pi runtime is configured");
+    assert_eq!(runtime.model, EXAMPLE_MODEL);
+    assert_eq!(runtime.timeout_secs, EXAMPLE_TIMEOUT_SECS);
+    assert_eq!(runtime.max_tokens, EXAMPLE_MAX_TOKENS);
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.plan]

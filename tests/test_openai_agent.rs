@@ -42,6 +42,9 @@ const INLINE_REASONING_TEXT_CONTENT: &str =
     "<think>private reasoning repeats Return a concise answer</think> bounded answer ";
 const INLINE_REASONING_JSON_CONTENT: &str =
     "<think>private reasoning repeats Return a concise answer</think> {\"ok\":true} ";
+const TOKEN_LIMIT_CONTENT: &str = "<think>private reasoning repeats Return a concise answer";
+const TOKEN_LIMIT_FINISH_REASON: &str = "length";
+const COMPLETE_FINISH_REASON: &str = "stop";
 const MALFORMED_INLINE_REASONING_CONTENT: &[&str] = &[
     "<think>private reasoning repeats Return a concise answer",
     "prefix <think>private reasoning repeats Return a concise answer</think>bounded answer",
@@ -55,6 +58,9 @@ const API_KEY_VALUE: &str = "secret-test-token";
 const API_KEY_REFERENCE: &str = "openai_test_key";
 const PI_RUNTIME_KEY: &str = "pi";
 const CONFIGURED_RUNTIME_COUNT: usize = 2;
+const EXAMPLE_TIMEOUT_SECS: u64 = 600;
+const EXAMPLE_MAX_TOKENS: u32 = 8_192;
+const EXAMPLE_MODEL: &str = "VibeThinker-3B";
 const HTTP_STATUS_OK: u16 = 200;
 const HTTP_STATUS_REDIRECT: u16 = 302;
 const HTTP_STATUS_UNAVAILABLE: u16 = 503;
@@ -148,6 +154,10 @@ fn runtime_registry(runtime: OpenAiRuntimeConfig) -> AgentRuntimeConfig {
 }
 
 fn response(content: Option<&str>) -> OpenAiHttpResponse {
+    response_with_finish_reason(content, COMPLETE_FINISH_REASON)
+}
+
+fn response_with_finish_reason(content: Option<&str>, finish_reason: &str) -> OpenAiHttpResponse {
     OpenAiHttpResponse {
         status: HTTP_STATUS_OK,
         body: serde_json::to_vec(&serde_json::json!({
@@ -159,7 +169,7 @@ fn response(content: Option<&str>) -> OpenAiHttpResponse {
                     "content": content,
                     "reasoning_content": "must never become output"
                 },
-                "finish_reason": "stop"
+                "finish_reason": finish_reason
             }],
             "usage": {"prompt_tokens": 3, "completion_tokens": 2}
         }))

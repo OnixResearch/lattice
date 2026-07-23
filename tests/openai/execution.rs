@@ -69,6 +69,34 @@ fn decoder_rejects_ambiguous_reasoning_without_echoing_private_content() {
     }
 }
 
+// r[verify lattice.agent_runtime.inline_reasoning_boundary]
+// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.malformed]
+#[test]
+fn decoder_reports_token_exhaustion_without_admitting_partial_content() {
+    let cases = [
+        (AgentOutputMode::Text, TOKEN_LIMIT_CONTENT),
+        (AgentOutputMode::Text, TEXT_CONTENT),
+        (AgentOutputMode::Json, JSON_CONTENT),
+    ];
+
+    for (output_mode, content) in cases {
+        let plan = plan_openai_chat(&runtime(), &request(output_mode), MAX_RESPONSE_BYTES).expect("valid plan");
+        let error = decode_openai_chat_response(
+            &plan,
+            &response_with_finish_reason(Some(content), TOKEN_LIMIT_FINISH_REASON),
+            &AgentExecutionContext::default(),
+        )
+        .expect_err("token-exhausted response must fail before output typing");
+        let diagnostic = error.to_string();
+
+        assert!(diagnostic.contains("exhausted max_tokens"));
+        assert!(diagnostic.contains("increase the configured max_tokens bound"));
+        assert!(!diagnostic.contains(INLINE_REASONING_PRIVATE));
+        assert!(!diagnostic.contains(PROMPT));
+        assert!(!diagnostic.contains(content));
+    }
+}
+
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.credentials]
 #[tokio::test]
 async fn executor_passes_resolved_node_credential_to_native_adapter() {
