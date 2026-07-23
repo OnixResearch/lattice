@@ -76,10 +76,15 @@ const SHELL_MARKERS: &[&str] = &[
 ];
 const NON_AUTH_MARKER: &str =
     concat!("// r[verify lattice.agent_runtime.animus_output.scenario.non-authoritative", "]\n");
-const OPENAI_MARKERS: &[&str] = &[concat!(
-    "// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.plain",
-    "]\n"
-)];
+const OPENAI_MARKERS: &[&str] = &[
+    concat!("// r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.plain", "]\n"),
+    concat!("// r[verify n8n", "clone.workflow_execution.agent_nodes.openai_compatible", "]\n"),
+    concat!(
+        "// r[verify n8n",
+        "clone.workflow_execution.agent_nodes.openai_compatible.scenario.real-graph",
+        "]\n"
+    ),
+];
 const UNRELATED: &str = "lattice.agent_orchestration.authority.scenario.ambient-denied";
 const ADDED: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING: &str = "lattice.example.dangling.scenario.marker";

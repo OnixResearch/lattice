@@ -71,6 +71,7 @@ fn completed_outputs(step_status: &NodeStatus) -> &HashMap<rat_nodegraph::model:
     }
 }
 
+// r[verify n8nclone.workflow_execution.subworkflows.invocation.outputs]
 #[tokio::test]
 async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port() {
     let temporary = tempfile::tempdir().expect("temporary store directory");
@@ -167,6 +168,7 @@ impl SubworkflowRunnerShell for RecordingCorrelatedShell {
     }
 }
 
+// r[verify n8nclone.workflow_execution.subworkflows.events.correlation]
 #[tokio::test]
 async fn child_events_bind_parent_run_child_run_and_subworkflow_node_identity() {
     let (parent, subworkflow_node_id) = parent_workflow(CHILD_OUTPUT);

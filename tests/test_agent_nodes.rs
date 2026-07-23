@@ -246,6 +246,8 @@ fn handoff_envelope(path: &str, media_type: Option<&str>) -> String {
     envelope.to_string()
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes]
+// r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.compatibility]
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.config]
 #[test]
 fn default_agent_runtime_config_contains_command_presets() {
@@ -260,6 +262,7 @@ fn default_agent_runtime_config_contains_command_presets() {
     assert!(clankers.args.iter().any(|arg| arg == PROMPT_ARG_TEMPLATE));
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.pi_adapter.image_prompt]
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
 // r[verify n8nclone.workflow_execution.runtime_registry.command_runtime]
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.planning]
@@ -338,6 +341,7 @@ fn agent_command_reports_process_runner_failure() {
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.route]
 #[cfg(unix)]
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters]
 #[test]
 fn production_pi_text_adapter_executes_command() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
@@ -396,6 +400,8 @@ fn production_adapter_empty_command_rejects_before_spawn() {
 
 // r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.image]
 #[cfg(unix)]
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff]
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.success]
 #[test]
 fn production_image_handoff_loads_typed_image() {
     let temp_dir = tempfile::tempdir().expect("temporary image handoff directory");
@@ -522,6 +528,8 @@ fn artifact_handoff_rejects_oversized_file() {
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
+#[rustfmt::skip]
+// r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.rejected]
 #[test]
 fn handoff_rejects_output_path_outside_working_directory() {
     let cwd_dir = tempfile::tempdir().expect("temporary cwd directory");
@@ -583,6 +591,7 @@ fn handoff_rejects_invalid_envelope_json() {
     assert!(error.to_string().contains("handoff envelope is invalid JSON"), "error: {error}");
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.errors.decode]
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
 #[test]
 fn decode_agent_command_output_rejects_invalid_json() {
@@ -614,6 +623,7 @@ fn decode_agent_command_output_reports_nonzero_stderr() {
     assert!(error.to_string().contains(NONZERO_STDERR), "error: {error}");
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.config.pi]
 // r[verify n8nclone.workflow_execution.agent_nodes.config]
 #[test]
 fn add_agent_node_records_config_and_ports() {
@@ -635,6 +645,7 @@ fn add_agent_node_records_config_and_ports() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.execute.text_json]
 // r[verify n8nclone.workflow_execution.agent_nodes.pi_adapter]
 // r[verify n8nclone.workflow_execution.agent_nodes.execute]
 #[tokio::test]
@@ -669,6 +680,9 @@ async fn pi_agent_node_executes_text_request_through_adapter() {
     assert_eq!(requests[0].text_inputs, vec!["extra prompt".to_string()]);
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.clankers_adapter.image_context]
+// r[verify n8nclone.workflow_execution.agent_nodes.config.clankers]
+// r[verify n8nclone.workflow_execution.agent_nodes.execute.image]
 // r[verify n8nclone.workflow_execution.agent_nodes.clankers_adapter]
 // r[verify n8nclone.workflow_execution.agent_nodes.execute]
 #[tokio::test]
@@ -703,6 +717,7 @@ async fn clankers_agent_node_executes_image_request_through_adapter() {
     assert_eq!(requests[0].image_inputs.len(), 1);
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.execute.type_mismatch]
 // r[verify n8nclone.workflow_execution.agent_nodes.execute]
 #[tokio::test]
 async fn output_mode_mismatch_marks_node_failed() {
@@ -722,6 +737,9 @@ async fn output_mode_mismatch_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.cache_key.image_edit]
+// r[verify n8nclone.workflow_execution.agent_nodes.cache_key.prompt_edit]
+// r[verify n8nclone.workflow_execution.agent_nodes.cache_key.target_edit]
 // r[verify n8nclone.workflow_execution.agent_nodes.cache_key]
 #[test]
 fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
@@ -742,6 +760,7 @@ fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
     assert_ne!(original_key, node_execution_cache_key(node_id, original_config, &inputs_b));
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.config.invalid]
 // r[verify n8nclone.workflow_execution.agent_nodes.config]
 #[test]
 fn empty_agent_prompt_is_validation_diagnostic() {
@@ -753,6 +772,7 @@ fn empty_agent_prompt_is_validation_diagnostic() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::EmptyAgentPrompt));
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.pi_adapter.preflight_reject]
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn preflight_rejection_marks_node_failed() {
@@ -769,6 +789,7 @@ async fn preflight_rejection_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.clankers_adapter.session_failure]
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn session_failure_marks_node_failed() {
@@ -785,6 +806,7 @@ async fn session_failure_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.errors.adapter]
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn adapter_failure_marks_node_failed() {
@@ -801,6 +823,7 @@ async fn adapter_failure_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.errors.credential]
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn credential_failure_skips_agent_adapter_call() {

@@ -40,6 +40,7 @@ fn memory_fs() -> MemoryFileSystem {
     MemoryFileSystem::new([(PATH_ALLOWED.to_string(), INITIAL_CONTENT.to_string())].into())
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.config.read]
 // r[verify n8nclone.workflow_execution.file_nodes.config]
 #[test]
 fn add_file_node_records_config_and_ports() {
@@ -58,6 +59,8 @@ fn add_file_node_records_config_and_ports() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.interface.memory]
+// r[verify n8nclone.workflow_execution.file_nodes.read.content]
 // r[verify n8nclone.workflow_execution.file_nodes.interface]
 // r[verify n8nclone.workflow_execution.file_nodes.read]
 #[tokio::test]
@@ -81,6 +84,7 @@ async fn read_file_node_reads_content_through_interface() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.read.missing]
 // r[verify n8nclone.workflow_execution.file_nodes.read]
 #[tokio::test]
 async fn missing_file_marks_node_failed() {
@@ -96,6 +100,8 @@ async fn missing_file_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.config.write]
+// r[verify n8nclone.workflow_execution.file_nodes.write_append.write]
 // r[verify n8nclone.workflow_execution.file_nodes.write_append]
 #[tokio::test]
 async fn write_file_node_writes_content_and_reports_bytes() {
@@ -125,6 +131,7 @@ async fn write_file_node_writes_content_and_reports_bytes() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.write_append.append]
 // r[verify n8nclone.workflow_execution.file_nodes.write_append]
 #[tokio::test]
 async fn append_file_node_appends_input_content() {
@@ -142,6 +149,7 @@ async fn append_file_node_appends_input_content() {
     assert_eq!(fs.read_text(PATH_ALLOWED).as_deref(), Some("initial appended"));
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.safety.outside_root]
 // r[verify n8nclone.workflow_execution.file_nodes.safety]
 #[test]
 fn path_outside_allowed_roots_is_validation_diagnostic() {
@@ -160,6 +168,7 @@ fn path_outside_allowed_roots_is_validation_diagnostic() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::UnsafeFilePath));
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.safety.overwrite]
 // r[verify n8nclone.workflow_execution.file_nodes.safety]
 #[tokio::test]
 async fn write_without_overwrite_fails_without_modifying_existing_file() {
@@ -208,6 +217,7 @@ async fn default_executor_reads_local_file_within_allowed_root() {
     assert!(matches!(result.status, NodeStatus::Completed { .. }));
 }
 
+// r[verify n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.nested-io]
 // r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.production-file-effects]
 #[test]
 fn local_filesystem_writes_and_appends_within_allowed_root() {

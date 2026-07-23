@@ -79,6 +79,8 @@ fn artifact_reference() -> ReplayArtifactReference {
     }
 }
 
+// r[verify n8nclone.workflow_execution.replay.core.fold]
+// r[verify n8nclone.workflow_execution.replay.core.no_side_effects]
 // r[verify n8nclone.workflow_execution.replay.core]
 // r[verify n8nclone.tui_ux.replay_debugger.timeline]
 #[test]
@@ -137,6 +139,7 @@ fn unknown_nodes_are_rejected_when_snapshot_ids_are_known() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == ReplayDiagnosticCode::UnknownNode));
 }
 
+// r[verify n8nclone.workflow_execution.replay.artifact_placeholders.missing]
 // r[verify n8nclone.workflow_execution.replay.artifact_placeholders]
 // r[verify n8nclone.workflow_validation.replay_records.artifact]
 #[test]
@@ -194,6 +197,8 @@ fn replay_bundle_rejects_plaintext_secret_markers() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.replay.event_store.completed]
+// r[verify n8nclone.workflow_execution.replay.event_store.partial]
 // r[verify n8nclone.workflow_execution.replay.event_store]
 #[test]
 fn store_persists_replay_events_for_run() {

@@ -300,6 +300,10 @@ fn string_output(outputs: &HashMap<PortId, Value>, port: PortId) -> &str {
     }
 }
 
+// r[verify n8nclone.workflow_execution.headless.exit_status.success]
+// r[verify n8nclone.workflow_execution.headless.history.persist]
+// r[verify n8nclone.workflow_execution.headless.run.saved]
+// r[verify n8nclone.workflow_execution.headless.summary.text]
 // r[verify n8nclone.workflow_execution.headless.run]
 // r[verify n8nclone.workflow_execution.headless.summary]
 // r[verify n8nclone.workflow_execution.headless.exit_status]
@@ -497,6 +501,7 @@ async fn default_template_catalog_runs_every_template_headlessly() {
     assert_eq!(records.len(), DEFAULT_NODE_TEMPLATE_FILES.len());
 }
 
+// r[verify n8nclone.workflow_execution.headless.summary.json]
 // r[verify n8nclone.workflow_execution.headless.run]
 // r[verify n8nclone.workflow_execution.headless.summary]
 // r[verify n8nclone.workflow_execution.headless.exit_status]
@@ -528,6 +533,8 @@ fn cli_run_saved_workflow_emits_json_summary() {
     assert_eq!(summary.failures, NO_FAILURES);
 }
 
+// r[verify n8nclone.workflow_execution.headless.errors.load_failure]
+// r[verify n8nclone.workflow_execution.headless.run.missing]
 // r[verify n8nclone.workflow_execution.headless.errors]
 #[tokio::test]
 async fn headless_run_missing_workflow_fails_without_history_record() {
@@ -543,6 +550,7 @@ async fn headless_run_missing_workflow_fails_without_history_record() {
     assert!(store.load_run_details(RunId(MISSING_RUN_ID)).expect("run details lookup succeeds").is_none());
 }
 
+// r[verify n8nclone.workflow_execution.headless.exit_status.failure]
 // r[verify n8nclone.workflow_execution.headless.exit_status]
 // r[verify n8nclone.workflow_execution.headless.errors]
 // r[verify lattice.workflow_execution.headless_run_details]

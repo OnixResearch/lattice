@@ -122,6 +122,7 @@ fn evaluates_bounded_transforms_without_side_effects() {
     assert_eq!(value.text, "HELLO");
 }
 
+// r[verify n8nclone.workflow_execution.expression_mapping.config]
 // r[verify n8nclone.workflow_execution.expression_mapping.evaluate.stdout]
 // r[verify n8nclone.workflow_execution.expression_mapping.config.command]
 #[tokio::test]

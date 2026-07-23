@@ -104,6 +104,8 @@ fn repository_closure<'a>(
     }
 }
 
+// r[verify n8nclone.workflow_execution.rats_dependency]
+// r[verify n8nclone.workflow_execution.rats_dependency.scenario.source-completeness]
 #[test]
 fn pinned_rats_snapshot_is_source_complete_and_has_a_focused_consumer_compile_rail() {
     let repository_root = Path::new(env!("CARGO_MANIFEST_DIR"));

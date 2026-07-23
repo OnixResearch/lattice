@@ -98,6 +98,8 @@ impl NodeRuntime for FakeRuntime {
     }
 }
 
+// r[verify n8nclone.workflow_execution.generic_pipeline_runner]
+// r[verify n8nclone.workflow_execution.seaglass_graph_core.scenario.provenance]
 // r[verify n8nclone.workflow_execution.runner_core.plan_ir]
 #[test]
 fn runner_plan_preserves_typed_nodes_edges_and_runtime_bindings() {
@@ -160,6 +162,7 @@ fn runner_admission_rejects_cycle() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == RunnerDiagnosticCode::CycleDetected));
 }
 
+// r[verify n8nclone.workflow_execution.seaglass_graph_core.scenario.compatibility]
 // r[verify n8nclone.workflow_execution.seaglass_graph_core]
 #[test]
 fn shared_graph_core_reports_critical_path_and_bottlenecks() {
@@ -277,6 +280,7 @@ fn lifecycle_admits_failure_and_cancellation_paths() {
     );
 }
 
+// r[verify n8nclone.workflow_execution.runtime_registry]
 // r[verify n8nclone.workflow_execution.runtime_registry.dispatch]
 #[test]
 fn builtin_runtime_registry_accepts_default_shell_binding() {
@@ -288,6 +292,7 @@ fn builtin_runtime_registry_accepts_default_shell_binding() {
     assert!(diagnostics.is_empty());
 }
 
+// r[verify n8nclone.workflow_execution.trait_boundaries]
 // r[verify n8nclone.workflow_execution.trait_boundaries.runtime_dispatch]
 #[test]
 fn node_runtime_trait_exposes_binding_and_node_scoped_failure() {
@@ -373,6 +378,7 @@ fn runtime_output_contract_rejects_wrong_port_and_type() {
     );
 }
 
+// r[verify n8nclone.workflow_execution.runner_events]
 // r[verify n8nclone.workflow_execution.runner_events.stream]
 #[test]
 fn runner_events_assign_ordered_sequences() {
@@ -429,6 +435,7 @@ fn capturing_event_sink_records_ordered_events() {
     assert_eq!(sink.events, vec![first, second]);
 }
 
+// r[verify n8nclone.workflow_execution.artifact_references]
 // r[verify n8nclone.workflow_execution.artifact_references.model]
 // r[verify n8nclone.workflow_execution.artifact_references.trellis_identity]
 #[test]
@@ -442,6 +449,7 @@ fn artifact_reference_carries_hash_type_length_and_backend() {
     assert_eq!(reference.backend_ref, ARTIFACT_BACKEND_REF);
 }
 
+// r[verify n8nclone.workflow_execution.durable_runner]
 // r[verify n8nclone.workflow_execution.durable_runner.resume]
 #[test]
 fn durable_runner_decision_skips_completed_and_blocks_failed_dependencies() {

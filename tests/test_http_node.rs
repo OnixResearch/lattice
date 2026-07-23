@@ -44,6 +44,7 @@ fn workflow_with_http_node() -> (Workflow, rat_nodegraph::model::NodeId) {
     (workflow, node_id)
 }
 
+// r[verify n8nclone.workflow_execution.http_node.config.create]
 // r[verify n8nclone.workflow_execution.http_node.config]
 #[test]
 fn add_http_node_records_config_and_ports() {
@@ -61,6 +62,8 @@ fn add_http_node_records_config_and_ports() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.http_node.execute.success]
+// r[verify n8nclone.workflow_execution.http_node.outputs.body]
 // r[verify n8nclone.workflow_execution.http_node.execute]
 // r[verify n8nclone.workflow_execution.http_node.outputs]
 #[tokio::test]
@@ -94,6 +97,7 @@ async fn http_node_executes_through_client_and_maps_outputs() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.http_node.config.invalid]
 // r[verify n8nclone.workflow_execution.http_node.config]
 // r[verify n8nclone.workflow_execution.http_node.errors]
 #[test]
@@ -107,6 +111,7 @@ fn invalid_http_method_and_url_are_validation_diagnostics() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::InvalidHttpUrl));
 }
 
+// r[verify n8nclone.workflow_execution.http_node.execute.failure]
 // r[verify n8nclone.workflow_execution.http_node.errors]
 #[tokio::test]
 async fn http_transport_failure_marks_node_failed() {
@@ -124,6 +129,7 @@ async fn http_transport_failure_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.http_node.errors.timeout]
 // r[verify n8nclone.workflow_execution.http_node.errors]
 #[tokio::test]
 async fn http_timeout_marks_node_failed() {
@@ -141,6 +147,7 @@ async fn http_timeout_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.http_node.cache_key.url_edit]
 // r[verify n8nclone.workflow_execution.http_node.cache_key]
 #[test]
 fn http_cache_key_changes_when_request_config_changes() {

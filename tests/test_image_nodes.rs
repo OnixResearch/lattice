@@ -125,6 +125,8 @@ async fn image_input_node_loads_jpeg_through_interface() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.image_input_nodes.capability_read.scenario.success]
+// r[verify n8nclone.workflow_execution.image_input_nodes.production_io]
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.local]
 #[test]
 fn local_image_io_loads_png_and_jpeg_files() {
@@ -158,6 +160,7 @@ fn local_image_io_rejects_missing_allowed_root() {
     assert_eq!(result, Err(ImageError::UnsafePath(png_path)));
 }
 
+// r[verify n8nclone.workflow_execution.image_input_nodes.load.local]
 // r[verify n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
 #[tokio::test]
 async fn default_executor_loads_local_image_file() {
@@ -179,6 +182,7 @@ async fn default_executor_loads_local_image_file() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.image_input_nodes.load.unsupported]
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn unsupported_image_format_marks_node_failed() {
@@ -195,6 +199,7 @@ async fn unsupported_image_format_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.image_input_nodes.load.missing]
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn missing_image_marks_node_failed() {
@@ -210,6 +215,7 @@ async fn missing_image_marks_node_failed() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.image_input_nodes.load.oversized]
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn oversized_image_marks_node_failed() {

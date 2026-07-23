@@ -183,6 +183,7 @@ fn durable_llm_orchestration_binds_the_checked_in_agent_graph() {
     assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Webhook));
 }
 
+// r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.feedback-boundary]
 // r[verify n8nclone.workflow_execution.llm_operating_graph]
 #[tokio::test]
 async fn failed_role_blocks_aggregation_and_effect_nodes() {

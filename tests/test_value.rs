@@ -111,6 +111,7 @@ fn value_from_json() {
     assert!(display.contains("key"));
 }
 
+// r[verify n8nclone.workflow_execution.image_values.model.route]
 // r[verify n8nclone.workflow_execution.image_values.model]
 #[test]
 fn value_from_image_is_typed_and_display_safe() {
@@ -127,6 +128,7 @@ fn value_from_image_is_typed_and_display_safe() {
     assert!(!display.contains("image-a"), "image display must not dump raw bytes");
 }
 
+// r[verify n8nclone.workflow_execution.image_values.model.store]
 // r[verify n8nclone.workflow_execution.image_values.model]
 #[test]
 fn image_hash_includes_bytes_and_media_type() {
@@ -236,6 +238,7 @@ fn type_tag_any_accepts_everything() {
     assert!(TypeTag::Any.compatible_with(&TypeTag::Any));
 }
 
+// r[verify n8nclone.workflow_execution.image_values.model.incompatible]
 #[test]
 fn type_tag_mismatches() {
     assert!(!TypeTag::String.compatible_with(&TypeTag::Bytes));

@@ -206,6 +206,8 @@ fn completed_stdout<'a>(workflow: &Workflow, node_id: NodeId, status: &'a NodeSt
 // Single-node execution
 // ---------------------------------------------------------------------------
 
+// r[verify n8nclone.workflow_execution.pipeline_stdin.real_port_outputs]
+// r[verify n8nclone.workflow_execution.pipeline_stdin.real_port_outputs.completed]
 #[tokio::test]
 async fn execute_echo_produces_stdout() {
     let (wf, node_id) = common::standalone_node("echo", "echo hello");
@@ -490,6 +492,9 @@ fn exit_code_output_cannot_wire_to_string_stdin() {
     assert!(workflow.graph.add_edge(source_exit, target_stdin).is_err());
 }
 
+// r[verify n8nclone.workflow_execution.pipeline_stdin.cache_real_ports.routable]
+// r[verify n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin]
+// r[verify n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin.connected]
 #[tokio::test]
 async fn regression_connected_stdout_reaches_downstream_stdin() {
     let (wf, echo_node, grep_node) = common::two_node_pipeline();
@@ -697,6 +702,7 @@ async fn cache_key_includes_shell_executable_config() {
     }
 }
 
+// r[verify n8nclone.workflow_execution.pipeline_stdin.cache_real_ports]
 #[tokio::test]
 async fn run_uses_cache_when_hash_matches() {
     let (wf, node_id) = common::standalone_node("echo", "echo cached");

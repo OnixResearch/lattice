@@ -1,5 +1,6 @@
 use super::*;
 
+// r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible]
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.success]
 // r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.plain]
 #[test]
@@ -185,6 +186,7 @@ fn adapter_rejects_transport_failure_and_oversized_response() {
     assert!(oversized.to_string().contains("exceeded"));
 }
 
+// r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.real-graph]
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.success]
 #[tokio::test]
 async fn production_transport_calls_local_compatible_endpoint() {
