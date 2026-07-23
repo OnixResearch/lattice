@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::ErrorKind;
+use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -21,6 +22,10 @@ const BYTES_PER_KIB: usize = 1024;
 const KIB_PER_MIB: usize = 1024;
 const DEFAULT_IMAGE_BYTE_BUDGET_MIB: usize = 10;
 const IMAGE_IO_NOT_CONFIGURED: &str = "no image I/O configured";
+const PNG_EXTENSION: &str = "png";
+const JPEG_EXTENSION: &str = "jpeg";
+const JPEG_SHORT_EXTENSION: &str = "jpg";
+const SUPPORTED_DECLARED_IMAGE_EXTENSIONS: &[&str] = &[PNG_EXTENSION, JPEG_EXTENSION, JPEG_SHORT_EXTENSION];
 pub const DEFAULT_MAX_IMAGE_BYTES: usize = DEFAULT_IMAGE_BYTE_BUDGET_MIB * KIB_PER_MIB * BYTES_PER_KIB;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,6 +136,20 @@ pub fn image_input_plan(path: &str, allowed_roots: &[String], max_bytes: usize) 
 // r[impl n8nclone.workflow_execution.image_input_nodes.load]
 pub fn validate_image_path_allowed(path: &str, allowed_roots: &[String]) -> Result<(), ImageError> {
     file_node::validate_path_allowed(path, allowed_roots).map_err(|_| ImageError::UnsafePath(path.to_string()))
+}
+
+pub fn validate_declared_image_format(path: &str) -> Result<(), ImageError> {
+    let Some(extension) = Path::new(path).extension().and_then(|value| value.to_str()) else {
+        return Ok(());
+    };
+    if SUPPORTED_DECLARED_IMAGE_EXTENSIONS
+        .iter()
+        .any(|supported| extension.eq_ignore_ascii_case(supported))
+    {
+        Ok(())
+    } else {
+        Err(ImageError::UnsupportedFormat(path.to_string()))
+    }
 }
 
 pub fn validate_image_size(path: &str, bytes: usize, max_bytes: usize) -> Result<(), ImageError> {

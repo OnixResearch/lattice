@@ -523,6 +523,23 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
     assert_eq!(report.enabled_trigger_count, EXPECTED_TRIGGER_COUNT);
 }
 
+#[test]
+fn webhook_cookbook_malformed_drift_is_rejected_deterministically() {
+    let temp_dir = tempfile::tempdir().expect("temporary cookbook drift directory");
+    let malformed_path = temp_dir.path().join("malformed-webhook-cookbook.ncl");
+    let source = std::fs::read_to_string(COOKBOOK_WORKFLOW_PATH).expect("cookbook source reads");
+    let malformed = source.replacen("kind = \"shell\"", "kind = \"unsupported-cookbook-node\"", 1);
+    std::fs::write(&malformed_path, malformed).expect("malformed cookbook fixture writes");
+
+    let first = load_workflow_nickel_file(&malformed_path).expect_err("malformed cookbook is rejected").to_string();
+    let second = load_workflow_nickel_file(&malformed_path)
+        .expect_err("repeated malformed cookbook is rejected")
+        .to_string();
+
+    assert_eq!(first, second);
+    assert!(first.contains("unsupported node kind"), "diagnostic: {first}");
+}
+
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.accepted]
 // r[verify n8nclone.credentials.webhook_cookbook_secret_safety]

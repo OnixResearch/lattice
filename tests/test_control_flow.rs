@@ -25,6 +25,7 @@ use lattice::engine::workflow::Workflow;
 use lattice::node_kind_provider::property_lines_for_config;
 use lattice::tui::App;
 use lattice::tui::app::PropertyEditField;
+use lattice::workflow_format::WorkflowFormatError;
 use lattice::workflow_format::portable_to_workflow;
 use lattice::workflow_format::workflow_to_portable;
 use lattice::workflow_validation::WorkflowDiagnosticCode;
@@ -272,6 +273,26 @@ fn portable_format_round_trips_control_flow_configs() {
     assert!(matches!(imported.node_config(condition.id), Some(NodeConfig::Condition(_))));
     assert!(matches!(imported.node_config(merge.id), Some(NodeConfig::Merge(_))));
     assert!(matches!(imported.node_config(subworkflow.id), Some(NodeConfig::Subworkflow(_))));
+}
+
+#[test]
+fn portable_import_rejects_malformed_control_flow_without_partial_workflow() {
+    let mut workflow = Workflow::new("malformed-control-flow");
+    let condition_id = workflow.add_condition_node(DECISION_LABEL, ready_condition_config());
+    let mut portable = workflow_to_portable(&workflow);
+    let condition = portable
+        .configs
+        .iter_mut()
+        .find(|config| config.node_id == condition_id.0)
+        .expect("condition config exported");
+    condition.condition_branches[0].predicate = "unknown-predicate".to_string();
+
+    let error = portable_to_workflow(portable).expect_err("malformed control flow rejected");
+
+    assert!(matches!(
+        error,
+        WorkflowFormatError::InvalidControlFlowConfig { node_id, .. } if node_id == condition_id.0
+    ));
 }
 
 // r[verify n8nclone.tui_ux.control_flow.add_flow.condition]

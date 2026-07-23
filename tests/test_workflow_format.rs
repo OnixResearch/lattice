@@ -25,6 +25,9 @@ const CONFIG_FILE_NAME: &str = "config.ncl";
 const STORE_FILE_NAME: &str = "lattice.redb";
 const EXPORTED_WORKFLOW_FILE_NAME: &str = "workflow.ncl";
 const IMPORTED_WORKFLOW_FILE_NAME: &str = "imported.ncl";
+const INVALID_IMAGE_WORKFLOW_PATH: &str = "examples/workflows/invalid-unsupported-image-format.ncl";
+const INVALID_IMAGE_WORKFLOW_NAME: &str = "invalid-unsupported-image-format";
+const EXISTING_WORKFLOW_NAME: &str = "existing-workflow";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 4;
@@ -397,6 +400,35 @@ fn image_workflow_static_import_export_and_validation_do_not_read_image_bytes() 
         NodeConfig::ImageInput { path, .. } => assert_eq!(path, &missing_path),
         _ => panic!("expected image input config"),
     }
+}
+
+#[test]
+fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store() {
+    let temp_dir = tempfile::tempdir().expect("temporary image import directory");
+    let (config_path, data_dir) = write_test_config(&temp_dir);
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store opens");
+    store.save_workflow(&Workflow::new(EXISTING_WORKFLOW_NAME)).expect("existing workflow saves");
+    drop(store);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
+        .arg("--config")
+        .arg(&config_path)
+        .arg("import")
+        .arg(INVALID_IMAGE_WORKFLOW_PATH)
+        .output()
+        .expect("invalid image import command runs");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store reopens");
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("unsupported image format"), "stderr: {stderr}");
+    assert!(store.load_workflow(EXISTING_WORKFLOW_NAME).expect("existing workflow loads").is_some());
+    assert!(
+        store
+            .load_workflow(INVALID_IMAGE_WORKFLOW_NAME)
+            .expect("invalid workflow lookup succeeds")
+            .is_none()
+    );
 }
 
 // r[verify n8nclone.workflow_format.node_kind_provider.handlers]

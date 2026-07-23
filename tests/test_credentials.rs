@@ -166,6 +166,25 @@ async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
     assert_bytes_omit_secret(&persisted, SECRET_VALUE);
 }
 
+#[test]
+fn nickel_import_round_trip_preserves_opaque_provider_reference_without_resolution() {
+    let (workflow, node_id) = workflow_with_secret_ref();
+    let temp_dir = tempfile::tempdir().expect("temporary credential import directory");
+    let workflow_path = temp_dir.path().join(WORKFLOW_FILE_NAME);
+    std::fs::write(&workflow_path, workflow_to_nickel(&workflow)).expect("credential workflow written");
+
+    let imported =
+        load_workflow_nickel_file(&workflow_path).expect("credential workflow imports without provider access");
+    let imported_ref = imported
+        .node_credentials(node_id)
+        .and_then(|refs| refs.env.get(SECRET_ENV_NAME))
+        .expect("opaque credential reference imports");
+
+    assert_eq!(imported_ref.provider, PROVIDER_NAME);
+    assert_eq!(imported_ref.key, SECRET_KEY);
+    assert_eq!(imported_ref.field, None);
+}
+
 // r[verify n8nclone.credentials.provider_interface]
 // r[verify n8nclone.credentials.provider_interface.resolve]
 // r[verify n8nclone.credentials.redaction]

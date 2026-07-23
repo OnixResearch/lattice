@@ -1276,6 +1276,15 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
         }
     };
 
+    let diagnostics = workflow_validation::validate_workflow(&workflow);
+    if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+        eprintln!("Import failed: workflow validation rejected the input");
+        for diagnostic in workflow_validation::fatal_diagnostics(&diagnostics) {
+            eprintln!("  {}", workflow_validation::format_diagnostic(&diagnostic));
+        }
+        return ExitCode::FAILURE;
+    }
+
     let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => {
