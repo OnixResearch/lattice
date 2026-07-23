@@ -408,7 +408,10 @@ fn truncated_credential_output_is_rejected_before_secret_parsing() {
         .resolve(&SecretRef::new(COMMAND_PROVIDER_ID, COMMAND_PROVIDER_KEY, None))
         .expect_err("truncated credential output must not be parsed");
     let diagnostic = error.to_string();
-    assert!(diagnostic.contains("process output exceeded limit"));
+    assert!(
+        diagnostic.contains("process output exceeded limit"),
+        "unexpected bounded credential diagnostic: {diagnostic}",
+    );
     assert!(!diagnostic.contains("must-not-be-returned"));
 }
 

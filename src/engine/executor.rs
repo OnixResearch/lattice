@@ -22,7 +22,6 @@ use crate::agent_node::AgentNodeSettings;
 use crate::agent_node::AgentOutput;
 use crate::agent_node::AgentRequest;
 use crate::agent_node::AgentRuntimeConfig;
-use crate::agent_node::ProcessRunner;
 use crate::agent_node::ProductionAgentAdapter;
 use crate::control_flow;
 use crate::credentials;
@@ -953,6 +952,15 @@ pub struct StepResult {
     pub input_hash: ContentHash,
 }
 
+struct RuntimeParts {
+    credential_provider: Box<dyn CredentialProvider>,
+    http_client: Box<dyn HttpClient>,
+    file_system: Box<dyn FileSystem>,
+    image_io: Box<dyn ImageIo>,
+    agent_adapter: Box<dyn AgentAdapter>,
+    local_process: LocalProcessConfig,
+}
+
 /// The executor.
 pub struct Executor {
     next_run_id: u64,
@@ -963,6 +971,7 @@ pub struct Executor {
     agent_adapter: Box<dyn AgentAdapter>,
     local_process: LocalProcessConfig,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
+    cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -986,30 +995,40 @@ fn default_subworkflow_runner_shell() -> Box<dyn SubworkflowRunnerShell> {
 }
 
 impl Executor {
-    pub fn new() -> Self {
+    fn with_components(components: RuntimeParts) -> Self {
         Self {
             next_run_id: 0,
+            credential_provider: components.credential_provider,
+            http_client: components.http_client,
+            file_system: components.file_system,
+            image_io: components.image_io,
+            agent_adapter: components.agent_adapter,
+            local_process: components.local_process,
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
+            cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_credential_provider(credential_provider: Box<dyn CredentialProvider>) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider,
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.config]
@@ -1024,68 +1043,58 @@ impl Executor {
         let credential_provider =
             crate::credentials::EnvironmentCredentialProvider::from_current_env(&credential_env_keys);
         let local_process = agent_runtime.local_process.clone();
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider: Box::new(credential_provider),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
             local_process,
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_http_client(http_client: Box<dyn HttpClient>) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client,
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_file_system(file_system: Box<dyn FileSystem>) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_image_io(image_io: Box<dyn ImageIo>) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io,
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_agent_adapter(agent_adapter: Box<dyn AgentAdapter>) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NoopHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter,
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_subworkflow_runner_shell(subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>) -> Self {
@@ -1097,21 +1106,24 @@ impl Executor {
         self
     }
 
+    pub fn with_cancellation(mut self, cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Self {
+        self.cancellation = cancellation;
+        self
+    }
+
     pub fn new_with_clients(
         credential_provider: Box<dyn CredentialProvider>,
         http_client: Box<dyn HttpClient>,
         file_system: Box<dyn FileSystem>,
     ) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider,
             http_client,
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     pub fn new_with_runtime_clients(
@@ -1121,16 +1133,14 @@ impl Executor {
         image_io: Box<dyn ImageIo>,
         agent_adapter: Box<dyn AgentAdapter>,
     ) -> Self {
-        Self {
-            next_run_id: 0,
+        Self::with_components(RuntimeParts {
             credential_provider,
             http_client,
             file_system,
             image_io,
             agent_adapter,
             local_process: LocalProcessConfig::default(),
-            subworkflow_runner_shell: default_subworkflow_runner_shell(),
-        }
+        })
     }
 
     /// Execute a single node given its input values.
@@ -1267,6 +1277,7 @@ impl Executor {
                         stdin_value,
                     },
                     &self.local_process,
+                    std::sync::Arc::clone(&self.cancellation),
                 )
                 .await;
 
@@ -1883,6 +1894,7 @@ struct ShellExecutionInput<'a> {
 async fn execute_shell(
     input: ShellExecutionInput<'_>,
     config: &LocalProcessConfig,
+    cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<ShellOutputValues, crate::agent_node::ProcessError> {
     let stdin = if input.should_pipe_stdin {
         input.stdin_value.map(Value::as_display_string).unwrap_or_default().into_bytes()
@@ -1901,7 +1913,7 @@ async fn execute_shell(
     debug_assert_eq!(request.args.len(), SHELL_ARGUMENT_COUNT);
     debug_assert_eq!(request.program, config.shell_program);
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
-    let output = tokio::task::spawn_blocking(move || runner.run(&request))
+    let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request, &cancellation))
         .await
         .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
 

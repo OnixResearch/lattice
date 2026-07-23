@@ -19,7 +19,7 @@ struct OperatorE2eCase {
 
 const OPERATOR_E2E_CASES: &[OperatorE2eCase] = &[
     OperatorE2eCase {
-        name: "TUI PTY navigation, execution, history, and non-terminal boundaries",
+        name: "TUI PTY success, failure/rerun, diagnostics, cancellation, resize, and non-terminal boundaries",
         test_target: "test_tui_ux_completion",
         test_filter: "operator_e2e_tui_process",
         exact_filter: false,

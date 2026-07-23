@@ -3,6 +3,10 @@
 mod common;
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use lattice::engine::executor::Executor;
 use lattice::engine::executor::NodeStatus;
@@ -62,6 +66,20 @@ const CACHE_KEY_DIRECT_INPUT: &str = "direct input";
 const CACHE_KEY_NODE_ID_VALUE: u64 = 4242;
 const CACHE_KEY_INPUT_PORT_VALUE: u64 = 9001;
 const CACHE_KEY_OTHER_INPUT_PORT_VALUE: u64 = 9002;
+#[cfg(unix)]
+const CANCELLATION_READY_FILE_NAME: &str = "executor-cancellation-ready";
+#[cfg(unix)]
+const CANCELLATION_FORBIDDEN_FILE_NAME: &str = "executor-cancellation-forbidden";
+#[cfg(unix)]
+const CANCELLATION_FORBIDDEN_EFFECT: &str = "must-not-complete";
+#[cfg(unix)]
+const CANCELLATION_DELAY_SECS: u64 = 2;
+#[cfg(unix)]
+const CANCELLATION_OBSERVATION_WAIT_SECS: u64 = 3;
+#[cfg(unix)]
+const CANCELLATION_POLL_ATTEMPTS: usize = 250;
+#[cfg(unix)]
+const CANCELLATION_POLL_DELAY_MS: u64 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ShellConfigMutation {
@@ -243,6 +261,51 @@ async fn execute_failing_command() {
         }
         other => panic!("expected Completed (with non-zero exit), got {:?}", other),
     }
+}
+
+// r[verify lattice.tui_ux.process_failure_recovery.scenario.cancel]
+#[tokio::test]
+async fn explicit_false_cancellation_token_allows_shell_completion() {
+    let (workflow, node_id) = common::standalone_node("uncancelled", "printf completed");
+    let cancellation = Arc::new(AtomicBool::new(false));
+    let executor = Executor::new().with_cancellation(cancellation);
+
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
+
+    assert!(matches!(result.status, NodeStatus::Completed { .. }));
+}
+
+// r[verify lattice.tui_ux.process_failure_recovery.scenario.cancel]
+#[cfg(unix)]
+#[tokio::test]
+async fn explicit_cancellation_token_stops_bounded_shell_before_pending_effect() {
+    let temp_dir = tempfile::tempdir().expect("temporary executor cancellation directory");
+    let ready_path = temp_dir.path().join(CANCELLATION_READY_FILE_NAME);
+    let forbidden_path = temp_dir.path().join(CANCELLATION_FORBIDDEN_FILE_NAME);
+    let command = common::ready_then_delayed_effect_command(
+        &ready_path,
+        &forbidden_path,
+        CANCELLATION_DELAY_SECS,
+        CANCELLATION_FORBIDDEN_EFFECT,
+    );
+    let (workflow, node_id) = common::standalone_node("cancel", &command);
+    let cancellation = Arc::new(AtomicBool::new(false));
+    let executor = Executor::new().with_cancellation(Arc::clone(&cancellation));
+    let execution = tokio::spawn(async move { executor.execute_node(&workflow, node_id, &HashMap::new()).await });
+
+    for _ in 0..CANCELLATION_POLL_ATTEMPTS {
+        if ready_path.exists() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(CANCELLATION_POLL_DELAY_MS)).await;
+    }
+    assert!(ready_path.exists(), "cancellable shell must report readiness");
+    cancellation.store(true, Ordering::SeqCst);
+    let result = execution.await.expect("cancellable executor task joins");
+    tokio::time::sleep(Duration::from_secs(CANCELLATION_OBSERVATION_WAIT_SECS)).await;
+
+    assert!(matches!(result.status, NodeStatus::Failed { ref error } if error == "process cancelled"));
+    assert!(!forbidden_path.exists(), "canceled bounded shell must not perform its pending effect");
 }
 
 #[tokio::test]

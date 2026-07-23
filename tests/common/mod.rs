@@ -163,6 +163,50 @@ pub fn post_effect_parent_death_once_then_repeat_command(
 }
 
 #[cfg(unix)]
+pub fn identified_write_command(path: &std::path::Path, effect: &str) -> String {
+    assert!(!effect.is_empty(), "identified write effect must be observable");
+    let path = quote_path_for_posix_shell(path);
+    let effect = quote_for_posix_shell(effect);
+    format!("printf %s {effect} > {path}")
+}
+
+#[cfg(unix)]
+pub fn timeout_once_then_succeed_command(
+    marker_path: &std::path::Path,
+    failure_delay_seconds: u64,
+    failure_token: &str,
+    success_token: &str,
+) -> String {
+    assert!(failure_delay_seconds > 0, "failure delay must be positive");
+    assert!(!failure_token.is_empty(), "failure token must be observable");
+    assert!(!success_token.is_empty(), "success token must be observable");
+    let marker = quote_path_for_posix_shell(marker_path);
+    let failure_token = quote_for_posix_shell(failure_token);
+    let success_token = quote_for_posix_shell(success_token);
+    format!(
+        "if [ ! -e {marker} ]; then printf %s {failure_token} > {marker}; sleep {failure_delay_seconds}; fi; printf %s {success_token}"
+    )
+}
+
+#[cfg(unix)]
+pub fn ready_then_delayed_effect_command(
+    ready_path: &std::path::Path,
+    effect_path: &std::path::Path,
+    delay_seconds: u64,
+    effect: &str,
+) -> String {
+    assert!(delay_seconds > 0, "delayed effect requires a positive delay");
+    assert!(!effect.is_empty(), "delayed effect must be observable");
+    let ready = quote_path_for_posix_shell(ready_path);
+    let effect_path = quote_path_for_posix_shell(effect_path);
+    let effect = quote_for_posix_shell(effect);
+    format!(
+        "printf %s '{}' > {ready}; sleep {delay_seconds}; printf %s {effect} > {effect_path}",
+        PROCESS_GATE_READY_CONTENT,
+    )
+}
+
+#[cfg(unix)]
 pub fn copy_crash_store_snapshot(source: &std::path::Path, destination: &std::path::Path) -> u64 {
     assert_ne!(source, destination, "crash snapshot must not replace the original store");
     let copied = std::fs::copy(source, destination).expect("crash store snapshot copies");

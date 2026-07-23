@@ -141,6 +141,7 @@ struct ActiveRun {
     workflow: Workflow,
     receiver: mpsc::UnboundedReceiver<RunEvent>,
     handle: JoinHandle<()>,
+    cancellation: Arc<std::sync::atomic::AtomicBool>,
 }
 
 #[derive(Debug)]
@@ -2048,6 +2049,8 @@ impl App {
 
         let active_workflow = workflow.clone();
         let executor_factory = self.executor_factory.clone();
+        let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let executor_cancellation = Arc::clone(&cancellation);
         let handle = tokio::spawn(async move {
             if sender
                 .send(RunEvent::ReplayStarted {
@@ -2058,7 +2061,7 @@ impl App {
             {
                 return;
             }
-            let mut executor = executor_factory();
+            let mut executor = executor_factory().with_cancellation(executor_cancellation);
             let cache = HashMap::new();
             let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
             if sender
@@ -2077,6 +2080,7 @@ impl App {
             workflow: active_workflow,
             receiver,
             handle,
+            cancellation,
         });
         true
     }
@@ -2088,6 +2092,7 @@ impl App {
             return false;
         };
 
+        active_run.cancellation.store(true, std::sync::atomic::Ordering::SeqCst);
         active_run.handle.abort();
         for status in self.run_state.node_statuses.values_mut() {
             if matches!(*status, NodeRunStatus::Pending | NodeRunStatus::Running) {

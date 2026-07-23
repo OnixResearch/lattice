@@ -23,6 +23,12 @@ The scheduler profile records that the schedule remains due, the local effect is
 
 These checks establish bounded local observations and at-least-once risk. They do not prove remote commit identity, provider deduplication, external cancellation, arbitrary kill safety, equivalent behavior on unsupported hosts, or exactly-once external execution.
 
+## Operator TUI recovery evidence
+
+On supported Unix/Linux hosts, the continuous portable-PTY matrix drives the real TUI through successful execution, deterministic failure inspection, an explicit fresh rerun, fatal validation rejection without effects, active cancellation after child readiness, constrained/restored terminal resize, history inspection, keyboard exit, and non-terminal rejection. Durable assertions preserve independent failed and rerun records, keep invalid workflows from creating runs, and require bounded child cancellation to prevent its pending local effect.
+
+The PTY checks assert semantic surfaces rather than byte-identical ANSI frames. They do not prove rendering equivalence across terminal emulators, unsupported-platform behavior, arbitrary child or whole-host cleanup, workflow semantic correctness, external cancellation, or production readiness.
+
 ## Traceability debt inventory
 
 The maintained inventory partitions Cairn's exact missing-requirement set without turning inventory rows into Tracey evidence. Generate the failing coverage receipt first, then regenerate or check the BLAKE3-bound report:
