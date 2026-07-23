@@ -122,6 +122,7 @@ fn store_missing_run_details_returns_none() {
 
 // r[verify n8nclone.tui_ux.run_history.details.persist]
 // r[verify n8nclone.tui_ux.run_history.node_outputs]
+// r[verify n8nclone.tui_ux.run_history.details.persist.nodes]
 #[tokio::test]
 async fn run_detail_record_captures_node_outputs() {
     let (workflow, node_id) = common::standalone_node(NODE_LABEL, NODE_COMMAND);
@@ -164,6 +165,8 @@ fn run_detail_record_replaces_sensitive_values_before_persistence() {
 
 // r[verify n8nclone.tui_ux.run_history.timeline]
 // r[verify n8nclone.tui_ux.run_history.node_outputs]
+// r[verify n8nclone.tui_ux.run_history.inspect]
+// r[verify n8nclone.tui_ux.workspace]
 #[test]
 fn app_inspects_run_history_details() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -183,6 +186,7 @@ fn app_inspects_run_history_details() {
 }
 
 // r[verify n8nclone.tui_ux.run_history.details.empty_error]
+// r[verify n8nclone.tui_ux.run_history.empty_error]
 #[test]
 fn app_reports_missing_run_history_details() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -201,6 +205,7 @@ fn app_reports_missing_run_history_details() {
 }
 
 // r[verify n8nclone.tui_ux.run_history.rerun]
+// r[verify n8nclone.tui_ux.run_history.rerun.workflow]
 #[tokio::test]
 async fn app_reruns_history_workflow_without_replacing_current_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -224,6 +229,9 @@ async fn app_reruns_history_workflow_without_replacing_current_workflow() {
     assert!(app.cancel_active_run());
 }
 
+// r[verify n8nclone.tui_ux.replay_debugger.timeline.open]
+// r[verify n8nclone.tui_ux.run_history.node_outputs.inspect]
+// r[verify n8nclone.tui_ux.run_history.timeline.show]
 #[test]
 fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -252,6 +260,8 @@ fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
     assert!(rendered.contains(OUTPUT_TEXT), "rendered: {rendered}");
 }
 
+// r[verify n8nclone.tui_ux.run_history.node_outputs.missing]
+// r[verify n8nclone.tui_ux.run_history.rerun.unavailable]
 #[test]
 fn app_renders_empty_node_output_and_unavailable_rerun_as_recoverable() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");

@@ -207,6 +207,10 @@
                 echo "invalid traceability inventory policy unexpectedly exported" >&2
                 exit "$unexpected_success"
               fi
+              if nickel export --format json ${src}/cairn-policy/fixtures/invalid-traceability-negative-missing-count.ncl > /dev/null 2>&1; then
+                echo "negative traceability missing count unexpectedly exported" >&2
+                exit "$unexpected_success"
+              fi
               touch "$out"
             '';
 

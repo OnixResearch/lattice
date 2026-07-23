@@ -374,6 +374,7 @@ async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
 }
 
 // r[verify n8nclone.tui_ux.triggers.manage]
+// r[verify n8nclone.tui_ux.triggers.manage.list]
 #[test]
 fn tui_exposes_minimal_trigger_status_lines() {
     let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());
@@ -394,6 +395,7 @@ fn tui_exposes_minimal_trigger_status_lines() {
     assert!(lines[0].contains("last=none"));
 }
 
+// r[verify n8nclone.tui_ux.triggers.manage.error]
 #[test]
 fn tui_trigger_error_summary_reports_status_without_raw_message_or_payload() {
     let trigger = webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly);

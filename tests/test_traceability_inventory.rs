@@ -28,10 +28,10 @@ const SAMPLE_REFERENCED: usize = 1;
 const SAMPLE_MISSING_COUNT: usize = 2;
 const REVIEWED_COUNT: usize = 1;
 const SAMPLE_UNASSESSED_COUNT: usize = 1;
-const CURRENT_MISSING_COUNT: usize = 98;
+const CURRENT_MISSING_COUNT: usize = 0;
 const CURRENT_REVIEWED_COUNT: usize = 0;
-const CURRENT_UNASSESSED_COUNT: usize = 98;
-const CURRENT_MISSING_HASH: &str = "faeedead13276c73dccc7b24c34731914375b8aabe89c51bc0969757a2dde118";
+const CURRENT_UNASSESSED_COUNT: usize = 0;
+const CURRENT_MISSING_HASH: &str = "86a0d721f0469382362733937cb24599c20b620b51b53628bce4215c77a19f87";
 const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
 const REQUIRED_UNASSESSED_NON_CLAIM: &str = "unassessed does not mean behavior or evidence is absent";
 
@@ -76,6 +76,28 @@ fn sample_observed_evidence() -> BTreeMap<String, String> {
     BTreeMap::from([(EVIDENCE_PATH.to_string(), VALID_HASH.to_string())])
 }
 
+fn complete_coverage() -> CoverageReceipt {
+    CoverageReceipt {
+        profile_id: PROFILE_ID.to_string(),
+        requirements: SAMPLE_REQUIREMENTS,
+        referenced: SAMPLE_REQUIREMENTS,
+        missing: Vec::new(),
+        dangling: Vec::new(),
+        policy_hash: VALID_HASH.to_string(),
+        input_hash: VALID_HASH.to_string(),
+        receipt_hash: VALID_HASH.to_string(),
+        valid: true,
+    }
+}
+
+fn complete_policy(coverage: &CoverageReceipt) -> ReviewPolicy {
+    let mut policy = sample_policy(&sample_coverage());
+    policy.expected_missing_count = coverage.missing.len();
+    policy.expected_missing_hash = missing_set_hash(&coverage.missing);
+    policy.reviewed.clear();
+    policy
+}
+
 fn issue_codes(report: &InventoryReport) -> Vec<&str> {
     report.issues.iter().map(|issue| issue.code.as_str()).collect()
 }
@@ -103,6 +125,36 @@ fn deterministic_inventory_partitions_every_missing_id_once() {
         }
     ]);
     assert!(verify_report(&first).is_empty());
+}
+
+// r[verify lattice.repository_validation.traceability_debt_inventory.scenario.complete]
+#[test]
+fn successful_coverage_produces_an_empty_inventory() {
+    let coverage = complete_coverage();
+    let policy = complete_policy(&coverage);
+    let report = build_inventory(&coverage, &policy, &BTreeMap::new());
+
+    assert!(report.valid, "issues: {:?}", report.issues);
+    assert!(report.rows.is_empty());
+    assert_eq!(report.summary.total, CURRENT_MISSING_COUNT);
+    assert_eq!(report.missing_set_hash, CURRENT_MISSING_HASH);
+    assert!(verify_report(&report).is_empty());
+}
+
+// r[verify lattice.repository_validation.traceability_debt_inventory.scenario.fail_closed]
+#[test]
+fn inconsistent_terminal_coverage_fails_closed() {
+    let mut incomplete = sample_coverage();
+    incomplete.valid = true;
+    let incomplete_report = build_inventory(&incomplete, &sample_policy(&incomplete), &sample_observed_evidence());
+
+    let mut unsuccessful_empty = complete_coverage();
+    unsuccessful_empty.valid = false;
+    let empty_policy = complete_policy(&unsuccessful_empty);
+    let empty_report = build_inventory(&unsuccessful_empty, &empty_policy, &BTreeMap::new());
+
+    assert!(issue_codes(&incomplete_report).contains(&"coverage.expected_missing"));
+    assert!(issue_codes(&empty_report).contains(&"coverage.expected_missing"));
 }
 
 // r[verify lattice.repository_validation.traceability_debt_inventory.scenario.fail_closed]
@@ -184,7 +236,7 @@ fn missing_decision_remains_unassessed_without_absence_claim() {
 // r[verify lattice.repository_validation.traceability_debt_inventory.scenario.complete]
 // r[verify lattice.repository_validation.traceability_debt_inventory.scenario.non_claim]
 #[test]
-fn checked_inventory_pins_current_debt_without_promoting_it() {
+fn checked_inventory_matches_current_traceability_state() {
     let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("generated inventory must decode");
 
     assert!(report.valid, "issues: {:?}", report.issues);
@@ -195,6 +247,6 @@ fn checked_inventory_pins_current_debt_without_promoting_it() {
     assert!(!report.summary.by_classification.contains_key("exact_maintained_evidence"));
     assert!(!report.summary.by_classification.contains_key("partial_evidence_only"));
     assert!(!report.summary.by_classification.contains_key("no_exact_evidence_identified"));
-    assert_eq!(report.summary.by_classification.get("unassessed"), Some(&CURRENT_UNASSESSED_COUNT));
+    assert!(!report.summary.by_classification.contains_key("unassessed"));
     assert!(verify_report(&report).is_empty());
 }

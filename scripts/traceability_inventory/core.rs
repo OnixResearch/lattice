@@ -309,7 +309,8 @@ fn validate_inputs(coverage: &CoverageReceipt, policy: &ReviewPolicy) -> Vec<Inv
     if policy.hash_algorithm != EXPECTED_HASH_ALGORITHM {
         issues.push(InventoryIssue::new("policy.hash_algorithm", &policy.hash_algorithm));
     }
-    if coverage.valid || coverage.missing.is_empty() {
+    let is_complete = coverage.missing.is_empty();
+    if coverage.valid != is_complete {
         issues.push(InventoryIssue::new("coverage.expected_missing", coverage.valid.to_string()));
     }
     if !coverage.dangling.is_empty() {

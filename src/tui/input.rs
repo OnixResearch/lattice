@@ -810,6 +810,8 @@ mod tests {
         (temp_dir, app)
     }
 
+    // r[verify n8nclone.tui_ux.command_palette.execute]
+    // r[verify n8nclone.tui_ux.properties.discoverable_entrypoints]
     #[test]
     fn palette_executes_filtered_action_and_closes() {
         let (_temp_dir, mut app) = test_app();
@@ -828,6 +830,7 @@ mod tests {
         assert!(!app.show_palette);
     }
 
+    // r[verify n8nclone.tui_ux.command_palette.interactive]
     #[test]
     fn palette_navigation_executes_selected_action() {
         let (_temp_dir, mut app) = test_app();
@@ -842,6 +845,7 @@ mod tests {
         assert!(!app.show_palette);
     }
 
+    // r[verify n8nclone.tui_ux.properties.discoverable_entrypoints.palette_command]
     #[test]
     fn palette_filters_to_edit_command_action() {
         let (_temp_dir, mut app) = test_app();
@@ -858,6 +862,7 @@ mod tests {
         assert!(!app.show_palette);
     }
 
+    // r[verify n8nclone.tui_ux.command_palette.escape]
     #[test]
     fn palette_escape_closes_without_changing_workflow() {
         let (_temp_dir, mut app) = test_app();
@@ -872,6 +877,7 @@ mod tests {
         assert_eq!(app.workflow.graph.node_count(), node_count);
     }
 
+    // r[verify n8nclone.tui_ux.command_palette.no_match]
     #[test]
     fn palette_enter_with_no_match_keeps_recoverable_state() {
         let (_temp_dir, mut app) = test_app();
@@ -933,6 +939,8 @@ mod tests {
         assert!(!app.is_workflow_browser_open());
     }
 
+    // r[verify n8nclone.tui_ux.mouse_wiring.drag_release]
+    // r[verify n8nclone.tui_ux.mouse_wiring.drag_release.compatible]
     #[test]
     fn mouse_drag_release_creates_compatible_edge() {
         let (_temp_dir, mut app) = app_with_two_shell_nodes();
@@ -967,6 +975,8 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.mouse_wiring.snap_near_ports]
+    // r[verify n8nclone.tui_ux.mouse_wiring.snap_near_ports.release]
     #[test]
     fn mouse_drag_release_near_visible_input_snaps_to_edge() {
         let (_temp_dir, mut app) = app_with_two_shell_nodes();
@@ -1004,6 +1014,9 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.mouse_wiring.visible_port_clicks]
+    // r[verify n8nclone.tui_ux.mouse_wiring.visible_port_clicks.complete]
+    // r[verify n8nclone.tui_ux.mouse_wiring.visible_port_clicks.start]
     #[test]
     fn mouse_click_release_keeps_click_to_click_wiring_available() {
         let (_temp_dir, mut app) = app_with_two_shell_nodes();
@@ -1040,6 +1053,8 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.mouse_wiring.invalid_release]
+    // r[verify n8nclone.tui_ux.mouse_wiring.snap_near_ports.far_release]
     #[test]
     fn mouse_drag_release_on_non_port_cancels_wiring_without_edge() {
         let (_temp_dir, mut app) = app_with_two_shell_nodes();
@@ -1068,6 +1083,9 @@ mod tests {
         assert!(!app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.properties.discoverable_entrypoints]
+    // r[verify n8nclone.tui_ux.properties.discoverable_entrypoints.canvas_command]
+    // r[verify n8nclone.tui_ux.properties.edit_command]
     #[test]
     fn canvas_key_edits_shell_command_without_focus_change() {
         let (_temp_dir, mut app) = test_app();
@@ -1097,6 +1115,8 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.properties.cancel]
+    // r[verify n8nclone.tui_ux.properties.modal_text_entry.cancel]
     #[test]
     fn canvas_key_cancels_property_edit_without_mutating_command() {
         let (_temp_dir, mut app) = test_app();
@@ -1128,6 +1148,7 @@ mod tests {
         );
     }
 
+    // r[verify n8nclone.tui_ux.properties.discoverable_entrypoints.no_selection]
     #[test]
     fn edit_shortcut_without_selection_does_not_mutate_workflow() {
         let (_temp_dir, mut app) = test_app();
@@ -1140,6 +1161,9 @@ mod tests {
         assert!(!app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.properties.edit_shell]
+    // r[verify n8nclone.tui_ux.properties.modal_text_entry]
+    // r[verify n8nclone.tui_ux.properties.modal_text_entry.save_command]
     #[test]
     fn property_keys_edit_shell_command() {
         let (_temp_dir, mut app) = test_app();
@@ -1162,6 +1186,7 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.credentials.providers.edit]
     #[test]
     fn property_key_edits_agent_credentials() {
         let (_temp_dir, mut app) = test_app();

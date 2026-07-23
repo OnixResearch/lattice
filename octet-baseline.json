@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:93d082c36d07531f05d9c5143e24548e358f7223ed1b69254bb8deb4abb848f3",
+  "baseline_hash": "b3:41adfd53108109da0bcf82948ba8e505647705c3c1d02843f84f205387ea7a98",
   "findings": [
     {
       "stable_id": "b3:4cea1c1908ae6229",
@@ -9074,8 +9074,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:bb3d857276959738",
-      "semantic_id": "b3:bb3d857276959738",
+      "stable_id": "b3:439725885d9504ba",
+      "semantic_id": "b3:439725885d9504ba",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -9083,7 +9083,7 @@
       "file": "src/tui/app.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 3322 lines (limit: 300)",
+      "message": "source file is 3367 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -10238,7 +10238,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2182,
+      "line": 2184,
       "column": 40,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -10251,7 +10251,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2208,
+      "line": 2210,
       "column": 19,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -10264,14 +10264,14 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/tui/app.rs",
-      "line": 2263,
+      "line": 2265,
       "column": 13,
       "message": "`old_viewport` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:d57b82281ac568dd",
-      "semantic_id": "b3:d57b82281ac568dd",
+      "stable_id": "b3:c3583075e83b3c8c",
+      "semantic_id": "b3:c3583075e83b3c8c",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -10279,7 +10279,7 @@
       "file": "src/tui/input.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1238 lines (limit: 300)",
+      "message": "source file is 1263 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -10803,8 +10803,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:bd1672b4598ba448",
-      "semantic_id": "b3:bd1672b4598ba448",
+      "stable_id": "b3:787d70235899cf8a",
+      "semantic_id": "b3:787d70235899cf8a",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -10812,7 +10812,7 @@
       "file": "src/tui/panels.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1105 lines (limit: 300)",
+      "message": "source file is 1119 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {

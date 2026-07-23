@@ -29,6 +29,7 @@ fn test_config(temp_dir: &tempfile::TempDir) -> AppConfig {
 }
 
 // r[verify n8nclone.tui_ux.node_kind_provider.property_metadata]
+// r[verify n8nclone.tui_ux.node_kind_provider]
 #[test]
 fn provider_property_metadata_lists_shell_type_and_command() {
     let config = NodeConfig::shell(SHELL_COMMAND);

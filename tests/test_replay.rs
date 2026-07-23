@@ -109,6 +109,7 @@ fn artifact_reference() -> ReplayArtifactReference {
 // r[verify n8nclone.workflow_execution.replay.core.no_side_effects]
 // r[verify n8nclone.workflow_execution.replay.core]
 // r[verify n8nclone.tui_ux.replay_debugger.timeline]
+// r[verify n8nclone.tui_ux.replay_debugger.timeline.step]
 #[test]
 fn replay_timeline_folds_events_and_moves_cursor() {
     let events = ordered_events();
@@ -181,6 +182,7 @@ fn missing_artifact_payload_renders_placeholder_without_validation_failure() {
 }
 
 // r[verify n8nclone.tui_ux.replay_debugger.redaction]
+// r[verify n8nclone.tui_ux.replay_debugger.redaction.secret]
 #[test]
 fn sensitive_values_are_redacted_in_replay_summaries() {
     let summary = summarize_value(&Value::from_sensitive_string("secret-token".to_string()));

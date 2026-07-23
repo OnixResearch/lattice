@@ -2,8 +2,8 @@ let NonEmptyString = std.contract.from_predicate (fun value =>
   std.is_string value && std.string.length value > 0
 ) in
 
-let PositiveNumber = std.contract.from_predicate (fun value =>
-  std.is_number value && value > 0
+let NonNegativeNumber = std.contract.from_predicate (fun value =>
+  std.is_number value && value >= 0
 ) in
 
 let Blake3Hex = std.contract.from_predicate (fun value =>
@@ -50,7 +50,7 @@ let ReviewDecision = {
   ReviewPolicy = {
     schema_version | NonEmptyString,
     hash_algorithm | NonEmptyString,
-    expected_missing_count | PositiveNumber,
+    expected_missing_count | NonNegativeNumber,
     expected_missing_hash | Blake3Hex,
     reviewed | Array ReviewDecision,
     non_claims | Array NonEmptyString,

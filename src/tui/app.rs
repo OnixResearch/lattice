@@ -2156,8 +2156,10 @@ impl App {
                         self.run_output_lines.push(record);
                     }
 
-                    if let Some(ref store) = self.store {
-                        let _ = store.put_cache(&step.input_hash, outputs);
+                    if let Some(ref store) = self.store
+                        && store.put_cache(&step.input_hash, outputs).is_err()
+                    {
+                        self.output.push_line("Cache update failed");
                     }
                 }
                 NodeStatus::Failed { error } => {
@@ -2486,6 +2488,7 @@ mod tests {
         records.into_iter().map(|record| record.rendered()).collect()
     }
 
+    // r[verify n8nclone.tui_ux.unsaved.mutation_marks_dirty]
     #[test]
     fn mutation_marks_workflow_dirty() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2497,6 +2500,7 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.unsaved.save_clears]
     #[test]
     fn successful_save_clears_dirty_state() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2510,6 +2514,7 @@ mod tests {
         assert!(!app.is_confirming_quit());
     }
 
+    // r[verify n8nclone.tui_ux.unsaved.failed_save]
     #[test]
     fn failed_save_keeps_dirty_state() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2522,6 +2527,7 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.unsaved.quit_confirm]
     #[test]
     fn dirty_quit_requests_confirmation() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2544,6 +2550,7 @@ mod tests {
         assert!(!app.is_confirming_quit());
     }
 
+    // r[verify n8nclone.tui_ux.workflow_browser.open]
     #[test]
     fn workflow_browser_lists_saved_workflows() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2558,6 +2565,7 @@ mod tests {
         assert_eq!(app.workflow_browser.selected, 0);
     }
 
+    // r[verify n8nclone.tui_ux.workflow_browser.empty]
     #[test]
     fn workflow_browser_reports_empty_store() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2570,6 +2578,7 @@ mod tests {
         assert_eq!(app.workflow_browser.message.as_deref(), Some("No saved workflows available"),);
     }
 
+    // r[verify n8nclone.tui_ux.workflow_browser.load]
     #[test]
     fn workflow_browser_loads_selected_workflow() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2589,6 +2598,7 @@ mod tests {
         assert!(!app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.workflow_browser.load_failure]
     #[test]
     fn workflow_browser_load_failure_preserves_current_workflow() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2621,6 +2631,7 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.properties.validate_timeout]
     #[test]
     fn property_edit_rejects_invalid_timeout_without_mutating() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2667,6 +2678,9 @@ mod tests {
         assert_eq!(validate_timeout_secs("nope"), Err(PropertyEditError::InvalidTimeout));
     }
 
+    // r[verify n8nclone.tui_ux.add_node.guided]
+    // r[verify n8nclone.tui_ux.add_node.shell_fields]
+    // r[verify n8nclone.tui_ux.workspace]
     #[test]
     fn add_node_flow_creates_shell_node_from_entered_fields() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2690,6 +2704,8 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow]
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow.input]
     #[test]
     fn add_node_flow_creates_image_input_node() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2711,6 +2727,9 @@ mod tests {
         assert!(app.has_unsaved_changes());
     }
 
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow]
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow.clankers]
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow.pi]
     #[test]
     fn add_node_flow_creates_pi_and_clankers_agent_nodes() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2747,6 +2766,14 @@ mod tests {
         }
     }
 
+    // r[verify n8nclone.tui_ux.agent_nodes.errors]
+    // r[verify n8nclone.tui_ux.agent_nodes.errors.invalid_target]
+    // r[verify n8nclone.tui_ux.agent_nodes.properties]
+    // r[verify n8nclone.tui_ux.agent_nodes.properties.image_path]
+    // r[verify n8nclone.tui_ux.agent_nodes.properties.invalid]
+    // r[verify n8nclone.tui_ux.agent_nodes.properties.prompt]
+    // r[verify n8nclone.tui_ux.agent_nodes.properties.target]
+    // r[verify n8nclone.tui_ux.properties.tests]
     #[test]
     fn image_and_agent_property_edits_update_config_and_reject_invalid_values() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2808,6 +2835,7 @@ mod tests {
         assert!(app.property_edit.is_some());
     }
 
+    // r[verify n8nclone.tui_ux.add_node.template]
     #[test]
     fn add_node_flow_creates_node_from_template() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2844,6 +2872,8 @@ mod tests {
         }
     }
 
+    // r[verify n8nclone.tui_ux.add_node.cancel]
+    // r[verify n8nclone.tui_ux.agent_nodes.add_flow.cancel]
     #[test]
     fn add_node_flow_cancel_preserves_workflow() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -2955,6 +2985,8 @@ mod tests {
         );
     }
 
+    // r[verify n8nclone.tui_ux.image_nodes.preview.no_raw_bytes]
+    // r[verify n8nclone.tui_ux.image_nodes.preview.output_panel]
     #[test]
     fn completed_image_outputs_render_bounded_preview_metadata() {
         let mut workflow = Workflow::new("image-preview");
@@ -3103,6 +3135,7 @@ mod tests {
         );
     }
 
+    // r[verify n8nclone.tui_ux.background_runs.status]
     #[tokio::test]
     async fn background_run_starts_without_blocking() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3117,6 +3150,7 @@ mod tests {
         assert!(app.cancel_active_run());
     }
 
+    // r[verify n8nclone.tui_ux.background_runs.cancel]
     #[tokio::test]
     async fn cancel_active_run_marks_pending_nodes_skipped() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3131,6 +3165,7 @@ mod tests {
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Skipped),);
     }
 
+    // r[verify n8nclone.tui_ux.background_runs.failure]
     #[tokio::test]
     async fn failed_background_run_marks_node_failed() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3177,6 +3212,9 @@ mod tests {
         assert!(output_text_lines(&app).iter().any(|line| line.contains("image/png image")));
     }
 
+    // r[verify n8nclone.tui_ux.agent_nodes.errors]
+    // r[verify n8nclone.tui_ux.agent_nodes.errors.missing_path]
+    // r[verify n8nclone.tui_ux.agent_nodes.errors.unsupported_format]
     #[tokio::test]
     async fn image_node_error_feedback_is_visible_after_run_failure() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3205,6 +3243,8 @@ mod tests {
         assert!(output_text_lines(&invalid_app).iter().any(|line| line.contains("unsupported image format")));
     }
 
+    // r[verify n8nclone.tui_ux.agent_nodes.errors]
+    // r[verify n8nclone.tui_ux.agent_nodes.errors.adapter]
     #[tokio::test]
     async fn agent_error_feedback_is_visible_after_run_failure() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3234,6 +3274,10 @@ mod tests {
         assert!(output_text_lines(&preflight_app).iter().any(|line| line.contains("preflight rejected")));
     }
 
+    // r[verify n8nclone.tui_ux.run_history.list]
+    // r[verify n8nclone.tui_ux.run_history.persist]
+    // r[verify n8nclone.tui_ux.run_history.persist_record]
+    // r[verify n8nclone.tui_ux.workspace]
     #[tokio::test]
     async fn completed_background_run_is_persisted_to_history() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -3295,6 +3339,7 @@ mod tests {
         assert!(app.run_history.detail_record.is_none());
     }
 
+    // r[verify n8nclone.tui_ux.run_history.details.empty_error.storage]
     #[test]
     fn run_detail_storage_failure_keeps_history_open_and_reports_safe_error() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");

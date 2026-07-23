@@ -517,6 +517,7 @@ fn command_provider_enforces_output_limit() {
 }
 
 // r[verify n8nclone.credentials.provider_diagnostics.redaction]
+// r[verify n8nclone.tui_ux.credentials.providers.test]
 #[test]
 fn provider_probe_hides_resolved_secret_and_redacts_error_key() {
     let provider = EnvironmentCredentialProvider::from_map([(SECRET_KEY.to_string(), SECRET_VALUE.to_string())].into());

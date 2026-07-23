@@ -41,6 +41,9 @@ fn rendered_frame_text(app: &mut App) -> String {
     buffer.content().iter().map(|cell| cell.symbol()).collect()
 }
 
+// r[verify n8nclone.tui_ux.keyboard_first]
+// r[verify n8nclone.tui_ux.workspace]
+// r[verify n8nclone.tui_ux.workspace.starts]
 #[test]
 fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -61,6 +64,9 @@ fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     assert!(palette.contains("Add Shell Node"), "authoring action missing: {palette}");
 }
 
+// r[verify n8nclone.tui_ux.background_runs.long_running]
+// r[verify n8nclone.tui_ux.background_runs.responsive]
+// r[verify n8nclone.tui_ux.replay_debugger.active_run.stream]
 #[tokio::test]
 async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
@@ -88,6 +94,8 @@ async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() 
     assert!(app.cancel_active_run());
 }
 
+// r[verify n8nclone.tui_ux.image_nodes.preview]
+// r[verify n8nclone.tui_ux.image_nodes.preview.canvas]
 #[test]
 fn canvas_renders_bounded_image_metadata_fallback_without_raw_bytes() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");

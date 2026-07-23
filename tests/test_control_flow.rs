@@ -300,6 +300,7 @@ fn portable_import_rejects_malformed_control_flow_without_partial_workflow() {
 
 // r[verify n8nclone.tui_ux.control_flow.add_flow.condition]
 // r[verify n8nclone.tui_ux.control_flow.properties.invalid_predicate]
+// r[verify n8nclone.tui_ux.control_flow.properties]
 #[test]
 fn tui_adds_condition_node_and_preserves_previous_predicate_on_invalid_edit() {
     let mut app = test_app();

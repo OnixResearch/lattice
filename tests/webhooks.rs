@@ -422,6 +422,7 @@ fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_withou
 }
 
 // r[verify n8nclone.scheduling.webhook_listener.process.start]
+// r[verify n8nclone.tui_ux.webhook_listener.cli.start]
 #[test]
 fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let temp_dir = tempfile::tempdir().expect("temporary live listener directory");

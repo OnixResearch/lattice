@@ -1,0 +1,83 @@
+{
+  "command": "traceability coverage",
+  "dangling": [],
+  "input_hash": "3a9da18f5db75fddb4591df21cab7bbc4b33d5f5bf4f598199d5431de8f3a4f4",
+  "missing": [],
+  "policy": "cairn-default",
+  "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
+  "profile": {
+    "evidence_sources": [
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "src",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "tests",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "examples",
+        "source_kind": "rust_source"
+      },
+      {
+        "extensions": [
+          "ncl"
+        ],
+        "root": "examples",
+        "source_kind": "nickel_source"
+      },
+      {
+        "extensions": [
+          "rs"
+        ],
+        "root": "scripts",
+        "source_kind": "tool_source"
+      },
+      {
+        "extensions": [
+          "ncl"
+        ],
+        "root": "cairn-policy",
+        "source_kind": "nickel_source"
+      }
+    ],
+    "id": "cairn-default",
+    "marker_verbs": [
+      "impl",
+      "verify",
+      "depends",
+      "related"
+    ],
+    "requirement_sources": [
+      {
+        "extensions": [
+          "md"
+        ],
+        "root": "cairn/specs",
+        "source_kind": "accepted_specs"
+      }
+    ]
+  },
+  "profile_id": "cairn-default",
+  "receipt_hash": "a1cc3943d801e2710304db0a2c769d31d6a43543244346fc800538353334ba27",
+  "referenced": 880,
+  "requirements": 880,
+  "root": ".",
+  "source_summary": {
+    "evidence_files": 200,
+    "evidence_manifest_hash": "40d24c09f5ccc786e2b0a081cfb2c9783e422b859926df0300a3508b3c441792",
+    "requirement_files": 12,
+    "requirement_manifest_hash": "5bc25a3e84a078391f4b6d38c15600cf75d60d938c29dff3b2b58b27408a5c9b"
+  },
+  "valid": true,
+  "verdict": "pass"
+}
