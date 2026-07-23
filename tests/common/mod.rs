@@ -15,6 +15,47 @@ const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 
+#[cfg(unix)]
+pub const FORCED_DEATH_MARKER_CONTENT: &str = "forced-death";
+
+#[cfg(unix)]
+fn quote_for_posix_shell(value: &str) -> String {
+    assert!(!value.contains('\0'), "shell fixture value must not contain NUL");
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(unix)]
+fn quote_path_for_posix_shell(path: &std::path::Path) -> String {
+    assert!(path.is_absolute(), "fault-injection fixture paths must be absolute");
+    quote_for_posix_shell(path.to_str().expect("fault-injection fixture path must be UTF-8"))
+}
+
+/// Build a deterministic Unix shell command that kills its Lattice parent after
+/// recording a durable checkpoint.
+#[cfg(unix)]
+pub fn forced_parent_death_command(marker_path: &std::path::Path) -> String {
+    let marker = quote_path_for_posix_shell(marker_path);
+    format!("printf %s '{}' > {marker}; kill -KILL \"$PPID\"; exit", FORCED_DEATH_MARKER_CONTENT)
+}
+
+/// Kill the first Lattice parent at the workflow boundary, then emit one
+/// recovery effect when the same workflow is started by a later process.
+#[cfg(unix)]
+pub fn forced_parent_death_once_then_write_command(
+    marker_path: &std::path::Path,
+    recovery_effect_path: &std::path::Path,
+    recovery_effect: &str,
+) -> String {
+    assert!(!recovery_effect.is_empty(), "recovery effect must be observable");
+    let marker = quote_path_for_posix_shell(marker_path);
+    let recovery_effect_path = quote_path_for_posix_shell(recovery_effect_path);
+    let recovery_effect = quote_for_posix_shell(recovery_effect);
+    format!(
+        "if [ ! -e {marker} ]; then printf %s '{}' > {marker}; kill -KILL \"$PPID\"; exit; fi; printf %s {recovery_effect} > {recovery_effect_path}",
+        FORCED_DEATH_MARKER_CONTENT,
+    )
+}
+
 /// Build a simple linear two-node workflow: echo → grep.
 /// Returns (workflow, node_a_id, node_b_id).
 pub fn two_node_pipeline() -> (Workflow, rat_nodegraph::model::NodeId, rat_nodegraph::model::NodeId) {

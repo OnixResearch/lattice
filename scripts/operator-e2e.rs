@@ -31,13 +31,13 @@ const OPERATOR_E2E_CASES: &[OperatorE2eCase] = &[
         exact_filter: true,
     },
     OperatorE2eCase {
-        name: "scheduler daemon process boundary",
+        name: "scheduler daemon process and restart boundaries",
         test_target: "test_scheduler",
-        test_filter: "operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_schedules",
-        exact_filter: true,
+        test_filter: "operator_e2e_scheduler_",
+        exact_filter: false,
     },
     OperatorE2eCase {
-        name: "orchestration recovery process boundary",
+        name: "orchestration recovery and forced-death boundaries",
         test_target: "test_orchestration_cli",
         test_filter: "operator_e2e_orchestration_recovery",
         exact_filter: false,

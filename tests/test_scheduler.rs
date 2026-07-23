@@ -1,5 +1,7 @@
 //! Tests for schedule persistence, pure due-run evaluation, and daemon run planning.
 
+mod common;
+
 use std::collections::HashSet;
 use std::process::Command;
 
@@ -46,6 +48,14 @@ const FUTURE_SCHEDULE_ID: &str = "future";
 const MISSING_SCHEDULE_ID: &str = "missing-workflow";
 const RUN_HISTORY_LIMIT: usize = 10;
 const EXPECTED_PERSISTED_RUNS: usize = 1;
+#[cfg(unix)]
+const FORCED_DEATH_MARKER_FILE_NAME: &str = "scheduler-forced-death";
+#[cfg(unix)]
+const CRASH_SNAPSHOT_FILE_NAME: &str = "scheduler-crashed-state.redb";
+#[cfg(unix)]
+const RECOVERY_EFFECT_FILE_NAME: &str = "scheduler-recovery-effect";
+#[cfg(unix)]
+const RECOVERY_EFFECT: &str = "restarted-once";
 
 #[derive(Default)]
 struct FakeRunner {
@@ -169,6 +179,69 @@ fn operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_
     assert!(advanced_due.next_run_epoch_ms > DUE_EPOCH_MS);
     assert!(advanced_missing.next_run_epoch_ms > DUE_EPOCH_MS);
     assert_eq!(unchanged_future.next_run_epoch_ms, FUTURE_EPOCH_MS);
+}
+
+#[cfg(unix)]
+#[test]
+fn operator_e2e_scheduler_restart_retries_due_run_after_forced_process_death() {
+    let temp_dir = tempfile::tempdir().expect("temporary scheduler restart directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let marker_path = temp_dir.path().join(FORCED_DEATH_MARKER_FILE_NAME);
+    let recovery_effect_path = temp_dir.path().join(RECOVERY_EFFECT_FILE_NAME);
+    let store_path = data_dir.join(STORE_FILE_NAME);
+    let store = Store::new(&store_path).expect("scheduler restart store opens");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node(
+        "scheduler-restart",
+        common::forced_parent_death_once_then_write_command(&marker_path, &recovery_effect_path, RECOVERY_EFFECT),
+    );
+    store.save_workflow(&workflow).expect("scheduler restart workflow saves");
+    store.save_schedule(&schedule(START_EPOCH_MS)).expect("scheduler restart schedule saves");
+    drop(store);
+
+    let crashed = scheduler_command(&config_path).output().expect("first scheduler process starts");
+
+    assert!(!crashed.status.success(), "forced-death scheduler unexpectedly succeeded");
+    assert!(crashed.status.code().is_none(), "forced-death scheduler was not terminated by a signal");
+    assert_eq!(
+        std::fs::read_to_string(&marker_path).expect("forced-death marker persists"),
+        common::FORCED_DEATH_MARKER_CONTENT,
+    );
+    assert!(!recovery_effect_path.exists(), "recovery effect must not occur before restart");
+
+    let crash_snapshot_path = temp_dir.path().join(CRASH_SNAPSHOT_FILE_NAME);
+    let snapshot_bytes =
+        std::fs::copy(&store_path, &crash_snapshot_path).expect("crashed scheduler store snapshot copies");
+    assert!(snapshot_bytes > 0, "crashed scheduler store snapshot must not be empty");
+    let after_crash = Store::new(&crash_snapshot_path).expect("crashed scheduler snapshot repairs and reopens");
+    let unchanged = after_crash
+        .load_schedule(SCHEDULE_ID)
+        .expect("crashed schedule loads")
+        .expect("crashed schedule remains");
+    assert_eq!(unchanged.next_run_epoch_ms, START_EPOCH_MS);
+    assert!(after_crash.list_runs(RUN_HISTORY_LIMIT).expect("crashed run history lists").is_empty());
+    drop(after_crash);
+
+    let restarted = scheduler_command(&config_path).output().expect("restarted scheduler process returns");
+    let restarted_stdout = String::from_utf8_lossy(&restarted.stdout);
+    let restarted_stderr = String::from_utf8_lossy(&restarted.stderr);
+
+    assert!(restarted.status.success(), "stderr: {restarted_stderr}");
+    assert!(
+        restarted_stdout.contains(&format!("started schedule {SCHEDULE_ID} workflow {WORKFLOW_NAME}")),
+        "stdout: {restarted_stdout}"
+    );
+    assert_eq!(std::fs::read_to_string(&recovery_effect_path).expect("recovery effect persists"), RECOVERY_EFFECT,);
+
+    let recovered = Store::new(&store_path).expect("restarted scheduler store reopens");
+    let runs = recovered.list_runs(RUN_HISTORY_LIMIT).expect("restarted run history lists");
+    let advanced = recovered
+        .load_schedule(SCHEDULE_ID)
+        .expect("restarted schedule loads")
+        .expect("restarted schedule remains");
+    assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
+    assert_eq!(runs[0].workflow_name, WORKFLOW_NAME);
+    assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
 }
 
 // r[verify n8nclone.scheduling.schedule_model]
