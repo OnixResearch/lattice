@@ -99,6 +99,7 @@ fn production_adapter_rejects_missing_or_ambiguous_routes_before_transport() {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::new(),
             max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
+            local_process: Default::default(),
         },
         Arc::new(transport.clone()),
     );

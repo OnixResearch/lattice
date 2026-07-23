@@ -150,6 +150,7 @@ fn runtime_registry(runtime: OpenAiRuntimeConfig) -> AgentRuntimeConfig {
         runtimes: BTreeMap::new(),
         openai_compatible: BTreeMap::from([(PI_RUNTIME_KEY.to_string(), runtime)]),
         max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
+        local_process: Default::default(),
     }
 }
 

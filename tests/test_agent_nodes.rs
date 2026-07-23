@@ -174,6 +174,7 @@ fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: 
         runtimes,
         openai_compatible: BTreeMap::new(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        local_process: Default::default(),
     }
 }
 
@@ -200,6 +201,7 @@ fn runtime_config_for_script(
         runtimes,
         openai_compatible: BTreeMap::new(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        local_process: Default::default(),
     }
 }
 
@@ -223,6 +225,7 @@ fn command_plan(target: AgentTarget, output_mode: AgentOutputMode) -> AgentComma
         args: Vec::new(),
         cwd: None,
         output_mode,
+        timeout_secs: AgentRuntimeConfig::default().local_process.limits.command_agent_timeout_secs,
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
     }
 }

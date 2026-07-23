@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "bounded-exec": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784441700,
+        "narHash": "sha256-BVmqyUYyoNpY6LfOABxwPO3DY88ZtXeKNg3TPoGCcL0=",
+        "ref": "refs/heads/main",
+        "rev": "29dac88ecded94457572db3fdfaaaab95fa91525",
+        "revCount": 3,
+        "type": "git",
+        "url": "ssh://git@github.com/OnixResearch/bounded-exec.git"
+      },
+      "original": {
+        "rev": "29dac88ecded94457572db3fdfaaaab95fa91525",
+        "type": "git",
+        "url": "ssh://git@github.com/OnixResearch/bounded-exec.git"
+      }
+    },
     "cairn": {
       "inputs": {
         "nixpkgs": [
@@ -337,6 +354,7 @@
     },
     "root": {
       "inputs": {
+        "bounded-exec": "bounded-exec",
         "crane": "crane",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",

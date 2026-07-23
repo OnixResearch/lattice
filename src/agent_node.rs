@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::Path;
-use std::process::Command;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -41,7 +40,6 @@ const HANDOFF_PATH_FIELD: &str = "path";
 const HANDOFF_MEDIA_TYPE_FIELD: &str = "media_type";
 const HANDOFF_METADATA_FIELD: &str = "metadata";
 const CURRENT_DIRECTORY: &str = ".";
-const AGENT_COMMAND_NO_TIMEOUT_SECS: u64 = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AgentTarget {
@@ -80,6 +78,8 @@ pub struct AgentRuntimeConfig {
     pub openai_compatible: BTreeMap<String, crate::openai::RuntimeConfig>,
     #[serde(default = "default_agent_output_max_bytes")]
     pub max_output_bytes: usize,
+    #[serde(skip, default)]
+    pub local_process: crate::process::core::RuntimeConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +95,7 @@ impl Default for AgentRuntimeConfig {
             runtimes: default_agent_runtimes(),
             openai_compatible: BTreeMap::new(),
             max_output_bytes: default_agent_output_max_bytes(),
+            local_process: crate::process::core::RuntimeConfig::default(),
         }
     }
 }
@@ -206,6 +207,7 @@ pub struct AgentCommandPlan {
     pub args: Vec<String>,
     pub cwd: Option<String>,
     pub output_mode: AgentOutputMode,
+    pub timeout_secs: u64,
     pub max_output_bytes: usize,
 }
 
@@ -236,16 +238,20 @@ pub struct ProcessOutput {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProcessError {
+    InvalidRequest(&'static str),
     Spawn(String),
     Timeout,
+    Cancelled,
     OutputLimitExceeded { limit: usize, actual: usize },
 }
 
 impl std::fmt::Display for ProcessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::InvalidRequest(message) => write!(f, "process request rejected: {message}"),
             Self::Spawn(message) => write!(f, "process spawn failed: {message}"),
             Self::Timeout => write!(f, "process timed out"),
+            Self::Cancelled => write!(f, "process cancelled"),
             Self::OutputLimitExceeded { limit, actual } => {
                 write!(f, "process output exceeded limit {limit} bytes with {actual} bytes")
             }
@@ -260,13 +266,29 @@ pub trait ProcessRunner {
     fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, ProcessError>;
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ProductionProcessRunner;
+#[derive(Debug, Clone, Default)]
+pub struct ProductionProcessRunner {
+    config: crate::process::core::RuntimeConfig,
+}
+
+impl ProductionProcessRunner {
+    pub fn new(config: crate::process::core::RuntimeConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn run_with_cancellation(
+        &self,
+        request: &ProcessRequest,
+        cancellation: &std::sync::atomic::AtomicBool,
+    ) -> Result<ProcessOutput, ProcessError> {
+        crate::process::shell::run_bounded(request, &self.config, Some(cancellation))
+    }
+}
 
 // r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
 impl ProcessRunner for ProductionProcessRunner {
     fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, ProcessError> {
-        run_process_request(request)
+        crate::process::shell::run_bounded(request, &self.config, None)
     }
 }
 
@@ -368,7 +390,7 @@ impl AgentAdapter for ProductionAgentAdapter {
         match runtime_route_for_target(&self.config, request.target)? {
             RuntimeRoute::Command => {
                 let plan = plan_agent_command(&self.config, request)?;
-                let output = run_agent_command(&plan)?;
+                let output = run_agent_command(&plan, &self.config.local_process)?;
                 decode_agent_command_output(&plan, &output)
             }
             RuntimeRoute::OpenAi(runtime) => {
@@ -524,6 +546,7 @@ pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -
         args,
         cwd: request.cwd.clone(),
         output_mode: request.output_mode,
+        timeout_secs: config.local_process.limits.command_agent_timeout_secs,
         max_output_bytes: config.max_output_bytes,
     })
 }
@@ -621,8 +644,12 @@ fn append_optional_string_section(sections: &mut Vec<String>, heading: &str, val
     sections.push(format!("{heading}:\n{value}"));
 }
 
-fn run_agent_command(plan: &AgentCommandPlan) -> Result<AgentCommandOutput, AgentError> {
-    run_agent_command_with_runner(plan, &ProductionProcessRunner)
+// r[impl lattice.agent_runtime.bounded_command_process]
+fn run_agent_command(
+    plan: &AgentCommandPlan,
+    config: &crate::process::core::RuntimeConfig,
+) -> Result<AgentCommandOutput, AgentError> {
+    run_agent_command_with_runner(plan, &ProductionProcessRunner::new(config.clone()))
 }
 
 // r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]
@@ -644,7 +671,7 @@ fn process_request_for_agent_command(plan: &AgentCommandPlan) -> ProcessRequest 
         cwd: plan.cwd.clone(),
         env: BTreeMap::new(),
         stdin: Vec::new(),
-        timeout_secs: AGENT_COMMAND_NO_TIMEOUT_SECS,
+        timeout_secs: plan.timeout_secs,
         output_limit_bytes: plan.max_output_bytes,
     }
 }
@@ -655,33 +682,6 @@ fn agent_command_output_from_process_output(output: ProcessOutput) -> AgentComma
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
-}
-
-fn run_process_request(request: &ProcessRequest) -> Result<ProcessOutput, ProcessError> {
-    let mut command = Command::new(&request.program);
-    command.args(&request.args);
-    if let Some(cwd) = request.cwd.as_ref().filter(|value| !value.trim().is_empty()) {
-        command.current_dir(cwd);
-    }
-    for (key, value) in &request.env {
-        command.env(key, value);
-    }
-    if !request.stdin.is_empty() {
-        command.stdin(std::process::Stdio::piped());
-    }
-    let output = command.output().map_err(|error| ProcessError::Spawn(error.to_string()))?;
-    let total_output_bytes = output.stdout.len().saturating_add(output.stderr.len());
-    if total_output_bytes > request.output_limit_bytes {
-        return Err(ProcessError::OutputLimitExceeded {
-            limit: request.output_limit_bytes,
-            actual: total_output_bytes,
-        });
-    }
-    Ok(ProcessOutput {
-        status_code: output.status.code(),
-        stdout: output.stdout,
-        stderr: output.stderr,
-    })
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.command]

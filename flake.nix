@@ -10,6 +10,10 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     octet.url = "github:OnixResearch/octet";
+    bounded-exec = {
+      url = "git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
+      flake = false;
+    };
   };
 
   outputs =
@@ -20,6 +24,7 @@
       rust-overlay,
       flake-utils,
       octet,
+      bounded-exec,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -52,12 +57,12 @@
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/" (
             toString path
           );
-        isRepositoryValidationAssetPath =
-          path: toString path == "${sourceRoot}/.gitignore";
+        isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
           toString path == "${sourceRoot}/README.md"
           || toString path == "${sourceRoot}/flake.nix"
+          || toString path == "${sourceRoot}/flake.lock"
           || pkgs.lib.hasPrefix "${sourceRoot}/scripts/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/cairn/archive/2026-07-20-rename-n8nclone-to-lattice/" (
             toString path
@@ -72,6 +77,19 @@
             || isRatsCompileTimeAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
+        };
+
+        boundedExecCargoSource = "git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
+        cargoVendorDir = craneLib.vendorCargoDeps {
+          inherit src;
+          overrideVendorGitCheckout =
+            packages: checkout:
+            if builtins.all (package: package.source == boundedExecCargoSource) packages then
+              checkout.overrideAttrs (_old: {
+                src = bounded-exec;
+              })
+            else
+              checkout;
         };
 
         # Common build inputs
@@ -94,7 +112,12 @@
 
         # Build just the cargo dependencies for caching
         cargoArtifacts = craneLib.buildDepsOnly {
-          inherit src nativeBuildInputs buildInputs;
+          inherit
+            src
+            cargoVendorDir
+            nativeBuildInputs
+            buildInputs
+            ;
         };
 
         octetPreCommitCheck = pkgs.writeShellApplication {
@@ -172,7 +195,7 @@
           '';
         };
 
-        octetVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+        octetVendorDir = cargoVendorDir;
 
         octetCheck =
           pkgs.runCommand "octet-consumer-check"
@@ -194,6 +217,13 @@
               OCTET_ARTIFACT_DIR="$PWD/target/octet-check" octet-precommit-check
               mkdir -p "$out"
             '';
+
+        boundedExecSourceIdentityCheck = pkgs.runCommand "lattice-bounded-exec-source-identity" { } ''
+          test -f ${bounded-exec}/Cargo.toml
+          grep --fixed-strings 'license = "AGPL-3.0-or-later"' ${bounded-exec}/Cargo.toml > /dev/null
+          grep --fixed-strings 'name = "bounded-exec"' ${bounded-exec}/crates/bounded-exec/Cargo.toml > /dev/null
+          touch "$out"
+        '';
 
         traceabilityInventoryPolicyCheck =
           pkgs.runCommand "lattice-traceability-inventory-policy"
@@ -219,6 +249,7 @@
           inherit
             src
             cargoArtifacts
+            cargoVendorDir
             nativeBuildInputs
             buildInputs
             ;
@@ -238,6 +269,7 @@
             inherit
               src
               cargoArtifacts
+              cargoVendorDir
               nativeBuildInputs
               buildInputs
               ;
@@ -250,6 +282,7 @@
             inherit
               src
               cargoArtifacts
+              cargoVendorDir
               nativeBuildInputs
               buildInputs
               ;
@@ -264,6 +297,9 @@
 
           # Octet Tiger Style lints
           octet = octetCheck;
+
+          # Exact published process-runner source identity
+          bounded-exec-source = boundedExecSourceIdentityCheck;
 
           # Typed traceability inventory policy and negative fixture
           traceability-inventory-policy = traceabilityInventoryPolicyCheck;

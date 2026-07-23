@@ -124,6 +124,12 @@ lattice --config ./demo/config.ncl runs show 1 --output json
 
 Production `LocalFs` read, write, and append effects require at least one explicit `allowed_roots` entry. The runtime selects the most-specific matching root, opens it as a directory capability, and resolves only the relative target through that handle. The same capability core confines production image inputs, Markdown prompt hydration, and generic-agent image/artifact handoffs while preserving their byte, UTF-8, and media checks. Parent traversal and escaping symlinks fail closed, including if an intermediate path is replaced after the root is opened. Configured roots, workflow directories, and agent working directories are trusted authority grants; these readers do not turn untrusted workflow definitions into a host sandbox.
 
+## Bounded local processes
+
+Shell nodes, command-backed agents, and command credential providers share the pinned `bounded-exec` process mechanism. Application Nickel config supplies positive stdin, stdout, stderr, command-agent deadline, polling, and teardown limits. Lattice resolves the configured executable and current directory, while `bounded-exec` owns concurrent stream draining, bounded retention, deadline/cancellation handling, process-group teardown, and reaping. Truncated command-agent or credential output is rejected before parsing.
+
+These bounds report only the observed local process outcome under the supplied policy. They do not claim sandboxing, executable authorization, hermeticity, syscall restriction, remote cancellation, whole-host cleanup, semantic correctness, or release eligibility.
+
 ## Verification
 
 ```bash
@@ -132,6 +138,7 @@ verus verus/example_spec.rs
 
 ## References
 
+- [bounded-exec](https://github.com/OnixResearch/bounded-exec): reviewed AGPL bounded child-process mechanics pinned at `29dac88ecded94457572db3fdfaaaab95fa91525`.
 - [Pi coding agent](https://pi.dev): SDK, print, RPC, and image prompt surfaces for generic agent-node integration.
 - [Clankers](https://github.com/brittonr/clankers): Rust terminal coding agent with one-shot, daemon, MCP/ACP, context image references, and image-generation surfaces for generic agent-node integration.
 - [Trellis](../trellis/): verified-logic primitives for graph admission, job lifecycle, durable replay, effect/capability admission, and typed durable references used as design inputs for the generic pipeline runner.

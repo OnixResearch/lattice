@@ -136,6 +136,7 @@ fn runtime_registry(key: &str, runtime: OpenAiRuntimeConfig) -> AgentRuntimeConf
         runtimes: BTreeMap::new(),
         openai_compatible: BTreeMap::from([(key.to_string(), runtime)]),
         max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
+        local_process: Default::default(),
     }
 }
 
@@ -291,6 +292,7 @@ fn missing_or_failed_animus_provider_does_not_fallback() {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::new(),
             max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
+            local_process: Default::default(),
         },
         Arc::new(missing_transport.clone()),
     );

@@ -643,7 +643,7 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(definition) => definition,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::start(&store, definition, actor, app_config.agent_runtime.clone()).await {
+            match orchestration::start(&store, definition, actor, app_config.effective_agent_runtime()).await {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -686,7 +686,8 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(proposal) => proposal,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::approve(&store, instance, proposal, actor, app_config.agent_runtime.clone()).await {
+            match orchestration::approve(&store, instance, proposal, actor, app_config.effective_agent_runtime()).await
+            {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -729,7 +730,7 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 instance_id: instance,
                 actor,
             },
-            app_config.agent_runtime.clone(),
+            app_config.effective_agent_runtime(),
         )
         .await
         {
@@ -877,7 +878,7 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
         &store,
         &args.workflow,
         run_id,
-        app_config.agent_runtime.clone(),
+        app_config.effective_agent_runtime(),
     )
     .await
     {
@@ -958,7 +959,7 @@ async fn run_scheduler_daemon_once(
             &store,
             &plan.workflow_name,
             run_id,
-            app_config.agent_runtime.clone(),
+            app_config.effective_agent_runtime(),
         )
         .await
         {

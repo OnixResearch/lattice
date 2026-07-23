@@ -77,6 +77,8 @@ rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor
 home = "0.5.12"
 dirs-next = "2.0.0"
 cap-std = "4.0.2"
+bounded-exec = { git = "ssh://git@github.com/OnixResearch/bounded-exec.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }
+which = "8.0.0"
 animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
 animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
 animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }

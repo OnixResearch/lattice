@@ -22,6 +22,10 @@ use crate::agent_node::AgentRuntimeConfig;
 
 pub mod identity;
 
+const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
+const DEFAULT_MAX_PARALLELISM: usize = 4;
+const DEFAULT_SHELL: &str = "sh";
+
 /// Application-level configuration loaded from Nickel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -36,6 +40,9 @@ pub struct AppConfig {
     /// Production command and OpenAI-compatible agent runtime configuration.
     #[serde(default)]
     pub agent_runtime: AgentRuntimeConfig,
+    /// Shared stdin, capture, command-agent deadline, polling, and teardown bounds.
+    #[serde(default)]
+    pub process_limits: crate::process::core::LimitConfig,
 }
 
 impl Default for AppConfig {
@@ -43,11 +50,24 @@ impl Default for AppConfig {
         let data_dir = default_data_dir().unwrap_or_else(|| PathBuf::from(identity::CANONICAL_DATA_DIR_NAME));
         Self {
             data_dir,
-            default_timeout_secs: 60,
-            shell: "sh".into(),
-            max_parallelism: 4,
+            default_timeout_secs: DEFAULT_SHELL_TIMEOUT_SECS,
+            shell: DEFAULT_SHELL.into(),
+            max_parallelism: DEFAULT_MAX_PARALLELISM,
             agent_runtime: AgentRuntimeConfig::default(),
+            process_limits: crate::process::core::LimitConfig::default(),
         }
+    }
+}
+
+impl AppConfig {
+    /// Derive the explicit process runtime consumed by every executor entry point.
+    pub fn effective_agent_runtime(&self) -> AgentRuntimeConfig {
+        let mut runtime = self.agent_runtime.clone();
+        runtime.local_process = crate::process::core::RuntimeConfig {
+            shell_program: self.shell.clone(),
+            limits: self.process_limits.clone(),
+        };
+        runtime
     }
 }
 
@@ -445,11 +465,35 @@ pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, Stri
 
 /// Generate a default config.ncl file.
 pub fn default_config_ncl() -> &'static str {
-    r#"{
+    r#"let PositiveNumber = std.contract.from_predicate (fun value =>
+  std.is_number value && value > 0
+) in
+let ProcessLimits = {
+  stdin_max_bytes | PositiveNumber,
+  stdout_max_bytes | PositiveNumber,
+  stderr_max_bytes | PositiveNumber,
+  command_agent_timeout_secs | PositiveNumber,
+  poll_interval_millis | PositiveNumber,
+  teardown_grace_millis | PositiveNumber,
+} in
+let stream_limit_bytes = 64 * 1024 * 1024 in
+let command_agent_timeout_secs = 600 in
+let process_poll_interval_millis = 10 in
+let process_teardown_grace_millis = 1000 in
+let process_limits = {
+  stdin_max_bytes = stream_limit_bytes,
+  stdout_max_bytes = stream_limit_bytes,
+  stderr_max_bytes = stream_limit_bytes,
+  command_agent_timeout_secs = command_agent_timeout_secs,
+  poll_interval_millis = process_poll_interval_millis,
+  teardown_grace_millis = process_teardown_grace_millis,
+} | ProcessLimits in
+{
   data_dir = "~/.lattice",
   default_timeout_secs = 60,
   shell = "sh",
   max_parallelism = 4,
+  process_limits = process_limits,
   agent_runtime = {
     max_output_bytes = 64 * 1024 * 1024,
     runtimes = {

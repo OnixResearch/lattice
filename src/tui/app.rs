@@ -888,7 +888,7 @@ impl App {
     pub fn new(config: AppConfig) -> Self {
         let workflow = Workflow::new("untitled");
         let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
-        let agent_runtime = config.agent_runtime.clone();
+        let agent_runtime = config.effective_agent_runtime();
 
         let store = match Store::new(crate::config::store_path(&config.data_dir)) {
             Ok(s) => Some(s),

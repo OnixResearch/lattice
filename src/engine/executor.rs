@@ -12,7 +12,6 @@ use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
-use tokio::process::Command;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -23,6 +22,7 @@ use crate::agent_node::AgentNodeSettings;
 use crate::agent_node::AgentOutput;
 use crate::agent_node::AgentRequest;
 use crate::agent_node::AgentRuntimeConfig;
+use crate::agent_node::ProcessRunner;
 use crate::agent_node::ProductionAgentAdapter;
 use crate::control_flow;
 use crate::credentials;
@@ -53,6 +53,12 @@ const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
 const SHELL_STDERR_OUTPUT_INDEX: usize = 1;
 const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 const SHELL_STDIN_INPUT_LABEL: &str = "stdin";
+const SHELL_COMMAND_FLAG: &str = "-c";
+const UNKNOWN_EXIT_CODE: i32 = -1;
+const PROCESS_TASK_FAILURE_DIAGNOSTIC: &str = "bounded local process task failed";
+const SHELL_ARGUMENT_COUNT: usize = 2;
+
+type LocalProcessConfig = crate::process::core::RuntimeConfig;
 const HTTP_BODY_INPUT_LABEL: &str = "body";
 const FILE_CONTENT_INPUT_LABEL: &str = "content";
 const FILE_CONTENT_OUTPUT_INDEX: usize = 0;
@@ -955,6 +961,7 @@ pub struct Executor {
     file_system: Box<dyn FileSystem>,
     image_io: Box<dyn ImageIo>,
     agent_adapter: Box<dyn AgentAdapter>,
+    local_process: LocalProcessConfig,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
 }
 
@@ -987,6 +994,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -999,6 +1007,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1014,6 +1023,7 @@ impl Executor {
             .collect();
         let credential_provider =
             crate::credentials::EnvironmentCredentialProvider::from_current_env(&credential_env_keys);
+        let local_process = agent_runtime.local_process.clone();
         Self {
             next_run_id: 0,
             credential_provider: Box::new(credential_provider),
@@ -1021,6 +1031,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
+            local_process,
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1033,6 +1044,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1045,6 +1057,7 @@ impl Executor {
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1057,6 +1070,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io,
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1069,6 +1083,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter,
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1094,6 +1109,7 @@ impl Executor {
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1112,6 +1128,7 @@ impl Executor {
             file_system,
             image_io,
             agent_adapter,
+            local_process: LocalProcessConfig::default(),
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
@@ -1241,12 +1258,15 @@ impl Executor {
                 let merged_env = merged_shell_env(&resolved_env, &secret_env.env);
                 let stdin_value = shell_stdin_value(node, inputs);
                 let result = execute_shell(
-                    &resolved_command.value,
-                    &resolved_cwd_value,
-                    &merged_env,
-                    *timeout_secs,
-                    *pipe_stdin,
-                    stdin_value,
+                    ShellExecutionInput {
+                        command: &resolved_command.value,
+                        cwd: &resolved_cwd_value,
+                        environment: &merged_env,
+                        timeout_secs: *timeout_secs,
+                        should_pipe_stdin: *pipe_stdin,
+                        stdin_value,
+                    },
+                    &self.local_process,
                 )
                 .await;
 
@@ -1849,64 +1869,46 @@ fn redact_shell_outputs(outputs: ShellOutputValues, secret_values: &[String]) ->
     }
 }
 
-/// Execute a shell command, returning output values keyed by port.
-async fn execute_shell(
-    command: &str,
-    cwd: &Option<String>,
-    env: &HashMap<String, String>,
+struct ShellExecutionInput<'a> {
+    command: &'a str,
+    cwd: &'a Option<String>,
+    environment: &'a HashMap<String, String>,
     timeout_secs: u64,
-    pipe_stdin: bool,
-    stdin_value: Option<&Value>,
-) -> Result<ShellOutputValues, Box<dyn std::error::Error + Send + Sync>> {
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c").arg(command);
+    should_pipe_stdin: bool,
+    stdin_value: Option<&'a Value>,
+}
 
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
-
-    for (k, v) in env {
-        cmd.env(k, v);
-    }
-
-    if pipe_stdin {
-        cmd.stdin(std::process::Stdio::piped());
+/// Execute a shell command through the shared blocking bounded-process shell.
+// r[impl lattice.workflow_execution.bounded_process_compatibility]
+async fn execute_shell(
+    input: ShellExecutionInput<'_>,
+    config: &LocalProcessConfig,
+) -> Result<ShellOutputValues, crate::agent_node::ProcessError> {
+    let stdin = if input.should_pipe_stdin {
+        input.stdin_value.map(Value::as_display_string).unwrap_or_default().into_bytes()
     } else {
-        cmd.stdin(std::process::Stdio::null());
-    }
-    cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::piped());
-
-    let mut child = cmd.spawn()?;
-
-    // Pipe stdin from the node's selected stdin input value.
-    if pipe_stdin
-        && let Some(stdin_val) = stdin_value
-        && let Some(ref mut stdin) = child.stdin
-    {
-        use tokio::io::AsyncWriteExt;
-        let data = stdin_val.as_display_string();
-        let _ = stdin.write_all(data.as_bytes()).await;
-        // Drop stdin to close the pipe.
-        drop(child.stdin.take());
-    }
-
-    let output = if timeout_secs > 0 {
-        tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), child.wait_with_output())
-            .await
-            .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> { "command timed out".into() })??
-    } else {
-        child.wait_with_output().await?
+        Vec::new()
     };
-
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    let exit_code = output.status.code().unwrap_or(-1);
+    let request = crate::agent_node::ProcessRequest {
+        program: config.shell_program.clone(),
+        args: vec![SHELL_COMMAND_FLAG.to_owned(), input.command.to_owned()],
+        cwd: input.cwd.clone(),
+        env: input.environment.iter().map(|(key, value)| (key.clone(), value.clone())).collect(),
+        stdin,
+        timeout_secs: input.timeout_secs,
+        output_limit_bytes: config.limits.stdout_max_bytes.max(config.limits.stderr_max_bytes),
+    };
+    debug_assert_eq!(request.args.len(), SHELL_ARGUMENT_COUNT);
+    debug_assert_eq!(request.program, config.shell_program);
+    let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
+    let output = tokio::task::spawn_blocking(move || runner.run(&request))
+        .await
+        .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
 
     Ok(ShellOutputValues {
-        stdout,
-        stderr,
-        exit_code,
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        exit_code: output.status_code.unwrap_or(UNKNOWN_EXIT_CODE),
     })
 }
 

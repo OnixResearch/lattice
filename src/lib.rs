@@ -15,6 +15,7 @@ pub mod n8n_json;
 pub mod node_kind_provider;
 pub mod openai;
 pub mod orchestration;
+pub mod process;
 pub mod replay;
 pub mod run;
 pub mod scheduler;
