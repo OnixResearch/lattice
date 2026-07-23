@@ -1,0 +1,1016 @@
+{
+  "rows": [
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.image_edit",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.prompt_edit",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.cache_key.target_edit",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.clankers_adapter.image_context",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.clankers_adapter.session_failure",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.command_runtimes",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.command_runtimes.compatibility",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.clankers",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.invalid",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.config.pi",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.adapter",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.credential",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.errors.decode",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.image",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.text_json",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.execute.type_mismatch",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "b098a79e987d43b388bcd4aeb3e24670b3e4cf8cd64a674c6512d25fe782e133",
+          "path": "tests/test_openai_agent.rs"
+        },
+        {
+          "blake3": "18460a437c7ebbce21d0c892da7c82d4304b37978b35a552db5107a9d6bd8edb",
+          "path": "tests/openai/execution.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.openai_compatible",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "b098a79e987d43b388bcd4aeb3e24670b3e4cf8cd64a674c6512d25fe782e133",
+          "path": "tests/test_openai_agent.rs"
+        },
+        {
+          "blake3": "18460a437c7ebbce21d0c892da7c82d4304b37978b35a552db5107a9d6bd8edb",
+          "path": "tests/openai/execution.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.real-graph",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.rejected",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.output_file_handoff.capability_read.scenario.success",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.pi_adapter.image_prompt",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.pi_adapter.preflight_reject",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "9faaa9dfc1bdc0b8ce58ae4fbbf7d7f62101c078eda740f08093d39b0831c71d",
+          "path": "tests/test_agent_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.agent_nodes.production_adapters",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.artifact_references",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.durable_runner",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "631bd616bee1092c85e51f391e0c645f2bcacaedf081535cde728b6498b3b929",
+          "path": "tests/test_expression_mapping.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.expression_mapping.config",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.config.read",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.config.write",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.interface.memory",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.local_capabilities.scenario.nested-io",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.read.content",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.read.missing",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.safety.outside_root",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.safety.overwrite",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.write_append.append",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "3bf2f546e8ab0926c013518e5173eb2d69385e3670c2cbfd72dee5136fbbc8e0",
+          "path": "tests/test_file_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.file_nodes.write_append.write",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.generic_pipeline_runner",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.errors.load_failure",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.exit_status.failure",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.exit_status.success",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.history.persist",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.run.missing",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.run.saved",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.summary.json",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d280a1f24588acd70ba6e78f14b4335e3a164ace50c6caeaeca7b920599998b3",
+          "path": "tests/test_headless.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.headless.summary.text",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.cache_key.url_edit",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.config.create",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.config.invalid",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.errors.timeout",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.execute.failure",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.execute.success",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "d4ba859c260fd0eed4e6cef0b7b0e9096bc0fbf4f878d69d3d6cc9501e947410",
+          "path": "tests/test_http_node.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.http_node.outputs.body",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.capability_read.scenario.success",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.local",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.missing",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.oversized",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.load.unsupported",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "1a12421802f5f53aa16abe694e6d6fef9b453427eface71249df92ba1a370828",
+          "path": "tests/test_image_nodes.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_input_nodes.production_io",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "be8a19304f37bdd1927bb261425da56676540dba46576675819014870cbe2133",
+          "path": "tests/test_value.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.incompatible",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "be8a19304f37bdd1927bb261425da56676540dba46576675819014870cbe2133",
+          "path": "tests/test_value.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.route",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "be8a19304f37bdd1927bb261425da56676540dba46576675819014870cbe2133",
+          "path": "tests/test_value.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.image_values.model.store",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "07d3feeb19a1f2aabdb3e1eabedfa07f293b4fd8b70d9110f1f34e2cb930699d",
+          "path": "tests/test_llm_operating_graph.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.llm_operating_graph.scenario.feedback-boundary",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.cache_real_ports",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.cache_real_ports.routable",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.real_port_outputs",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.real_port_outputs.completed",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "f5e619ece4d412284aeda3e91e67e4b722e18a86e981b98ea9afd8a70d9c70d1",
+          "path": "tests/test_executor.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.pipeline_stdin.stdout_to_stdin.connected",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "blake3": "3480f048cb94674d034d369f28411c0dcacd22af440aa56e2a2d35f1a53b3607",
+          "path": "tests/test_repository_validation.rs"
+        },
+        {
+          "blake3": "c842338d0fdde2dfb63eac9ed64b99a1b0bab0dcda4e393b0d7757c2cfb34d91",
+          "path": "vendor-cargo-deps/rats/source/SOURCE"
+        }
+      ],
+      "rationale_code": "gap.current-vendor-completeness-unproved",
+      "requirement_id": "n8nclone.workflow_execution.rats_dependency",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "blake3": "3480f048cb94674d034d369f28411c0dcacd22af440aa56e2a2d35f1a53b3607",
+          "path": "tests/test_repository_validation.rs"
+        },
+        {
+          "blake3": "c842338d0fdde2dfb63eac9ed64b99a1b0bab0dcda4e393b0d7757c2cfb34d91",
+          "path": "vendor-cargo-deps/rats/source/SOURCE"
+        }
+      ],
+      "rationale_code": "gap.current-vendor-completeness-unproved",
+      "requirement_id": "n8nclone.workflow_execution.rats_dependency.scenario.source-completeness",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "2697ee9b683f6ea1d026495a75ac086d8e3b098b06c77bcec66b1e9ca8cd3d10",
+          "path": "tests/test_replay.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.replay.artifact_placeholders.missing",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "2697ee9b683f6ea1d026495a75ac086d8e3b098b06c77bcec66b1e9ca8cd3d10",
+          "path": "tests/test_replay.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.replay.core.fold",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "2697ee9b683f6ea1d026495a75ac086d8e3b098b06c77bcec66b1e9ca8cd3d10",
+          "path": "tests/test_replay.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.replay.core.no_side_effects",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "2697ee9b683f6ea1d026495a75ac086d8e3b098b06c77bcec66b1e9ca8cd3d10",
+          "path": "tests/test_replay.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.replay.event_store.completed",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "2697ee9b683f6ea1d026495a75ac086d8e3b098b06c77bcec66b1e9ca8cd3d10",
+          "path": "tests/test_replay.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.replay.event_store.partial",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.runner_events",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.runtime_registry",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.seaglass_graph_core.scenario.compatibility",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.seaglass_graph_core.scenario.provenance",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "blake3": "57cd0eb8653f9019d0fc20ea8d675d8d2640cc1b652d1ee98fe4d59fc09e80f6",
+          "path": "tests/test_control_flow.rs"
+        }
+      ],
+      "rationale_code": "gap.parent-child-event-correlation-absent",
+      "requirement_id": "n8nclone.workflow_execution.subworkflows.events.correlation",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "partial_evidence_only",
+      "evidence": [
+        {
+          "blake3": "57cd0eb8653f9019d0fc20ea8d675d8d2640cc1b652d1ee98fe4d59fc09e80f6",
+          "path": "tests/test_control_flow.rs"
+        }
+      ],
+      "rationale_code": "gap.child-workflow-execution-absent",
+      "requirement_id": "n8nclone.workflow_execution.subworkflows.invocation.outputs",
+      "subsystem": "workflow-execution"
+    },
+    {
+      "classification": "exact_maintained_evidence",
+      "evidence": [
+        {
+          "blake3": "09cfa296c3c660c521a7b635e4274b3322c7bc916cc232c7252b161b39948a36",
+          "path": "tests/test_runner_core.rs"
+        }
+      ],
+      "rationale_code": "assertions.direct-maintained-test",
+      "requirement_id": "n8nclone.workflow_execution.trait_boundaries",
+      "subsystem": "workflow-execution"
+    }
+  ]
+}
