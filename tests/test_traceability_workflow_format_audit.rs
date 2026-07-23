@@ -34,49 +34,9 @@ const UNRELATED: &str = concat!("n8n", "clone.tui_ux.add_node.cancel");
 const ADDED: &str = "lattice.example.unaccepted.scenario.added";
 const DANGLING: &str = "lattice.example.dangling.scenario.marker";
 
-const IDS: &[&str] = &[
-    "n8nclone.workflow_format.agent_nodes.invalid",
-    "n8nclone.workflow_format.agent_nodes.invalid.image_format",
-    "n8nclone.workflow_format.agent_nodes.invalid.missing_prompt",
-    "n8nclone.workflow_format.agent_nodes.invalid.port_type",
-    "n8nclone.workflow_format.agent_nodes.invalid.target",
-    "n8nclone.workflow_format.agent_nodes.nickel.export",
-    "n8nclone.workflow_format.agent_nodes.nickel.import",
-    "n8nclone.workflow_format.agent_nodes.nickel.round_trip",
-    "n8nclone.workflow_format.control_flow",
-    "n8nclone.workflow_format.control_flow.compatibility",
-    "n8nclone.workflow_format.control_flow.compatibility.invalid",
-    "n8nclone.workflow_format.credentials.providers.export",
-    "n8nclone.workflow_format.credentials.providers.import",
-    "n8nclone.workflow_format.credentials.providers.reject_plaintext",
-    "n8nclone.workflow_format.generic_pipeline_ir",
-    "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.rejected",
-    "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.success",
-    "n8nclone.workflow_format.n8n_json.export.supported",
-    "n8nclone.workflow_format.n8n_json.export.unsupported",
-    "n8nclone.workflow_format.n8n_json.fixtures.supported",
-    "n8nclone.workflow_format.n8n_json.fixtures.unsupported",
-    "n8nclone.workflow_format.n8n_json.import.malformed",
-    "n8nclone.workflow_format.n8n_json.import.supported",
-    "n8nclone.workflow_format.n8n_json.import_cli.report",
-    "n8nclone.workflow_format.n8n_parity_fixture_pack",
-    "n8nclone.workflow_format.n8n_parity_mapping_reports",
-    "n8nclone.workflow_format.nickel.export.missing",
-    "n8nclone.workflow_format.nickel.export.saved",
-    "n8nclone.workflow_format.nickel.import.invalid",
-    "n8nclone.workflow_format.nickel.import.valid",
-    "n8nclone.workflow_format.nickel.invalid.missing_field",
-    "n8nclone.workflow_format.nickel.round_trip.preserve",
-    "n8nclone.workflow_format.node_kind_provider",
-    "n8nclone.workflow_format.replay_bundles.export",
-    "n8nclone.workflow_format.replay_bundles.import",
-    "n8nclone.workflow_format.replay_bundles.reject_unsafe",
-    "n8nclone.workflow_format.triggers.nickel.compatibility",
-    "n8nclone.workflow_format.triggers.nickel.export",
-    "n8nclone.workflow_format.triggers.nickel.import",
-    "n8nclone.workflow_format.webhook_cookbook_example",
-    "n8nclone.workflow_format.webhook_cookbook_example.drift",
-];
+#[path = "traceability_workflow_format_ids.rs"]
+mod workflow_format_ids;
+use workflow_format_ids::IDS;
 const PARTIAL_IDS: &[&str] = &[IDS[0], IDS[1], IDS[10], IDS[12], IDS[40]];
 
 #[derive(Debug, serde::Deserialize)]

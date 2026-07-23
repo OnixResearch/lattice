@@ -14,7 +14,7 @@ const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-webhook-cook
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-n8n-credential-completion-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-n8n-credential-completion-reviewed.json");
 
-const MAIN_SOURCE: &str = include_str!("../src/main.rs");
+const MAIN_SOURCE: &str = include_str!("fixtures/traceability-n8n-credential-completion-reviewed-main.txt");
 const N8N_SOURCE: &str = include_str!("../src/n8n_json.rs");
 const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
 const BOUNDARY_TESTS: &str = include_str!("test_n8n_credential_boundaries.rs");

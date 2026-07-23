@@ -105,6 +105,7 @@ fn write_markdown_workflow(temp_dir: &tempfile::TempDir, prompt_file: &str) -> s
 // r[verify n8nclone.workflow_format.nickel.export]
 // r[verify n8nclone.workflow_format.nickel.import]
 // r[verify n8nclone.workflow_format.nickel.round_trip]
+// r[verify n8nclone.workflow_format.nickel.round_trip.preserve]
 #[test]
 fn nickel_export_import_preserves_pipeline_shape_and_config() {
     let (workflow, _source, target) = common::two_node_pipeline();
@@ -122,6 +123,7 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
     assert!(workflow.graph.node(target).is_some());
 }
 
+// r[verify n8nclone.workflow_format.generic_pipeline_ir]
 // r[verify n8nclone.workflow_format.generic_pipeline_ir.nickel]
 // r[verify n8nclone.workflow_format.generic_pipeline_ir.import]
 #[test]
@@ -147,6 +149,7 @@ fn nickel_export_import_preserves_runner_metadata() {
 }
 
 // r[verify n8nclone.workflow_format.generic_pipeline_ir.compatibility]
+// r[verify n8nclone.workflow_format.triggers.nickel.compatibility]
 #[test]
 fn portable_import_defaults_empty_runner_metadata_for_older_workflows() {
     let (workflow, _source, _target) = common::two_node_pipeline();
@@ -164,6 +167,8 @@ fn portable_import_defaults_empty_runner_metadata_for_older_workflows() {
 
 // r[verify n8nclone.workflow_format.nickel.export]
 // r[verify n8nclone.workflow_format.nickel.import]
+// r[verify n8nclone.workflow_format.nickel.export.saved]
+// r[verify n8nclone.workflow_format.nickel.import.valid]
 #[test]
 fn cli_export_then_import_saves_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary cli directory");
@@ -201,6 +206,7 @@ fn cli_export_then_import_saves_workflow() {
 }
 
 // r[verify n8nclone.workflow_format.nickel.export]
+// r[verify n8nclone.workflow_format.nickel.export.missing]
 #[test]
 fn cli_export_missing_workflow_writes_no_file() {
     let temp_dir = tempfile::tempdir().expect("temporary cli directory");
@@ -222,6 +228,9 @@ fn cli_export_missing_workflow_writes_no_file() {
 
 // r[verify n8nclone.workflow_format.nickel.invalid]
 // r[verify n8nclone.workflow_format.agent_nodes.nickel]
+// r[verify n8nclone.workflow_format.agent_nodes.nickel.export]
+// r[verify n8nclone.workflow_format.agent_nodes.nickel.import]
+// r[verify n8nclone.workflow_format.agent_nodes.nickel.round_trip]
 #[test]
 fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
     let mut workflow = Workflow::new("image-agent-workflow");
@@ -253,6 +262,7 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
 }
 
 // r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.valid]
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.success]
 #[test]
 fn markdown_agent_prompt_file_loads_and_round_trips_source() {
     let temp_dir = tempfile::tempdir().expect("temporary Markdown workflow directory");
@@ -276,6 +286,8 @@ fn markdown_agent_prompt_file_loads_and_round_trips_source() {
 }
 
 // r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid.missing_prompt]
 #[test]
 fn markdown_agent_prompt_source_cardinality_fails_closed() {
     let workflow = markdown_agent_workflow(ROLE_PROMPT_PATH);
@@ -362,6 +374,7 @@ fn malformed_markdown_agent_prompt_content_fails_closed() {
 
 #[cfg(unix)]
 // r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.invalid]
+// r[verify n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.rejected]
 #[test]
 fn markdown_agent_prompt_symlink_escape_fails_closed() {
     use std::os::unix::fs::symlink;
@@ -402,6 +415,8 @@ fn image_workflow_static_import_export_and_validation_do_not_read_image_bytes() 
     }
 }
 
+// r[verify n8nclone.workflow_format.agent_nodes.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid.image_format]
 #[test]
 fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store() {
     let temp_dir = tempfile::tempdir().expect("temporary image import directory");
@@ -432,6 +447,8 @@ fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store()
 }
 
 // r[verify n8nclone.workflow_format.node_kind_provider.handlers]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid.target]
 #[test]
 fn portable_import_rejects_invalid_agent_target() {
     let mut workflow = Workflow::new("invalid-agent-workflow");
@@ -458,6 +475,8 @@ fn portable_import_rejects_invalid_agent_output_mode() {
     assert!(matches!(error, WorkflowFormatError::InvalidAgentOutputMode { .. }));
 }
 
+// r[verify n8nclone.workflow_format.agent_nodes.invalid]
+// r[verify n8nclone.workflow_format.agent_nodes.invalid.port_type]
 #[test]
 fn portable_import_rejects_incompatible_image_agent_port() {
     let mut workflow = Workflow::new("invalid-image-port-workflow");
@@ -476,6 +495,8 @@ fn portable_import_rejects_incompatible_image_agent_port() {
     assert!(matches!(error, WorkflowFormatError::InvalidGraph(_)));
 }
 
+// r[verify n8nclone.workflow_format.nickel.import.invalid]
+// r[verify n8nclone.workflow_format.nickel.invalid.missing_field]
 #[test]
 fn nickel_import_rejects_missing_required_field() {
     let temp_dir = tempfile::tempdir().expect("temporary workflow format directory");

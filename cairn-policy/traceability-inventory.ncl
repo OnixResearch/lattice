@@ -3,8 +3,8 @@ let Contracts = import "traceability-inventory-contracts.ncl" in
 {
   schema_version = "lattice.traceability-debt-inventory.v1",
   hash_algorithm = "BLAKE3",
-  expected_missing_count = 222,
-  expected_missing_hash = "d7a9219183e54afdfd12bb9778e6a5965c2b0c1a84ee13e908a5401e47277dbe",
+  expected_missing_count = 181,
+  expected_missing_hash = "87f32950fa7ce692a6a5c98f02d174e050d8cce18d05e785821c84795e81dba0",
   reviewed = [],
   non_claims = [
     "inventory rows do not satisfy requirements or create Tracey evidence",

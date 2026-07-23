@@ -140,6 +140,7 @@ fn nickel_with_plaintext_value(workflow: &Workflow, value: &str) -> String {
 
 // r[verify n8nclone.credentials.secret_refs.model]
 // r[verify n8nclone.credentials.secret_refs.model.store_ref]
+// r[verify n8nclone.workflow_format.credentials.providers.export]
 #[tokio::test]
 async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -166,6 +167,7 @@ async fn resolved_secret_is_not_saved_or_exported_with_workflow() {
     assert_bytes_omit_secret(&persisted, SECRET_VALUE);
 }
 
+// r[verify n8nclone.workflow_format.credentials.providers.import]
 #[test]
 fn nickel_import_round_trip_preserves_opaque_provider_reference_without_resolution() {
     let (workflow, node_id) = workflow_with_secret_ref();
@@ -550,6 +552,7 @@ fn provider_backed_cache_identity_excludes_resolved_secret_values() {
 
 // r[verify n8nclone.credentials.secret_refs.model]
 // r[verify n8nclone.credentials.secret_refs.model.reject_plaintext]
+// r[verify n8nclone.workflow_format.credentials.providers.reject_plaintext]
 #[test]
 fn nickel_import_rejects_all_non_null_plaintext_credential_shapes_with_safe_error() {
     let (workflow, _node_id) = workflow_with_secret_ref();

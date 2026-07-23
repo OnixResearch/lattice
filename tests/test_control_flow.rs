@@ -249,8 +249,10 @@ fn validation_rejects_merge_inputs_incompatible_with_typed_output() {
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == WorkflowDiagnosticCode::InvalidMergeConfig));
 }
 
+// r[verify n8nclone.workflow_format.control_flow]
 // r[verify n8nclone.workflow_format.control_flow.export]
 // r[verify n8nclone.workflow_format.control_flow.import]
+// r[verify n8nclone.workflow_format.control_flow.compatibility]
 // r[verify n8nclone.workflow_format.control_flow.compatibility.existing]
 #[test]
 fn portable_format_round_trips_control_flow_configs() {
@@ -275,6 +277,7 @@ fn portable_format_round_trips_control_flow_configs() {
     assert!(matches!(imported.node_config(subworkflow.id), Some(NodeConfig::Subworkflow(_))));
 }
 
+// r[verify n8nclone.workflow_format.control_flow.compatibility.invalid]
 #[test]
 fn portable_import_rejects_malformed_control_flow_without_partial_workflow() {
     let mut workflow = Workflow::new("malformed-control-flow");

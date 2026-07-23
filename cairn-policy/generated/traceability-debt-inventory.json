@@ -3,32 +3,31 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 843,
-    "referenced": 621,
-    "missing": 222,
+    "requirements": 851,
+    "referenced": 670,
+    "missing": 181,
     "dangling": 0,
     "valid": false,
     "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "9d4e5b6873e94f78e7843467865e1139f119084ca156ba5b5054e2a5dd92941c",
-    "receipt_hash": "a258d47d3bfc5a00870c5144bc120fa8a907b4232cd4a0b7f3328e04c03d04ae"
+    "input_hash": "a7d39f59800766a5bbd93187806ba75898990d12ea2d106a76b39e5dfcee302f",
+    "receipt_hash": "50c7dad21b28f4ba794a4504843008346ae2716009592fd1b227b3ebea265743"
   },
   "review_policy": {
-    "expected_missing_count": 222,
-    "expected_missing_hash": "d7a9219183e54afdfd12bb9778e6a5965c2b0c1a84ee13e908a5401e47277dbe",
+    "expected_missing_count": 181,
+    "expected_missing_hash": "87f32950fa7ce692a6a5c98f02d174e050d8cce18d05e785821c84795e81dba0",
     "reviewed_decisions": 0,
-    "policy_hash": "e00cdd172fd9242019e7437e93857e59ed59d0e5a3590b5443147cdff06668e5"
+    "policy_hash": "c3a023ffc7a11a1ccbed5e0a1670d1200d25e2a81243bdbf76a9fd141271eea1"
   },
   "summary": {
-    "total": 222,
+    "total": 181,
     "reviewed": 0,
-    "unassessed": 222,
+    "unassessed": 181,
     "by_classification": {
-      "unassessed": 222
+      "unassessed": 181
     },
     "by_subsystem": {
       "tui-ux": 98,
-      "workflow-execution": 83,
-      "workflow-format": 41
+      "workflow-execution": 83
     }
   },
   "rows": [
@@ -1298,296 +1297,9 @@
       "classification": "unassessed",
       "evidence": [],
       "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.image_format",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.missing_prompt",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.port_type",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.invalid.target",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.export",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.import",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.agent_nodes.nickel.round_trip",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.control_flow",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.control_flow.compatibility",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.control_flow.compatibility.invalid",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.credentials.providers.export",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.credentials.providers.import",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.credentials.providers.reject_plaintext",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.generic_pipeline_ir",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.rejected",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.markdown_agent_prompts.capability_read.scenario.success",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.export.supported",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.export.unsupported",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.fixtures.supported",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.fixtures.unsupported",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.import.malformed",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.import.supported",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_json.import_cli.report",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_parity_fixture_pack",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.n8n_parity_mapping_reports",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.export.missing",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.export.saved",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.import.invalid",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.import.valid",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.invalid.missing_field",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.nickel.round_trip.preserve",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.node_kind_provider",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.replay_bundles.export",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.replay_bundles.import",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.replay_bundles.reject_unsafe",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.triggers.nickel.compatibility",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.triggers.nickel.export",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.triggers.nickel.import",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.webhook_cookbook_example",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "n8nclone.workflow_format.webhook_cookbook_example.drift",
-      "subsystem": "workflow-format",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
     }
   ],
-  "missing_set_hash": "d7a9219183e54afdfd12bb9778e6a5965c2b0c1a84ee13e908a5401e47277dbe",
+  "missing_set_hash": "87f32950fa7ce692a6a5c98f02d174e050d8cce18d05e785821c84795e81dba0",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -1597,5 +1309,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "33c8d28619ea9ad6be5b4a9b2750282f5c08da818976d792997766c71f5fc63a"
+  "inventory_hash": "68c5009df66b3adca4a3a4b9e7f3f6449b650efa0f78b6de4b6e6741d781091c"
 }

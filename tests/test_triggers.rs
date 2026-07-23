@@ -307,6 +307,8 @@ fn schedule_trigger_preserves_schedule_semantics() {
 }
 
 // r[verify n8nclone.workflow_format.triggers.nickel]
+// r[verify n8nclone.workflow_format.triggers.nickel.export]
+// r[verify n8nclone.workflow_format.triggers.nickel.import]
 #[test]
 fn workflow_format_round_trips_triggers_through_portable_and_nickel() {
     let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());

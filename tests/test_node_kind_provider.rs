@@ -52,6 +52,7 @@ fn provider_validation_accepts_valid_shell_and_rejects_empty_command() {
     assert!(invalid_issues.iter().any(|issue| issue.code == NodeKindValidationCode::EmptyShellCommand));
 }
 
+// r[verify n8nclone.workflow_format.node_kind_provider]
 // r[verify n8nclone.workflow_format.node_kind_provider.export]
 // r[verify n8nclone.workflow_format.node_kind_provider.import]
 #[test]

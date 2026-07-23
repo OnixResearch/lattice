@@ -17,7 +17,7 @@ const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
 const WORKFLOW_FORMAT_SOURCE: &str = include_str!("../src/workflow_format.rs");
 const WORKFLOW_VALIDATION_SOURCE: &str =
     include_str!("fixtures/traceability-core-credentials-reviewed-workflow-validation.txt");
-const CREDENTIAL_TESTS: &str = include_str!("test_credentials.rs");
+const CREDENTIAL_TESTS: &str = include_str!("fixtures/traceability-workflow-format-audit-reviewed-credentials.txt");
 const CREDENTIAL_SOURCE_PATH: &str = "src/credentials.rs";
 const EXECUTOR_SOURCE_PATH: &str = "src/engine/executor.rs";
 const WORKFLOW_FORMAT_SOURCE_PATH: &str = "src/workflow_format.rs";

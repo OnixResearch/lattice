@@ -487,6 +487,7 @@ fn dry_run_reports_safe_status_and_redacted_credential_diagnostics() {
     assert!(!output.contains(SECRET_VALUE));
 }
 
+// r[verify n8nclone.workflow_format.webhook_cookbook_example]
 // r[verify n8nclone.workflow_format.webhook_cookbook_example.import]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow]
 // r[verify n8nclone.scheduling.webhook_cookbook_operator_flow.dry_run]
@@ -523,6 +524,7 @@ fn webhook_cookbook_import_persists_trigger_and_dry_runs() {
     assert_eq!(report.enabled_trigger_count, EXPECTED_TRIGGER_COUNT);
 }
 
+// r[verify n8nclone.workflow_format.webhook_cookbook_example.drift]
 #[test]
 fn webhook_cookbook_malformed_drift_is_rejected_deterministically() {
     let temp_dir = tempfile::tempdir().expect("temporary cookbook drift directory");

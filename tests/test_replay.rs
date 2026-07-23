@@ -161,6 +161,8 @@ fn sensitive_values_are_redacted_in_replay_summaries() {
 }
 
 // r[verify n8nclone.workflow_format.replay_bundles]
+// r[verify n8nclone.workflow_format.replay_bundles.export]
+// r[verify n8nclone.workflow_format.replay_bundles.import]
 #[test]
 fn replay_bundle_round_trips_safe_events() {
     let bundle = export_replay_bundle(RUN_ID, "wf", None, ordered_events());
@@ -172,6 +174,7 @@ fn replay_bundle_round_trips_safe_events() {
 }
 
 // r[verify n8nclone.workflow_format.replay_bundles]
+// r[verify n8nclone.workflow_format.replay_bundles.reject_unsafe]
 // r[verify n8nclone.workflow_validation.replay_records]
 #[test]
 fn replay_bundle_rejects_plaintext_secret_markers() {

@@ -151,7 +151,9 @@ fn assert_report_matches_golden(actual: &lattice::n8n_json::N8nMappingReport, go
     assert_eq!(report_to_pretty_json(actual), golden.trim_end());
 }
 
+// r[verify n8nclone.workflow_format.n8n_parity_fixture_pack]
 // r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.supported]
+// r[verify n8nclone.workflow_format.n8n_parity_mapping_reports]
 // r[verify n8nclone.workflow_format.n8n_parity_mapping_reports.supported]
 // r[verify n8nclone.credentials.n8n_parity_secret_safety.placeholders]
 #[test]
@@ -173,7 +175,10 @@ fn parity_supported_fixtures_import_validate_and_match_golden_reports() {
     }
 }
 
+// r[verify n8nclone.workflow_format.n8n_parity_fixture_pack]
 // r[verify n8nclone.workflow_format.n8n_parity_fixture_pack.unsupported]
+// r[verify n8nclone.workflow_format.n8n_parity_mapping_reports]
+// r[verify n8nclone.workflow_format.n8n_json.fixtures.unsupported]
 // r[verify n8nclone.workflow_validation.n8n_parity_diagnostics]
 // r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.malformed_connection]
 // r[verify n8nclone.workflow_validation.n8n_parity_diagnostics.plaintext_credential]
@@ -211,6 +216,8 @@ fn parity_fixture_documentation_lists_all_tested_fixture_files() {
 
 // r[verify n8nclone.workflow_format.n8n_json.import]
 // r[verify n8nclone.workflow_format.n8n_json.fixtures]
+// r[verify n8nclone.workflow_format.n8n_json.import.supported]
+// r[verify n8nclone.workflow_format.n8n_json.fixtures.supported]
 #[test]
 fn supported_shell_fixture_imports_to_typed_workflow() {
     let result = import_n8n_json_str(SHELL_FIXTURE);
@@ -227,6 +234,8 @@ fn supported_shell_fixture_imports_to_typed_workflow() {
 }
 
 // r[verify n8nclone.workflow_format.n8n_json.import]
+// r[verify n8nclone.workflow_format.n8n_json.import.supported]
+// r[verify n8nclone.workflow_format.n8n_json.fixtures.supported]
 // r[verify n8nclone.credentials.n8n_json.placeholders]
 #[test]
 fn supported_http_fixture_imports_credential_placeholder() {
@@ -249,6 +258,7 @@ fn supported_http_fixture_imports_credential_placeholder() {
 }
 
 // r[verify n8nclone.workflow_format.n8n_json.export]
+// r[verify n8nclone.workflow_format.n8n_json.export.supported]
 #[test]
 fn supported_shell_workflow_exports_to_n8n_json() {
     let mut workflow = Workflow::new("exportable");
@@ -287,6 +297,7 @@ fn plaintext_credentials_are_rejected() {
 }
 
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported]
+// r[verify n8nclone.workflow_format.n8n_json.import.malformed]
 #[test]
 fn malformed_json_is_rejected() {
     let result = import_n8n_json_str(MALFORMED_FIXTURE);
@@ -317,6 +328,7 @@ fn unsupported_expressions_are_rejected() {
 
 // r[verify n8nclone.workflow_validation.n8n_json.export_limits]
 // r[verify n8nclone.workflow_validation.n8n_json.export_limits.node]
+// r[verify n8nclone.workflow_format.n8n_json.export.unsupported]
 #[test]
 fn unsupported_export_node_reports_diagnostic() {
     let mut workflow = Workflow::new("unsupported-export");
@@ -329,6 +341,7 @@ fn unsupported_export_node_reports_diagnostic() {
 }
 
 // r[verify n8nclone.workflow_format.n8n_json.import_cli]
+// r[verify n8nclone.workflow_format.n8n_json.import_cli.report]
 #[test]
 fn import_n8n_cli_persists_workflow_and_report() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
