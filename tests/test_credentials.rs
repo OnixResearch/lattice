@@ -41,6 +41,7 @@ use lattice::workflow_validation::format_diagnostic;
 use lattice::workflow_validation::validate_workflow;
 use lattice::workflow_validation::validate_workflow_with_credential_registry;
 use pretty_assertions::assert_eq;
+use tracing::instrument::WithSubscriber;
 
 const PROVIDER_NAME: &str = "env";
 const SECRET_KEY: &str = "api_token";
@@ -206,10 +207,7 @@ async fn credential_provider_redacts_output_logs_history_json_and_persistence() 
             bytes: Arc::clone(&writer_bytes),
         })
         .finish();
-    let subscriber_guard = tracing::subscriber::set_default(subscriber);
-
-    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
-    drop(subscriber_guard);
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).with_subscriber(subscriber).await;
 
     let NodeStatus::Completed { outputs, .. } = &result.status else {
         panic!("expected completed node, got {:?}", result.status);
