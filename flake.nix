@@ -46,6 +46,12 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+        isRatsCompileTimeAssetPath =
+          path:
+          toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/" (
+            toString path
+          );
         isRepositoryValidationAssetPath =
           path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
@@ -63,6 +69,7 @@
             craneLib.filterCargoSources path type
             || isSourceFixturePath path
             || isAnimusCompileTimeAssetPath path
+            || isRatsCompileTimeAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };

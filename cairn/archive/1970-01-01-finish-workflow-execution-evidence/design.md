@@ -1,0 +1,7 @@
+# Design
+
+The source boundary remains a pinned, allowlisted Rats Git snapshot. Its sync shell stages a detached revision before atomic replacement, while pure validation rejects unsafe, duplicate, or incomplete path sets. Maintained positive and adversarial tests bind the pin, `SOURCE` metadata, nested manual assertion module, generated snapshots, and a focused offline consumer compile that avoids unrelated Rats workspace dependencies.
+
+Subworkflow execution uses a functional core plus imperative shell. The pure core resolves declared parent inputs, validates child results, and maps declared child output names onto the parent node's real graph `PortId` values. An injected async runner shell owns saved-workflow lookup and bounded child execution. Its invocation contains the exact parent run ID and subworkflow node ID; the shell emits only bounded lifecycle metadata carrying that correlation. The default shell fails closed instead of manufacturing placeholder outputs.
+
+Positive tests prove named-child dispatch, real-port output routing, and exact success correlation. Negative tests prove recursion rejection, missing runner configuration, missing mapped child output, and mismatched child correlation fail without output. A byte-bound completion inventory then reclassifies all 83 workflow-execution rows as exact while preserving the 181-item missing set and adding no selected markers.

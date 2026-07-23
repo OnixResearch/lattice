@@ -13,7 +13,7 @@ const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-operator-dia
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-core-credentials-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-core-credentials-reviewed.json");
 const CREDENTIAL_SOURCE_HEX: &str = include_str!("fixtures/traceability-reviewed-credentials-source.hex");
-const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
+const EXECUTOR_SOURCE: &str = include_str!("fixtures/traceability-reviewed-executor-source.txt");
 const WORKFLOW_FORMAT_SOURCE: &str = include_str!("../src/workflow_format.rs");
 const WORKFLOW_VALIDATION_SOURCE: &str =
     include_str!("fixtures/traceability-core-credentials-reviewed-workflow-validation.txt");

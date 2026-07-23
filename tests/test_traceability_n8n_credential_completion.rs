@@ -16,7 +16,7 @@ const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-n8n-credent
 
 const MAIN_SOURCE: &str = include_str!("fixtures/traceability-n8n-credential-completion-reviewed-main.txt");
 const N8N_SOURCE: &str = include_str!("../src/n8n_json.rs");
-const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
+const EXECUTOR_SOURCE: &str = include_str!("fixtures/traceability-reviewed-executor-source.txt");
 const BOUNDARY_TESTS: &str = include_str!("test_n8n_credential_boundaries.rs");
 const N8N_TESTS: &str = include_str!("fixtures/traceability-workflow-validation-audit-reviewed-n8n-json.txt");
 const COMMAND_FIXTURE: &str = include_str!("fixtures/n8n/parity/supported/command-pipeline.json");

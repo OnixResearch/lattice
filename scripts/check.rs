@@ -26,6 +26,7 @@ const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "tests/fixtures/traceability-inventory-coverage.json",
 ];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
+const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
 const TEST_ARGS: &[&str] = &["test"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
@@ -71,6 +72,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         program: CARGO_PROGRAM,
         args: FORMAT_CHECK_ARGS,
         use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "Rats focused consumer compile",
+        program: CARGO_PROGRAM,
+        args: FOCUSED_CONSUMER_CHECK_ARGS,
+        use_repo_local_target: true,
     },
     CheckStep {
         name: "tests",

@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:866c9783be4c56abaff7d2c0c7f4cfb950bd290c65dce7297c653e60326ff602",
+  "baseline_hash": "b3:923eb4e2656647be66cab37000b4eb67a46e45fbfaed247df9c9dc3dc715d629",
   "findings": [
     {
       "stable_id": "b3:4cea1c1908ae6229",
@@ -1521,8 +1521,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:37dea33f0daa03dd",
-      "semantic_id": "b3:37dea33f0daa03dd",
+      "stable_id": "b3:f28c4937f0e2775c",
+      "semantic_id": "b3:f28c4937f0e2775c",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -1530,7 +1530,7 @@
       "file": "src/engine/executor.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1879 lines (limit: 300)",
+      "message": "source file is 1956 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -1814,7 +1814,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 32,
+      "line": 33,
       "column": 1,
       "message": "non-trait import `runner` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1827,7 +1827,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 33,
+      "line": 34,
       "column": 1,
       "message": "non-trait import `ContentHash` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1840,7 +1840,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 34,
+      "line": 35,
       "column": 1,
       "message": "non-trait import `Value` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1853,7 +1853,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 35,
+      "line": 36,
       "column": 1,
       "message": "non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1866,7 +1866,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 36,
+      "line": 37,
       "column": 1,
       "message": "non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1879,7 +1879,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 37,
+      "line": 38,
       "column": 1,
       "message": "non-trait import `expressions` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1892,7 +1892,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 38,
+      "line": 39,
       "column": 1,
       "message": "non-trait import `ExpressionContext` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1905,7 +1905,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 39,
+      "line": 40,
       "column": 1,
       "message": "non-trait import `FileOperationKind` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1918,7 +1918,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 40,
+      "line": 41,
       "column": 1,
       "message": "non-trait import `FileOperationPlan` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1931,7 +1931,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 41,
+      "line": 42,
       "column": 1,
       "message": "non-trait import `FileOperationResult` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1944,7 +1944,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 43,
+      "line": 44,
       "column": 1,
       "message": "non-trait import `http` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1957,7 +1957,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 45,
+      "line": 46,
       "column": 1,
       "message": "non-trait import `HttpRequestPlan` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1970,7 +1970,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 46,
+      "line": 47,
       "column": 1,
       "message": "non-trait import `NoopHttpClient` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1983,7 +1983,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 47,
+      "line": 48,
       "column": 1,
       "message": "non-trait import `image_node` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -1996,7 +1996,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 49,
+      "line": 50,
       "column": 1,
       "message": "non-trait import `LocalImageIo` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -2009,7 +2009,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 198,
+      "line": 199,
       "column": 78,
       "message": "function `update_node_config_hash` is 76 lines (limit: 70)",
       "crate_name": "lattice"
@@ -2022,7 +2022,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 336,
+      "line": 337,
       "column": 25,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -2035,7 +2035,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 372,
+      "line": 373,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2048,7 +2048,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 373,
+      "line": 374,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2061,7 +2061,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 381,
+      "line": 382,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2074,7 +2074,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 447,
+      "line": 448,
       "column": 23,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -2087,7 +2087,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 477,
+      "line": 478,
       "column": 1,
       "message": "2 consecutive `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -2100,7 +2100,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 477,
+      "line": 478,
       "column": 1,
       "message": "function has 7 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -2113,7 +2113,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 509,
+      "line": 510,
       "column": 1,
       "message": "function has 7 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -2126,7 +2126,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 535,
+      "line": 536,
       "column": 1,
       "message": "function has 8 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -2139,7 +2139,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 617,
+      "line": 618,
       "column": 75,
       "message": "function `file_output_port_ids` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -2152,7 +2152,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 692,
+      "line": 693,
       "column": 77,
       "message": "function `agent_output_port_ids` has 0 assertion(s) in 34 lines (need 2+)",
       "crate_name": "lattice"
@@ -2165,7 +2165,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 783,
+      "line": 784,
       "column": 27,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -2178,20 +2178,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 805,
+      "line": 806,
       "column": 16,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:71750a7d1a0b9efe",
-      "semantic_id": "b3:71750a7d1a0b9efe",
+      "stable_id": "b3:964c6afd75476294",
+      "semantic_id": "b3:964c6afd75476294",
       "identity_status": "computed",
       "lint": "path_segment_repetition",
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 965,
+      "line": 951,
       "column": 1,
       "message": "item name `Executor` repeats `executor` from ancestor path segment `executor`",
       "crate_name": "lattice"
@@ -2204,7 +2204,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 976,
+      "line": 963,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2217,7 +2217,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 987,
+      "line": 974,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2230,7 +2230,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 994,
+      "line": 985,
       "column": 34,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2243,7 +2243,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 995,
+      "line": 986,
       "column": 26,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2256,7 +2256,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1006,
+      "line": 998,
       "column": 26,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2269,46 +2269,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1027,
-      "column": 26,
-      "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:95d27621b846167c",
-      "semantic_id": "b3:95d27621b846167c",
-      "identity_status": "computed",
-      "lint": "explicit_defaults",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/engine/executor.rs",
-      "line": 1037,
-      "column": 34,
-      "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:95d27621b846167c",
-      "semantic_id": "b3:95d27621b846167c",
-      "identity_status": "computed",
-      "lint": "explicit_defaults",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/engine/executor.rs",
-      "line": 1048,
-      "column": 34,
-      "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:9200504abf2ed3cf",
-      "semantic_id": "b3:9200504abf2ed3cf",
-      "identity_status": "computed",
-      "lint": "explicit_defaults",
-      "group": "tigerstyle::safety",
-      "severity": "error",
-      "file": "src/engine/executor.rs",
-      "line": 1049,
+      "line": 1020,
       "column": 26,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2321,7 +2282,20 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1059,
+      "line": 1031,
+      "column": 34,
+      "message": "implicit default on external type — construct with explicit values",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:95d27621b846167c",
+      "semantic_id": "b3:95d27621b846167c",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/engine/executor.rs",
+      "line": 1043,
       "column": 34,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2334,7 +2308,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1060,
+      "line": 1044,
       "column": 26,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2347,7 +2321,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1070,
+      "line": 1055,
       "column": 34,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2360,7 +2334,33 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1071,
+      "line": 1056,
+      "column": 26,
+      "message": "implicit default on external type — construct with explicit values",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:95d27621b846167c",
+      "semantic_id": "b3:95d27621b846167c",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/engine/executor.rs",
+      "line": 1067,
+      "column": 34,
+      "message": "implicit default on external type — construct with explicit values",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:9200504abf2ed3cf",
+      "semantic_id": "b3:9200504abf2ed3cf",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "error",
+      "file": "src/engine/executor.rs",
+      "line": 1068,
       "column": 26,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2373,7 +2373,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1168,
+      "line": 1178,
       "column": 21,
       "message": "`output_ports` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2386,7 +2386,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1268,
+      "line": 1278,
       "column": 21,
       "message": "`output_ports` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2399,7 +2399,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1351,
+      "line": 1361,
       "column": 21,
       "message": "`output_ports` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2412,7 +2412,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1384,
+      "line": 1394,
       "column": 38,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2425,7 +2425,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1425,
+      "line": 1435,
       "column": 21,
       "message": "`output_ports` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2438,7 +2438,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1489,
+      "line": 1499,
       "column": 21,
       "message": "`output_ports` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2451,7 +2451,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1683,
+      "line": 1751,
       "column": 17,
       "message": "`port_values` looks like a quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -2464,7 +2464,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1709,
+      "line": 1784,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2477,7 +2477,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1726,
+      "line": 1801,
       "column": 25,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2490,7 +2490,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1776,
+      "line": 1853,
       "column": 1,
       "message": "function has 6 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
@@ -2503,7 +2503,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1781,
+      "line": 1858,
       "column": 5,
       "message": "boolean binding `pipe_stdin` should have a predicate prefix",
       "crate_name": "lattice"
@@ -2516,7 +2516,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1783,
+      "line": 1860,
       "column": 74,
       "message": "function `execute_shell` has 0 assertion(s) in 42 lines (need 2+)",
       "crate_name": "lattice"
@@ -2529,7 +2529,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1812,
+      "line": 1889,
       "column": 9,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "lattice"
@@ -2542,7 +2542,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1814,
+      "line": 1891,
       "column": 9,
       "message": "explicitly dropping a must-use value hides the required handling",
       "crate_name": "lattice"
@@ -2555,7 +2555,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/engine/executor.rs",
-      "line": 1851,
+      "line": 1928,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -4401,7 +4401,7 @@
       "group": "tigerstyle::purity",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 260,
+      "line": 262,
       "column": 29,
       "message": "direct system clock read in production code",
       "crate_name": "lattice"
@@ -4414,7 +4414,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/headless.rs",
-      "line": 278,
+      "line": 280,
       "column": 13,
       "message": "`Result` value silently discarded with `let _ = ...`",
       "crate_name": "lattice"

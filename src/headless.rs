@@ -251,7 +251,9 @@ where
     }
 
     let started_epoch_ms = chrono::Utc::now().timestamp_millis();
-    let mut executor = executor_factory();
+    let workflow_catalog = std::sync::Arc::new(crate::engine::WorkflowCatalogRepository::from_repository(store)?);
+    let subworkflow_shell = crate::engine::RepositorySubworkflowRunnerShell::new(workflow_catalog);
+    let mut executor = executor_factory().with_subworkflow_runner_shell(Box::new(subworkflow_shell));
     let cache = HashMap::new();
     let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
     persist_completed_outputs_to_cache(store, &results);

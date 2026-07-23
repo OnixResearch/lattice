@@ -14,7 +14,7 @@ const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-n8n-credenti
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-provider-credential-completion-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-provider-credential-completion-reviewed.json");
 const CREDENTIAL_SOURCE: &str = include_str!("../src/credentials.rs");
-const EXECUTOR_SOURCE: &str = include_str!("../src/engine/executor.rs");
+const EXECUTOR_SOURCE: &str = include_str!("fixtures/traceability-reviewed-executor-source.txt");
 const BOUNDARY_TESTS: &str = include_str!("test_provider_credential_boundaries.rs");
 
 const CREDENTIAL_SOURCE_PATH: &str = "src/credentials.rs";

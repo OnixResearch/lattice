@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Theme tokens snapshot</title>
+<style>
+:root[data-rats-theme="rats-terminal-dark"] {
+  --rats-primary: #5ea1ff;
+  --rats-secondary: #66d9ef;
+  --rats-background: #101216;
+  --rats-surface: #1b1f27;
+  --rats-text: #f4f4f5;
+  --rats-text-muted: #9ca3af;
+  --rats-success: #22c55e;
+  --rats-warning: #facc15;
+  --rats-error: #ef4444;
+}
+:root[data-rats-theme="rats-light"] {
+  --rats-primary: #2563eb;
+  --rats-secondary: #0891b2;
+  --rats-background: #ffffff;
+  --rats-surface: #f8fafc;
+  --rats-text: #111827;
+  --rats-text-muted: #6b7280;
+  --rats-success: #16a34a;
+  --rats-warning: #d97706;
+  --rats-error: #dc2626;
+}
+</style>
+<section data-fixture="theme.tokens" data-renderer="meteorite-dom" data-size="640x480">
+  <article data-rats-theme="rats-terminal-dark">Dark semantic preview</article>
+  <article data-rats-theme="rats-light">Light semantic preview</article>
+</section>
+</html>

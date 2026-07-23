@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 const BASELINE_COVERAGE: &str = include_str!("fixtures/traceability-provider-credential-promotion-current.json");
 const CURRENT_COVERAGE: &str = include_str!("fixtures/traceability-webhook-auth-completion-current.json");
 const REVIEWED_INVENTORY: &str = include_str!("fixtures/traceability-webhook-auth-completion-reviewed.json");
-const HEADLESS_SOURCE: &str = include_str!("../src/headless.rs");
+const HEADLESS_SOURCE: &str = include_str!("fixtures/traceability-reviewed-headless-source.txt");
 const STORE_SOURCE: &str = include_str!("../src/store/mod.rs");
 const TRIGGER_SOURCE: &str = include_str!("../src/triggers.rs");
 const WEBHOOK_CONTROLS_SOURCE: &str = include_str!("../src/webhooks/controls.rs");

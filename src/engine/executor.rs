@@ -29,6 +29,7 @@ use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::EmptyCredentialProvider;
 use crate::credentials::NodeCredentialRefs;
+use crate::engine::child::SubworkflowRunnerShell;
 use crate::engine::runner;
 use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
@@ -836,21 +837,6 @@ fn value_to_json(value: &Value) -> serde_json::Value {
     }
 }
 
-// r[impl n8nclone.workflow_execution.subworkflows.events]
-fn subworkflow_invocation_event_value(
-    node_id: NodeId,
-    config: &control_flow::SubworkflowNodeConfig,
-    inputs: &HashMap<PortId, Value>,
-) -> Value {
-    let input_count = inputs.len();
-    Value::from_json(serde_json::json!({
-        "event": "subworkflow_invocation_admitted",
-        "subworkflow_node_id": node_id.0,
-        "workflow_name": config.workflow_name,
-        "input_count": input_count,
-    }))
-}
-
 // r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
 fn completed_step_result(
     node_id: NodeId,
@@ -969,6 +955,7 @@ pub struct Executor {
     file_system: Box<dyn FileSystem>,
     image_io: Box<dyn ImageIo>,
     agent_adapter: Box<dyn AgentAdapter>,
+    subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -987,6 +974,10 @@ fn default_agent_adapter() -> Box<dyn AgentAdapter> {
     Box::<ProductionAgentAdapter>::default()
 }
 
+fn default_subworkflow_runner_shell() -> Box<dyn SubworkflowRunnerShell> {
+    Box::new(crate::engine::child::UnavailableSubworkflowRunnerShell)
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
@@ -996,6 +987,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1007,6 +999,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1028,6 +1021,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1039,6 +1033,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1050,6 +1045,7 @@ impl Executor {
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1061,6 +1057,7 @@ impl Executor {
             file_system: default_file_system(),
             image_io,
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1072,7 +1069,17 @@ impl Executor {
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter,
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
+    }
+
+    pub fn new_with_subworkflow_runner_shell(subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>) -> Self {
+        Self::new().with_subworkflow_runner_shell(subworkflow_runner_shell)
+    }
+
+    pub fn with_subworkflow_runner_shell(mut self, subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>) -> Self {
+        self.subworkflow_runner_shell = subworkflow_runner_shell;
+        self
     }
 
     pub fn new_with_clients(
@@ -1087,6 +1094,7 @@ impl Executor {
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1104,6 +1112,7 @@ impl Executor {
             file_system,
             image_io,
             agent_adapter,
+            subworkflow_runner_shell: default_subworkflow_runner_shell(),
         }
     }
 
@@ -1114,7 +1123,7 @@ impl Executor {
         node_id: NodeId,
         inputs: &HashMap<PortId, Value>,
     ) -> StepResult {
-        self.execute_node_with_expression_context(workflow, node_id, inputs, &ExpressionContext::default())
+        self.execute_node_with_expression_context(workflow, node_id, inputs, &ExpressionContext::default(), None)
             .await
     }
 
@@ -1124,6 +1133,7 @@ impl Executor {
         node_id: NodeId,
         inputs: &HashMap<PortId, Value>,
         expression_context: &ExpressionContext,
+        parent_run_id: Option<RunId>,
     ) -> StepResult {
         let node = match workflow.graph.node(node_id) {
             Some(n) => n,
@@ -1645,16 +1655,55 @@ impl Executor {
                         input_hash,
                     };
                 }
-                completed_step_result(
-                    node_id,
-                    input_hash,
+                let Some(parent_run_id) = parent_run_id else {
+                    return StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: "subworkflow execution requires a parent run identity".to_string(),
+                        },
+                        input_hash,
+                    };
+                };
+                let invocation = match crate::engine::child::build_invocation(
+                    &workflow.meta.name,
+                    parent_run_id,
                     node,
-                    node.output_ports
-                        .iter()
-                        .map(|port| (port.id, subworkflow_invocation_event_value(node_id, config, inputs)))
-                        .collect(),
-                    false,
-                )
+                    config,
+                    inputs,
+                ) {
+                    Ok(invocation) => invocation,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        };
+                    }
+                };
+                let execution = match self.subworkflow_runner_shell.execute(&invocation).await {
+                    Ok(execution) => execution,
+                    Err(error) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: error.to_string(),
+                            },
+                            input_hash,
+                        };
+                    }
+                };
+                match crate::engine::child::validate_and_map_execution(node, config, &invocation, execution) {
+                    Ok(outputs) => completed_step_result(node_id, input_hash, node, outputs, false),
+                    Err(error) => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_string(),
+                        },
+                        input_hash,
+                    },
+                }
             }
         }
     }
@@ -1664,6 +1713,25 @@ impl Executor {
         &mut self,
         workflow: &Workflow,
         cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+    ) -> (RunId, Vec<StepResult>) {
+        self.run_with_bound_inputs(workflow, cache, &HashMap::new()).await
+    }
+
+    pub async fn run_with_named_inputs(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        named_inputs: &BTreeMap<String, Value>,
+    ) -> Result<(RunId, Vec<StepResult>), crate::engine::child::SubworkflowExecutionError> {
+        let bound_inputs = crate::engine::child::bind_named_inputs(workflow, named_inputs)?;
+        Ok(self.run_with_bound_inputs(workflow, cache, &bound_inputs).await)
+    }
+
+    async fn run_with_bound_inputs(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        bound_inputs: &HashMap<PortId, Value>,
     ) -> (RunId, Vec<StepResult>) {
         let run_id = RunId(self.next_run_id);
         self.next_run_id += 1;
@@ -1689,8 +1757,15 @@ impl Executor {
                 "runner state count must remain bounded by admitted nodes"
             );
 
-            // Gather inputs from upstream edges.
-            let inputs = gather_inputs(workflow, node_id, &port_values);
+            // Gather inputs from upstream edges and admitted workflow-bound inputs.
+            let mut inputs = gather_inputs(workflow, node_id, &port_values);
+            if let Some(node) = workflow.graph.node(node_id) {
+                for port in &node.input_ports {
+                    if let Some(value) = bound_inputs.get(&port.id) {
+                        inputs.insert(port.id, value.clone());
+                    }
+                }
+            }
 
             // Check cache.
             let input_hash = match workflow.node_config(node_id) {
@@ -1732,7 +1807,9 @@ impl Executor {
             }
 
             let expression_context = expression_context_from_workflow_outputs(workflow, &port_values);
-            let step = self.execute_node_with_expression_context(workflow, node_id, &inputs, &expression_context).await;
+            let step = self
+                .execute_node_with_expression_context(workflow, node_id, &inputs, &expression_context, Some(run_id))
+                .await;
 
             // Store outputs for downstream nodes.
             if let NodeStatus::Completed { ref outputs, .. } = step.status {
