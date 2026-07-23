@@ -13,6 +13,8 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
 use lattice::config::AppConfig;
 use lattice::engine::RunId;
+use lattice::engine::Workflow;
+use lattice::store::Store;
 use lattice::tui::App;
 use lattice::tui::app::RunOutputLine;
 use lattice::tui::app::palette_action;
@@ -46,7 +48,21 @@ const PTY_TRANSCRIPT_MAX_BYTES: usize = 1_048_576;
 const PTY_POLL_ATTEMPTS: usize = 250;
 const PTY_POLL_DELAY_MS: u64 = 20;
 const TUI_QUIT_INPUT: &[u8] = b"\x11";
+const TUI_OPEN_WORKFLOW_INPUT: &[u8] = b"\x0f";
+const TUI_RUN_WORKFLOW_INPUT: &[u8] = b"\x12";
+const TUI_OPEN_HISTORY_INPUT: &[u8] = b"\x10history\r";
+const TUI_CONFIRM_INPUT: &[u8] = b"\r";
 const TUI_WORKSPACE_SURFACES: &[&str] = &["Canvas", "Properties", "Output", "untitled"];
+const TUI_WORKFLOW_BROWSER_SURFACES: &[&str] = &["Open Workflow", TUI_WORKFLOW_NAME];
+const TUI_COMPLETED_RUN_SURFACES: &[&str] = &[TUI_SHELL_OUTPUT, "run", "complete"];
+const TUI_HISTORY_SURFACES: &[&str] = &["Run History", TUI_WORKFLOW_NAME];
+const TUI_WORKFLOW_NAME: &str = "operator-tui-workflow";
+const TUI_NODE_LABEL: &str = "Operator Shell";
+const TUI_SHELL_OUTPUT: &str = "tui-process-e2e";
+const TUI_SHELL_COMMAND: &str = "printf tui-process-e2e";
+const STORE_FILE_NAME: &str = "lattice.redb";
+const TUI_RUN_HISTORY_LIMIT: usize = 10;
+const EXPECTED_TUI_RUN_COUNT: usize = 1;
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -83,22 +99,43 @@ fn transcript_text(transcript: &Arc<Mutex<Vec<u8>>>) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
-fn transcript_has_workspace(transcript: &str) -> bool {
-    TUI_WORKSPACE_SURFACES.iter().all(|surface| transcript.contains(surface))
+fn transcript_has_surfaces(transcript: &str, surfaces: &[&str]) -> bool {
+    surfaces.iter().all(|surface| transcript.contains(surface))
 }
 
-fn wait_for_workspace(transcript: &Arc<Mutex<Vec<u8>>>) -> String {
+fn transcript_has_workspace(transcript: &str) -> bool {
+    transcript_has_surfaces(transcript, TUI_WORKSPACE_SURFACES)
+}
+
+fn wait_for_surfaces(transcript: &Arc<Mutex<Vec<u8>>>, surfaces: &[&str], phase: &str) -> String {
+    assert!(!surfaces.is_empty(), "PTY surface wait must name observable output");
     for _ in 0..PTY_POLL_ATTEMPTS {
         let text = transcript_text(transcript);
-        if transcript_has_workspace(&text) {
+        if transcript_has_surfaces(&text, surfaces) {
             return text;
         }
         thread::sleep(Duration::from_millis(PTY_POLL_DELAY_MS));
     }
-    panic!(
-        "TUI did not render the workspace within the bounded PTY startup window: {}",
-        transcript_text(transcript)
-    );
+    panic!("TUI did not render {phase} within the bounded PTY window: {}", transcript_text(transcript));
+}
+
+fn wait_for_workspace(transcript: &Arc<Mutex<Vec<u8>>>) -> String {
+    wait_for_surfaces(transcript, TUI_WORKSPACE_SURFACES, "the workspace")
+}
+
+fn write_pty_input(writer: &mut dyn Write, input: &[u8], description: &str) {
+    assert!(!input.is_empty(), "PTY input must contain an action");
+    writer.write_all(input).unwrap_or_else(|error| panic!("{description} input writes to PTY: {error}"));
+    writer.flush().unwrap_or_else(|error| panic!("{description} input flushes to PTY: {error}"));
+}
+
+fn save_operator_tui_workflow(temp_dir: &TempDir) {
+    let data_dir = temp_dir.path().join("data");
+    std::fs::create_dir_all(&data_dir).expect("operator TUI data directory creates");
+    let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("operator TUI store opens");
+    let mut workflow = Workflow::new(TUI_WORKFLOW_NAME);
+    workflow.add_shell_node(TUI_NODE_LABEL, TUI_SHELL_COMMAND);
+    store.save_workflow(&workflow).expect("operator TUI workflow saves");
 }
 
 fn wait_for_pty_exit(child: &mut dyn portable_pty::Child) -> portable_pty::ExitStatus {
@@ -130,9 +167,10 @@ fn bounded_transcript_read_len(current_bytes: usize, incoming_bytes: usize) -> u
 }
 
 #[test]
-fn operator_e2e_tui_process_renders_in_a_pty_and_exits_on_keyboard_input() {
+fn operator_e2e_tui_process_navigates_executes_inspects_history_and_exits() {
     let temp_dir = tempfile::tempdir().expect("temporary operator E2E directory");
     let config_path = write_cli_config(&temp_dir);
+    save_operator_tui_workflow(&temp_dir);
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -172,15 +210,36 @@ fn operator_e2e_tui_process_renders_in_a_pty_and_exits_on_keyboard_input() {
     });
 
     let rendered = wait_for_workspace(&transcript);
-    writer.write_all(TUI_QUIT_INPUT).expect("quit input writes to PTY");
-    writer.flush().expect("quit input flushes to PTY");
+    write_pty_input(writer.as_mut(), TUI_OPEN_WORKFLOW_INPUT, "open workflow");
+    let browser = wait_for_surfaces(&transcript, TUI_WORKFLOW_BROWSER_SURFACES, "the workflow browser");
+    write_pty_input(writer.as_mut(), TUI_CONFIRM_INPUT, "select workflow");
+    let opened = wait_for_surfaces(&transcript, &[TUI_NODE_LABEL], "the selected workflow");
+    write_pty_input(writer.as_mut(), TUI_RUN_WORKFLOW_INPUT, "run workflow");
+    let completed = wait_for_surfaces(&transcript, TUI_COMPLETED_RUN_SURFACES, "the completed workflow run");
+    write_pty_input(writer.as_mut(), TUI_OPEN_HISTORY_INPUT, "open run history");
+    let history = wait_for_surfaces(&transcript, TUI_HISTORY_SURFACES, "run history");
+    write_pty_input(writer.as_mut(), TUI_CONFIRM_INPUT, "inspect run history");
+    let details = wait_for_surfaces(&transcript, &["Outputs for", TUI_NODE_LABEL], "run details");
+    write_pty_input(writer.as_mut(), TUI_QUIT_INPUT, "quit");
     let status = wait_for_pty_exit(child.as_mut());
     drop(writer);
     drop(pair.master);
     reader_thread.join().expect("PTY transcript reader joins");
 
-    assert!(status.success(), "TUI exit status: {status}; transcript: {rendered}");
+    assert!(status.success(), "TUI exit status: {status}; transcript: {details}");
     assert!(transcript_has_workspace(&rendered));
+    assert!(transcript_has_surfaces(&browser, TUI_WORKFLOW_BROWSER_SURFACES));
+    assert!(opened.contains(TUI_NODE_LABEL));
+    assert!(transcript_has_surfaces(&completed, TUI_COMPLETED_RUN_SURFACES));
+    assert!(transcript_has_surfaces(&history, TUI_HISTORY_SURFACES));
+    assert!(details.contains(&format!("Outputs for {TUI_NODE_LABEL}")));
+
+    let store = Store::new(temp_dir.path().join("data").join(STORE_FILE_NAME)).expect("operator TUI store reopens");
+    let runs = store.list_runs(TUI_RUN_HISTORY_LIMIT).expect("operator TUI run history lists");
+    assert_eq!(runs.len(), EXPECTED_TUI_RUN_COUNT);
+    assert_eq!(runs[0].workflow_name, TUI_WORKFLOW_NAME);
+    assert_eq!(runs[0].failures, 0);
+    assert!(store.load_run_details(runs[0].run_id).expect("operator TUI run details load").is_some());
 }
 
 #[test]

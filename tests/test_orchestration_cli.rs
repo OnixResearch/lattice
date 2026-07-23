@@ -1,7 +1,10 @@
 mod common;
 
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::process::Command;
+use std::process::Stdio;
+use std::time::Duration;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
@@ -62,6 +65,31 @@ const EXPECTED_RESTART_INSTANCE_COUNT: usize = 1;
 const FORCED_DEATH_MARKER_FILE_NAME: &str = "orchestration-forced-death";
 #[cfg(unix)]
 const CRASH_SNAPSHOT_FILE_NAME: &str = "orchestration-crashed-state.redb";
+const RECOVERY_CONTENDER_CHILD_TEST_NAME: &str = "orchestration_recovery_contender_child_entrypoint";
+const RECOVERY_CONTENDER_CONFIG_ENV: &str = "LATTICE_RECOVERY_CONTENDER_CONFIG";
+const RECOVERY_CONTENDER_INSTANCE_ENV: &str = "LATTICE_RECOVERY_CONTENDER_INSTANCE";
+const RECOVERY_CONTENDER_READY_ENV: &str = "LATTICE_RECOVERY_CONTENDER_READY";
+const RECOVERY_CONTENDER_RELEASE_ENV: &str = "LATTICE_RECOVERY_CONTENDER_RELEASE";
+const RECOVERY_CONTENDER_RESULT_ENV: &str = "LATTICE_RECOVERY_CONTENDER_RESULT";
+const RECOVERY_CONTENDER_POLL_ATTEMPTS: usize = 500;
+const RECOVERY_CONTENDER_POLL_DELAY_MS: u64 = 10;
+const RECOVERY_CONTENDER_COUNT: usize = 2;
+const RECOVERY_SETTLED_EVENT_COUNT: usize = 3;
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct RecoveryContenderResult {
+    success: bool,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoveryContenderOutcome {
+    Reconciled,
+    AlreadySettled,
+    ActiveOwnerRejected,
+    Unexpected,
+}
 
 fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
     fixture_with_shell_command(completion, SHELL_COMMAND)
@@ -128,6 +156,44 @@ fn command(config_path: &std::path::Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_lattice"));
     command.arg("--config").arg(config_path).arg("orchestration");
     command
+}
+
+fn recovery_contender_command(
+    config_path: &Path,
+    instance_id: &str,
+    ready_path: &Path,
+    release_path: &Path,
+    result_path: &Path,
+) -> Command {
+    let mut contender = Command::new(std::env::current_exe().expect("orchestration test executable resolves"));
+    contender
+        .arg("--exact")
+        .arg(RECOVERY_CONTENDER_CHILD_TEST_NAME)
+        .env(RECOVERY_CONTENDER_CONFIG_ENV, config_path)
+        .env(RECOVERY_CONTENDER_INSTANCE_ENV, instance_id)
+        .env(RECOVERY_CONTENDER_READY_ENV, ready_path)
+        .env(RECOVERY_CONTENDER_RELEASE_ENV, release_path)
+        .env(RECOVERY_CONTENDER_RESULT_ENV, result_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    contender
+}
+
+fn recovery_contender_outcome(result: &RecoveryContenderResult) -> RecoveryContenderOutcome {
+    if result.success && result.stdout.contains("\"Reconciled\"") {
+        return RecoveryContenderOutcome::Reconciled;
+    }
+    if result.success && result.stdout.contains("NothingPending") {
+        return RecoveryContenderOutcome::AlreadySettled;
+    }
+    let normalized_stderr = result.stderr.to_ascii_lowercase();
+    if !result.success
+        && normalized_stderr.contains("orchestration failed:")
+        && (normalized_stderr.contains("already open") || normalized_stderr.contains("acquire lock"))
+    {
+        return RecoveryContenderOutcome::ActiveOwnerRejected;
+    }
+    RecoveryContenderOutcome::Unexpected
 }
 
 fn persist_observed_failure(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
@@ -560,6 +626,145 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
         .expect("repeated abandon command must execute");
     assert!(!repeated.status.success());
     assert!(String::from_utf8_lossy(&repeated.stderr).contains("no pending dispatch"));
+}
+
+#[test]
+fn orchestration_recovery_contender_child_entrypoint() {
+    let Ok(config_path) = std::env::var(RECOVERY_CONTENDER_CONFIG_ENV) else {
+        return;
+    };
+    let instance_id = std::env::var(RECOVERY_CONTENDER_INSTANCE_ENV).expect("contender instance id is configured");
+    let ready_path = std::env::var_os(RECOVERY_CONTENDER_READY_ENV).expect("contender ready path is configured");
+    let release_path = std::env::var_os(RECOVERY_CONTENDER_RELEASE_ENV).expect("contender release path is configured");
+    let result_path = std::env::var_os(RECOVERY_CONTENDER_RESULT_ENV).expect("contender result path is configured");
+    std::fs::write(&ready_path, "ready").expect("contender ready marker persists");
+    common::wait_for_path(
+        Path::new(&release_path),
+        RECOVERY_CONTENDER_POLL_ATTEMPTS,
+        Duration::from_millis(RECOVERY_CONTENDER_POLL_DELAY_MS),
+    );
+
+    let output = command(Path::new(&config_path))
+        .arg("recover")
+        .arg(instance_id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("contender recovery process executes");
+    let result = RecoveryContenderResult {
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    };
+    std::fs::write(&result_path, serde_json::to_vec(&result).expect("contender result serializes"))
+        .expect("contender result persists");
+}
+
+#[test]
+fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_transition() {
+    let (directory, config_path, _definition_path, store) = fixture(CompletionPolicy::RunSucceeded);
+    let workflow = store
+        .load_workflow(WORKFLOW_NAME)
+        .expect("concurrent recovery workflow lookup succeeds")
+        .expect("concurrent recovery workflow exists");
+    let pending = persist_acknowledged_pending(&store, &workflow);
+    let intent = pending.pending_dispatch.as_ref().expect("concurrent recovery dispatch remains pending");
+    persist_pending_run_record(&store, &pending, RunOwner::Orchestration {
+        instance_id: pending.id.clone(),
+        dispatch_id: intent.id.clone(),
+    });
+    drop(store);
+
+    let release_path = directory.path().join("recovery-contenders-release");
+    let first_ready_path = directory.path().join("recovery-contender-first-ready");
+    let second_ready_path = directory.path().join("recovery-contender-second-ready");
+    let first_result_path = directory.path().join("recovery-contender-first-result.json");
+    let second_result_path = directory.path().join("recovery-contender-second-result.json");
+    let first =
+        recovery_contender_command(&config_path, &pending.id, &first_ready_path, &release_path, &first_result_path)
+            .spawn()
+            .expect("first recovery contender starts");
+    let second =
+        recovery_contender_command(&config_path, &pending.id, &second_ready_path, &release_path, &second_result_path)
+            .spawn()
+            .expect("second recovery contender starts");
+    let first = common::ChildGuard::new(first);
+    let second = common::ChildGuard::new(second);
+    for ready_path in [&first_ready_path, &second_ready_path] {
+        common::wait_for_path(
+            ready_path,
+            RECOVERY_CONTENDER_POLL_ATTEMPTS,
+            Duration::from_millis(RECOVERY_CONTENDER_POLL_DELAY_MS),
+        );
+    }
+    std::fs::write(&release_path, "release").expect("recovery contenders release together");
+    let first_child = first.wait_with_output();
+    let second_child = second.wait_with_output();
+    assert!(first_child.status.success(), "first contender harness failed");
+    assert!(second_child.status.success(), "second contender harness failed");
+
+    let results = [&first_result_path, &second_result_path]
+        .into_iter()
+        .map(|path| {
+            serde_json::from_slice::<RecoveryContenderResult>(
+                &std::fs::read(path).expect("recovery contender result reads"),
+            )
+            .expect("recovery contender result parses")
+        })
+        .collect::<Vec<_>>();
+    let outcomes = results.iter().map(recovery_contender_outcome).collect::<Vec<_>>();
+    assert_eq!(
+        outcomes.iter().filter(|outcome| **outcome == RecoveryContenderOutcome::Reconciled).count(),
+        1,
+        "contender outcomes: {outcomes:?}; results: {results:?}"
+    );
+    assert_eq!(outcomes.len(), RECOVERY_CONTENDER_COUNT);
+    assert!(
+        outcomes.iter().all(|outcome| matches!(
+            outcome,
+            RecoveryContenderOutcome::Reconciled
+                | RecoveryContenderOutcome::AlreadySettled
+                | RecoveryContenderOutcome::ActiveOwnerRejected
+        )),
+        "contender outcomes: {outcomes:?}; results: {results:?}"
+    );
+
+    let store_path = config_path.parent().expect("config has parent").join("data").join(STORE_FILE_NAME);
+    let settled = Store::new(&store_path).expect("concurrent recovery store reopens");
+    let instance = settled
+        .load_orchestration(&pending.id)
+        .expect("concurrent recovery instance lookup succeeds")
+        .expect("concurrent recovery instance remains");
+    let events = settled.load_orchestration_events(&pending.id).expect("concurrent recovery events load");
+    let runs = settled.list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT).expect("concurrent recovery runs list");
+    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert!(instance.pending_dispatch.is_none());
+    assert_eq!(events.len(), RECOVERY_SETTLED_EVENT_COUNT);
+    assert_eq!(runs.len(), EXPECTED_OBSERVED_RUN_COUNT);
+    drop(settled);
+
+    let repeated = command(&config_path)
+        .arg("recover")
+        .arg(&pending.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("settled recovery command executes");
+    assert!(repeated.status.success(), "stderr: {}", String::from_utf8_lossy(&repeated.stderr));
+    assert!(String::from_utf8_lossy(&repeated.stdout).contains("NothingPending"));
+
+    let replay = command(&config_path)
+        .arg("replay")
+        .arg(&pending.id)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("concurrent recovery replay executes");
+    assert!(replay.status.success(), "stderr: {}", String::from_utf8_lossy(&replay.stderr));
+    let report: lattice::orchestration::ReplayReport =
+        serde_json::from_slice(&replay.stdout).expect("concurrent recovery replay parses");
+    assert!(report.valid);
+    assert_eq!(report.instance, instance);
 }
 
 #[cfg(unix)]

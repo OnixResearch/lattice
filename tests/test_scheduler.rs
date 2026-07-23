@@ -4,6 +4,8 @@ mod common;
 
 use std::collections::HashSet;
 use std::process::Command;
+use std::process::Stdio;
+use std::time::Duration;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
@@ -56,6 +58,18 @@ const CRASH_SNAPSHOT_FILE_NAME: &str = "scheduler-crashed-state.redb";
 const RECOVERY_EFFECT_FILE_NAME: &str = "scheduler-recovery-effect";
 #[cfg(unix)]
 const RECOVERY_EFFECT: &str = "restarted-once";
+#[cfg(unix)]
+const CONCURRENT_READY_FILE_NAME: &str = "scheduler-concurrent-ready";
+#[cfg(unix)]
+const CONCURRENT_RELEASE_FILE_NAME: &str = "scheduler-concurrent-release";
+#[cfg(unix)]
+const CONCURRENT_EFFECT_FILE_NAME: &str = "scheduler-concurrent-effect";
+#[cfg(unix)]
+const CONCURRENT_EFFECT: &str = "single-owner";
+#[cfg(unix)]
+const CONCURRENT_GATE_POLL_ATTEMPTS: usize = 500;
+#[cfg(unix)]
+const CONCURRENT_GATE_POLL_DELAY_MS: u64 = 10;
 
 #[derive(Default)]
 struct FakeRunner {
@@ -242,6 +256,87 @@ fn operator_e2e_scheduler_restart_retries_due_run_after_forced_process_death() {
     assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
     assert_eq!(runs[0].workflow_name, WORKFLOW_NAME);
     assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
+}
+
+#[cfg(unix)]
+#[test]
+fn operator_e2e_scheduler_concurrent_daemons_admit_one_store_owner_and_one_durable_run() {
+    let temp_dir = tempfile::tempdir().expect("temporary concurrent scheduler directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let ready_path = temp_dir.path().join(CONCURRENT_READY_FILE_NAME);
+    let release_path = temp_dir.path().join(CONCURRENT_RELEASE_FILE_NAME);
+    let effect_path = temp_dir.path().join(CONCURRENT_EFFECT_FILE_NAME);
+    let store_path = data_dir.join(STORE_FILE_NAME);
+    let store = Store::new(&store_path).expect("concurrent scheduler store opens");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node(
+        "scheduler-concurrent",
+        common::gated_write_command(&ready_path, &release_path, &effect_path, CONCURRENT_EFFECT),
+    );
+    store.save_workflow(&workflow).expect("concurrent scheduler workflow saves");
+    store.save_schedule(&schedule(START_EPOCH_MS)).expect("concurrent scheduler schedule saves");
+    drop(store);
+
+    let first = scheduler_command(&config_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("first concurrent scheduler starts");
+    let mut first = common::ChildGuard::new(first);
+    common::wait_for_path(
+        &ready_path,
+        CONCURRENT_GATE_POLL_ATTEMPTS,
+        Duration::from_millis(CONCURRENT_GATE_POLL_DELAY_MS),
+    );
+    assert_eq!(
+        std::fs::read_to_string(&ready_path).expect("concurrent scheduler ready marker reads"),
+        common::PROCESS_GATE_READY_CONTENT,
+    );
+    assert!(
+        first.child_mut().try_wait().expect("first concurrent scheduler remains observable").is_none(),
+        "first concurrent scheduler must still own the store while gated"
+    );
+
+    let contender = scheduler_command(&config_path).output().expect("second concurrent scheduler returns");
+    let contender_stderr = String::from_utf8_lossy(&contender.stderr);
+    let normalized_contender_stderr = contender_stderr.to_ascii_lowercase();
+    assert!(!contender.status.success(), "second concurrent scheduler unexpectedly acquired the store");
+    assert!(contender_stderr.contains("Scheduler failed:"), "stderr: {contender_stderr}");
+    assert!(
+        normalized_contender_stderr.contains("already open") || normalized_contender_stderr.contains("acquire lock"),
+        "second scheduler did not report active store ownership: {contender_stderr}"
+    );
+    assert!(!effect_path.exists(), "gated workflow effect must not occur before release");
+
+    std::fs::write(&release_path, "release").expect("concurrent scheduler gate releases");
+    let first_output = first.wait_with_output();
+    let first_stdout = String::from_utf8_lossy(&first_output.stdout);
+    let first_stderr = String::from_utf8_lossy(&first_output.stderr);
+    assert!(first_output.status.success(), "stderr: {first_stderr}");
+    assert!(
+        first_stdout.contains(&format!("started schedule {SCHEDULE_ID} workflow {WORKFLOW_NAME}")),
+        "stdout: {first_stdout}"
+    );
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("concurrent scheduler effect reads"), CONCURRENT_EFFECT);
+
+    let settled = Store::new(&store_path).expect("concurrent scheduler store reopens");
+    let runs = settled.list_runs(RUN_HISTORY_LIMIT).expect("concurrent scheduler runs list");
+    let advanced = settled
+        .load_schedule(SCHEDULE_ID)
+        .expect("concurrent scheduler schedule loads")
+        .expect("concurrent scheduler schedule remains");
+    assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
+    assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
+    drop(settled);
+
+    let after_advance = scheduler_command(&config_path).output().expect("post-advance scheduler returns");
+    assert!(after_advance.status.success(), "stderr: {}", String::from_utf8_lossy(&after_advance.stderr));
+    assert!(!String::from_utf8_lossy(&after_advance.stdout).contains("started schedule"));
+    let final_store = Store::new(&store_path).expect("final concurrent scheduler store reopens");
+    assert_eq!(
+        final_store.list_runs(RUN_HISTORY_LIMIT).expect("final concurrent scheduler runs list").len(),
+        EXPECTED_PERSISTED_RUNS,
+    );
 }
 
 // r[verify n8nclone.scheduling.schedule_model]

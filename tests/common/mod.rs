@@ -17,6 +17,52 @@ const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 
 #[cfg(unix)]
 pub const FORCED_DEATH_MARKER_CONTENT: &str = "forced-death";
+#[cfg(unix)]
+pub const PROCESS_GATE_READY_CONTENT: &str = "ready";
+#[cfg(unix)]
+const PROCESS_GATE_POLL_INTERVAL_SECONDS: &str = "0.01";
+
+pub struct ChildGuard {
+    child: Option<std::process::Child>,
+}
+
+impl ChildGuard {
+    pub fn new(child: std::process::Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    pub fn child_mut(&mut self) -> &mut std::process::Child {
+        self.child.as_mut().expect("guarded child remains owned")
+    }
+
+    pub fn wait_with_output(mut self) -> std::process::Output {
+        self.child
+            .take()
+            .expect("guarded child remains owned")
+            .wait_with_output()
+            .expect("guarded child output remains observable")
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+pub fn wait_for_path(path: &std::path::Path, attempts: usize, poll_delay: std::time::Duration) {
+    assert!(attempts > 0, "path wait must be bounded by at least one attempt");
+    for _ in 0..attempts {
+        if path.exists() {
+            return;
+        }
+        std::thread::sleep(poll_delay);
+    }
+    panic!("path did not appear within the bounded wait: {}", path.display());
+}
 
 #[cfg(unix)]
 fn quote_for_posix_shell(value: &str) -> String {
@@ -53,6 +99,26 @@ pub fn forced_parent_death_once_then_write_command(
     format!(
         "if [ ! -e {marker} ]; then printf %s '{}' > {marker}; kill -KILL \"$PPID\"; exit; fi; printf %s {recovery_effect} > {recovery_effect_path}",
         FORCED_DEATH_MARKER_CONTENT,
+    )
+}
+
+/// Hold a workflow effect behind an observable file gate so another process
+/// can contend while the first Lattice process still owns its state store.
+#[cfg(unix)]
+pub fn gated_write_command(
+    ready_path: &std::path::Path,
+    release_path: &std::path::Path,
+    effect_path: &std::path::Path,
+    effect: &str,
+) -> String {
+    assert!(!effect.is_empty(), "gated effect must be observable");
+    let ready = quote_path_for_posix_shell(ready_path);
+    let release = quote_path_for_posix_shell(release_path);
+    let effect_path = quote_path_for_posix_shell(effect_path);
+    let effect = quote_for_posix_shell(effect);
+    format!(
+        "printf %s '{}' > {ready}; while [ ! -e {release} ]; do sleep {PROCESS_GATE_POLL_INTERVAL_SECONDS}; done; printf %s {effect} > {effect_path}",
+        PROCESS_GATE_READY_CONTENT,
     )
 }
 

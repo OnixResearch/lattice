@@ -62,6 +62,8 @@ const LIMIT_BYTES: usize = 1024;
 const RUN_ID_VALUE: u64 = 42;
 const CURRENT_EPOCH_MS: i64 = 1_000;
 const HISTORY_LIMIT: usize = 1;
+const OPERATOR_HISTORY_LIMIT: usize = 10;
+const EXPECTED_OPERATOR_TRIGGER_HISTORY: usize = 2;
 const EXPECTED_TRIGGER_COUNT: u64 = 1;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
@@ -81,6 +83,8 @@ const HTTP_ACCEPTED_STATUS: &str = "HTTP/1.1 202 Accepted";
 const HTTP_ACCEPTED_BODY: &str = "\"status\":\"accepted\"";
 const HTTP_NOT_FOUND_STATUS: &str = "HTTP/1.1 404 Not Found";
 const HTTP_NOT_FOUND_BODY: &str = "\"code\":\"not_found\"";
+const HTTP_CONFLICT_STATUS: &str = "HTTP/1.1 409 Conflict";
+const HTTP_DUPLICATE_BODY: &str = "\"code\":\"duplicate_idempotency_key\"";
 
 struct ListenerChild {
     child: Option<Child>,
@@ -480,11 +484,12 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let status = read_listener_status(stdout);
     let rejected_response = send_http_request(address, listener.child_mut(), &http_request_bytes(MISSING_PATH));
     let accepted_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
+    let duplicate_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
     listener.stop();
 
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("reopen live listener store");
-    let runs = store.list_runs(HISTORY_LIMIT).expect("live listener runs list");
-    let history = store.list_trigger_runs(HISTORY_LIMIT).expect("live listener trigger history lists");
+    let runs = store.list_runs(OPERATOR_HISTORY_LIMIT).expect("live listener runs list");
+    let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("live listener trigger history lists");
 
     assert!(status.contains(&format!("bind={address}")), "status: {status}");
     assert!(status.contains("loaded_triggers=1"), "status: {status}");
@@ -497,10 +502,18 @@ fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     assert!(accepted_response.contains(HTTP_ACCEPTED_STATUS));
     assert!(accepted_response.contains(HTTP_ACCEPTED_BODY));
     assert!(accepted_response.contains(TRIGGER_ID));
+    assert!(duplicate_response.contains(HTTP_CONFLICT_STATUS));
+    assert!(duplicate_response.contains(HTTP_DUPLICATE_BODY));
+    assert!(!duplicate_response.contains(HTTP_ACCEPTED_BODY));
     assert_eq!(runs.len(), HISTORY_LIMIT);
-    assert_eq!(history.len(), HISTORY_LIMIT);
-    assert_eq!(history[0].trigger_id, TRIGGER_ID);
-    assert_eq!(history[0].status, TriggerRunStatus::Started);
+    assert_eq!(history.len(), EXPECTED_OPERATOR_TRIGGER_HISTORY);
+    assert!(history.iter().all(|record| record.trigger_id == TRIGGER_ID));
+    assert_eq!(history.iter().filter(|record| record.status == TriggerRunStatus::Started).count(), HISTORY_LIMIT,);
+    let duplicate = history
+        .iter()
+        .find(|record| record.status == TriggerRunStatus::Rejected)
+        .expect("duplicate listener request persists one rejected history record");
+    assert_eq!(duplicate.idempotency_key.as_deref(), Some(EVENT_KEY));
 }
 
 // r[verify n8nclone.tui_ux.webhook_listener.cli.dry_run]
