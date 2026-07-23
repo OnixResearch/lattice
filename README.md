@@ -15,6 +15,14 @@ nix flake check -L --option secret-key-files '' # full CI; check outputs do not 
 
 The Octet hook runs the lib target profile, keeps every configured Octet lint at `deny`, and accepts the current checked-in `octet-baseline.json` debt. New unaccepted Octet finding IDs fail the hook.
 
+## Operator crash-boundary evidence
+
+`scripts/operator-e2e.rs` exercises selected post-effect/pre-persistence death windows through real scheduler and webhook processes on supported Unix/Linux hosts. Each fixture appends an identified local effect attempt before killing its Lattice parent, inspects a copied crash store without first repairing the original, and then restarts or redelivers against that original state.
+
+The scheduler profile records that the schedule remains due, the local effect is attempted again after restart, and only the restarted terminal run persists. The initial webhook profile records the current risk boundary: the first response is incomplete, redelivery of the same trigger-scoped key performs a second local effect attempt, and only the redelivered terminal run and accepted trigger record persist. The atomic webhook-admission change is responsible for deliberately replacing that duplicate-risk profile with a durable pre-effect claim.
+
+These checks establish bounded local observations and at-least-once risk. They do not prove remote commit identity, provider deduplication, external cancellation, arbitrary kill safety, equivalent behavior on unsupported hosts, or exactly-once external execution.
+
 ## Traceability debt inventory
 
 The maintained inventory partitions Cairn's exact missing-requirement set without turning inventory rows into Tracey evidence. Generate the failing coverage receipt first, then regenerate or check the BLAKE3-bound report:

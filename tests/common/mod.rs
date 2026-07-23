@@ -21,6 +21,7 @@ pub const FORCED_DEATH_MARKER_CONTENT: &str = "forced-death";
 pub const PROCESS_GATE_READY_CONTENT: &str = "ready";
 #[cfg(unix)]
 const PROCESS_GATE_POLL_INTERVAL_SECONDS: &str = "0.01";
+const POST_EFFECT_EXPECTED_ATTEMPT_COUNT: usize = 2;
 
 pub struct ChildGuard {
     child: Option<std::process::Child>,
@@ -41,6 +42,27 @@ impl ChildGuard {
             .expect("guarded child remains owned")
             .wait_with_output()
             .expect("guarded child output remains observable")
+    }
+
+    pub fn wait_for_exit(mut self, attempts: usize, poll_delay: std::time::Duration) -> std::process::ExitStatus {
+        assert!(attempts > 0, "child wait must be bounded by at least one attempt");
+        for _ in 0..attempts {
+            let status = self
+                .child
+                .as_mut()
+                .expect("guarded child remains owned")
+                .try_wait()
+                .expect("guarded child status remains observable");
+            if let Some(status) = status {
+                self.child = None;
+                return status;
+            }
+            std::thread::sleep(poll_delay);
+        }
+        let mut child = self.child.take().expect("guarded child remains owned");
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("child did not exit within the bounded wait");
     }
 }
 
@@ -120,6 +142,153 @@ pub fn gated_write_command(
         "printf %s '{}' > {ready}; while [ ! -e {release} ]; do sleep {PROCESS_GATE_POLL_INTERVAL_SECONDS}; done; printf %s {effect} > {effect_path}",
         PROCESS_GATE_READY_CONTENT,
     )
+}
+
+/// Record one effect attempt on every invocation and kill the first Lattice
+/// parent only after the attempt and checkpoint are observable.
+#[cfg(unix)]
+pub fn post_effect_parent_death_once_then_repeat_command(
+    checkpoint_path: &std::path::Path,
+    attempts_path: &std::path::Path,
+    effect: &str,
+) -> String {
+    assert!(!effect.is_empty(), "post-effect attempt must be observable");
+    let checkpoint = quote_path_for_posix_shell(checkpoint_path);
+    let attempts = quote_path_for_posix_shell(attempts_path);
+    let effect = quote_for_posix_shell(effect);
+    format!(
+        "printf '%s\\n' {effect} >> {attempts}; sync; if [ ! -e {checkpoint} ]; then printf %s '{}' > {checkpoint}; sync; kill -KILL \"$PPID\"; exit; fi",
+        FORCED_DEATH_MARKER_CONTENT,
+    )
+}
+
+#[cfg(unix)]
+pub fn copy_crash_store_snapshot(source: &std::path::Path, destination: &std::path::Path) -> u64 {
+    assert_ne!(source, destination, "crash snapshot must not replace the original store");
+    let copied = std::fs::copy(source, destination).expect("crash store snapshot copies");
+    assert!(copied > 0, "crash store snapshot must not be empty");
+    copied
+}
+
+#[cfg(unix)]
+pub fn identified_effect_attempt_count(path: &std::path::Path, expected_effect: &str) -> usize {
+    assert!(!expected_effect.is_empty(), "expected effect must be identified");
+    let contents = std::fs::read_to_string(path).expect("effect-attempt file reads");
+    let attempts = contents.lines().collect::<Vec<_>>();
+    assert!(!attempts.is_empty(), "at least one effect attempt must be observable");
+    assert!(
+        attempts.iter().all(|attempt| *attempt == expected_effect),
+        "every effect attempt must match the reviewed identity"
+    );
+    attempts.len()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostEffectIngress {
+    Scheduler,
+    Webhook,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostEffectHttpOutcome {
+    NotApplicable,
+    FirstIncompleteThenAccepted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PostEffectCrashProfile {
+    pub ingress: PostEffectIngress,
+    pub pre_restart_run_count: usize,
+    pub schedule_remains_due: Option<bool>,
+    pub final_attempt_count: usize,
+    pub final_run_count: usize,
+    pub final_started_history_count: usize,
+    pub final_rejected_history_count: usize,
+    pub http_outcome: PostEffectHttpOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PostEffectCrashObservation {
+    pub ingress: PostEffectIngress,
+    pub checkpoint_observed: bool,
+    pub pre_restart_run_count: usize,
+    pub schedule_remains_due: Option<bool>,
+    pub final_attempt_count: usize,
+    pub final_run_count: usize,
+    pub final_started_history_count: usize,
+    pub final_rejected_history_count: usize,
+    pub http_outcome: PostEffectHttpOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostEffectCrashError {
+    MissingCheckpoint,
+    UnsupportedOutcome,
+    PrematureTerminalRecord,
+    PreRestartRunCountMismatch,
+    ScheduleStateMismatch,
+    AttemptCountMismatch,
+    FinalRunCountMismatch,
+    TriggerHistoryMismatch,
+    HttpOutcomeMismatch,
+}
+
+pub const SCHEDULER_POST_EFFECT_PROFILE: PostEffectCrashProfile = PostEffectCrashProfile {
+    ingress: PostEffectIngress::Scheduler,
+    pre_restart_run_count: 0,
+    schedule_remains_due: Some(true),
+    final_attempt_count: POST_EFFECT_EXPECTED_ATTEMPT_COUNT,
+    final_run_count: 1,
+    final_started_history_count: 0,
+    final_rejected_history_count: 0,
+    http_outcome: PostEffectHttpOutcome::NotApplicable,
+};
+
+pub const WEBHOOK_POST_EFFECT_DUPLICATE_RISK_PROFILE: PostEffectCrashProfile = PostEffectCrashProfile {
+    ingress: PostEffectIngress::Webhook,
+    pre_restart_run_count: 0,
+    schedule_remains_due: None,
+    final_attempt_count: POST_EFFECT_EXPECTED_ATTEMPT_COUNT,
+    final_run_count: 1,
+    final_started_history_count: 1,
+    final_rejected_history_count: 0,
+    http_outcome: PostEffectHttpOutcome::FirstIncompleteThenAccepted,
+};
+
+pub fn classify_post_effect_crash(
+    profile: PostEffectCrashProfile,
+    observation: PostEffectCrashObservation,
+) -> Result<(), PostEffectCrashError> {
+    if !observation.checkpoint_observed {
+        return Err(PostEffectCrashError::MissingCheckpoint);
+    }
+    if observation.ingress != profile.ingress {
+        return Err(PostEffectCrashError::UnsupportedOutcome);
+    }
+    if observation.pre_restart_run_count > 0 && profile.pre_restart_run_count == 0 {
+        return Err(PostEffectCrashError::PrematureTerminalRecord);
+    }
+    if observation.pre_restart_run_count != profile.pre_restart_run_count {
+        return Err(PostEffectCrashError::PreRestartRunCountMismatch);
+    }
+    if observation.schedule_remains_due != profile.schedule_remains_due {
+        return Err(PostEffectCrashError::ScheduleStateMismatch);
+    }
+    if observation.final_attempt_count != profile.final_attempt_count {
+        return Err(PostEffectCrashError::AttemptCountMismatch);
+    }
+    if observation.final_run_count != profile.final_run_count {
+        return Err(PostEffectCrashError::FinalRunCountMismatch);
+    }
+    if observation.final_started_history_count != profile.final_started_history_count
+        || observation.final_rejected_history_count != profile.final_rejected_history_count
+    {
+        return Err(PostEffectCrashError::TriggerHistoryMismatch);
+    }
+    if observation.http_outcome != profile.http_outcome {
+        return Err(PostEffectCrashError::HttpOutcomeMismatch);
+    }
+    Ok(())
 }
 
 /// Build a simple linear two-node workflow: echo → grep.

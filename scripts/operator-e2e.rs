@@ -25,13 +25,13 @@ const OPERATOR_E2E_CASES: &[OperatorE2eCase] = &[
         exact_filter: false,
     },
     OperatorE2eCase {
-        name: "webhook listener loopback and duplicate-delivery boundaries",
+        name: "webhook listener loopback, duplicate-delivery, and post-effect crash boundaries",
         test_target: "webhooks",
-        test_filter: "operator_listener_loads_persisted_trigger_and_accepts_loopback_request",
-        exact_filter: true,
+        test_filter: "operator_listener_",
+        exact_filter: false,
     },
     OperatorE2eCase {
-        name: "scheduler daemon process, restart, and concurrent-owner boundaries",
+        name: "scheduler daemon process, pre/post-effect restart, and concurrent-owner boundaries",
         test_target: "test_scheduler",
         test_filter: "operator_e2e_scheduler_",
         exact_filter: false,

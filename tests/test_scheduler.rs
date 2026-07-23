@@ -59,6 +59,16 @@ const RECOVERY_EFFECT_FILE_NAME: &str = "scheduler-recovery-effect";
 #[cfg(unix)]
 const RECOVERY_EFFECT: &str = "restarted-once";
 #[cfg(unix)]
+const POST_EFFECT_CHECKPOINT_FILE_NAME: &str = "scheduler-post-effect-checkpoint";
+#[cfg(unix)]
+const POST_EFFECT_ATTEMPTS_FILE_NAME: &str = "scheduler-post-effect-attempts";
+#[cfg(unix)]
+const POST_EFFECT_IDENTITY: &str = "scheduler-attempt";
+#[cfg(unix)]
+const POST_EFFECT_WAIT_ATTEMPTS: usize = 500;
+#[cfg(unix)]
+const POST_EFFECT_WAIT_DELAY_MS: u64 = 10;
+#[cfg(unix)]
 const CONCURRENT_READY_FILE_NAME: &str = "scheduler-concurrent-ready";
 #[cfg(unix)]
 const CONCURRENT_RELEASE_FILE_NAME: &str = "scheduler-concurrent-release";
@@ -256,6 +266,92 @@ fn operator_e2e_scheduler_restart_retries_due_run_after_forced_process_death() {
     assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
     assert_eq!(runs[0].workflow_name, WORKFLOW_NAME);
     assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
+}
+
+// r[verify lattice.repository_validation.post_effect_crash_boundaries]
+// r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.scheduler]
+// r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.non-claim]
+#[cfg(unix)]
+#[test]
+fn operator_e2e_scheduler_post_effect_death_repeats_reviewed_attempt_after_restart() {
+    let temp_dir = tempfile::tempdir().expect("temporary scheduler post-effect directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let checkpoint_path = temp_dir.path().join(POST_EFFECT_CHECKPOINT_FILE_NAME);
+    let attempts_path = temp_dir.path().join(POST_EFFECT_ATTEMPTS_FILE_NAME);
+    let store_path = data_dir.join(STORE_FILE_NAME);
+    let store = Store::new(&store_path).expect("scheduler post-effect store opens");
+    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    workflow.add_shell_node(
+        "scheduler-post-effect",
+        common::post_effect_parent_death_once_then_repeat_command(
+            &checkpoint_path,
+            &attempts_path,
+            POST_EFFECT_IDENTITY,
+        ),
+    );
+    store.save_workflow(&workflow).expect("scheduler post-effect workflow saves");
+    store.save_schedule(&schedule(START_EPOCH_MS)).expect("scheduler post-effect schedule saves");
+    drop(store);
+
+    let crashed = scheduler_command(&config_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("post-effect scheduler process starts");
+    let crashed = common::ChildGuard::new(crashed);
+    common::wait_for_path(
+        &checkpoint_path,
+        POST_EFFECT_WAIT_ATTEMPTS,
+        Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS),
+    );
+    let crash_status =
+        crashed.wait_for_exit(POST_EFFECT_WAIT_ATTEMPTS, Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS));
+
+    assert!(!crash_status.success(), "post-effect scheduler unexpectedly succeeded");
+    assert!(crash_status.code().is_none(), "post-effect scheduler was not terminated by a signal");
+    assert_eq!(
+        std::fs::read_to_string(&checkpoint_path).expect("post-effect checkpoint persists"),
+        common::FORCED_DEATH_MARKER_CONTENT,
+    );
+    assert_eq!(common::identified_effect_attempt_count(&attempts_path, POST_EFFECT_IDENTITY), 1);
+
+    let crash_snapshot_path = temp_dir.path().join(CRASH_SNAPSHOT_FILE_NAME);
+    common::copy_crash_store_snapshot(&store_path, &crash_snapshot_path);
+    let after_crash = Store::new(&crash_snapshot_path).expect("scheduler post-effect snapshot reopens");
+    let pre_restart_runs = after_crash.list_runs(RUN_HISTORY_LIMIT).expect("post-effect crash runs list");
+    let unchanged = after_crash
+        .load_schedule(SCHEDULE_ID)
+        .expect("post-effect crash schedule loads")
+        .expect("post-effect crash schedule remains");
+    let schedule_remains_due = unchanged.next_run_epoch_ms == START_EPOCH_MS;
+    drop(after_crash);
+
+    let restarted = scheduler_command(&config_path).output().expect("post-effect scheduler restart returns");
+    assert!(restarted.status.success(), "stderr: {}", String::from_utf8_lossy(&restarted.stderr));
+
+    let recovered = Store::new(&store_path).expect("post-effect scheduler store reopens");
+    let final_runs = recovered.list_runs(RUN_HISTORY_LIMIT).expect("post-effect final runs list");
+    let advanced = recovered
+        .load_schedule(SCHEDULE_ID)
+        .expect("post-effect final schedule loads")
+        .expect("post-effect final schedule remains");
+    let observation = common::PostEffectCrashObservation {
+        ingress: common::PostEffectIngress::Scheduler,
+        checkpoint_observed: checkpoint_path.exists(),
+        pre_restart_run_count: pre_restart_runs.len(),
+        schedule_remains_due: Some(schedule_remains_due),
+        final_attempt_count: common::identified_effect_attempt_count(&attempts_path, POST_EFFECT_IDENTITY),
+        final_run_count: final_runs.len(),
+        final_started_history_count: 0,
+        final_rejected_history_count: 0,
+        http_outcome: common::PostEffectHttpOutcome::NotApplicable,
+    };
+
+    assert!(schedule_remains_due, "post-effect crash must leave the schedule due");
+    assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
+    assert_eq!(final_runs.len(), EXPECTED_PERSISTED_RUNS);
+    assert_eq!(final_runs[0].workflow_name, WORKFLOW_NAME);
+    assert_eq!(common::classify_post_effect_crash(common::SCHEDULER_POST_EFFECT_PROFILE, observation), Ok(()),);
 }
 
 #[cfg(unix)]
