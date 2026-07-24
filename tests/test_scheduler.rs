@@ -50,6 +50,7 @@ const FUTURE_SCHEDULE_ID: &str = "future";
 const MISSING_SCHEDULE_ID: &str = "missing-workflow";
 const RUN_HISTORY_LIMIT: usize = 10;
 const EXPECTED_PERSISTED_RUNS: usize = 1;
+const EXPECTED_OCCURRENCE_COUNT: usize = 1;
 #[cfg(unix)]
 const FORCED_DEATH_MARKER_FILE_NAME: &str = "scheduler-forced-death";
 #[cfg(unix)]
@@ -146,6 +147,18 @@ fn scheduler_command(config_path: &std::path::Path) -> Command {
     command
 }
 
+fn scheduler_occurrences_command(config_path: &std::path::Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lattice"));
+    command.arg("--config").arg(config_path).arg("scheduler-occurrences");
+    command
+}
+
+fn scheduler_occurrence_command(config_path: &std::path::Path, subcommand: &str, identity: &str) -> Command {
+    let mut command = scheduler_occurrences_command(config_path);
+    command.arg(subcommand).arg(identity);
+    command
+}
+
 #[test]
 fn operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_schedules() {
     let temp_dir = tempfile::tempdir().expect("temporary operator E2E directory");
@@ -205,9 +218,64 @@ fn operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_
     assert_eq!(unchanged_future.next_run_epoch_ms, FUTURE_EPOCH_MS);
 }
 
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
+#[test]
+fn scheduler_occurrence_cli_lists_shows_and_rejects_invalid_bounds() {
+    let temp_dir = tempfile::tempdir().expect("temporary occurrence CLI directory");
+    let (config_path, data_dir) = write_cli_config(&temp_dir);
+    let store_path = data_dir.join(STORE_FILE_NAME);
+    let store = Store::new(&store_path).expect("occurrence CLI store opens");
+    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("occurrence CLI workflow saves");
+    store.save_schedule(&schedule(START_EPOCH_MS)).expect("occurrence CLI schedule saves");
+    drop(store);
+
+    let daemon = scheduler_command(&config_path).output().expect("occurrence CLI daemon returns");
+    assert!(daemon.status.success(), "stderr: {}", String::from_utf8_lossy(&daemon.stderr));
+    let store = Store::new(&store_path).expect("occurrence CLI store reopens");
+    let occurrences = store.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).expect("occurrence CLI state lists");
+    assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
+    let identity = occurrences[0].identity.clone();
+    drop(store);
+
+    let list = scheduler_occurrences_command(&config_path)
+        .arg("list")
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("occurrence CLI list returns");
+    assert!(list.status.success(), "stderr: {}", String::from_utf8_lossy(&list.stderr));
+    assert!(String::from_utf8_lossy(&list.stdout).contains(&identity));
+
+    let show = scheduler_occurrence_command(&config_path, "show", &identity)
+        .arg("--output")
+        .arg("json")
+        .output()
+        .expect("occurrence CLI show returns");
+    assert!(show.status.success(), "stderr: {}", String::from_utf8_lossy(&show.stderr));
+    assert!(String::from_utf8_lossy(&show.stdout).contains("succeeded"));
+
+    let invalid_limit = scheduler_occurrences_command(&config_path)
+        .arg("list")
+        .arg("--limit")
+        .arg("0")
+        .output()
+        .expect("invalid occurrence CLI limit returns");
+    assert!(!invalid_limit.status.success());
+    assert!(String::from_utf8_lossy(&invalid_limit.stderr).contains("outside the supported bound"));
+
+    let missing = scheduler_occurrence_command(&config_path, "show", "b3:missing")
+        .output()
+        .expect("missing occurrence CLI show returns");
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("does not exist"));
+}
+
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.restart]
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.retry]
 #[cfg(unix)]
 #[test]
-fn operator_e2e_scheduler_restart_retries_due_run_after_forced_process_death() {
+fn operator_e2e_scheduler_restart_requires_explicit_retry_after_pre_effect_death() {
     let temp_dir = tempfile::tempdir().expect("temporary scheduler restart directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let marker_path = temp_dir.path().join(FORCED_DEATH_MARKER_FILE_NAME);
@@ -231,49 +299,67 @@ fn operator_e2e_scheduler_restart_retries_due_run_after_forced_process_death() {
         std::fs::read_to_string(&marker_path).expect("forced-death marker persists"),
         common::FORCED_DEATH_MARKER_CONTENT,
     );
-    assert!(!recovery_effect_path.exists(), "recovery effect must not occur before restart");
+    assert!(!recovery_effect_path.exists(), "recovery effect must not occur before explicit retry");
 
     let crash_snapshot_path = temp_dir.path().join(CRASH_SNAPSHOT_FILE_NAME);
     let snapshot_bytes =
         std::fs::copy(&store_path, &crash_snapshot_path).expect("crashed scheduler store snapshot copies");
     assert!(snapshot_bytes > 0, "crashed scheduler store snapshot must not be empty");
     let after_crash = Store::new(&crash_snapshot_path).expect("crashed scheduler snapshot repairs and reopens");
-    let unchanged = after_crash
+    let advanced_after_crash = after_crash
         .load_schedule(SCHEDULE_ID)
         .expect("crashed schedule loads")
         .expect("crashed schedule remains");
-    assert_eq!(unchanged.next_run_epoch_ms, START_EPOCH_MS);
+    let occurrences =
+        after_crash.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).expect("crashed occurrences list");
+    assert!(advanced_after_crash.next_run_epoch_ms > DUE_EPOCH_MS);
     assert!(after_crash.list_runs(RUN_HISTORY_LIMIT).expect("crashed run history lists").is_empty());
+    assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
+    assert_eq!(occurrences[0].status, lattice::scheduler::ScheduleOccurrenceStatus::PendingUnobserved);
+    let identity = occurrences[0].identity.clone();
     drop(after_crash);
 
     let restarted = scheduler_command(&config_path).output().expect("restarted scheduler process returns");
     let restarted_stdout = String::from_utf8_lossy(&restarted.stdout);
     let restarted_stderr = String::from_utf8_lossy(&restarted.stderr);
-
     assert!(restarted.status.success(), "stderr: {restarted_stderr}");
-    assert!(
-        restarted_stdout.contains(&format!("started schedule {SCHEDULE_ID} workflow {WORKFLOW_NAME}")),
-        "stdout: {restarted_stdout}"
-    );
-    assert_eq!(std::fs::read_to_string(&recovery_effect_path).expect("recovery effect persists"), RECOVERY_EFFECT,);
+    assert!(!restarted_stdout.contains("started schedule"), "stdout: {restarted_stdout}");
+    assert!(!recovery_effect_path.exists(), "ordinary restart must not retry the occurrence");
 
-    let recovered = Store::new(&store_path).expect("restarted scheduler store reopens");
-    let runs = recovered.list_runs(RUN_HISTORY_LIMIT).expect("restarted run history lists");
-    let advanced = recovered
-        .load_schedule(SCHEDULE_ID)
-        .expect("restarted schedule loads")
-        .expect("restarted schedule remains");
+    let recovery = scheduler_occurrence_command(&config_path, "recover", &identity)
+        .output()
+        .expect("pending occurrence recovery returns");
+    assert!(recovery.status.success(), "stderr: {}", String::from_utf8_lossy(&recovery.stderr));
+    assert!(String::from_utf8_lossy(&recovery.stdout).contains("pending_unobserved"));
+
+    let retry = scheduler_occurrence_command(&config_path, "retry", &identity)
+        .arg("--acknowledge-duplicate-risk")
+        .output()
+        .expect("explicit occurrence retry returns");
+    assert!(retry.status.success(), "stderr: {}", String::from_utf8_lossy(&retry.stderr));
+    assert_eq!(std::fs::read_to_string(&recovery_effect_path).expect("retry effect persists"), RECOVERY_EFFECT,);
+
+    let recovered = Store::new(&store_path).expect("retried scheduler store reopens");
+    let runs = recovered.list_runs(RUN_HISTORY_LIMIT).expect("retried run history lists");
+    let occurrence = recovered
+        .load_schedule_occurrence(&identity)
+        .expect("retried occurrence loads")
+        .expect("retried occurrence remains");
     assert_eq!(runs.len(), EXPECTED_PERSISTED_RUNS);
     assert_eq!(runs[0].workflow_name, WORKFLOW_NAME);
-    assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
+    assert_eq!(occurrence.status, lattice::scheduler::ScheduleOccurrenceStatus::Succeeded);
+    assert_eq!(occurrence.attempt_run_ids.len(), lattice::scheduler::MAX_SCHEDULE_OCCURRENCE_ATTEMPTS);
 }
 
 // r[verify lattice.repository_validation.post_effect_crash_boundaries]
 // r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.scheduler]
 // r[verify lattice.repository_validation.post_effect_crash_boundaries.scenario.non-claim]
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.restart]
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.abandon]
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.non_claim]
 #[cfg(unix)]
 #[test]
-fn operator_e2e_scheduler_post_effect_death_repeats_reviewed_attempt_after_restart() {
+fn operator_e2e_scheduler_post_effect_death_suppresses_restart_and_allows_abandonment() {
     let temp_dir = tempfile::tempdir().expect("temporary scheduler post-effect directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let checkpoint_path = temp_dir.path().join(POST_EFFECT_CHECKPOINT_FILE_NAME);
@@ -319,22 +405,41 @@ fn operator_e2e_scheduler_post_effect_death_repeats_reviewed_attempt_after_resta
     common::copy_crash_store_snapshot(&store_path, &crash_snapshot_path);
     let after_crash = Store::new(&crash_snapshot_path).expect("scheduler post-effect snapshot reopens");
     let pre_restart_runs = after_crash.list_runs(RUN_HISTORY_LIMIT).expect("post-effect crash runs list");
-    let unchanged = after_crash
+    let advanced_after_crash = after_crash
         .load_schedule(SCHEDULE_ID)
         .expect("post-effect crash schedule loads")
         .expect("post-effect crash schedule remains");
-    let schedule_remains_due = unchanged.next_run_epoch_ms == START_EPOCH_MS;
+    let occurrences = after_crash
+        .list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT)
+        .expect("post-effect occurrences list");
+    let schedule_remains_due = advanced_after_crash.next_run_epoch_ms == START_EPOCH_MS;
+    assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
+    assert_eq!(occurrences[0].status, lattice::scheduler::ScheduleOccurrenceStatus::PendingUnobserved);
+    let identity = occurrences[0].identity.clone();
     drop(after_crash);
 
     let restarted = scheduler_command(&config_path).output().expect("post-effect scheduler restart returns");
     assert!(restarted.status.success(), "stderr: {}", String::from_utf8_lossy(&restarted.stderr));
+    assert!(!String::from_utf8_lossy(&restarted.stdout).contains("started schedule"));
+    assert_eq!(common::identified_effect_attempt_count(&attempts_path, POST_EFFECT_IDENTITY), 1);
+
+    let recovery = scheduler_occurrence_command(&config_path, "recover", &identity)
+        .output()
+        .expect("post-effect recovery returns");
+    assert!(recovery.status.success(), "stderr: {}", String::from_utf8_lossy(&recovery.stderr));
+    assert!(String::from_utf8_lossy(&recovery.stdout).contains("pending_unobserved"));
+    let abandonment = scheduler_occurrence_command(&config_path, "abandon", &identity)
+        .arg("--acknowledge-unknown-outcome")
+        .output()
+        .expect("post-effect abandonment returns");
+    assert!(abandonment.status.success(), "stderr: {}", String::from_utf8_lossy(&abandonment.stderr));
 
     let recovered = Store::new(&store_path).expect("post-effect scheduler store reopens");
     let final_runs = recovered.list_runs(RUN_HISTORY_LIMIT).expect("post-effect final runs list");
-    let advanced = recovered
-        .load_schedule(SCHEDULE_ID)
-        .expect("post-effect final schedule loads")
-        .expect("post-effect final schedule remains");
+    let final_occurrence = recovered
+        .load_schedule_occurrence(&identity)
+        .expect("post-effect occurrence loads")
+        .expect("post-effect occurrence remains");
     let observation = common::PostEffectCrashObservation {
         ingress: common::PostEffectIngress::Scheduler,
         checkpoint_observed: checkpoint_path.exists(),
@@ -347,10 +452,9 @@ fn operator_e2e_scheduler_post_effect_death_repeats_reviewed_attempt_after_resta
         http_outcome: common::PostEffectHttpOutcome::NotApplicable,
     };
 
-    assert!(schedule_remains_due, "post-effect crash must leave the schedule due");
-    assert!(advanced.next_run_epoch_ms > DUE_EPOCH_MS);
-    assert_eq!(final_runs.len(), EXPECTED_PERSISTED_RUNS);
-    assert_eq!(final_runs[0].workflow_name, WORKFLOW_NAME);
+    assert!(!schedule_remains_due, "post-effect claim must advance the schedule before effects");
+    assert!(final_runs.is_empty());
+    assert_eq!(final_occurrence.status, lattice::scheduler::ScheduleOccurrenceStatus::AbandonedUnknown);
     assert_eq!(common::classify_post_effect_crash(common::SCHEDULER_POST_EFFECT_PROFILE, observation), Ok(()),);
 }
 

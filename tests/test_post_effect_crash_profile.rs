@@ -57,7 +57,7 @@ fn classifier_rejects_death_before_the_effect_checkpoint() {
 #[test]
 fn classifier_rejects_premature_terminal_records_and_unreviewed_attempt_counts() {
     let mut premature = matching_observation(SCHEDULER_POST_EFFECT_PROFILE);
-    premature.pre_restart_run_count = SCHEDULER_POST_EFFECT_PROFILE.final_run_count;
+    premature.pre_restart_run_count = SCHEDULER_POST_EFFECT_PROFILE.pre_restart_run_count.saturating_add(1);
     let mut repeated_too_many = matching_observation(WEBHOOK_POST_EFFECT_CLAIM_PROFILE);
     repeated_too_many.final_attempt_count = WEBHOOK_POST_EFFECT_CLAIM_PROFILE.final_attempt_count.saturating_add(1);
 

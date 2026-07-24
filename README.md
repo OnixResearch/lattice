@@ -15,13 +15,29 @@ nix flake check -L --option secret-key-files '' # full CI; check outputs do not 
 
 The Octet hook runs the lib target profile, keeps every configured Octet lint at `deny`, and accepts the current checked-in `octet-baseline.json` debt. New unaccepted Octet finding IDs fail the hook.
 
+## Durable scheduler occurrences
+
+Before workflow effects, the scheduler now commits a domain-separated BLAKE3 identity for the exact `(schedule_id, due_epoch_ms)` occurrence. One redb transaction verifies the due slot, reserves the globally unique run ID, records the workflow revision and pending attempt, and advances the schedule. Ordinary daemon restart therefore cannot automatically admit that occurrence again.
+
+Inspect and close occurrence uncertainty explicitly:
+
+```bash
+lattice --config ./demo/config.ncl scheduler-occurrences list
+lattice --config ./demo/config.ncl scheduler-occurrences show <occurrence-b3>
+lattice --config ./demo/config.ncl scheduler-occurrences recover <occurrence-b3>
+lattice --config ./demo/config.ncl scheduler-occurrences retry <occurrence-b3> --acknowledge-duplicate-risk
+lattice --config ./demo/config.ncl scheduler-occurrences abandon <occurrence-b3> --acknowledge-unknown-outcome
+```
+
+Recovery settles only an exact terminal run owned by the active occurrence attempt. Missing run evidence remains `PendingUnobserved`. One explicit retry is available only while the saved workflow revision still matches; it reserves a fresh owned run and can duplicate an effect whose original outcome was not persisted. Abandonment records `AbandonedUnknown` without executing again or inventing success, failure, or cancellation.
+
 ## Operator crash-boundary evidence
 
 `scripts/operator-e2e.rs` exercises selected post-effect/pre-persistence death windows through real scheduler and webhook processes on supported Unix/Linux hosts. Each fixture appends an identified local effect attempt before killing its Lattice parent, inspects a copied crash store without first repairing the original, and then restarts or redelivers against that original state.
 
-The scheduler profile records that the schedule remains due, the local effect is attempted again after restart, and only the restarted terminal run persists. The archived initial webhook profile established the former duplicate-risk boundary: one incomplete response allowed redelivery to perform a second local attempt. The current webhook profile commits a domain-separated BLAKE3 trigger-scoped claim, reserved run identity, and safe started-history fact before effects; post-effect listener death leaves that claim locally accepted, and redelivery receives a conflict without a second local execution.
+The current scheduler profile records one pending occurrence with an advanced schedule, one local effect attempt, no terminal run, no automatic restart attempt, and explicit unknown-outcome abandonment. The archived scheduler baseline retains the former at-least-once duplicate profile. The archived initial webhook profile likewise retains its former duplicate-risk boundary. The current webhook profile commits a BLAKE3 trigger-scoped claim, reserved run identity, and safe started-history fact before effects; post-effect listener death leaves that claim locally accepted, and redelivery receives a conflict without a second local execution.
 
-Webhook claims establish local at-most-one admission only under the single active redb store owner. A started claim without terminal run evidence is intentionally uncertain and may suppress redelivery even when no external effect is observable; operators can inspect the safe claim digest and started/failed history without exposing the raw key. Scheduler observations retain at-least-once risk. These checks do not prove remote commit identity, provider deduplication, distributed multi-writer safety, response delivery, external cancellation, arbitrary kill safety, equivalent behavior on unsupported hosts, or exactly-once external execution.
+Scheduler and webhook claims establish local at-most-one automatic admission only under the single active redb store owner. A pending occurrence or started webhook claim without terminal run evidence is intentionally uncertain and may suppress work even when no external effect is observable. These checks do not prove remote commit identity, provider deduplication, distributed multi-writer safety, response delivery, external cancellation, arbitrary kill safety, equivalent behavior on unsupported hosts, exactly-once external execution, or production readiness.
 
 ## Operator TUI recovery evidence
 

@@ -120,6 +120,9 @@ pub enum SafeOwner {
         dispatch_id: String,
         binding: OwnerBindingState,
     },
+    ScheduleOccurrence {
+        identity: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

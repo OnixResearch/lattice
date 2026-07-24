@@ -64,6 +64,9 @@ fn owner_text(owner: &super::model::SafeOwner) -> String {
             dispatch_id,
             owner_binding_label(*binding),
         ),
+        super::model::SafeOwner::ScheduleOccurrence { identity } => {
+            format!("owner schedule_occurrence identity={identity}\n")
+        }
     }
 }
 

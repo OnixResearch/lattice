@@ -21,8 +21,7 @@ pub const FORCED_DEATH_MARKER_CONTENT: &str = "forced-death";
 pub const PROCESS_GATE_READY_CONTENT: &str = "ready";
 #[cfg(unix)]
 const PROCESS_GATE_POLL_INTERVAL_SECONDS: &str = "0.01";
-const POST_EFFECT_EXPECTED_ATTEMPT_COUNT: usize = 2;
-const POST_EFFECT_CLAIMED_ATTEMPT_COUNT: usize = 1;
+const POST_EFFECT_AT_MOST_ONE_ATTEMPT_COUNT: usize = 1;
 
 pub struct ChildGuard {
     child: Option<std::process::Child>,
@@ -290,9 +289,9 @@ pub enum PostEffectCrashError {
 pub const SCHEDULER_POST_EFFECT_PROFILE: PostEffectCrashProfile = PostEffectCrashProfile {
     ingress: PostEffectIngress::Scheduler,
     pre_restart_run_count: 0,
-    schedule_remains_due: Some(true),
-    final_attempt_count: POST_EFFECT_EXPECTED_ATTEMPT_COUNT,
-    final_run_count: 1,
+    schedule_remains_due: Some(false),
+    final_attempt_count: POST_EFFECT_AT_MOST_ONE_ATTEMPT_COUNT,
+    final_run_count: 0,
     final_started_history_count: 0,
     final_rejected_history_count: 0,
     http_outcome: PostEffectHttpOutcome::NotApplicable,
@@ -302,7 +301,7 @@ pub const WEBHOOK_POST_EFFECT_CLAIM_PROFILE: PostEffectCrashProfile = PostEffect
     ingress: PostEffectIngress::Webhook,
     pre_restart_run_count: 0,
     schedule_remains_due: None,
-    final_attempt_count: POST_EFFECT_CLAIMED_ATTEMPT_COUNT,
+    final_attempt_count: POST_EFFECT_AT_MOST_ONE_ATTEMPT_COUNT,
     final_run_count: 0,
     final_started_history_count: 1,
     final_rejected_history_count: 0,

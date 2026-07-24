@@ -197,6 +197,17 @@ fn inspect_owner(
             orchestration,
             diagnostics,
         ),
+        crate::store::RunOwner::ScheduleOccurrence { identity } => {
+            if !is_blake3_identity(identity) {
+                diagnostics.push(super::model::DiagnosticCode::OwnerIdentityMalformed);
+            }
+            (
+                super::model::SafeOwner::ScheduleOccurrence {
+                    identity: safe_identity(identity),
+                },
+                None,
+            )
+        }
     }
 }
 

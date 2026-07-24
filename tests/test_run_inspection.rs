@@ -75,6 +75,7 @@ const ORCHESTRATION_ID: &str = "safe-inspection";
 const SAFE_ACTOR: &str = "operator:safe";
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
+const SCHEDULE_OCCURRENCE_IDENTITY: &str = "b3:0000000000000000000000000000000000000000000000000000000000000000";
 
 fn record(owner: RunOwner) -> RunRecord {
     RunRecord {
@@ -434,6 +435,49 @@ fn malformed_missing_owner_identities_are_not_echoed() {
     assert!(!report.valid);
     assert!(report.diagnostic_codes.contains(&DiagnosticCode::OwnerIdentityMalformed));
     assert!(report.diagnostic_codes.contains(&DiagnosticCode::OrchestrationMissing));
+    assert_private_content_absent(&rendered);
+    assert!(rendered.contains("[invalid]"));
+}
+
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
+#[test]
+fn schedule_occurrence_owner_is_safe_and_content_omitting() {
+    let record = record(RunOwner::ScheduleOccurrence {
+        identity: SCHEDULE_OCCURRENCE_IDENTITY.to_string(),
+    });
+    let report = inspect(Input {
+        record: &record,
+        details: None,
+        replay_events: None,
+        orchestration: None,
+    });
+    let rendered = render_text(&report);
+
+    assert!(report.valid);
+    assert!(matches!(
+        &report.owner,
+        SafeOwner::ScheduleOccurrence { identity } if identity == SCHEDULE_OCCURRENCE_IDENTITY
+    ));
+    assert!(rendered.contains(SCHEDULE_OCCURRENCE_IDENTITY));
+    assert_private_content_absent(&rendered);
+}
+
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
+#[test]
+fn malformed_schedule_occurrence_owner_is_rejected_without_echo() {
+    let record = record(RunOwner::ScheduleOccurrence {
+        identity: PRIVATE_PROMPT.to_string(),
+    });
+    let report = inspect(Input {
+        record: &record,
+        details: None,
+        replay_events: None,
+        orchestration: None,
+    });
+    let rendered = render_json(&report).expect("schedule occurrence JSON renders");
+
+    assert!(!report.valid);
+    assert!(report.diagnostic_codes.contains(&DiagnosticCode::OwnerIdentityMalformed));
     assert_private_content_absent(&rendered);
     assert!(rendered.contains("[invalid]"));
 }

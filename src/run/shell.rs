@@ -197,7 +197,7 @@ fn load_owner_instance(
     owner: &crate::store::RunOwner,
 ) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
     match owner {
-        crate::store::RunOwner::Unscoped => Ok(None),
+        crate::store::RunOwner::Unscoped | crate::store::RunOwner::ScheduleOccurrence { .. } => Ok(None),
         crate::store::RunOwner::Orchestration { instance_id, .. } => store.load_instance(instance_id),
     }
 }

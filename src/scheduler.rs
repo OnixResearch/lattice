@@ -17,6 +17,7 @@ const SCHEDULE_OCCURRENCE_DUE_TAG: &[u8] = b"due-epoch-ms";
 pub const MAX_SCHEDULE_OCCURRENCE_ATTEMPTS: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ScheduleOccurrenceStatus {
     PendingUnobserved,
     Succeeded,
@@ -219,6 +220,7 @@ pub enum ScheduleSkipReason {
     Disabled,
     OverlapPrevented,
     MissedRunSkipped,
+    OccurrenceAlreadyClaimed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

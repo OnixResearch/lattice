@@ -38,6 +38,8 @@ const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
 const WEBHOOK_MAX_IN_FLIGHT_CONNECTIONS: usize = 32;
+const DEFAULT_SCHEDULE_OCCURRENCE_LIMIT: usize = 20;
+const MAX_SCHEDULE_OCCURRENCE_LIMIT: usize = 100;
 
 #[path = "doctor/core.rs"]
 mod doctor;
@@ -78,6 +80,8 @@ enum CliCommand {
     ExportN8n(ExportN8nWorkflowArgs),
     /// Run one scheduler daemon evaluation without starting the TUI
     SchedulerDaemon(SchedulerDaemonArgs),
+    /// Inspect and explicitly close durable scheduled occurrences
+    SchedulerOccurrences(SchedulerOccurrencesCommandArgs),
     /// Inspect persisted triggers and trigger run history
     Triggers(TriggersCommandArgs),
     /// Listen for persisted webhook trigger HTTP requests
@@ -159,6 +163,51 @@ struct SchedulerDaemonArgs {
     /// Explicit current time for deterministic daemon evaluation
     #[arg(long)]
     now_epoch_ms: Option<i64>,
+}
+
+#[derive(clap::Args, Debug)]
+struct SchedulerOccurrencesCommandArgs {
+    #[command(subcommand)]
+    command: SchedulerOccurrenceCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum SchedulerOccurrenceCliCommand {
+    /// List bounded durable occurrence state without workflow content
+    List {
+        #[arg(long, default_value_t = DEFAULT_SCHEDULE_OCCURRENCE_LIMIT)]
+        limit: usize,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
+    /// Show one durable occurrence by its BLAKE3 identity
+    Show {
+        identity: String,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
+    /// Reconcile one pending occurrence from exact owned terminal run evidence
+    Recover {
+        identity: String,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
+    /// Explicitly perform the one bounded retry despite duplicate-effect risk
+    Retry {
+        identity: String,
+        #[arg(long)]
+        acknowledge_duplicate_risk: bool,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
+    /// Close one pending occurrence without inventing its unknown outcome
+    Abandon {
+        identity: String,
+        #[arg(long)]
+        acknowledge_unknown_outcome: bool,
+        #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
+        output: RunOutputFormat,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -367,6 +416,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         Some(CliCommand::ExportN8n(export_args)) => Ok(export_n8n_workflow_command(&app_config, &export_args)),
         Some(CliCommand::SchedulerDaemon(scheduler_args)) => {
             run_scheduler_daemon_once(&app_config, &scheduler_args).await
+        }
+        Some(CliCommand::SchedulerOccurrences(occurrence_args)) => {
+            Ok(run_scheduler_occurrences_command(&app_config, &occurrence_args).await)
         }
         Some(CliCommand::Triggers(trigger_args)) => Ok(run_triggers_command(&app_config, &trigger_args)),
         Some(CliCommand::WebhookListen(webhook_args)) => {
@@ -943,45 +995,72 @@ async fn run_scheduler_daemon_once(
     }
 
     for plan in evaluation.due_runs {
-        let run_id = match store.next_run_id() {
-            Ok(run_id) => run_id,
+        let resolution = match scheduler::shell::claim_due_occurrence(&store, &plan) {
+            Ok(resolution) => resolution,
+            Err(scheduler::shell::ScheduleOccurrenceShellError::MissingWorkflow(error)) => {
+                update_schedule_next_run(&store, &plan.schedule_id, plan.next_run_epoch_ms);
+                let outcome = schedule_error_outcome(&plan, error);
+                println!("{}", scheduler::render_daemon_outcome(&outcome));
+                continue;
+            }
             Err(error) => {
-                let outcome = ScheduleDaemonOutcome::Error {
-                    schedule_id: plan.schedule_id.clone(),
-                    workflow_name: plan.workflow_name.clone(),
-                    message: error.to_string(),
-                    next_run_epoch_ms: plan.next_run_epoch_ms,
-                };
+                let outcome = schedule_error_outcome(&plan, error.to_string());
                 println!("{}", scheduler::render_daemon_outcome(&outcome));
                 continue;
             }
         };
-        let outcome = match headless::run_saved_workflow_with_agent_runtime_config(
-            &store,
-            &plan.workflow_name,
-            run_id,
-            app_config.effective_agent_runtime(),
-        )
-        .await
-        {
-            Ok(summary) => ScheduleDaemonOutcome::Started {
-                schedule_id: plan.schedule_id.clone(),
-                workflow_name: plan.workflow_name.clone(),
-                summary: Box::new(summary),
-                next_run_epoch_ms: plan.next_run_epoch_ms,
-            },
-            Err(error) => ScheduleDaemonOutcome::Error {
-                schedule_id: plan.schedule_id.clone(),
-                workflow_name: plan.workflow_name.clone(),
-                message: error.to_string(),
-                next_run_epoch_ms: plan.next_run_epoch_ms,
-            },
+        let occurrence = match resolution {
+            scheduler::ScheduleOccurrenceClaimResolution::Inserted(occurrence) => occurrence,
+            scheduler::ScheduleOccurrenceClaimResolution::Existing(occurrence) => {
+                let outcome = ScheduleDaemonOutcome::Skipped(scheduler::SkippedScheduleRun {
+                    schedule_id: plan.schedule_id.clone(),
+                    workflow_name: plan.workflow_name.clone(),
+                    reason: ScheduleSkipReason::OccurrenceAlreadyClaimed,
+                    next_run_epoch_ms: occurrence.next_run_epoch_ms,
+                });
+                println!("{}", scheduler::render_daemon_outcome(&outcome));
+                continue;
+            }
+            scheduler::ScheduleOccurrenceClaimResolution::StaleSchedule {
+                current_next_run_epoch_ms,
+            } => {
+                let outcome = schedule_error_outcome(
+                    &plan,
+                    format!("schedule occurrence is stale at {current_next_run_epoch_ms}"),
+                );
+                println!("{}", scheduler::render_daemon_outcome(&outcome));
+                continue;
+            }
+            scheduler::ScheduleOccurrenceClaimResolution::MissingSchedule => {
+                let outcome = schedule_error_outcome(&plan, "schedule disappeared before occurrence claim".to_string());
+                println!("{}", scheduler::render_daemon_outcome(&outcome));
+                continue;
+            }
         };
-        update_schedule_next_run(&store, &plan.schedule_id, plan.next_run_epoch_ms);
+        let outcome =
+            match scheduler::shell::execute_occurrence(&store, &occurrence, app_config.effective_agent_runtime()).await
+            {
+                Ok(summary) => ScheduleDaemonOutcome::Started {
+                    schedule_id: plan.schedule_id.clone(),
+                    workflow_name: plan.workflow_name.clone(),
+                    summary: Box::new(summary),
+                    next_run_epoch_ms: plan.next_run_epoch_ms,
+                },
+                Err(error) => schedule_error_outcome(&plan, error.to_string()),
+            };
         println!("{}", scheduler::render_daemon_outcome(&outcome));
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+fn schedule_error_outcome(plan: &scheduler::DueRunPlan, message: String) -> ScheduleDaemonOutcome {
+    ScheduleDaemonOutcome::Error {
+        schedule_id: plan.schedule_id.clone(),
+        workflow_name: plan.workflow_name.clone(),
+        message,
+        next_run_epoch_ms: plan.next_run_epoch_ms,
+    }
 }
 
 fn update_schedule_next_run(store: &Store, schedule_id: &str, next_run_epoch_ms: i64) {
@@ -992,6 +1071,135 @@ fn update_schedule_next_run(store: &Store, schedule_id: &str, next_run_epoch_ms:
     if let Err(error) = store.save_schedule(&schedule) {
         eprintln!("Scheduler failed to update schedule {schedule_id}: {error}");
     }
+}
+
+// r[impl lattice.scheduling.scheduler_occurrence_admission]
+async fn run_scheduler_occurrences_command(
+    app_config: &config::AppConfig,
+    args: &SchedulerOccurrencesCommandArgs,
+) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => return scheduler_occurrence_failure(&error.to_string()),
+    };
+    match &args.command {
+        SchedulerOccurrenceCliCommand::List { limit, output } => {
+            if *limit == 0 || *limit > MAX_SCHEDULE_OCCURRENCE_LIMIT {
+                return scheduler_occurrence_failure("occurrence list limit is outside the supported bound");
+            }
+            match store.list_schedule_occurrences(*limit) {
+                Ok(occurrences) => render_schedule_occurrence_list(&occurrences, *output),
+                Err(error) => scheduler_occurrence_failure(&error.to_string()),
+            }
+        }
+        SchedulerOccurrenceCliCommand::Show { identity, output } => match store.load_schedule_occurrence(identity) {
+            Ok(Some(occurrence)) => render_schedule_occurrence_output(&occurrence, *output),
+            Ok(None) => scheduler_occurrence_failure("schedule occurrence does not exist"),
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+        SchedulerOccurrenceCliCommand::Recover { identity, output } => {
+            match scheduler::shell::recover_occurrence(&store, identity) {
+                Ok(outcome) => render_schedule_occurrence_recovery(&outcome, *output),
+                Err(error) => scheduler_occurrence_failure(&error.to_string()),
+            }
+        }
+        SchedulerOccurrenceCliCommand::Retry {
+            identity,
+            acknowledge_duplicate_risk,
+            output,
+        } => match scheduler::shell::retry_occurrence(
+            &store,
+            identity,
+            *acknowledge_duplicate_risk,
+            app_config.effective_agent_runtime(),
+        )
+        .await
+        {
+            Ok(occurrence) => render_schedule_occurrence_output(&occurrence, *output),
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+        SchedulerOccurrenceCliCommand::Abandon {
+            identity,
+            acknowledge_unknown_outcome,
+            output,
+        } => match scheduler::shell::abandon_occurrence(&store, identity, *acknowledge_unknown_outcome) {
+            Ok(occurrence) => render_schedule_occurrence_output(&occurrence, *output),
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+    }
+}
+
+fn render_schedule_occurrence_list(occurrences: &[scheduler::ScheduleOccurrence], output: RunOutputFormat) -> ExitCode {
+    match output {
+        RunOutputFormat::Text => {
+            if occurrences.is_empty() {
+                println!("No schedule occurrences recorded");
+            } else {
+                for occurrence in occurrences {
+                    println!("{}", scheduler::render_schedule_occurrence(occurrence));
+                }
+            }
+            ExitCode::SUCCESS
+        }
+        RunOutputFormat::Json => match serde_json::to_string_pretty(occurrences) {
+            Ok(rendered) => {
+                println!("{rendered}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+    }
+}
+
+fn render_schedule_occurrence_output(occurrence: &scheduler::ScheduleOccurrence, output: RunOutputFormat) -> ExitCode {
+    match output {
+        RunOutputFormat::Text => {
+            println!("{}", scheduler::render_schedule_occurrence(occurrence));
+            ExitCode::SUCCESS
+        }
+        RunOutputFormat::Json => match serde_json::to_string_pretty(occurrence) {
+            Ok(rendered) => {
+                println!("{rendered}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+    }
+}
+
+fn render_schedule_occurrence_recovery(
+    outcome: &scheduler::shell::ScheduleOccurrenceRecoveryOutcome,
+    output: RunOutputFormat,
+) -> ExitCode {
+    match output {
+        RunOutputFormat::Text => {
+            let (label, occurrence) = match outcome {
+                scheduler::shell::ScheduleOccurrenceRecoveryOutcome::AlreadyTerminal { occurrence } => {
+                    ("already_terminal", occurrence.as_ref())
+                }
+                scheduler::shell::ScheduleOccurrenceRecoveryOutcome::PendingUnobserved { occurrence } => {
+                    ("pending_unobserved", occurrence.as_ref())
+                }
+                scheduler::shell::ScheduleOccurrenceRecoveryOutcome::Reconciled { occurrence } => {
+                    ("reconciled", occurrence.as_ref())
+                }
+            };
+            println!("{label} {}", scheduler::render_schedule_occurrence(occurrence));
+            ExitCode::SUCCESS
+        }
+        RunOutputFormat::Json => match serde_json::to_string_pretty(outcome) {
+            Ok(rendered) => {
+                println!("{rendered}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => scheduler_occurrence_failure(&error.to_string()),
+        },
+    }
+}
+
+fn scheduler_occurrence_failure(message: &str) -> ExitCode {
+    eprintln!("Scheduler occurrences failed: {message}");
+    ExitCode::FAILURE
 }
 
 // r[impl n8nclone.tui_ux.triggers.manage]
