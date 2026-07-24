@@ -6,10 +6,19 @@ use std::process::Command;
 
 use lattice::agent_node::AgentOutputMode;
 use lattice::agent_node::AgentTarget;
+use lattice::control_flow::ConditionBranch;
+use lattice::control_flow::ConditionNodeConfig;
+use lattice::control_flow::ConditionPredicate;
+use lattice::control_flow::MergeNodeConfig;
+use lattice::control_flow::MergePolicy;
+use lattice::control_flow::SubworkflowNodeConfig;
+use lattice::credentials::NodeCredentialRefs;
+use lattice::credentials::SecretRef;
 use lattice::engine::runner::build_runner_plan;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::NodeRunnerSettings;
 use lattice::engine::workflow::Workflow;
+use lattice::file_node::FileOperationKind;
 use lattice::store::Store;
 use lattice::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
 use lattice::workflow_format::PortableEdge;
@@ -259,6 +268,119 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
         }
         _ => panic!("expected agent config"),
     }
+}
+
+#[test]
+fn nickel_export_import_preserves_agent_credential_references() {
+    let mut workflow = Workflow::new("credentialed-agent-workflow");
+    let agent_id = workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let mut credentials = NodeCredentialRefs::default();
+    credentials
+        .env
+        .insert("TOKEN".to_string(), SecretRef::new("env", "ARTIST_TOKEN", Some("access_token".to_string())));
+    workflow.set_node_credentials(agent_id, credentials);
+
+    let imported = exported_then_loaded(&workflow);
+    let imported_agent = imported.graph.nodes().find(|node| node.label == "Agent").expect("agent imported");
+    let imported_credentials = imported.node_credentials(imported_agent.id).expect("agent credentials imported");
+    let secret_ref = imported_credentials.env.get("TOKEN").expect("token reference imported");
+
+    assert_eq!(secret_ref.provider, "env");
+    assert_eq!(secret_ref.key, "ARTIST_TOKEN");
+    assert_eq!(secret_ref.field.as_deref(), Some("access_token"));
+}
+
+#[test]
+fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
+    let mut workflow = Workflow::new("all-credentialed-kinds");
+    let nodes = [
+        ("Shell", workflow.add_shell_node("Shell", "true")),
+        ("HTTP", workflow.add_http_node("HTTP", "GET", "https://example.com")),
+        ("File", workflow.add_file_node("File", FileOperationKind::Read, "./input.txt")),
+        ("Image", workflow.add_image_input_node("Image", "./input.png")),
+        ("Agent", workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text)),
+        (
+            "Condition",
+            workflow.add_condition_node("Condition", ConditionNodeConfig {
+                branches: vec![ConditionBranch {
+                    label: "match".to_string(),
+                    predicate: ConditionPredicate::Always,
+                }],
+            }),
+        ),
+        (
+            "Merge",
+            workflow.add_merge_node("Merge", MergeNodeConfig {
+                policy: MergePolicy::All,
+                required_inputs: vec!["input".to_string()],
+            }),
+        ),
+        (
+            "Subworkflow",
+            workflow.add_subworkflow_node("Subworkflow", SubworkflowNodeConfig {
+                workflow_name: "child".to_string(),
+                input_mappings: Vec::new(),
+                output_mappings: Vec::new(),
+            }),
+        ),
+    ];
+    for (label, node_id) in &nodes {
+        let mut credentials = NodeCredentialRefs::default();
+        credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", format!("{label}_TOKEN"), None));
+        workflow.set_node_credentials(*node_id, credentials);
+    }
+
+    let imported = exported_then_loaded(&workflow);
+
+    for (label, _) in &nodes {
+        let imported_node = imported.graph.nodes().find(|node| node.label == *label).expect("node imported");
+        let credentials = imported.node_credentials(imported_node.id).expect("credentials imported");
+        assert_eq!(credentials.env.get("TOKEN").expect("token reference").key, format!("{label}_TOKEN"));
+    }
+}
+
+#[test]
+fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
+    let temp_dir = tempfile::tempdir().expect("temporary deletion directory");
+    let store = Store::new(temp_dir.path().join(STORE_FILE_NAME)).expect("store opens");
+    let mut workflow = Workflow::new("deleted-node-round-trip");
+    let removed = workflow.add_agent_node("Removed", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let kept = workflow.add_shell_node("Kept", "true");
+    let removed_output = workflow.graph.node(removed).expect("removed node").output_ports[0].id;
+    let kept_input = workflow.graph.node(kept).expect("kept node").input_ports[0].id;
+    workflow.graph.add_edge(removed_output, kept_input).expect("incident edge");
+    let mut credentials = NodeCredentialRefs::default();
+    credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", "TOKEN", None));
+    workflow.set_node_credentials(removed, credentials);
+    workflow.set_node_runner_settings(removed, custom_runner_settings());
+
+    workflow.remove_node(removed).expect("aggregate node removal");
+    assert!(validate_workflow(&workflow).is_empty());
+    store.save_workflow(&workflow).expect("cleaned workflow saves");
+    let loaded = store
+        .load_workflow("deleted-node-round-trip")
+        .expect("cleaned workflow loads")
+        .expect("saved workflow exists");
+    let imported = exported_then_loaded(&loaded);
+
+    assert_eq!(imported.graph.node_count(), 1);
+    assert_eq!(imported.graph.edge_count(), 0);
+    assert!(imported.graph.nodes().any(|node| node.label == "Kept"));
+    assert!(!imported.graph.nodes().any(|node| node.label == "Removed"));
+    assert_eq!(imported.configs.len(), imported.graph.node_count());
+    assert!(imported.credentials.is_empty());
+    assert!(
+        imported
+            .configs
+            .keys()
+            .all(|node_id| imported.graph.node(rat_nodegraph::model::NodeId(*node_id)).is_some())
+    );
+    assert!(
+        imported
+            .runner
+            .keys()
+            .all(|node_id| imported.graph.node(rat_nodegraph::model::NodeId(*node_id)).is_some())
+    );
 }
 
 // r[verify n8nclone.workflow_format.markdown_agent_prompts.scenario.valid]

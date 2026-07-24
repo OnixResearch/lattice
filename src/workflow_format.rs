@@ -535,7 +535,8 @@ fn node_config_to_portable(
     runner_settings: Option<&NodeRunnerSettings>,
 ) -> PortableNodeConfig {
     let portable_runner = portable_runner_fields(config, runner_settings);
-    match config {
+    let secret_env = portable_secret_env(credentials);
+    let result = match config {
         NodeConfig::Shell {
             command,
             cwd,
@@ -551,24 +552,6 @@ fn node_config_to_portable(
                 })
                 .collect::<Vec<_>>();
             env.sort_by(|left, right| left.key.cmp(&right.key));
-
-            // r[impl n8nclone.workflow_format.credentials.providers]
-            let mut secret_env = credentials
-                .map(|credentials| {
-                    credentials
-                        .env
-                        .iter()
-                        .map(|(name, secret_ref)| PortableSecretEnvVar {
-                            name: name.clone(),
-                            provider: secret_ref.provider.clone(),
-                            key: secret_ref.key.clone(),
-                            field: secret_ref.field.iter().cloned().collect(),
-                            plaintext_value: None,
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            secret_env.sort_by(|left, right| left.name.cmp(&right.name));
 
             PortableNodeConfig {
                 node_id,
@@ -642,7 +625,7 @@ fn node_config_to_portable(
                 command: String::new(),
                 cwd: Vec::new(),
                 env: Vec::new(),
-                secret_env: Vec::new(),
+                secret_env,
                 http_method: method.clone(),
                 url: url.clone(),
                 headers,
@@ -692,7 +675,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -739,7 +722,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -782,7 +765,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -825,7 +808,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -868,7 +851,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -911,7 +894,7 @@ fn node_config_to_portable(
             command: String::new(),
             cwd: Vec::new(),
             env: Vec::new(),
-            secret_env: Vec::new(),
+            secret_env,
             http_method: String::new(),
             url: String::new(),
             headers: Vec::new(),
@@ -950,7 +933,31 @@ fn node_config_to_portable(
             timeout_secs: 0,
             pipe_stdin: false,
         },
-    }
+    };
+    debug_assert_eq!(result.node_id, node_id);
+    debug_assert_eq!(result.kind, node_kind_provider::portable_kind_for_config(config));
+    result
+}
+
+// r[impl n8nclone.workflow_format.credentials.providers]
+fn portable_secret_env(credentials: Option<&NodeCredentialRefs>) -> Vec<PortableSecretEnvVar> {
+    let mut secret_env = credentials
+        .map(|credentials| {
+            credentials
+                .env
+                .iter()
+                .map(|(name, secret_ref)| PortableSecretEnvVar {
+                    name: name.clone(),
+                    provider: secret_ref.provider.clone(),
+                    key: secret_ref.key.clone(),
+                    field: secret_ref.field.iter().cloned().collect(),
+                    plaintext_value: None,
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    secret_env.sort_by(|left, right| left.name.cmp(&right.name));
+    secret_env
 }
 
 fn inline_agent_prompt(settings: &AgentNodeSettings) -> String {
@@ -1732,7 +1739,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch = [], merge_policy | String = \"\", merge_required_inputs | Array String = [], subworkflow_name | String = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping = [], subworkflow_output_mappings | Array SubworkflowOutputMapping = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch | default = [], merge_policy | String | default = \"\", merge_required_inputs | Array String | default = [], subworkflow_name | String | default = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping | default = [], subworkflow_output_mappings | Array SubworkflowOutputMapping | default = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {

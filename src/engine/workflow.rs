@@ -194,6 +194,32 @@ pub struct Workflow {
     pub triggers: Vec<TriggerDefinition>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationError {
+    NodeNotFound(NodeId),
+    ConditionConfigNotFound(NodeId),
+    InvalidConditionConfig(crate::control_flow::ControlFlowError),
+    Graph(rat_nodegraph::model::GraphError),
+}
+
+impl From<rat_nodegraph::model::GraphError> for MutationError {
+    fn from(error: rat_nodegraph::model::GraphError) -> Self {
+        Self::Graph(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodeRemovalPlan {
+    pub node_id: NodeId,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConditionBranchReconciliationPlan {
+    pub node_id: NodeId,
+    pub config: ConditionNodeConfig,
+    pub requested_specs: Vec<PortSpec>,
+}
+
 impl Workflow {
     pub fn new(name: impl Into<String>) -> Self {
         let mut graph = Graph::new();
@@ -347,6 +373,64 @@ impl Workflow {
         id
     }
 
+    pub fn plan_node_removal(&self, node_id: NodeId) -> Result<NodeRemovalPlan, MutationError> {
+        if self.graph.node(node_id).is_none() {
+            return Err(MutationError::NodeNotFound(node_id));
+        }
+        Ok(NodeRemovalPlan { node_id })
+    }
+
+    /// Remove a node and all node-owned workflow state as one lifecycle operation.
+    pub fn remove_node(&mut self, node_id: NodeId) -> Result<(), MutationError> {
+        let plan = self.plan_node_removal(node_id)?;
+        self.graph.remove_node(plan.node_id)?;
+        self.configs.remove(&plan.node_id.0);
+        self.credentials.remove(&plan.node_id.0);
+        self.runner.remove(&plan.node_id.0);
+        Ok(())
+    }
+
+    pub fn plan_condition_branch_reconciliation(
+        &self,
+        node_id: NodeId,
+        branches: Vec<crate::control_flow::ConditionBranch>,
+    ) -> Result<ConditionBranchReconciliationPlan, MutationError> {
+        if self.graph.node(node_id).is_none() {
+            return Err(MutationError::NodeNotFound(node_id));
+        }
+        if !matches!(self.configs.get(&node_id.0), Some(NodeConfig::Condition(_))) {
+            return Err(MutationError::ConditionConfigNotFound(node_id));
+        }
+        let config = ConditionNodeConfig { branches };
+        crate::control_flow::validate_condition_config(&config).map_err(MutationError::InvalidConditionConfig)?;
+        let requested_specs = config
+            .branches
+            .iter()
+            .map(|branch| PortSpec::new(branch.label.clone(), TypeTag::Any.as_str()))
+            .collect();
+        Ok(ConditionBranchReconciliationPlan {
+            node_id,
+            config,
+            requested_specs,
+        })
+    }
+
+    /// Reconcile condition branches and output ports without stale ownership or edges.
+    pub fn replace_condition_branches(
+        &mut self,
+        node_id: NodeId,
+        branches: Vec<crate::control_flow::ConditionBranch>,
+    ) -> Result<(), MutationError> {
+        let plan = self.plan_condition_branch_reconciliation(node_id, branches)?;
+        self.graph.reconcile_node_ports(
+            plan.node_id,
+            rat_nodegraph::model::PortDirection::Output,
+            &plan.requested_specs,
+        )?;
+        self.configs.insert(plan.node_id.0, NodeConfig::Condition(plan.config));
+        Ok(())
+    }
+
     /// Get the config for a node.
     pub fn node_config(&self, id: NodeId) -> Option<&NodeConfig> {
         self.configs.get(&id.0)
@@ -384,5 +468,151 @@ impl Workflow {
     /// Touch the modified timestamp.
     pub fn touch(&mut self) {
         self.meta.modified = chrono::Utc::now();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::control_flow::ConditionPredicate;
+    use crate::credentials::SecretRef;
+
+    fn branch(label: &str) -> crate::control_flow::ConditionBranch {
+        crate::control_flow::ConditionBranch {
+            label: label.to_string(),
+            predicate: ConditionPredicate::Always,
+        }
+    }
+
+    #[test]
+    fn remove_node_cleans_all_owned_state_and_incident_edges() {
+        let mut workflow = Workflow::new("aggregate deletion");
+        let source = workflow.add_shell_node("source", "printf source");
+        let target = workflow.add_shell_node("target", "cat");
+        let source_port = workflow.graph.node(source).expect("source node").output_ports[0].id;
+        let target_port = workflow.graph.node(target).expect("target node").input_ports[0].id;
+        workflow.graph.add_edge(source_port, target_port).expect("compatible edge");
+
+        let mut credentials = NodeCredentialRefs::default();
+        credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", "TOKEN", None));
+        workflow.set_node_credentials(source, credentials);
+        workflow.set_node_runner_settings(source, NodeRunnerSettings::new("host", "shell"));
+
+        workflow.remove_node(source).expect("aggregate removal succeeds");
+
+        assert!(workflow.graph.node(source).is_none());
+        assert!(workflow.graph.node(target).is_some());
+        assert!(workflow.node_config(source).is_none());
+        assert!(workflow.node_credentials(source).is_none());
+        assert!(workflow.node_runner_settings(source).is_none());
+        assert_eq!(workflow.graph.edge_count(), 0);
+    }
+
+    #[test]
+    fn remove_node_cleans_owned_state_for_every_builtin_config_kind() {
+        let mut workflow = Workflow::new("all built-in deletion");
+        let nodes = [
+            workflow.add_shell_node("shell", "true"),
+            workflow.add_http_node("http", "GET", "https://example.com"),
+            workflow.add_file_node("file", FileOperationKind::Read, "./input.txt"),
+            workflow.add_image_input_node("image", "./input.png"),
+            workflow.add_agent_node("agent", AgentTarget::Pi, "prompt", AgentOutputMode::Text),
+            workflow.add_condition_node("condition", ConditionNodeConfig {
+                branches: vec![branch("match")],
+            }),
+            workflow.add_merge_node("merge", MergeNodeConfig {
+                policy: crate::control_flow::MergePolicy::All,
+                required_inputs: vec!["input".to_string()],
+            }),
+            workflow.add_subworkflow_node("subworkflow", SubworkflowNodeConfig {
+                workflow_name: "child".to_string(),
+                input_mappings: Vec::new(),
+                output_mappings: Vec::new(),
+            }),
+        ];
+        for node_id in nodes {
+            let mut credentials = NodeCredentialRefs::default();
+            credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", "TOKEN", None));
+            workflow.set_node_credentials(node_id, credentials);
+            workflow.set_node_runner_settings(node_id, NodeRunnerSettings::new("host", "builtin"));
+        }
+
+        for node_id in nodes {
+            workflow.remove_node(node_id).expect("built-in node removal succeeds");
+        }
+
+        assert_eq!(workflow.graph.node_count(), 0);
+        assert!(workflow.configs.is_empty());
+        assert!(workflow.credentials.is_empty());
+        assert!(workflow.runner.is_empty());
+    }
+
+    #[test]
+    fn remove_missing_node_fails_without_mutating_workflow() {
+        let mut workflow = Workflow::new("failed deletion");
+        let node = workflow.add_shell_node("kept", "true");
+        let missing = NodeId(u64::MAX);
+
+        assert_eq!(workflow.remove_node(missing), Err(MutationError::NodeNotFound(missing)));
+        assert!(workflow.graph.node(node).is_some());
+        assert!(workflow.node_config(node).is_some());
+        assert_eq!(workflow.graph.node_count(), 1);
+    }
+
+    #[test]
+    fn condition_reconciliation_preserves_matching_ports_and_drops_removed_edges() {
+        let mut workflow = Workflow::new("condition reconciliation");
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("keep"), branch("remove")],
+        });
+        let keep_target = workflow.add_shell_node("keep target", "cat");
+        let remove_target = workflow.add_shell_node("remove target", "cat");
+        let condition_node = workflow.graph.node(condition).expect("condition node");
+        let keep_port = condition_node.output_ports[0].id;
+        let remove_port = condition_node.output_ports[1].id;
+        let keep_input = workflow.graph.node(keep_target).expect("keep target").input_ports[0].id;
+        let remove_input = workflow.graph.node(remove_target).expect("remove target").input_ports[0].id;
+        workflow.graph.add_edge(keep_port, keep_input).expect("keep edge");
+        workflow.graph.add_edge(remove_port, remove_input).expect("remove edge");
+
+        workflow
+            .replace_condition_branches(condition, vec![branch("added"), branch("keep")])
+            .expect("valid branch reconciliation");
+
+        let reconciled = workflow.graph.node(condition).expect("reconciled condition");
+        assert_eq!(reconciled.output_ports.len(), 2);
+        assert_eq!(reconciled.output_ports[0].label, "added");
+        assert_eq!(reconciled.output_ports[1].label, "keep");
+        assert_eq!(reconciled.output_ports[1].id, keep_port);
+        assert!(workflow.graph.port(remove_port).is_none());
+        assert_eq!(workflow.graph.edges().len(), 1);
+        assert_eq!(workflow.graph.edges()[0].source, keep_port);
+        assert_eq!(workflow.graph.edges()[0].target, keep_input);
+    }
+
+    #[test]
+    fn invalid_condition_reconciliation_preserves_config_ports_and_edges() {
+        let mut workflow = Workflow::new("rejected condition reconciliation");
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("first"), branch("second")],
+        });
+        let prior_config = workflow.node_config(condition).cloned().expect("condition config");
+        let prior_ports = workflow.graph.node(condition).expect("condition node").output_ports.clone();
+        let prior_edges = workflow.graph.edges().to_vec();
+
+        let result = workflow.replace_condition_branches(condition, vec![branch("duplicate"), branch("duplicate")]);
+
+        assert_eq!(
+            result,
+            Err(MutationError::InvalidConditionConfig(crate::control_flow::ControlFlowError::DuplicateBranchLabel(
+                "duplicate".to_string()
+            )))
+        );
+        assert_eq!(workflow.graph.node(condition).expect("condition node").output_ports, prior_ports);
+        assert_eq!(workflow.graph.edges(), prior_edges);
+        match (workflow.node_config(condition), prior_config) {
+            (Some(NodeConfig::Condition(actual)), NodeConfig::Condition(expected)) => assert_eq!(actual, &expected),
+            _ => panic!("expected unchanged condition config"),
+        }
     }
 }

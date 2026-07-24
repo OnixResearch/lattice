@@ -362,7 +362,7 @@ fn property_field_title(field: PropertyEditField) -> &'static str {
         PropertyEditField::AgentContextRefs => "Agent Context Refs",
         PropertyEditField::AgentCwd => "Agent CWD",
         PropertyEditField::AgentSession => "Agent Session",
-        PropertyEditField::AgentCredentials => "Agent Credentials",
+        PropertyEditField::Credentials => "Credentials",
         PropertyEditField::ConditionBranches => "Condition Branches",
     }
 }
@@ -806,6 +806,8 @@ fn render_add_node_kind_lines() -> Vec<Line<'static>> {
     vec![
         Line::styled("Choose node type", Style::default().fg(Color::Yellow)),
         Line::from("s: shell"),
+        Line::from("h: HTTP request"),
+        Line::from("f: file operation"),
         Line::from("i: image input"),
         Line::from("p: Pi agent"),
         Line::from("c: Clankers agent"),
@@ -820,6 +822,8 @@ fn render_add_node_kind_lines() -> Vec<Line<'static>> {
 fn add_node_label_title(kind: AddNodeKind) -> &'static str {
     match kind {
         AddNodeKind::Shell => "Shell node label",
+        AddNodeKind::Http => "HTTP node label",
+        AddNodeKind::File => "File node label",
         AddNodeKind::ImageInput => "Image input label",
         AddNodeKind::PiAgent => "Pi agent label",
         AddNodeKind::ClankersAgent => "Clankers agent label",
@@ -832,6 +836,8 @@ fn add_node_label_title(kind: AddNodeKind) -> &'static str {
 fn add_node_config_title(kind: AddNodeKind) -> &'static str {
     match kind {
         AddNodeKind::Shell => "Shell command",
+        AddNodeKind::Http => "HTTP request (METHOD URL)",
+        AddNodeKind::File => "File operation (read|write|append PATH)",
         AddNodeKind::ImageInput => "Image path",
         AddNodeKind::PiAgent => "Pi agent prompt",
         AddNodeKind::ClankersAgent => "Clankers agent prompt",

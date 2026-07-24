@@ -158,6 +158,11 @@ fn run_history_key_action(key: &KeyEvent) -> RunHistoryKeyAction {
 }
 
 fn handle_add_node_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    debug_assert!(app.add_node_flow.open);
+    debug_assert!(
+        app.add_node_flow.step != AddNodeStep::TemplateParameter
+            || app.add_node_flow.parameter_index < app.add_node_flow.parameter_values.len()
+    );
     match add_node_key_action(key, app.add_node_flow.step) {
         AddNodeKeyAction::Close => app.cancel_add_node_flow(),
         AddNodeKeyAction::Confirm => app.confirm_add_node_flow(),
@@ -166,6 +171,8 @@ fn handle_add_node_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         AddNodeKeyAction::SelectNextTemplate => app.select_next_node_template(),
         AddNodeKeyAction::SelectPreviousTemplate => app.select_previous_node_template(),
         AddNodeKeyAction::ManualShell => app.start_manual_shell_node_flow(),
+        AddNodeKeyAction::Http => app.start_http_node_flow(),
+        AddNodeKeyAction::File => app.start_file_node_flow(),
         AddNodeKeyAction::ImageInput => app.start_image_input_node_flow(),
         AddNodeKeyAction::PiAgent => app.start_pi_agent_node_flow(),
         AddNodeKeyAction::ClankersAgent => app.start_clankers_agent_node_flow(),
@@ -187,6 +194,8 @@ enum AddNodeKeyAction {
     SelectNextTemplate,
     SelectPreviousTemplate,
     ManualShell,
+    Http,
+    File,
     ImageInput,
     PiAgent,
     ClankersAgent,
@@ -209,6 +218,12 @@ fn add_node_key_action(key: &KeyEvent, step: AddNodeStep) -> AddNodeKeyAction {
                 && accepts_palette_text(key.modifiers) =>
         {
             AddNodeKeyAction::ManualShell
+        }
+        KeyCode::Char('h') | KeyCode::Char('H') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::Http
+        }
+        KeyCode::Char('f') | KeyCode::Char('F') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
+            AddNodeKeyAction::File
         }
         KeyCode::Char('i') | KeyCode::Char('I') if step == AddNodeStep::Kind && accepts_palette_text(key.modifiers) => {
             AddNodeKeyAction::ImageInput
@@ -385,8 +400,18 @@ fn accepts_palette_text(modifiers: KeyModifiers) -> bool {
 }
 
 fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    debug_assert_eq!(app.workflow.graph.node_count(), app.graph_state.graph.node_count());
+    debug_assert_eq!(app.workflow.graph.edge_count(), app.graph_state.graph.edge_count());
     if let Some(field) = property_edit_shortcut(key) {
         app.start_property_edit(field);
+        return None;
+    }
+
+    if matches!(key.code, KeyCode::Delete | KeyCode::Backspace)
+        && app.graph_state.selected_edge.is_none()
+        && !app.graph_state.selected.is_empty()
+    {
+        app.delete_selected_nodes();
         return None;
     }
 
@@ -448,7 +473,7 @@ fn property_edit_shortcut(key: &KeyEvent) -> Option<PropertyEditField> {
         KeyCode::Char('x') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentContextRefs),
         KeyCode::Char('w') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCwd),
         KeyCode::Char('n') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentSession),
-        KeyCode::Char('k') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::AgentCredentials),
+        KeyCode::Char('k') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::Credentials),
         KeyCode::Char('b') if accepts_palette_text(key.modifiers) => Some(PropertyEditField::ConditionBranches),
         _ => None,
     }
@@ -732,7 +757,10 @@ mod tests {
 
     use super::*;
     use crate::config::AppConfig;
+    use crate::credentials::NodeCredentialRefs;
+    use crate::credentials::SecretRef;
     use crate::engine::workflow::NodeConfig;
+    use crate::engine::workflow::NodeRunnerSettings;
     use crate::tui::app::PropertyEditState;
     use crate::tui::app::WorkflowBrowserState;
 
@@ -749,6 +777,46 @@ mod tests {
 
     fn key_event(modifiers: KeyModifiers, code: KeyCode) -> Event {
         Event::Key(KeyEvent::new(code, modifiers))
+    }
+
+    #[test]
+    fn delete_key_removes_selected_node_and_all_owned_workflow_state() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("delete me", "true");
+        let node_id = app.graph_state.focused.expect("focused shell node");
+        let mut credentials = NodeCredentialRefs::default();
+        credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", "TOKEN", None));
+        app.workflow.set_node_credentials(node_id, credentials);
+        app.workflow.set_node_runner_settings(node_id, NodeRunnerSettings::new("host", "shell"));
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Canvas;
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Delete)), None);
+
+        assert!(app.workflow.graph.node(node_id).is_none());
+        assert!(app.workflow.node_config(node_id).is_none());
+        assert!(app.workflow.node_credentials(node_id).is_none());
+        assert!(app.workflow.node_runner_settings(node_id).is_none());
+        assert!(app.graph_state.selected.is_empty());
+        assert!(app.graph_state.focused.is_none());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
+    fn delete_key_without_selection_preserves_workflow_and_dirty_state() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("keep me", "true");
+        let node_id = app.graph_state.focused.expect("focused shell node");
+        app.graph_state.selected.clear();
+        app.graph_state.focused = None;
+        app.clear_workflow_dirty();
+        app.focus = FocusPanel::Canvas;
+
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Delete)), None);
+
+        assert!(app.workflow.graph.node(node_id).is_some());
+        assert!(app.workflow.node_config(node_id).is_some());
+        assert!(!app.has_unsaved_changes());
     }
 
     fn mouse_event(kind: MouseEventKind, column: u16, row: u16) -> Event {
@@ -1213,6 +1281,23 @@ mod tests {
     }
 
     #[test]
+    fn property_edit_supports_credentials_for_non_agent_node() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_http_node("HTTP", "GET", "https://example.com");
+        app.clear_workflow_dirty();
+        let node_id = app.graph_state.focused.expect("focused node");
+
+        assert!(app.start_property_edit(PropertyEditField::Credentials));
+        app.property_edit.as_mut().expect("credential edit").draft = "TOKEN=env:key".to_string();
+        assert!(app.save_property_edit());
+
+        let credentials = app.workflow.node_credentials(node_id).expect("credentials");
+        assert_eq!(credentials.env.get("TOKEN").expect("token ref").identity(), "env:key");
+        assert!(app.property_edit.is_none());
+        assert!(app.has_unsaved_changes());
+    }
+
+    #[test]
     fn add_node_keys_create_shell_node_and_cancel_flow() {
         let (_temp_dir, mut app) = test_app();
 
@@ -1259,5 +1344,61 @@ mod tests {
 
         assert_eq!(app.workflow.graph.node_count(), 1);
         assert!(!app.is_add_node_flow_open());
+    }
+
+    #[test]
+    fn add_node_keys_create_http_and_file_nodes() {
+        let (_temp_dir, mut app) = test_app();
+
+        app.open_add_node_flow();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('h'))), None);
+        app.add_node_flow.label = "Fetch".to_string();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None);
+        app.add_node_flow.command = "POST https://example.com/items".to_string();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None);
+
+        app.open_add_node_flow();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('f'))), None);
+        app.add_node_flow.label = "Read".to_string();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None);
+        app.add_node_flow.command = "read ./input.txt".to_string();
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Enter)), None);
+
+        let fetch = app.workflow.graph.nodes().find(|node| node.label == "Fetch").expect("HTTP node");
+        let read = app.workflow.graph.nodes().find(|node| node.label == "Read").expect("file node");
+        assert!(matches!(
+            app.workflow.node_config(fetch.id),
+            Some(NodeConfig::Http { method, url, .. })
+                if method == "POST" && url == "https://example.com/items"
+        ));
+        assert!(matches!(
+            app.workflow.node_config(read.id),
+            Some(NodeConfig::File {
+                operation: crate::file_node::FileOperationKind::Read,
+                path,
+                ..
+            }) if path == "./input.txt"
+        ));
+        assert!(!app.is_add_node_flow_open());
+    }
+
+    #[test]
+    fn invalid_http_and_file_drafts_do_not_create_nodes() {
+        let (_temp_dir, mut app) = test_app();
+
+        app.open_add_node_flow();
+        app.start_http_node_flow();
+        app.add_node_flow.step = AddNodeStep::Command;
+        app.add_node_flow.command = "INVALID not-a-url".to_string();
+        app.confirm_add_node_flow();
+        assert_eq!(app.workflow.graph.node_count(), 0);
+        assert!(app.is_add_node_flow_open());
+
+        app.start_file_node_flow();
+        app.add_node_flow.step = AddNodeStep::Command;
+        app.add_node_flow.command = "erase ./input.txt".to_string();
+        app.confirm_add_node_flow();
+        assert_eq!(app.workflow.graph.node_count(), 0);
+        assert!(app.is_add_node_flow_open());
     }
 }

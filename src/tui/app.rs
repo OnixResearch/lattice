@@ -81,6 +81,8 @@ const DEFAULT_CONDITION_BRANCH_LABEL: &str = "match";
 const DEFAULT_CONDITION_PREDICATE: &str = "always";
 const DEFAULT_MERGE_INPUT_LEFT: &str = "left";
 const DEFAULT_MERGE_INPUT_RIGHT: &str = "right";
+const DEFAULT_HTTP_DRAFT: &str = "GET https://example.com";
+const DEFAULT_FILE_DRAFT: &str = "read ./file.txt";
 
 /// Which panel has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,7 +177,7 @@ pub enum PropertyEditField {
     AgentContextRefs,
     AgentCwd,
     AgentSession,
-    AgentCredentials,
+    Credentials,
     ConditionBranches,
 }
 
@@ -194,7 +196,7 @@ impl PropertyEditField {
             Self::AgentContextRefs => "agent context refs",
             Self::AgentCwd => "agent cwd",
             Self::AgentSession => "agent session",
-            Self::AgentCredentials => "agent credentials",
+            Self::Credentials => "credentials",
             Self::ConditionBranches => "condition branches",
         }
     }
@@ -219,6 +221,8 @@ pub enum PropertyEditError {
     InvalidAgentCredentials,
     InvalidConditionBranches,
     InvalidMergePolicy,
+    InvalidHttpConfig,
+    InvalidFileConfig,
 }
 
 pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
@@ -274,6 +278,35 @@ fn condition_predicate_to_draft(predicate: &control_flow::ConditionPredicate) ->
         control_flow::ConditionPredicate::JsonPointerExists(value) => format!("json_exists:{value}"),
         control_flow::ConditionPredicate::BoolEquals(value) => format!("bool:{value}"),
     }
+}
+
+fn http_config_from_draft(input: &str) -> Result<(String, String), PropertyEditError> {
+    let Some((method, url)) = input.trim().split_once(char::is_whitespace) else {
+        return Err(PropertyEditError::InvalidHttpConfig);
+    };
+    let method = method.trim();
+    let url = url.trim();
+    if !crate::http::validate_http_method(method) || !crate::http::validate_http_url(url) {
+        return Err(PropertyEditError::InvalidHttpConfig);
+    }
+    Ok((method.to_string(), url.to_string()))
+}
+
+fn file_config_from_draft(input: &str) -> Result<(crate::file_node::FileOperationKind, String), PropertyEditError> {
+    let Some((operation, path)) = input.trim().split_once(char::is_whitespace) else {
+        return Err(PropertyEditError::InvalidFileConfig);
+    };
+    let operation = match operation.trim().to_ascii_lowercase().as_str() {
+        "read" => crate::file_node::FileOperationKind::Read,
+        "write" => crate::file_node::FileOperationKind::Write,
+        "append" => crate::file_node::FileOperationKind::Append,
+        _ => return Err(PropertyEditError::InvalidFileConfig),
+    };
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(PropertyEditError::InvalidFileConfig);
+    }
+    Ok((operation, path.to_string()))
 }
 
 fn merge_config_from_draft(input: &str) -> Result<MergeNodeConfig, PropertyEditError> {
@@ -558,6 +591,8 @@ pub enum AddNodeStep {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddNodeKind {
     Shell,
+    Http,
+    File,
     ImageInput,
     PiAgent,
     ClankersAgent,
@@ -1034,6 +1069,16 @@ impl App {
         self.add_node_flow = AddNodeFlowState::templates();
     }
 
+    pub fn start_http_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::Http, self.next_http_node_label());
+        self.add_node_flow.command = DEFAULT_HTTP_DRAFT.to_string();
+    }
+
+    pub fn start_file_node_flow(&mut self) {
+        self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::File, self.next_file_node_label());
+        self.add_node_flow.command = DEFAULT_FILE_DRAFT.to_string();
+    }
+
     pub fn start_image_input_node_flow(&mut self) {
         self.add_node_flow = AddNodeFlowState::typed(AddNodeKind::ImageInput, self.next_image_node_label());
     }
@@ -1125,6 +1170,8 @@ impl App {
     fn confirm_typed_node_from_flow(&mut self) {
         match self.add_node_flow.kind {
             AddNodeKind::Shell => self.confirm_shell_node_from_flow(),
+            AddNodeKind::Http => self.confirm_http_node_from_flow(),
+            AddNodeKind::File => self.confirm_file_node_from_flow(),
             AddNodeKind::ImageInput => self.confirm_image_input_node_from_flow(),
             AddNodeKind::PiAgent => self.confirm_agent_node_from_flow(AgentTarget::Pi),
             AddNodeKind::ClankersAgent => self.confirm_agent_node_from_flow(AgentTarget::Clankers),
@@ -1138,6 +1185,32 @@ impl App {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_shell_node_label());
         let command = self.add_node_flow.command.clone();
         self.add_shell_node(&label, &command);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_http_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_http_node_label());
+        let (method, url) = match http_config_from_draft(&self.add_node_flow.command) {
+            Ok(config) => config,
+            Err(_) => {
+                self.output.push_line("Invalid HTTP config; use METHOD URL");
+                return;
+            }
+        };
+        self.add_http_node(&label, &method, &url);
+        self.cancel_add_node_flow();
+    }
+
+    fn confirm_file_node_from_flow(&mut self) {
+        let label = normalized_node_label(&self.add_node_flow.label, &self.next_file_node_label());
+        let (operation, path) = match file_config_from_draft(&self.add_node_flow.command) {
+            Ok(config) => config,
+            Err(_) => {
+                self.output.push_line("Invalid file config; use read|write|append PATH");
+                return;
+            }
+        };
+        self.add_file_node(&label, operation, &path);
         self.cancel_add_node_flow();
     }
 
@@ -1267,27 +1340,35 @@ impl App {
     }
 
     fn next_shell_node_label(&self) -> String {
-        format!("Shell {}", self.workflow.graph.node_count() + 1)
+        format!("Shell {}", self.workflow.graph.node_count().saturating_add(1))
+    }
+
+    fn next_http_node_label(&self) -> String {
+        format!("HTTP {}", self.workflow.graph.node_count().saturating_add(1))
+    }
+
+    fn next_file_node_label(&self) -> String {
+        format!("File {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     fn next_image_node_label(&self) -> String {
-        format!("Image {}", self.workflow.graph.node_count() + 1)
+        format!("Image {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     fn next_agent_node_label(&self) -> String {
-        format!("Agent {}", self.workflow.graph.node_count() + 1)
+        format!("Agent {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     fn next_condition_node_label(&self) -> String {
-        format!("Condition {}", self.workflow.graph.node_count() + 1)
+        format!("Condition {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     fn next_merge_node_label(&self) -> String {
-        format!("Merge {}", self.workflow.graph.node_count() + 1)
+        format!("Merge {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     fn next_subworkflow_node_label(&self) -> String {
-        format!("Subworkflow {}", self.workflow.graph.node_count() + 1)
+        format!("Subworkflow {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
     /// Return whether the run-history modal is open.
@@ -1544,7 +1625,33 @@ impl App {
         }
     }
 
-    /// Start editing a selected shell-node property.
+    /// Delete selected nodes through the aggregate workflow lifecycle operation.
+    pub(crate) fn delete_selected_nodes(&mut self) -> usize {
+        let mut node_ids = self.graph_state.selected.iter().copied().collect::<Vec<_>>();
+        node_ids.sort_unstable();
+        if node_ids.is_empty() {
+            return 0;
+        }
+        if node_ids.iter().any(|node_id| self.workflow.plan_node_removal(*node_id).is_err()) {
+            self.output.push_line("Node deletion failed; selection is stale");
+            return 0;
+        }
+
+        let mut removed = 0;
+        for node_id in &node_ids {
+            if self.workflow.remove_node(*node_id).is_ok() {
+                removed += 1;
+            }
+        }
+        debug_assert_eq!(removed, node_ids.len());
+        self.property_edit = self.property_edit.take().filter(|edit| !node_ids.contains(&edit.node_id));
+        self.sync_graph_state();
+        self.mark_workflow_dirty();
+        self.output.push_line(&format!("Deleted {removed} node(s)"));
+        removed
+    }
+
+    /// Start editing a selected node property.
     // r[impl n8nclone.tui_ux.node_kind_provider.unsupported_edit]
     pub fn start_property_edit(&mut self, field: PropertyEditField) -> bool {
         let Some(node_id) = self.selected_node_id() else {
@@ -1611,7 +1718,7 @@ impl App {
                 false
             }
             Err(PropertyEditError::InvalidAgentCredentials) => {
-                self.output.push_line("Invalid agent credentials; use ENV=provider:key[, ENV=provider:key.field]");
+                self.output.push_line("Invalid credentials; use ENV=provider:key[, ENV=provider:key.field]");
                 false
             }
             Err(PropertyEditError::InvalidConditionBranches) => {
@@ -1696,10 +1803,10 @@ impl App {
                 NodeConfig::Agent(settings) => Some(settings.session.clone().unwrap_or_default()),
                 _ => None,
             },
-            PropertyEditField::AgentCredentials => match self.workflow.node_config(node_id)? {
-                NodeConfig::Agent(_) => Some(credentials_to_draft(self.workflow.node_credentials(node_id))),
-                _ => None,
-            },
+            PropertyEditField::Credentials => {
+                self.workflow.node_config(node_id)?;
+                Some(credentials_to_draft(self.workflow.node_credentials(node_id)))
+            }
             PropertyEditField::ConditionBranches => match self.workflow.node_config(node_id)? {
                 NodeConfig::Condition(config) => Some(condition_branches_to_draft(config)),
                 _ => None,
@@ -1844,37 +1951,27 @@ impl App {
                     | PropertyEditField::Command
                     | PropertyEditField::TimeoutSecs
                     | PropertyEditField::ImagePath
-                    | PropertyEditField::AgentCredentials
+                    | PropertyEditField::Credentials
                     | PropertyEditField::ConditionBranches => return Err(PropertyEditError::MissingConfig),
                 }
                 self.workflow.set_node_config(edit.node_id, NodeConfig::Agent(settings));
                 Ok(())
             }
-            PropertyEditField::AgentCredentials => match self.workflow.node_config(edit.node_id) {
-                Some(NodeConfig::Agent(_)) => {
-                    self.workflow.set_node_credentials(edit.node_id, credentials_from_draft(&edit.draft)?);
-                    Ok(())
-                }
-                _ => Err(PropertyEditError::MissingConfig),
-            },
-            PropertyEditField::ConditionBranches => {
-                let Some(NodeConfig::Condition(mut config)) = self.workflow.node_config(edit.node_id).cloned() else {
+            PropertyEditField::Credentials => {
+                if self.workflow.node_config(edit.node_id).is_none() {
                     return Err(PropertyEditError::MissingConfig);
-                };
-                config.branches = condition_branches_from_draft(&edit.draft)?;
-                if let Some(node) = self.workflow.graph.node_mut(edit.node_id) {
-                    node.output_ports = config
-                        .branches
-                        .iter()
-                        .zip(node.output_ports.iter())
-                        .map(|(branch, port)| rat_nodegraph::model::Port {
-                            label: branch.label.clone(),
-                            ..port.clone()
-                        })
-                        .collect();
                 }
-                self.workflow.set_node_config(edit.node_id, NodeConfig::Condition(config));
+                self.workflow.set_node_credentials(edit.node_id, credentials_from_draft(&edit.draft)?);
+                Ok(())
+            }
+            PropertyEditField::ConditionBranches => {
+                let branches = condition_branches_from_draft(&edit.draft)?;
+                self.workflow
+                    .replace_condition_branches(edit.node_id, branches)
+                    .map_err(|_| PropertyEditError::MissingConfig)?;
                 self.sync_graph_state();
+                self.graph_state.selected.insert(edit.node_id);
+                self.graph_state.focused = Some(edit.node_id);
                 Ok(())
             }
         }
@@ -1902,6 +1999,22 @@ impl App {
     /// Add a new shell node to the workflow.
     pub fn add_shell_node(&mut self, label: &str, command: &str) {
         let id = self.workflow.add_shell_node(label, command);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    pub fn add_http_node(&mut self, label: &str, method: &str, url: &str) {
+        let id = self.workflow.add_http_node(label, method, url);
+        self.place_new_node(id);
+        self.sync_graph_state();
+        self.select_node(id);
+        self.mark_workflow_dirty();
+    }
+
+    pub fn add_file_node(&mut self, label: &str, operation: crate::file_node::FileOperationKind, path: &str) {
+        let id = self.workflow.add_file_node(label, operation, path);
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -2771,6 +2884,80 @@ mod tests {
         }
     }
 
+    #[test]
+    fn condition_property_edit_reconciles_ports_and_edges_by_label() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_condition_node("Route", ConditionNodeConfig {
+            branches: vec![
+                ConditionBranch {
+                    label: "remove".to_string(),
+                    predicate: control_flow::ConditionPredicate::Always,
+                },
+                ConditionBranch {
+                    label: "keep".to_string(),
+                    predicate: control_flow::ConditionPredicate::Always,
+                },
+            ],
+        });
+        let condition_id = app.graph_state.focused.expect("condition selected");
+        app.add_shell_node("Remove target", "cat");
+        let remove_target = app.graph_state.focused.expect("remove target selected");
+        app.add_shell_node("Keep target", "cat");
+        let keep_target = app.graph_state.focused.expect("keep target selected");
+        let condition = app.workflow.graph.node(condition_id).expect("condition node");
+        let removed_port = condition.output_ports[0].id;
+        let kept_port = condition.output_ports[1].id;
+        let remove_input = app.workflow.graph.node(remove_target).expect("remove target").input_ports[0].id;
+        let keep_input = app.workflow.graph.node(keep_target).expect("keep target").input_ports[0].id;
+        app.workflow.graph.add_edge(removed_port, remove_input).expect("remove edge");
+        app.workflow.graph.add_edge(kept_port, keep_input).expect("keep edge");
+        app.sync_graph_state();
+        app.select_node(condition_id);
+
+        assert!(app.start_property_edit(PropertyEditField::ConditionBranches));
+        app.property_edit.as_mut().expect("branch edit").draft = "added=always, keep=always".to_string();
+        assert!(app.save_property_edit());
+
+        let reconciled = app.workflow.graph.node(condition_id).expect("reconciled condition");
+        assert_eq!(reconciled.output_ports[0].label, "added");
+        assert_eq!(reconciled.output_ports[1].id, kept_port);
+        assert!(app.workflow.graph.port(removed_port).is_none());
+        assert_eq!(app.workflow.graph.edges().len(), 1);
+        assert_eq!(app.workflow.graph.edges()[0].source, kept_port);
+        assert_eq!(app.workflow.graph.edges()[0].target, keep_input);
+        assert_eq!(app.graph_state.focused, Some(condition_id));
+        assert!(app.graph_state.selected.contains(&condition_id));
+    }
+
+    #[test]
+    fn malformed_condition_property_edit_preserves_prior_topology() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let mut app = App::new(test_config(&temp_dir));
+        app.add_condition_node("Route", ConditionNodeConfig {
+            branches: vec![ConditionBranch {
+                label: "keep".to_string(),
+                predicate: control_flow::ConditionPredicate::Always,
+            }],
+        });
+        let condition_id = app.graph_state.focused.expect("condition selected");
+        let prior_ports = app.workflow.graph.node(condition_id).expect("condition node").output_ports.clone();
+        let prior_config = app.workflow.node_config(condition_id).cloned().expect("condition config");
+        app.clear_workflow_dirty();
+
+        assert!(app.start_property_edit(PropertyEditField::ConditionBranches));
+        app.property_edit.as_mut().expect("branch edit").draft = "malformed".to_string();
+        assert!(!app.save_property_edit());
+
+        assert_eq!(app.workflow.graph.node(condition_id).expect("condition node").output_ports, prior_ports);
+        match (app.workflow.node_config(condition_id), prior_config) {
+            (Some(NodeConfig::Condition(actual)), NodeConfig::Condition(expected)) => assert_eq!(actual, &expected),
+            _ => panic!("expected unchanged condition config"),
+        }
+        assert!(app.property_edit.is_some());
+        assert!(!app.has_unsaved_changes());
+    }
+
     // r[verify n8nclone.tui_ux.agent_nodes.errors]
     // r[verify n8nclone.tui_ux.agent_nodes.errors.invalid_target]
     // r[verify n8nclone.tui_ux.agent_nodes.properties]
@@ -2810,7 +2997,7 @@ mod tests {
         assert!(app.start_property_edit(PropertyEditField::AgentSession));
         app.property_edit.as_mut().expect("session edit").draft = "session-1".to_string();
         assert!(app.save_property_edit());
-        assert!(app.start_property_edit(PropertyEditField::AgentCredentials));
+        assert!(app.start_property_edit(PropertyEditField::Credentials));
         app.property_edit.as_mut().expect("credential edit").draft = "TOKEN=env:artist-token".to_string();
         assert!(app.save_property_edit());
         match app.workflow.node_config(agent_node_id).expect("agent config") {
@@ -2834,7 +3021,7 @@ mod tests {
         assert!(output_text_lines(&app).iter().any(|line| line.contains("Invalid agent target")));
         app.cancel_property_edit();
 
-        assert!(app.start_property_edit(PropertyEditField::AgentCredentials));
+        assert!(app.start_property_edit(PropertyEditField::Credentials));
         app.property_edit.as_mut().expect("bad credentials edit").draft = "not-a-ref".to_string();
         assert!(!app.save_property_edit());
         assert!(app.property_edit.is_some());
