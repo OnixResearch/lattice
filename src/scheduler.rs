@@ -86,6 +86,9 @@ pub enum ScheduleOccurrenceError {
     EmptyWorkflowName,
     EmptyWorkflowRevision,
     InvalidNextRun,
+    ScheduleDisabled,
+    ScheduleMismatch,
+    NextRunMisaligned,
     IdentityMismatch,
     MissingAttempt,
     TooManyAttempts,
@@ -108,6 +111,9 @@ impl fmt::Display for ScheduleOccurrenceError {
             Self::EmptyWorkflowName => "schedule occurrence requires a non-empty workflow name",
             Self::EmptyWorkflowRevision => "schedule occurrence requires a non-empty workflow revision",
             Self::InvalidNextRun => "schedule occurrence next run must be after its due epoch",
+            Self::ScheduleDisabled => "schedule occurrence cannot claim a disabled schedule",
+            Self::ScheduleMismatch => "schedule occurrence does not match the persisted due slot",
+            Self::NextRunMisaligned => "schedule occurrence next run is not aligned to its recurrence",
             Self::IdentityMismatch => "schedule occurrence identity does not match its canonical inputs",
             Self::MissingAttempt => "schedule occurrence has no attempt",
             Self::TooManyAttempts => "schedule occurrence exceeds the bounded attempt limit",
@@ -416,6 +422,28 @@ pub fn plan_schedule_occurrence(
         due_epoch_ms: plan.due_epoch_ms,
         next_run_epoch_ms: plan.next_run_epoch_ms,
     })
+}
+
+// r[impl lattice.scheduling.scheduler_occurrence_admission]
+pub fn validate_schedule_occurrence_claim(
+    schedule: &ScheduleDefinition,
+    request: &ScheduleOccurrenceClaimRequest,
+) -> Result<(), ScheduleOccurrenceError> {
+    if !schedule.enabled {
+        return Err(ScheduleOccurrenceError::ScheduleDisabled);
+    }
+    if schedule.id != request.schedule_id
+        || schedule.workflow_name != request.workflow_name
+        || schedule.next_run_epoch_ms != request.due_epoch_ms
+    {
+        return Err(ScheduleOccurrenceError::ScheduleMismatch);
+    }
+    let interval_ms = schedule.recurrence.interval_ms();
+    let advance_ms = request.next_run_epoch_ms.saturating_sub(request.due_epoch_ms);
+    if interval_ms <= 0 || advance_ms <= 0 || advance_ms % interval_ms != 0 {
+        return Err(ScheduleOccurrenceError::NextRunMisaligned);
+    }
+    Ok(())
 }
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]

@@ -30,6 +30,7 @@ use lattice::scheduler::shell::execute_occurrence;
 use lattice::scheduler::shell::recover_occurrence;
 use lattice::scheduler::shell::retry_occurrence;
 use lattice::scheduler::validate_schedule_occurrence;
+use lattice::scheduler::validate_schedule_occurrence_claim;
 use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 
@@ -56,6 +57,8 @@ const RUN_FINISHED_EPOCH_MS: i64 = 20;
 const ZERO_NODE_COUNT: usize = 0;
 const ZERO_CACHE_HITS: usize = 0;
 const RUN_ID_BEFORE_EXHAUSTION: RunId = RunId(u64::MAX - 1);
+const MISALIGNED_NEXT_RUN_EPOCH_MS: i64 = 1_500;
+const CHANGED_WORKFLOW_COMMAND: &str = "printf changed-workflow";
 
 fn plan(schedule_id: &str, due_epoch_ms: i64) -> DueRunPlan {
     DueRunPlan {
@@ -153,6 +156,27 @@ fn malformed_occurrence_inputs_fail_closed() {
     let mut tampered = pending_occurrence();
     tampered.identity = "b3:tampered".to_string();
     assert_eq!(validate_schedule_occurrence(&tampered), Err(ScheduleOccurrenceError::IdentityMismatch));
+
+    let request = plan_schedule_occurrence(&plan(SCHEDULE_ID, DUE_EPOCH_MS), WORKFLOW_REVISION)
+        .expect("claim validation request plans");
+    let mut disabled = schedule(DUE_EPOCH_MS);
+    disabled.enabled = false;
+    let mut mismatched = schedule(DUE_EPOCH_MS);
+    mismatched.workflow_name = OTHER_SCHEDULE_ID.to_string();
+    let mut misaligned = request.clone();
+    misaligned.next_run_epoch_ms = MISALIGNED_NEXT_RUN_EPOCH_MS;
+    assert_eq!(
+        validate_schedule_occurrence_claim(&disabled, &request),
+        Err(ScheduleOccurrenceError::ScheduleDisabled)
+    );
+    assert_eq!(
+        validate_schedule_occurrence_claim(&mismatched, &request),
+        Err(ScheduleOccurrenceError::ScheduleMismatch)
+    );
+    assert_eq!(
+        validate_schedule_occurrence_claim(&schedule(DUE_EPOCH_MS), &misaligned),
+        Err(ScheduleOccurrenceError::NextRunMisaligned)
+    );
 }
 
 // r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
@@ -464,6 +488,33 @@ async fn shell_claims_before_execution_and_settles_exact_owned_run() {
         recover_occurrence(&store, &occurrence.identity).expect("terminal occurrence recovers idempotently"),
         ScheduleOccurrenceRecoveryOutcome::AlreadyTerminal { .. }
     ));
+}
+
+// r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.ordering]
+#[tokio::test]
+async fn shell_rejects_changed_workflow_revision_before_effects() {
+    let (store, _dir) = common::temp_store();
+    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("initial workflow saves");
+    store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("revision schedule saves");
+    let ScheduleOccurrenceClaimResolution::Inserted(occurrence) =
+        claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("revision occurrence claims")
+    else {
+        panic!("first revision occurrence must insert");
+    };
+    let mut changed = Workflow::new(WORKFLOW_NAME);
+    changed.add_shell_node("changed", CHANGED_WORKFLOW_COMMAND);
+    store.save_workflow(&changed).expect("changed workflow saves");
+
+    let error = execute_occurrence(&store, &occurrence, lattice::agent_node::AgentRuntimeConfig::default())
+        .await
+        .expect_err("changed workflow revision rejects before execution");
+
+    assert!(error.to_string().contains("revision differs"));
+    assert!(store.load_run(occurrence.active_run_id).expect("changed run lookup succeeds").is_none());
+    assert_eq!(
+        store.load_schedule_occurrence(&occurrence.identity).unwrap().unwrap().status,
+        ScheduleOccurrenceStatus::PendingUnobserved
+    );
 }
 
 // r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]

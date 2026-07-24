@@ -398,7 +398,7 @@ impl Store {
             };
             deserialize::<ScheduleDefinition>(data.value())?
         };
-        if schedule.workflow_name != request.workflow_name || schedule.next_run_epoch_ms != request.due_epoch_ms {
+        if crate::scheduler::validate_schedule_occurrence_claim(&schedule, request).is_err() {
             return Ok(ScheduleOccurrenceClaimResolution::StaleSchedule {
                 current_next_run_epoch_ms: schedule.next_run_epoch_ms,
             });

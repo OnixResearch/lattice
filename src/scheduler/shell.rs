@@ -63,12 +63,8 @@ pub fn claim_due_occurrence(
     store: &Store,
     plan: &DueRunPlan,
 ) -> Result<ScheduleOccurrenceClaimResolution, ScheduleOccurrenceShellError> {
-    let workflow = store
-        .load_workflow(&plan.workflow_name)?
-        .ok_or_else(|| ScheduleOccurrenceShellError::MissingWorkflow(plan.workflow_name.clone()))?;
-    let revision = crate::orchestration::workflow_revision(&workflow)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidWorkflowRevision(error.to_string()))?;
-    let request = super::plan_schedule_occurrence(plan, &revision.content_hash)
+    let revision = load_workflow_revision(store, &plan.workflow_name)?;
+    let request = super::plan_schedule_occurrence(plan, &revision)
         .map_err(|error| ScheduleOccurrenceShellError::InvalidOccurrence(error.to_string()))?;
     store.claim_schedule_occurrence(&request).map_err(Into::into)
 }
@@ -84,6 +80,12 @@ pub async fn execute_occurrence(
     if occurrence.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
         return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
             super::ScheduleOccurrenceError::NotPending.to_string(),
+        ));
+    }
+    let revision = load_workflow_revision(store, &occurrence.workflow_name)?;
+    if revision != occurrence.workflow_revision {
+        return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
+            super::ScheduleOccurrenceError::WorkflowRevisionMismatch.to_string(),
         ));
     }
     let summary = crate::headless::run_owned_workflow(store, OwnedRunRequest {
@@ -156,12 +158,8 @@ pub async fn retry_occurrence(
     if store.load_run(current.active_run_id)?.is_some() {
         return Err(ScheduleOccurrenceShellError::RecoveryRequired);
     }
-    let workflow = store
-        .load_workflow(&current.workflow_name)?
-        .ok_or_else(|| ScheduleOccurrenceShellError::MissingWorkflow(current.workflow_name.clone()))?;
-    let revision = crate::orchestration::workflow_revision(&workflow)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidWorkflowRevision(error.to_string()))?;
-    let retried = store.retry_schedule_occurrence(identity, &revision.content_hash, acknowledged_duplicate_risk)?;
+    let revision = load_workflow_revision(store, &current.workflow_name)?;
+    let retried = store.retry_schedule_occurrence(identity, &revision, acknowledged_duplicate_risk)?;
     execute_occurrence(store, &retried, agent_runtime).await?;
     load_occurrence(store, identity)
 }
@@ -182,6 +180,15 @@ pub fn abandon_occurrence(
         return Err(ScheduleOccurrenceShellError::RecoveryRequired);
     }
     store.abandon_schedule_occurrence(identity, acknowledged_unknown_outcome).map_err(Into::into)
+}
+
+fn load_workflow_revision(store: &Store, workflow_name: &str) -> Result<String, ScheduleOccurrenceShellError> {
+    let workflow = store
+        .load_workflow(workflow_name)?
+        .ok_or_else(|| ScheduleOccurrenceShellError::MissingWorkflow(workflow_name.to_string()))?;
+    crate::orchestration::workflow_revision(&workflow)
+        .map(|revision| revision.content_hash)
+        .map_err(|error| ScheduleOccurrenceShellError::InvalidWorkflowRevision(error.to_string()))
 }
 
 fn load_occurrence(store: &Store, identity: &str) -> Result<ScheduleOccurrence, ScheduleOccurrenceShellError> {
