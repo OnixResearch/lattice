@@ -9,11 +9,11 @@ use lattice::engine::Workflow;
 use lattice::scheduler::DueRunPlan;
 use lattice::scheduler::MAX_SCHEDULE_OCCURRENCE_ATTEMPTS;
 use lattice::scheduler::MissedRunPolicy;
+use lattice::scheduler::OccurrenceError as ScheduleOccurrenceError;
 use lattice::scheduler::OverlapPolicy;
 use lattice::scheduler::RecurrenceRule;
 use lattice::scheduler::ScheduleDefinition;
 use lattice::scheduler::ScheduleOccurrenceClaimResolution;
-use lattice::scheduler::ScheduleOccurrenceError;
 use lattice::scheduler::ScheduleOccurrenceRecoveryDecision;
 use lattice::scheduler::ScheduleOccurrenceRunObservation;
 use lattice::scheduler::ScheduleOccurrenceRunOwnerObservation;
@@ -52,6 +52,7 @@ const CLAIM_CONTENDER_COUNT: usize = 8;
 const EXPECTED_INSERTED_COUNT: usize = 1;
 const EXPECTED_EXISTING_COUNT: usize = CLAIM_CONTENDER_COUNT - EXPECTED_INSERTED_COUNT;
 const EXPECTED_OCCURRENCE_COUNT: usize = 1;
+const OCCURRENCE_LIST_LIMIT: u64 = 1;
 const RUN_STARTED_EPOCH_MS: i64 = 10;
 const RUN_FINISHED_EPOCH_MS: i64 = 20;
 const ZERO_NODE_COUNT: usize = 0;
@@ -342,7 +343,7 @@ fn redb_claim_race_selects_one_occurrence_and_advances_once() {
         .expect("advanced schedule loads")
         .expect("advanced schedule exists");
     assert_eq!(advanced.next_run_epoch_ms, NEXT_RUN_EPOCH_MS);
-    let occurrences = store.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).expect("occurrences list");
+    let occurrences = store.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).expect("occurrences list");
     assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
     assert_eq!(occurrences[0].active_run_id, inserted[0]);
     assert_eq!(store.next_run_id().expect("following run reserves").0, inserted[0].0 + 1);
@@ -358,7 +359,7 @@ fn missing_stale_and_exhausted_claims_do_not_mutate_schedule_state() {
         missing_store.claim_schedule_occurrence(&request).expect("missing schedule resolves"),
         ScheduleOccurrenceClaimResolution::MissingSchedule
     );
-    assert!(missing_store.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).unwrap().is_empty());
+    assert!(missing_store.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).unwrap().is_empty());
 
     let (stale_store, _stale_dir) = common::temp_store();
     stale_store.save_schedule(&schedule(OTHER_DUE_EPOCH_MS)).expect("stale schedule saves");
@@ -378,7 +379,7 @@ fn missing_stale_and_exhausted_claims_do_not_mutate_schedule_state() {
     let error = exhausted_store.claim_schedule_occurrence(&request).expect_err("run id exhaustion rejects claim");
     assert!(error.to_string().contains("exhausted"));
     assert_eq!(exhausted_store.load_schedule(SCHEDULE_ID).unwrap().unwrap().next_run_epoch_ms, DUE_EPOCH_MS);
-    assert!(exhausted_store.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).unwrap().is_empty());
+    assert!(exhausted_store.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).unwrap().is_empty());
 }
 
 // r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]

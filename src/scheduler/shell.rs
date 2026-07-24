@@ -1,29 +1,16 @@
 //! Imperative scheduler occurrence shell.
 
-use crate::agent_node::AgentRuntimeConfig;
-use crate::headless::HeadlessRunSummary;
-use crate::headless::OwnedRunRequest;
-use crate::scheduler::DueRunPlan;
-use crate::scheduler::ScheduleOccurrence;
-use crate::scheduler::ScheduleOccurrenceClaimResolution;
-use crate::scheduler::ScheduleOccurrenceRecoveryDecision;
-use crate::scheduler::ScheduleOccurrenceRunObservation;
-use crate::scheduler::ScheduleOccurrenceRunOwnerObservation;
-use crate::store::RunOwner;
-use crate::store::Store;
-use crate::store::StoreError;
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
 pub enum ScheduleOccurrenceRecoveryOutcome {
-    AlreadyTerminal { occurrence: Box<ScheduleOccurrence> },
-    PendingUnobserved { occurrence: Box<ScheduleOccurrence> },
-    Reconciled { occurrence: Box<ScheduleOccurrence> },
+    AlreadyTerminal { occurrence: Box<super::ScheduleOccurrence> },
+    PendingUnobserved { occurrence: Box<super::ScheduleOccurrence> },
+    Reconciled { occurrence: Box<super::ScheduleOccurrence> },
 }
 
 #[derive(Debug)]
-pub enum ScheduleOccurrenceShellError {
-    Store(StoreError),
+pub enum Error {
+    Store(crate::store::StoreError),
     MissingOccurrence(String),
     MissingWorkflow(String),
     InvalidWorkflowRevision(String),
@@ -32,7 +19,7 @@ pub enum ScheduleOccurrenceShellError {
     RecoveryRequired,
 }
 
-impl std::fmt::Display for ScheduleOccurrenceShellError {
+impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Store(error) => write!(formatter, "{error}"),
@@ -50,90 +37,88 @@ impl std::fmt::Display for ScheduleOccurrenceShellError {
     }
 }
 
-impl std::error::Error for ScheduleOccurrenceShellError {}
+impl std::error::Error for Error {}
 
-impl From<StoreError> for ScheduleOccurrenceShellError {
-    fn from(error: StoreError) -> Self {
+impl From<crate::store::StoreError> for Error {
+    fn from(error: crate::store::StoreError) -> Self {
         Self::Store(error)
     }
 }
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]
 pub fn claim_due_occurrence(
-    store: &Store,
-    plan: &DueRunPlan,
-) -> Result<ScheduleOccurrenceClaimResolution, ScheduleOccurrenceShellError> {
+    store: &crate::store::Store,
+    plan: &super::DueRunPlan,
+) -> Result<super::ScheduleOccurrenceClaimResolution, Error> {
     let revision = load_workflow_revision(store, &plan.workflow_name)?;
     let request = super::plan_schedule_occurrence(plan, &revision)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidOccurrence(error.to_string()))?;
+        .map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
     store.claim_schedule_occurrence(&request).map_err(Into::into)
 }
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]
 pub async fn execute_occurrence(
-    store: &Store,
-    occurrence: &ScheduleOccurrence,
-    agent_runtime: AgentRuntimeConfig,
-) -> Result<HeadlessRunSummary, ScheduleOccurrenceShellError> {
-    super::validate_schedule_occurrence(occurrence)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidOccurrence(error.to_string()))?;
+    store: &crate::store::Store,
+    occurrence: &super::ScheduleOccurrence,
+    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+) -> Result<crate::headless::HeadlessRunSummary, Error> {
+    super::validate_schedule_occurrence(occurrence).map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
+    debug_assert!(!occurrence.identity.is_empty());
+    debug_assert_eq!(occurrence.attempt_run_ids.last().copied(), Some(occurrence.active_run_id));
     if occurrence.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
-        return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
-            super::ScheduleOccurrenceError::NotPending.to_string(),
-        ));
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
     }
     let revision = load_workflow_revision(store, &occurrence.workflow_name)?;
     if revision != occurrence.workflow_revision {
-        return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
-            super::ScheduleOccurrenceError::WorkflowRevisionMismatch.to_string(),
-        ));
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::WorkflowRevisionMismatch.to_string()));
     }
-    let summary = crate::headless::run_owned_workflow(store, OwnedRunRequest {
+    let summary = crate::headless::run_owned_workflow(store, crate::headless::OwnedRunRequest {
         workflow_name: occurrence.workflow_name.clone(),
         run_id: occurrence.active_run_id,
-        owner: RunOwner::ScheduleOccurrence {
+        owner: crate::store::RunOwner::ScheduleOccurrence {
             identity: occurrence.identity.clone(),
         },
         agent_runtime,
     })
     .await
-    .map_err(|error| ScheduleOccurrenceShellError::Execution(error.to_string()))?;
+    .map_err(|error| Error::Execution(error.to_string()))?;
     let recovered = recover_occurrence(store, &occurrence.identity)?;
     if !matches!(recovered, ScheduleOccurrenceRecoveryOutcome::Reconciled { .. }) {
-        return Err(ScheduleOccurrenceShellError::Execution(
-            "terminal run did not reconcile the active occurrence".to_string(),
-        ));
+        return Err(Error::Execution("terminal run did not reconcile the active occurrence".to_string()));
     }
+    debug_assert_eq!(summary.run_id, occurrence.active_run_id);
     Ok(summary)
 }
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]
 pub fn recover_occurrence(
-    store: &Store,
+    store: &crate::store::Store,
     identity: &str,
-) -> Result<ScheduleOccurrenceRecoveryOutcome, ScheduleOccurrenceShellError> {
+) -> Result<ScheduleOccurrenceRecoveryOutcome, Error> {
     let occurrence = load_occurrence(store, identity)?;
+    debug_assert_eq!(occurrence.identity, identity);
+    debug_assert_eq!(occurrence.attempt_run_ids.last().copied(), Some(occurrence.active_run_id));
     if occurrence.status.is_terminal() {
         return Ok(ScheduleOccurrenceRecoveryOutcome::AlreadyTerminal {
             occurrence: Box::new(occurrence),
         });
     }
     let record = store.load_run(occurrence.active_run_id)?;
-    let observation = record.as_ref().map(|record| ScheduleOccurrenceRunObservation {
+    let observation = record.as_ref().map(|record| super::ScheduleOccurrenceRunObservation {
         run_id: record.run_id,
         owner: owner_observation(&occurrence.identity, &record.owner),
         finished: record.finished_epoch_ms.is_some(),
         failures: record.failures,
     });
     match super::classify_schedule_occurrence_recovery(&occurrence, observation)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidOccurrence(error.to_string()))?
+        .map_err(|error| Error::InvalidOccurrence(error.to_string()))?
     {
-        ScheduleOccurrenceRecoveryDecision::PendingUnobserved { .. } => {
+        super::ScheduleOccurrenceRecoveryDecision::PendingUnobserved { .. } => {
             Ok(ScheduleOccurrenceRecoveryOutcome::PendingUnobserved {
                 occurrence: Box::new(occurrence),
             })
         }
-        ScheduleOccurrenceRecoveryDecision::Settle { run_id, status } => {
+        super::ScheduleOccurrenceRecoveryDecision::Settle { run_id, status } => {
             let occurrence = store.settle_schedule_occurrence(identity, run_id, status)?;
             Ok(ScheduleOccurrenceRecoveryOutcome::Reconciled {
                 occurrence: Box::new(occurrence),
@@ -144,67 +129,63 @@ pub fn recover_occurrence(
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]
 pub async fn retry_occurrence(
-    store: &Store,
+    store: &crate::store::Store,
     identity: &str,
-    acknowledged_duplicate_risk: bool,
-    agent_runtime: AgentRuntimeConfig,
-) -> Result<ScheduleOccurrence, ScheduleOccurrenceShellError> {
+    is_duplicate_risk_acknowledged: bool,
+    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+) -> Result<super::ScheduleOccurrence, Error> {
     let current = load_occurrence(store, identity)?;
     if current.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
-        return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
-            super::ScheduleOccurrenceError::NotPending.to_string(),
-        ));
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
     }
     if store.load_run(current.active_run_id)?.is_some() {
-        return Err(ScheduleOccurrenceShellError::RecoveryRequired);
+        return Err(Error::RecoveryRequired);
     }
     let revision = load_workflow_revision(store, &current.workflow_name)?;
-    let retried = store.retry_schedule_occurrence(identity, &revision, acknowledged_duplicate_risk)?;
+    let retried = store.retry_schedule_occurrence(identity, &revision, is_duplicate_risk_acknowledged)?;
     execute_occurrence(store, &retried, agent_runtime).await?;
     load_occurrence(store, identity)
 }
 
 // r[impl lattice.scheduling.scheduler_occurrence_admission]
 pub fn abandon_occurrence(
-    store: &Store,
+    store: &crate::store::Store,
     identity: &str,
-    acknowledged_unknown_outcome: bool,
-) -> Result<ScheduleOccurrence, ScheduleOccurrenceShellError> {
+    is_unknown_outcome_acknowledged: bool,
+) -> Result<super::ScheduleOccurrence, Error> {
     let current = load_occurrence(store, identity)?;
     if current.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
-        return Err(ScheduleOccurrenceShellError::InvalidOccurrence(
-            super::ScheduleOccurrenceError::NotPending.to_string(),
-        ));
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
     }
     if store.load_run(current.active_run_id)?.is_some() {
-        return Err(ScheduleOccurrenceShellError::RecoveryRequired);
+        return Err(Error::RecoveryRequired);
     }
-    store.abandon_schedule_occurrence(identity, acknowledged_unknown_outcome).map_err(Into::into)
+    store.abandon_schedule_occurrence(identity, is_unknown_outcome_acknowledged).map_err(Into::into)
 }
 
-fn load_workflow_revision(store: &Store, workflow_name: &str) -> Result<String, ScheduleOccurrenceShellError> {
+fn load_workflow_revision(store: &crate::store::Store, workflow_name: &str) -> Result<String, Error> {
     let workflow = store
         .load_workflow(workflow_name)?
-        .ok_or_else(|| ScheduleOccurrenceShellError::MissingWorkflow(workflow_name.to_string()))?;
+        .ok_or_else(|| Error::MissingWorkflow(workflow_name.to_string()))?;
     crate::orchestration::workflow_revision(&workflow)
         .map(|revision| revision.content_hash)
-        .map_err(|error| ScheduleOccurrenceShellError::InvalidWorkflowRevision(error.to_string()))
+        .map_err(|error| Error::InvalidWorkflowRevision(error.to_string()))
 }
 
-fn load_occurrence(store: &Store, identity: &str) -> Result<ScheduleOccurrence, ScheduleOccurrenceShellError> {
+fn load_occurrence(store: &crate::store::Store, identity: &str) -> Result<super::ScheduleOccurrence, Error> {
     store
         .load_schedule_occurrence(identity)?
-        .ok_or_else(|| ScheduleOccurrenceShellError::MissingOccurrence(identity.to_string()))
+        .ok_or_else(|| Error::MissingOccurrence(identity.to_string()))
 }
 
-fn owner_observation(identity: &str, owner: &RunOwner) -> ScheduleOccurrenceRunOwnerObservation {
+fn owner_observation(identity: &str, owner: &crate::store::RunOwner) -> super::ScheduleOccurrenceRunOwnerObservation {
     match owner {
-        RunOwner::ScheduleOccurrence {
+        crate::store::RunOwner::ScheduleOccurrence {
             identity: owner_identity,
-        } if owner_identity == identity => ScheduleOccurrenceRunOwnerObservation::Exact,
-        RunOwner::Unscoped => ScheduleOccurrenceRunOwnerObservation::Unscoped,
-        RunOwner::Orchestration { .. } | RunOwner::ScheduleOccurrence { .. } => {
-            ScheduleOccurrenceRunOwnerObservation::Foreign
+        } if owner_identity == identity => super::ScheduleOccurrenceRunOwnerObservation::Exact,
+        crate::store::RunOwner::Unscoped => super::ScheduleOccurrenceRunOwnerObservation::Unscoped,
+        crate::store::RunOwner::Orchestration { .. } | crate::store::RunOwner::ScheduleOccurrence { .. } => {
+            super::ScheduleOccurrenceRunOwnerObservation::Foreign
         }
     }
 }

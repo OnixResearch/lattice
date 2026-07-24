@@ -51,6 +51,7 @@ const MISSING_SCHEDULE_ID: &str = "missing-workflow";
 const RUN_HISTORY_LIMIT: usize = 10;
 const EXPECTED_PERSISTED_RUNS: usize = 1;
 const EXPECTED_OCCURRENCE_COUNT: usize = 1;
+const OCCURRENCE_LIST_LIMIT: u64 = 1;
 #[cfg(unix)]
 const FORCED_DEATH_MARKER_FILE_NAME: &str = "scheduler-forced-death";
 #[cfg(unix)]
@@ -232,7 +233,7 @@ fn scheduler_occurrence_cli_lists_shows_and_rejects_invalid_bounds() {
     let daemon = scheduler_command(&config_path).output().expect("occurrence CLI daemon returns");
     assert!(daemon.status.success(), "stderr: {}", String::from_utf8_lossy(&daemon.stderr));
     let store = Store::new(&store_path).expect("occurrence CLI store reopens");
-    let occurrences = store.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).expect("occurrence CLI state lists");
+    let occurrences = store.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).expect("occurrence CLI state lists");
     assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
     let identity = occurrences[0].identity.clone();
     drop(store);
@@ -310,8 +311,7 @@ fn operator_e2e_scheduler_restart_requires_explicit_retry_after_pre_effect_death
         .load_schedule(SCHEDULE_ID)
         .expect("crashed schedule loads")
         .expect("crashed schedule remains");
-    let occurrences =
-        after_crash.list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT).expect("crashed occurrences list");
+    let occurrences = after_crash.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).expect("crashed occurrences list");
     assert!(advanced_after_crash.next_run_epoch_ms > DUE_EPOCH_MS);
     assert!(after_crash.list_runs(RUN_HISTORY_LIMIT).expect("crashed run history lists").is_empty());
     assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
@@ -409,9 +409,8 @@ fn operator_e2e_scheduler_post_effect_death_suppresses_restart_and_allows_abando
         .load_schedule(SCHEDULE_ID)
         .expect("post-effect crash schedule loads")
         .expect("post-effect crash schedule remains");
-    let occurrences = after_crash
-        .list_schedule_occurrences(EXPECTED_OCCURRENCE_COUNT)
-        .expect("post-effect occurrences list");
+    let occurrences =
+        after_crash.list_schedule_occurrences(OCCURRENCE_LIST_LIMIT).expect("post-effect occurrences list");
     let schedule_remains_due = advanced_after_crash.next_run_epoch_ms == START_EPOCH_MS;
     assert_eq!(occurrences.len(), EXPECTED_OCCURRENCE_COUNT);
     assert_eq!(occurrences[0].status, lattice::scheduler::ScheduleOccurrenceStatus::PendingUnobserved);

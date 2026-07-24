@@ -10,21 +10,8 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:2fd78ab932fd13a705c8e70aebc1ae6130760f1eccce40181d8198d4ed8f8fab",
+  "baseline_hash": "b3:c2a0c70c9e93642b98e2488c10564a2709608e401671e666aaba5d291cfa5340",
   "findings": [
-    {
-      "stable_id": "b3:06c897a2695ce0ef",
-      "semantic_id": "b3:06c897a2695ce0ef",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
-      "crate_name": "lattice"
-    },
     {
       "stable_id": "b3:26821021bad21f74",
       "semantic_id": "b3:26821021bad21f74",
@@ -49,6 +36,19 @@
       "line": 1,
       "column": 1,
       "message": "module directory `src` contains 17 Rust source files (limit: 7)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:06c897a2695ce0ef",
+      "semantic_id": "b3:06c897a2695ce0ef",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "error",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
       "crate_name": "lattice"
     },
     {
@@ -4680,19 +4680,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:2fc93868bcff1915",
-      "semantic_id": "b3:2fc93868bcff1915",
-      "identity_status": "computed",
-      "lint": "usize_in_public_api",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/image_node.rs",
-      "line": 127,
-      "column": 1,
-      "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:eab3638efd6db7ae",
       "semantic_id": "b3:eab3638efd6db7ae",
       "identity_status": "computed",
@@ -4706,6 +4693,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:2fc93868bcff1915",
+      "semantic_id": "b3:2fc93868bcff1915",
+      "identity_status": "computed",
+      "lint": "usize_in_public_api",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/image_node.rs",
+      "line": 127,
+      "column": 1,
+      "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:7a13ea9418e13bcf",
       "semantic_id": "b3:7a13ea9418e13bcf",
       "identity_status": "computed",
@@ -4716,6 +4716,19 @@
       "line": 136,
       "column": 1,
       "message": "item name `validate_image_path_allowed` repeats `image` from ancestor path segment `image_node`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:5381e394a99edb7c",
+      "semantic_id": "b3:5381e394a99edb7c",
+      "identity_status": "computed",
+      "lint": "ambiguous_params",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/image_node.rs",
+      "line": 154,
+      "column": 1,
+      "message": "2 consecutive `usize` parameters are easy to swap by accident",
       "crate_name": "lattice"
     },
     {
@@ -4745,16 +4758,16 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:5381e394a99edb7c",
-      "semantic_id": "b3:5381e394a99edb7c",
+      "stable_id": "b3:d9f98aefe724874d",
+      "semantic_id": "b3:d9f98aefe724874d",
       "identity_status": "computed",
-      "lint": "ambiguous_params",
-      "group": "tigerstyle::structure",
+      "lint": "path_segment_repetition",
+      "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/image_node.rs",
-      "line": 154,
+      "line": 167,
       "column": 1,
-      "message": "2 consecutive `usize` parameters are easy to swap by accident",
+      "message": "item name `image_value_from_loaded_bytes` repeats `image` from ancestor path segment `image_node`",
       "crate_name": "lattice"
     },
     {
@@ -4768,19 +4781,6 @@
       "line": 167,
       "column": 1,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:d9f98aefe724874d",
-      "semantic_id": "b3:d9f98aefe724874d",
-      "identity_status": "computed",
-      "lint": "path_segment_repetition",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/image_node.rs",
-      "line": 167,
-      "column": 1,
-      "message": "item name `image_value_from_loaded_bytes` repeats `image` from ancestor path segment `image_node`",
       "crate_name": "lattice"
     },
     {
@@ -4914,19 +4914,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1547976671f06329",
-      "semantic_id": "b3:1547976671f06329",
-      "identity_status": "computed",
-      "lint": "renamed_imports",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/n8n_json.rs",
-      "line": 12,
-      "column": 1,
-      "message": "renamed import `Value as JsonValue` hides the original searchable name",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:f170439a8d9590f0",
       "semantic_id": "b3:f170439a8d9590f0",
       "identity_status": "computed",
@@ -4937,6 +4924,19 @@
       "line": 12,
       "column": 1,
       "message": "non-trait import `Value as JsonValue` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:1547976671f06329",
+      "semantic_id": "b3:1547976671f06329",
+      "identity_status": "computed",
+      "lint": "renamed_imports",
+      "group": "tigerstyle::naming",
+      "severity": "error",
+      "file": "src/n8n_json.rs",
+      "line": 12,
+      "column": 1,
+      "message": "renamed import `Value as JsonValue` hides the original searchable name",
       "crate_name": "lattice"
     },
     {
@@ -5525,19 +5525,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:190b8512583f78c3",
-      "semantic_id": "b3:190b8512583f78c3",
-      "identity_status": "computed",
-      "lint": "path_segment_repetition",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/n8n_json.rs",
-      "line": 493,
-      "column": 1,
-      "message": "item name `export_node_to_n8n_json` repeats `n8n` from ancestor path segment `n8n_json`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:2da5e3e917f5c1b2",
       "semantic_id": "b3:2da5e3e917f5c1b2",
       "identity_status": "computed",
@@ -5548,6 +5535,19 @@
       "line": 493,
       "column": 1,
       "message": "2 consecutive `i32` parameters are easy to swap by accident",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:190b8512583f78c3",
+      "semantic_id": "b3:190b8512583f78c3",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "tigerstyle::naming",
+      "severity": "error",
+      "file": "src/n8n_json.rs",
+      "line": 493,
+      "column": 1,
+      "message": "item name `export_node_to_n8n_json` repeats `n8n` from ancestor path segment `n8n_json`",
       "crate_name": "lattice"
     },
     {
@@ -5928,19 +5928,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:74ccdb58d014fd15",
-      "semantic_id": "b3:74ccdb58d014fd15",
-      "identity_status": "computed",
-      "lint": "function_length",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/node_kind_provider.rs",
-      "line": 235,
-      "column": 104,
-      "message": "function `validate_config_for_kind` is 76 lines (limit: 70)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:9ba2ed2f9c73e82b",
       "semantic_id": "b3:9ba2ed2f9c73e82b",
       "identity_status": "computed",
@@ -5951,6 +5938,19 @@
       "line": 235,
       "column": 104,
       "message": "function `validate_config_for_kind` has 0 assertion(s) in 76 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:74ccdb58d014fd15",
+      "semantic_id": "b3:74ccdb58d014fd15",
+      "identity_status": "computed",
+      "lint": "function_length",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/node_kind_provider.rs",
+      "line": 235,
+      "column": 104,
+      "message": "function `validate_config_for_kind` is 76 lines (limit: 70)",
       "crate_name": "lattice"
     },
     {
@@ -6396,19 +6396,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:1cc6b1a825fec54d",
-      "semantic_id": "b3:1cc6b1a825fec54d",
-      "identity_status": "computed",
-      "lint": "borrowed_argument_types",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/orchestration/core.rs",
-      "line": 665,
-      "column": 1,
-      "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:62d79a5d865d84af",
       "semantic_id": "b3:62d79a5d865d84af",
       "identity_status": "computed",
@@ -6419,6 +6406,19 @@
       "line": 665,
       "column": 1,
       "message": "2 consecutive `u64` parameters are easy to swap by accident",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:1cc6b1a825fec54d",
+      "semantic_id": "b3:1cc6b1a825fec54d",
+      "identity_status": "computed",
+      "lint": "borrowed_argument_types",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/orchestration/core.rs",
+      "line": 665,
+      "column": 1,
+      "message": "parameter uses `&Vec<OrchestrationDiagnostic>`; accept `&[OrchestrationDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
     },
     {
@@ -8034,19 +8034,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:06a810139f3ab036",
-      "semantic_id": "b3:06a810139f3ab036",
-      "identity_status": "computed",
-      "lint": "too_many_parameters",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/replay.rs",
-      "line": 655,
-      "column": 1,
-      "message": "function has 10 parameters (limit: 5) — consider an options struct",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:dda73964bef8d5e5",
       "semantic_id": "b3:dda73964bef8d5e5",
       "identity_status": "computed",
@@ -8057,6 +8044,19 @@
       "line": 655,
       "column": 1,
       "message": "item name `replay_event_record` repeats `replay` from ancestor path segment `replay`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:06a810139f3ab036",
+      "semantic_id": "b3:06a810139f3ab036",
+      "identity_status": "computed",
+      "lint": "too_many_parameters",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/replay.rs",
+      "line": 655,
+      "column": 1,
+      "message": "function has 10 parameters (limit: 5) — consider an options struct",
       "crate_name": "lattice"
     },
     {
@@ -8210,7 +8210,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/scheduler.rs",
-      "line": 110,
+      "line": 111,
       "column": 118,
       "message": "function `validate_schedule` has 0 assertion(s) in 31 lines (need 2+)",
       "crate_name": "lattice"
@@ -8223,7 +8223,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/scheduler.rs",
-      "line": 147,
+      "line": 148,
       "column": 23,
       "message": "function `evaluate_due_runs` has 0 assertion(s) in 39 lines (need 2+)",
       "crate_name": "lattice"
@@ -8236,14 +8236,14 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/scheduler.rs",
-      "line": 195,
+      "line": 196,
       "column": 23,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:30a5ceb94d447659",
-      "semantic_id": "b3:30a5ceb94d447659",
+      "stable_id": "b3:fc98de346aaed1b1",
+      "semantic_id": "b3:fc98de346aaed1b1",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -8251,7 +8251,7 @@
       "file": "src/store/mod.rs",
       "line": 1,
       "column": 1,
-      "message": "source file is 1241 lines (limit: 300)",
+      "message": "source file is 1237 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -8262,7 +8262,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 10,
+      "line": 12,
       "column": 1,
       "message": "non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8275,7 +8275,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 11,
+      "line": 13,
       "column": 1,
       "message": "non-trait import `Path` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8288,7 +8288,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 13,
+      "line": 15,
       "column": 1,
       "message": "non-trait import `NodeId` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8301,7 +8301,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 14,
+      "line": 16,
       "column": 1,
       "message": "non-trait import `PortId` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8314,7 +8314,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 15,
+      "line": 17,
       "column": 1,
       "message": "non-trait import `Database` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8327,7 +8327,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 18,
+      "line": 20,
       "column": 1,
       "message": "non-trait import `TableDefinition` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8340,7 +8340,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 19,
+      "line": 21,
       "column": 1,
       "message": "non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8353,7 +8353,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 20,
+      "line": 22,
       "column": 1,
       "message": "non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8366,7 +8366,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 23,
+      "line": 25,
       "column": 1,
       "message": "non-trait import `ContentHash` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8379,7 +8379,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 24,
+      "line": 26,
       "column": 1,
       "message": "non-trait import `RunId` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8392,7 +8392,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 25,
+      "line": 27,
       "column": 1,
       "message": "non-trait import `Value` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8405,7 +8405,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 26,
+      "line": 28,
       "column": 1,
       "message": "non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8418,7 +8418,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 27,
+      "line": 29,
       "column": 1,
       "message": "non-trait import `OrchestrationDefinition` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8431,7 +8431,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 28,
+      "line": 30,
       "column": 1,
       "message": "non-trait import `OrchestrationEvent` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8444,7 +8444,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 29,
+      "line": 31,
       "column": 1,
       "message": "non-trait import `OrchestrationInstance` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8457,7 +8457,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 30,
+      "line": 32,
       "column": 1,
       "message": "non-trait import `ReplayEventRecord` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8470,7 +8470,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 31,
+      "line": 33,
       "column": 1,
       "message": "non-trait import `ScheduleDefinition` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8483,7 +8483,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 32,
+      "line": 34,
       "column": 1,
       "message": "non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8496,7 +8496,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 33,
+      "line": 35,
       "column": 1,
       "message": "non-trait import `TriggerRunRecord` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8509,7 +8509,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 130,
+      "line": 135,
       "column": 1,
       "message": "trait has 8 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8522,7 +8522,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 176,
+      "line": 181,
       "column": 1,
       "message": "trait has 11 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -8535,7 +8535,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 208,
+      "line": 213,
       "column": 1,
       "message": "item name `Store` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -8548,7 +8548,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 288,
+      "line": 296,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8561,7 +8561,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 344,
+      "line": 350,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8574,7 +8574,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 396,
+      "line": 400,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8587,7 +8587,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 424,
+      "line": 428,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8600,7 +8600,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 654,
+      "line": 652,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -8613,7 +8613,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 663,
+      "line": 661,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8626,7 +8626,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 878,
+      "line": 874,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8639,7 +8639,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 922,
+      "line": 918,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -8652,7 +8652,7 @@
       "group": "tigerstyle::safety",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 942,
+      "line": 938,
       "column": 116,
       "message": "function `validate_event_batch` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -8665,7 +8665,7 @@
       "group": "tigerstyle::structure",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 979,
+      "line": 975,
       "column": 63,
       "message": "`as usize` from `u64` is platform-dependent",
       "crate_name": "lattice"
@@ -8678,7 +8678,7 @@
       "group": "tigerstyle::naming",
       "severity": "error",
       "file": "src/store/mod.rs",
-      "line": 1035,
+      "line": 1031,
       "column": 1,
       "message": "item name `StoreError` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -10296,19 +10296,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:36afdfa487dc7650",
-      "semantic_id": "b3:36afdfa487dc7650",
-      "identity_status": "computed",
-      "lint": "renamed_imports",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/tui/input.rs",
-      "line": 11,
-      "column": 1,
-      "message": "renamed import `handle_action as handle_fuzzy_action` hides the original searchable name",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:fd9411ed4eb033e6",
       "semantic_id": "b3:fd9411ed4eb033e6",
       "identity_status": "computed",
@@ -10319,6 +10306,19 @@
       "line": 11,
       "column": 1,
       "message": "non-trait import `handle_action as handle_fuzzy_action` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:36afdfa487dc7650",
+      "semantic_id": "b3:36afdfa487dc7650",
+      "identity_status": "computed",
+      "lint": "renamed_imports",
+      "group": "tigerstyle::naming",
+      "severity": "error",
+      "file": "src/tui/input.rs",
+      "line": 11,
+      "column": 1,
+      "message": "renamed import `handle_action as handle_fuzzy_action` hides the original searchable name",
       "crate_name": "lattice"
     },
     {
@@ -10621,19 +10621,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:b7a55abb658f28ac",
-      "semantic_id": "b3:b7a55abb658f28ac",
-      "identity_status": "computed",
-      "lint": "function_length",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/tui/input.rs",
-      "line": 639,
-      "column": 73,
-      "message": "function `handle_mouse` is 73 lines (limit: 70)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:d9c6a8e879daa6c6",
       "semantic_id": "b3:d9c6a8e879daa6c6",
       "identity_status": "computed",
@@ -10644,6 +10631,19 @@
       "line": 639,
       "column": 73,
       "message": "function `handle_mouse` has 0 assertion(s) in 73 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:b7a55abb658f28ac",
+      "semantic_id": "b3:b7a55abb658f28ac",
+      "identity_status": "computed",
+      "lint": "function_length",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/tui/input.rs",
+      "line": 639,
+      "column": 73,
+      "message": "function `handle_mouse` is 73 lines (limit: 70)",
       "crate_name": "lattice"
     },
     {
@@ -11336,19 +11336,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:517cb5569b5d15aa",
-      "semantic_id": "b3:517cb5569b5d15aa",
-      "identity_status": "computed",
-      "lint": "function_length",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/tui/panels.rs",
-      "line": 213,
-      "column": 63,
-      "message": "function `render_properties` is 102 lines (limit: 70)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:8d6a739049a98c8e",
       "semantic_id": "b3:8d6a739049a98c8e",
       "identity_status": "computed",
@@ -11359,6 +11346,19 @@
       "line": 213,
       "column": 63,
       "message": "function `render_properties` has 0 assertion(s) in 102 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:517cb5569b5d15aa",
+      "semantic_id": "b3:517cb5569b5d15aa",
+      "identity_status": "computed",
+      "lint": "function_length",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/tui/panels.rs",
+      "line": 213,
+      "column": 63,
+      "message": "function `render_properties` is 102 lines (limit: 70)",
       "crate_name": "lattice"
     },
     {
@@ -14365,19 +14365,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:3f3b384f4dcbdd42",
-      "semantic_id": "b3:3f3b384f4dcbdd42",
-      "identity_status": "computed",
-      "lint": "function_length",
-      "group": "tigerstyle::structure",
-      "severity": "error",
-      "file": "src/workflow_format.rs",
-      "line": 1797,
-      "column": 68,
-      "message": "function `render_config` is 134 lines (limit: 70)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:ef98b8a5d7037780",
       "semantic_id": "b3:ef98b8a5d7037780",
       "identity_status": "computed",
@@ -14388,6 +14375,19 @@
       "line": 1797,
       "column": 68,
       "message": "function `render_config` has 0 assertion(s) in 134 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:3f3b384f4dcbdd42",
+      "semantic_id": "b3:3f3b384f4dcbdd42",
+      "identity_status": "computed",
+      "lint": "function_length",
+      "group": "tigerstyle::structure",
+      "severity": "error",
+      "file": "src/workflow_format.rs",
+      "line": 1797,
+      "column": 68,
+      "message": "function `render_config` is 134 lines (limit: 70)",
       "crate_name": "lattice"
     },
     {
@@ -14456,19 +14456,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:78b8e21ed6faa50a",
-      "semantic_id": "b3:78b8e21ed6faa50a",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "error",
-      "file": "src/workflow_validation.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `workflow_validation.rs` contains an underscore; prefer `workflow/validation.rs`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:a52c83371dc910a1",
       "semantic_id": "b3:a52c83371dc910a1",
       "identity_status": "computed",
@@ -14479,6 +14466,19 @@
       "line": 1,
       "column": 1,
       "message": "source file is 609 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:78b8e21ed6faa50a",
+      "semantic_id": "b3:78b8e21ed6faa50a",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "error",
+      "file": "src/workflow_validation.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `workflow_validation.rs` contains an underscore; prefer `workflow/validation.rs`",
       "crate_name": "lattice"
     },
     {

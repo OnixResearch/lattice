@@ -38,8 +38,8 @@ const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
 const WEBHOOK_MAX_IN_FLIGHT_CONNECTIONS: usize = 32;
-const DEFAULT_SCHEDULE_OCCURRENCE_LIMIT: usize = 20;
-const MAX_SCHEDULE_OCCURRENCE_LIMIT: usize = 100;
+const DEFAULT_SCHEDULE_OCCURRENCE_LIMIT: u64 = 20;
+const MAX_SCHEDULE_OCCURRENCE_LIMIT: u64 = 100;
 
 #[path = "doctor/core.rs"]
 mod doctor;
@@ -176,7 +176,7 @@ enum SchedulerOccurrenceCliCommand {
     /// List bounded durable occurrence state without workflow content
     List {
         #[arg(long, default_value_t = DEFAULT_SCHEDULE_OCCURRENCE_LIMIT)]
-        limit: usize,
+        limit: u64,
         #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
         output: RunOutputFormat,
     },
@@ -997,7 +997,7 @@ async fn run_scheduler_daemon_once(
     for plan in evaluation.due_runs {
         let resolution = match scheduler::shell::claim_due_occurrence(&store, &plan) {
             Ok(resolution) => resolution,
-            Err(scheduler::shell::ScheduleOccurrenceShellError::MissingWorkflow(error)) => {
+            Err(scheduler::shell::Error::MissingWorkflow(error)) => {
                 update_schedule_next_run(&store, &plan.schedule_id, plan.next_run_epoch_ms);
                 let outcome = schedule_error_outcome(&plan, error);
                 println!("{}", scheduler::render_daemon_outcome(&outcome));

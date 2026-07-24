@@ -7,6 +7,8 @@
 //!  - run_details: RunId → per-node execution detail log
 //!  - cache: input_hash → output values (skip re-execution)
 
+mod admission;
+
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -29,10 +31,6 @@ use crate::orchestration::OrchestrationEvent;
 use crate::orchestration::OrchestrationInstance;
 use crate::replay::ReplayEventRecord;
 use crate::scheduler::ScheduleDefinition;
-use crate::scheduler::ScheduleOccurrence;
-use crate::scheduler::ScheduleOccurrenceClaimRequest;
-use crate::scheduler::ScheduleOccurrenceClaimResolution;
-use crate::scheduler::ScheduleOccurrenceStatus;
 use crate::triggers::TriggerDefinition;
 use crate::triggers::TriggerRunRecord;
 
@@ -44,7 +42,6 @@ const RUN_DETAILS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_detai
 const RUN_REPLAY_EVENTS: TableDefinition<u64, &[u8]> = TableDefinition::new("run_replay_events");
 const RUN_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("run_counters");
 const SCHEDULES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedules");
-const SCHEDULE_OCCURRENCES: TableDefinition<&str, &[u8]> = TableDefinition::new("schedule_occurrences_v1");
 const TRIGGERS: TableDefinition<&str, &[u8]> = TableDefinition::new("triggers");
 const TRIGGER_RUNS: TableDefinition<&str, &[u8]> = TableDefinition::new("trigger_runs");
 const WEBHOOK_CLAIMS: TableDefinition<&str, &[u8]> = TableDefinition::new("webhook_claims_v1");
@@ -217,6 +214,8 @@ pub struct Store {
     db: Database,
 }
 
+// Occurrence admission stays isolated so its atomic transaction does not couple
+// policy to unrelated storage operations or ambient I/O.
 impl Store {
     /// Open or create the database at the given path.
     pub fn open(path: impl AsRef<Path>) -> Result<(), StoreError> {
@@ -233,7 +232,7 @@ impl Store {
             let _ = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(RUN_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(SCHEDULES).map_err(|e| StoreError::Table(e.to_string()))?;
-            let _ = txn.open_table(SCHEDULE_OCCURRENCES).map_err(|e| StoreError::Table(e.to_string()))?;
+            admission::ensure_table(&txn)?;
             let _ = txn.open_table(TRIGGERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(TRIGGER_RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(WEBHOOK_CLAIMS).map_err(|e| StoreError::Table(e.to_string()))?;
@@ -310,8 +309,6 @@ impl Store {
         Ok(())
     }
 
-    // -- schedules -----------------------------------------------------------
-
     /// Save or replace a schedule definition.
     pub fn save_schedule(&self, schedule: &ScheduleDefinition) -> Result<(), StoreError> {
         let data = serde_json::to_vec(schedule).map_err(|e| StoreError::Serialize(e.to_string()))?;
@@ -365,164 +362,6 @@ impl Store {
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
     }
-
-    // -- schedule occurrences ------------------------------------------------
-
-    // r[impl lattice.scheduling.scheduler_occurrence_admission]
-    pub fn claim_schedule_occurrence(
-        &self,
-        request: &ScheduleOccurrenceClaimRequest,
-    ) -> Result<ScheduleOccurrenceClaimResolution, StoreError> {
-        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
-        let existing = {
-            let occurrences =
-                txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-            occurrences
-                .get(request.identity.as_str())
-                .map_err(|error| StoreError::Db(error.to_string()))?
-                .map(|data| deserialize::<ScheduleOccurrence>(data.value()))
-                .transpose()?
-        };
-        if let Some(existing) = existing {
-            crate::scheduler::validate_schedule_occurrence(&existing)
-                .map_err(|error| StoreError::Conflict(error.to_string()))?;
-            return Ok(ScheduleOccurrenceClaimResolution::Existing(Box::new(existing)));
-        }
-
-        let mut schedule = {
-            let schedules = txn.open_table(SCHEDULES).map_err(|error| StoreError::Table(error.to_string()))?;
-            let Some(data) =
-                schedules.get(request.schedule_id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?
-            else {
-                return Ok(ScheduleOccurrenceClaimResolution::MissingSchedule);
-            };
-            deserialize::<ScheduleDefinition>(data.value())?
-        };
-        if crate::scheduler::validate_schedule_occurrence_claim(&schedule, request).is_err() {
-            return Ok(ScheduleOccurrenceClaimResolution::StaleSchedule {
-                current_next_run_epoch_ms: schedule.next_run_epoch_ms,
-            });
-        }
-
-        let run_id = reserve_run_id(&txn)?;
-        let occurrence = request.occurrence(run_id);
-        crate::scheduler::validate_schedule_occurrence(&occurrence)
-            .map_err(|error| StoreError::Conflict(error.to_string()))?;
-        schedule.next_run_epoch_ms = request.next_run_epoch_ms;
-        let occurrence_data = serialize(&occurrence)?;
-        let schedule_data = serialize(&schedule)?;
-        {
-            let mut occurrences =
-                txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-            occurrences
-                .insert(occurrence.identity.as_str(), occurrence_data.as_slice())
-                .map_err(|error| StoreError::Db(error.to_string()))?;
-        }
-        {
-            let mut schedules = txn.open_table(SCHEDULES).map_err(|error| StoreError::Table(error.to_string()))?;
-            schedules
-                .insert(schedule.id.as_str(), schedule_data.as_slice())
-                .map_err(|error| StoreError::Db(error.to_string()))?;
-        }
-        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
-        Ok(ScheduleOccurrenceClaimResolution::Inserted(Box::new(occurrence)))
-    }
-
-    pub fn load_schedule_occurrence(&self, identity: &str) -> Result<Option<ScheduleOccurrence>, StoreError> {
-        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let occurrences = txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-        let occurrence = occurrences
-            .get(identity)
-            .map_err(|error| StoreError::Db(error.to_string()))?
-            .map(|data| deserialize::<ScheduleOccurrence>(data.value()))
-            .transpose()?;
-        if let Some(occurrence) = &occurrence {
-            crate::scheduler::validate_schedule_occurrence(occurrence)
-                .map_err(|error| StoreError::Conflict(error.to_string()))?;
-        }
-        Ok(occurrence)
-    }
-
-    pub fn list_schedule_occurrences(&self, limit: usize) -> Result<Vec<ScheduleOccurrence>, StoreError> {
-        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let occurrences = txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-        let mut listed = Vec::with_capacity(limit);
-        let iter = occurrences.iter().map_err(|error| StoreError::Db(error.to_string()))?;
-        for entry in iter {
-            if listed.len() >= limit {
-                break;
-            }
-            let (_identity, data) = entry.map_err(|error| StoreError::Db(error.to_string()))?;
-            let occurrence = deserialize::<ScheduleOccurrence>(data.value())?;
-            crate::scheduler::validate_schedule_occurrence(&occurrence)
-                .map_err(|error| StoreError::Conflict(error.to_string()))?;
-            listed.push(occurrence);
-        }
-        assert!(listed.len() <= limit);
-        Ok(listed)
-    }
-
-    pub fn settle_schedule_occurrence(
-        &self,
-        identity: &str,
-        run_id: RunId,
-        status: ScheduleOccurrenceStatus,
-    ) -> Result<ScheduleOccurrence, StoreError> {
-        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
-        let current = load_schedule_occurrence_for_update(&txn, identity)?;
-        let settled = crate::scheduler::settle_schedule_occurrence(&current, run_id, status)
-            .map_err(|error| StoreError::Conflict(error.to_string()))?;
-        save_schedule_occurrence_in_transaction(&txn, &settled)?;
-        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
-        Ok(settled)
-    }
-
-    pub fn retry_schedule_occurrence(
-        &self,
-        identity: &str,
-        workflow_revision: &str,
-        acknowledged_duplicate_risk: bool,
-    ) -> Result<ScheduleOccurrence, StoreError> {
-        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
-        let current = load_schedule_occurrence_for_update(&txn, identity)?;
-        if run_exists_in_transaction(&txn, current.active_run_id)? {
-            return Err(StoreError::Conflict(
-                "schedule occurrence has persisted active-run evidence; recover before retry".to_string(),
-            ));
-        }
-        let run_id = reserve_run_id(&txn)?;
-        let retried = crate::scheduler::retry_schedule_occurrence(
-            &current,
-            workflow_revision,
-            run_id,
-            acknowledged_duplicate_risk,
-        )
-        .map_err(|error| StoreError::Conflict(error.to_string()))?;
-        save_schedule_occurrence_in_transaction(&txn, &retried)?;
-        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
-        Ok(retried)
-    }
-
-    pub fn abandon_schedule_occurrence(
-        &self,
-        identity: &str,
-        acknowledged_unknown_outcome: bool,
-    ) -> Result<ScheduleOccurrence, StoreError> {
-        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
-        let current = load_schedule_occurrence_for_update(&txn, identity)?;
-        if run_exists_in_transaction(&txn, current.active_run_id)? {
-            return Err(StoreError::Conflict(
-                "schedule occurrence has persisted active-run evidence; recover before abandonment".to_string(),
-            ));
-        }
-        let abandoned = crate::scheduler::abandon_schedule_occurrence(&current, acknowledged_unknown_outcome)
-            .map_err(|error| StoreError::Conflict(error.to_string()))?;
-        save_schedule_occurrence_in_transaction(&txn, &abandoned)?;
-        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
-        Ok(abandoned)
-    }
-
-    // -- triggers ------------------------------------------------------------
 
     // r[impl n8nclone.scheduling.triggers.model]
     pub fn save_trigger(&self, trigger: &TriggerDefinition) -> Result<(), StoreError> {
@@ -661,8 +500,6 @@ impl Store {
         Ok(claims)
     }
 
-    // -- value store (content-addressed) ------------------------------------
-
     /// Store a value by its content hash.
     pub fn put_value(&self, value: &Value) -> Result<(), StoreError> {
         let data = serde_json::to_vec(value).map_err(|e| StoreError::Serialize(e.to_string()))?;
@@ -688,8 +525,6 @@ impl Store {
             None => Ok(None),
         }
     }
-
-    // -- execution cache ----------------------------------------------------
 
     /// Store cached outputs for an input hash.
     pub fn put_cache(&self, input_hash: &ContentHash, outputs: &HashMap<PortId, Value>) -> Result<(), StoreError> {
@@ -717,8 +552,6 @@ impl Store {
             None => Ok(None),
         }
     }
-
-    // -- run records --------------------------------------------------------
 
     /// Store a run record without allowing a global run identity to be overwritten.
     // r[impl lattice.agent_orchestration.run_identity]
@@ -840,8 +673,6 @@ impl Store {
         txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
         Ok(run_id)
     }
-
-    // -- durable orchestration ---------------------------------------------
 
     // r[impl lattice.agent_orchestration.durability]
     pub fn save_orchestration_definition(&self, definition: &OrchestrationDefinition) -> Result<(), StoreError> {
@@ -1145,40 +976,6 @@ fn validate_next_event(
         return Err(StoreError::Conflict("orchestration event sequence is not contiguous".to_string()));
     }
     Ok(())
-}
-
-fn load_schedule_occurrence_for_update(
-    txn: &redb::WriteTransaction,
-    identity: &str,
-) -> Result<ScheduleOccurrence, StoreError> {
-    let occurrences = txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-    let Some(data) = occurrences.get(identity).map_err(|error| StoreError::Db(error.to_string()))? else {
-        return Err(StoreError::Conflict("schedule occurrence does not exist".to_string()));
-    };
-    let occurrence = deserialize::<ScheduleOccurrence>(data.value())?;
-    crate::scheduler::validate_schedule_occurrence(&occurrence)
-        .map_err(|error| StoreError::Conflict(error.to_string()))?;
-    Ok(occurrence)
-}
-
-fn save_schedule_occurrence_in_transaction(
-    txn: &redb::WriteTransaction,
-    occurrence: &ScheduleOccurrence,
-) -> Result<(), StoreError> {
-    crate::scheduler::validate_schedule_occurrence(occurrence)
-        .map_err(|error| StoreError::Conflict(error.to_string()))?;
-    let data = serialize(occurrence)?;
-    let mut occurrences = txn.open_table(SCHEDULE_OCCURRENCES).map_err(|error| StoreError::Table(error.to_string()))?;
-    occurrences
-        .insert(occurrence.identity.as_str(), data.as_slice())
-        .map_err(|error| StoreError::Db(error.to_string()))?;
-    Ok(())
-}
-
-fn run_exists_in_transaction(txn: &redb::WriteTransaction, run_id: RunId) -> Result<bool, StoreError> {
-    let runs = txn.open_table(RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
-    let exists = runs.get(run_id.0).map_err(|error| StoreError::Db(error.to_string()))?.is_some();
-    Ok(exists)
 }
 
 fn reserve_run_id(txn: &redb::WriteTransaction) -> Result<RunId, StoreError> {
