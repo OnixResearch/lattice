@@ -1,6 +1,6 @@
 ## Phase 1: Pure occurrence contract
 
-- [ ] [serial] Add domain-separated BLAKE3 occurrence identity, immutable slot facts, bounded attempt/status models, and claim/recovery/retry/abandon decisions with positive and negative tests. r[lattice.scheduling.scheduler_occurrence_admission]
+- [x] [serial] Add domain-separated BLAKE3 occurrence identity, immutable slot facts, bounded attempt/status models, and claim/recovery/retry/abandon decisions with positive and negative tests. r[lattice.scheduling.scheduler_occurrence_admission]
 - [ ] [serial] Extend durable run ownership for schedule occurrences and add pure exact-owner recovery checks that reject absent, foreign, mismatched, and legacy-unscoped records. r[lattice.scheduling.scheduler_occurrence_admission]
 
 ## Phase 2: Atomic store and execution shell
