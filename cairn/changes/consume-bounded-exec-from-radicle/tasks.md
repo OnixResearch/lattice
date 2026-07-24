@@ -1,6 +1,6 @@
 ## Phase 1: Evidence and baseline
 
-- [ ] [serial] Verify the accepted Bounded Exec publication receipt, canonical RID, HTTPS endpoint policy, and exact existing dependency revision before editing source declarations. r[lattice.repository_validation.radicle_bounded_exec_source]
+- [ ] [serial] Verify the accepted Bounded Exec publication receipt, concrete `onix-core` node/HTTPS deployment references, OnixOS multi-seed admission, canonical RID, endpoint policy, and exact existing dependency revision before editing source declarations. r[lattice.repository_validation.radicle_bounded_exec_source]
 - [ ] [serial] Record the smallest relevant Cargo, Nix, source-identity, bounded-process, and repository-check baselines without modifying unrelated active work. r[lattice.repository_validation.radicle_bounded_exec_behavior]
 
 ## Phase 2: Source cutover
@@ -17,7 +17,7 @@
 
 ## Phase 4: Availability and closeout
 
-- [ ] [serial] Consume OnixOS receipts proving acquisition of the exact dependency through each admitted seed and with either seed unavailable. r[lattice.repository_validation.radicle_bounded_exec_availability]
+- [ ] [serial] Consume concrete `onix-core` deployment receipts and OnixOS acceptance references proving acquisition of the exact dependency through each admitted seed and with either seed unavailable. r[lattice.repository_validation.radicle_bounded_exec_availability]
 - [ ] [parallel] Prove unavailable Radicle paths fail without a Bounded Exec GitHub fallback and record the exact bounded diagnostic. r[lattice.repository_validation.radicle_bounded_exec_availability]
 - [ ] [parallel] Update README dependency provenance and non-claims while preserving historical GitHub links only where required for archived evidence. r[lattice.repository_validation.radicle_bounded_exec_source]
 - [ ] [serial] Run focused Cargo tests, `scripts/check.rs`, Octet, Cairn validation/gates, and bounded `nix flake check`; sync and archive only after producer and availability evidence is accepted. r[lattice.repository_validation.radicle_bounded_exec_behavior]

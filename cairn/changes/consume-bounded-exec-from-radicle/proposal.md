@@ -1,6 +1,6 @@
 ## Why
 
-Lattice already consumes Bounded Exec at exact revision `29dac88ecded94457572db3fdfaaaab95fa91525`, but Cargo and Nix acquire it through GitHub SSH URLs. This keeps an Onix-owned runtime dependency coupled to GitHub availability even after the same Git object is published through Radicle.
+Lattice already consumes Bounded Exec at exact revision `29dac88ecded94457572db3fdfaaaab95fa91525`, but Cargo and Nix acquire it through GitHub SSH URLs. This keeps an Onix-owned runtime dependency coupled to GitHub availability even after the same Git object is published through Radicle. Cutover must wait for the accepted Bounded Exec publication receipt, the concrete `onix-core` node/HTTPS evidence it references, and OnixOS multi-seed admission.
 
 The safest pilot changes only source transport and repository identity. The Bounded Exec revision, crate API, process behavior, Lattice policy, and runtime tests remain fixed so failures can be attributed to source acquisition rather than a dependency upgrade.
 
@@ -15,5 +15,5 @@ The safest pilot changes only source transport and repository identity. The Boun
 ## Impact
 
 - **Files**: `Cargo.toml`, generated `Cargo.lock`, `flake.nix`, generated `flake.lock`, source-identity checks/fixtures, README reference metadata, and Cairn evidence.
-- **Cross-repo inputs**: accepted Bounded Exec publication evidence and OnixOS endpoint/availability evidence.
+- **Cross-repo inputs**: accepted Bounded Exec publication evidence, concrete `onix-core` node/HTTPS deployment evidence, and OnixOS catalog/availability acceptance.
 - **Testing**: source consistency positives and negatives, focused bounded-process tests, repository checks, Octet, Cairn gates, and bounded Nix validation.

@@ -8,7 +8,7 @@ Lattice currently names Bounded Exec in three coupled source surfaces:
 
 Changing only one surface would produce lock drift, duplicate source identities, or a build that works locally but fails in Nix. The pilot therefore treats those declarations and generated locks as one source-identity contract.
 
-Completion means Cargo and Nix resolve the accepted Radicle RID to the same existing Bounded Exec object with no GitHub source or fallback for that dependency. A documentation-only URL change, unlocked branch, path override, or GitHub-backed lock entry is false completion.
+Completion begins only after the accepted Bounded Exec publication receipt binds concrete `onix-core` node/HTTPS deployment evidence and OnixOS multi-seed admission. It ends when Cargo and Nix resolve the accepted Radicle RID to the same existing Bounded Exec object with no GitHub source or fallback for that dependency. A documentation-only URL change, unlocked branch, path override, or GitHub-backed lock entry is false completion.
 
 ## Decisions
 
@@ -38,7 +38,7 @@ Completion means Cargo and Nix resolve the accepted Radicle RID to the same exis
 
 ### Decision: Outage drills stay separate from deterministic CI
 
-**Choice:** Deterministic repository checks validate source declarations and locks without intentionally breaking network services. The OnixOS pilot runs live per-seed acquisition and outage drills and supplies BLAKE3-bound receipts for Lattice to reference.
+**Choice:** Deterministic repository checks validate source declarations and locks without intentionally breaking network services. `onix-core` performs concrete node deployment and outage operations; the OnixOS pilot validates their catalog alignment and supplies BLAKE3-bound acceptance references for Lattice.
 
 **Rationale:** A normal `nix flake check` should not depend on deliberately stopping shared infrastructure. Live availability evidence has a different owner and lifecycle.
 
@@ -55,7 +55,7 @@ Positive validation proves:
 - Cargo, Nix, Crane, and both generated locks agree on the accepted source and exact revision;
 - the fetched source contains the expected crates and AGPL license metadata;
 - focused local-process success, failure, timeout, truncation, cancellation, and teardown tests retain their outcomes;
-- each admitted seed path can supply the exact object under the OnixOS drill.
+- each admitted `onix-core` seed path can supply the exact object under the OnixOS acceptance drill.
 
 Negative validation covers different RIDs or endpoints, revision mismatch, stale GitHub lock entries, hidden path overrides, missing crates, altered source content, malformed producer evidence, unavailable Radicle paths, and attempted GitHub fallback.
 
