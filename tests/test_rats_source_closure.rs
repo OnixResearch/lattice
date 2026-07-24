@@ -5,7 +5,7 @@ use std::path::Path;
 
 use pretty_assertions::assert_eq;
 
-const EXPECTED_RATS_REVISION: &str = "5b932c689431cedb05428efe727889455ebe0beb";
+const EXPECTED_RATS_REVISION: &str = "3418e08e4408d6eb899dd4abc8af3fbad9499bb1";
 const RATS_ROOT: &str = "vendor-cargo-deps/rats/source";
 const SOURCE_METADATA: &str = "vendor-cargo-deps/rats/source/SOURCE";
 const ASSERTIONS_MODULE: &str = "vendor-cargo-deps/rats/source/ratcore/src/manual/doc/assertions.rs";

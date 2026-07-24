@@ -48,7 +48,7 @@ pub enum PortDirection {
 }
 
 /// A typed connection point on a node.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Port {
     pub id: PortId,
@@ -58,7 +58,7 @@ pub struct Port {
 }
 
 /// Descriptor for creating a port (before ID assignment).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortSpec {
     pub label: String,
     pub type_tag: String,
@@ -123,6 +123,10 @@ pub enum GraphError {
     WrongDirection,
     /// Node not found.
     NodeNotFound(NodeId),
+    /// Port labels must be unique within one direction on a node.
+    DuplicatePortLabel(String),
+    /// No fresh monotonically increasing port identifier remains.
+    PortIdExhausted,
     /// Edge not found.
     EdgeNotFound { source: PortId, target: PortId },
 }
@@ -146,6 +150,8 @@ impl fmt::Display for GraphError {
                 write!(f, "source must be Output, target must be Input")
             }
             Self::NodeNotFound(id) => write!(f, "node {id} not found"),
+            Self::DuplicatePortLabel(label) => write!(f, "duplicate port label: {label}"),
+            Self::PortIdExhausted => write!(f, "port identifier space is exhausted"),
             Self::EdgeNotFound { source, target } => {
                 write!(f, "edge {source} → {target} not found")
             }
@@ -211,6 +217,91 @@ impl Clone for Graph {
             compat_fn: None, // can't clone closures; caller re-sets after clone
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct PortReconciliationPlan {
+    replacement: Vec<Port>,
+    prior_ids: Vec<PortId>,
+    incident_edge_cleanup_ids: std::collections::BTreeSet<u64>,
+    next_port_id: u64,
+}
+
+// r[impl rat_nodegraph.port_reconciliation.plan]
+fn plan_port_reconciliation(
+    existing: &[Port],
+    requested: &[PortSpec],
+    direction: PortDirection,
+    next_port_id: u64,
+) -> Result<PortReconciliationPlan, GraphError> {
+    debug_assert!(
+        existing
+            .iter()
+            .all(|candidate| candidate.direction == direction)
+    );
+
+    let mut existing_by_label = BTreeMap::new();
+    for candidate in existing {
+        if existing_by_label
+            .insert(candidate.label.clone(), candidate)
+            .is_some()
+        {
+            return Err(GraphError::DuplicatePortLabel(candidate.label.clone()));
+        }
+    }
+
+    let mut requested_labels = std::collections::BTreeSet::new();
+    for spec in requested {
+        if !requested_labels.insert(spec.label.clone()) {
+            return Err(GraphError::DuplicatePortLabel(spec.label.clone()));
+        }
+    }
+
+    let mut next_free_identity_raw = next_port_id;
+    let mut replacement = Vec::with_capacity(requested.len());
+    let mut incident_edge_cleanup_ids = std::collections::BTreeSet::new();
+    for spec in requested {
+        if let Some(existing_port) = existing_by_label.get(&spec.label) {
+            let mut candidate = (*existing_port).clone();
+            if candidate.type_tag != spec.type_tag {
+                incident_edge_cleanup_ids.insert(candidate.id.0);
+                candidate.type_tag = spec.type_tag.clone();
+            }
+            candidate.direction = direction;
+            replacement.push(candidate);
+            continue;
+        }
+
+        let following_identity_raw = next_free_identity_raw
+            .checked_add(1)
+            .ok_or(GraphError::PortIdExhausted)?;
+        replacement.push(Port {
+            id: PortId(next_free_identity_raw),
+            label: spec.label.clone(),
+            type_tag: spec.type_tag.clone(),
+            direction,
+        });
+        next_free_identity_raw = following_identity_raw;
+    }
+
+    for candidate in existing {
+        if !requested_labels.contains(&candidate.label) {
+            incident_edge_cleanup_ids.insert(candidate.id.0);
+        }
+    }
+
+    debug_assert_eq!(replacement.len(), requested.len());
+    debug_assert!(
+        replacement
+            .iter()
+            .all(|candidate| candidate.direction == direction)
+    );
+    Ok(PortReconciliationPlan {
+        replacement,
+        prior_ids: existing.iter().map(|candidate| candidate.id).collect(),
+        incident_edge_cleanup_ids,
+        next_port_id: next_free_identity_raw,
+    })
 }
 
 impl Graph {
@@ -320,6 +411,57 @@ impl Graph {
         }
 
         Ok(())
+    }
+
+    /// Reconcile one direction of a node's ports by stable label identity.
+    ///
+    /// Matching labels preserve their identifiers. New labels receive fresh
+    /// monotonic identifiers. Removed ports and type-changed ports lose their
+    /// incident edges so the graph cannot retain dangling or incompatible
+    /// topology. Duplicate labels and identifier exhaustion fail atomically.
+    // r[impl rat_nodegraph.port_reconciliation]
+    // r[impl rat_nodegraph.port_reconciliation.apply]
+    pub fn reconcile_node_ports(
+        &mut self,
+        id: NodeId,
+        direction: PortDirection,
+        requested: &[PortSpec],
+    ) -> Result<Vec<PortId>, GraphError> {
+        let existing = {
+            let node = self.nodes.get(&id).ok_or(GraphError::NodeNotFound(id))?;
+            match direction {
+                PortDirection::Input => node.input_ports.clone(),
+                PortDirection::Output => node.output_ports.clone(),
+            }
+        };
+        let plan = plan_port_reconciliation(&existing, requested, direction, self.next_port_id)?;
+
+        let Some(node) = self.nodes.get_mut(&id) else {
+            return Err(GraphError::NodeNotFound(id));
+        };
+        match direction {
+            PortDirection::Input => node.input_ports = plan.replacement.clone(),
+            PortDirection::Output => node.output_ports = plan.replacement.clone(),
+        }
+
+        for port_id in &plan.prior_ids {
+            self.port_owner.remove(port_id);
+        }
+        for port in &plan.replacement {
+            self.port_owner.insert(port.id, id);
+        }
+        self.edges.retain(|edge| {
+            !plan.incident_edge_cleanup_ids.contains(&edge.source.0)
+                && !plan.incident_edge_cleanup_ids.contains(&edge.target.0)
+        });
+        self.next_port_id = plan.next_port_id;
+
+        debug_assert!(
+            plan.replacement
+                .iter()
+                .all(|port| self.port_owner.get(&port.id) == Some(&id))
+        );
+        Ok(plan.replacement.iter().map(|port| port.id).collect())
     }
 
     // -- edge operations ----------------------------------------------------
@@ -763,6 +905,144 @@ mod tests {
         g.remove_edge(src, tgt).unwrap();
         assert_eq!(g.edge_count(), 0);
         assert_eq!(g.node_count(), 2);
+    }
+
+    // r[verify rat_nodegraph.port_reconciliation.scenario.change]
+    #[test]
+    fn reconcile_ports_preserves_matching_identity_and_cleans_removed_edges() {
+        let mut g = Graph::new();
+        let source = g.add_node("Source", &[], &[string_port("keep"), string_port("remove")]);
+        let target = g.add_node(
+            "Target",
+            &[string_port("keep-in"), string_port("remove-in")],
+            &[],
+        );
+        let keep_id = g.node(source).unwrap().output_ports[0].id;
+        let remove_id = g.node(source).unwrap().output_ports[1].id;
+        let keep_target = g.node(target).unwrap().input_ports[0].id;
+        let remove_target = g.node(target).unwrap().input_ports[1].id;
+        g.add_edge(keep_id, keep_target).unwrap();
+        g.add_edge(remove_id, remove_target).unwrap();
+
+        let reconciled = g
+            .reconcile_node_ports(
+                source,
+                PortDirection::Output,
+                &[string_port("added"), string_port("keep")],
+            )
+            .unwrap();
+
+        let output_snapshot = g.node(source).unwrap().output_ports.clone();
+        assert_eq!(
+            output_snapshot
+                .iter()
+                .map(|port_value| port_value.label.as_str())
+                .collect::<Vec<_>>(),
+            vec!["added", "keep"]
+        );
+        assert_eq!(output_snapshot[1].id, keep_id);
+        assert_eq!(
+            reconciled,
+            output_snapshot
+                .iter()
+                .map(|port_value| port_value.id)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(g.edge_count(), 1);
+        assert_eq!(
+            g.edges()[0],
+            Edge {
+                source: keep_id,
+                target: keep_target
+            }
+        );
+        assert!(g.add_edge(output_snapshot[0].id, remove_target).is_ok());
+    }
+
+    // r[verify rat_nodegraph.port_reconciliation.scenario.change]
+    #[test]
+    fn reconcile_port_type_change_preserves_id_but_removes_incompatible_edge() {
+        let mut g = Graph::new();
+        let source = g.add_node("Source", &[], &[string_port("value")]);
+        let target = g.add_node("Target", &[string_port("value")], &[]);
+        let source_id = g.node(source).unwrap().output_ports[0].id;
+        let target_id = g.node(target).unwrap().input_ports[0].id;
+        g.add_edge(source_id, target_id).unwrap();
+
+        g.reconcile_node_ports(source, PortDirection::Output, &[number_port("value")])
+            .unwrap();
+
+        assert_eq!(g.node(source).unwrap().output_ports[0].id, source_id);
+        assert_eq!(g.node(source).unwrap().output_ports[0].type_tag, "number");
+        assert_eq!(g.edge_count(), 0);
+    }
+
+    // r[verify rat_nodegraph.port_reconciliation.scenario.reject]
+    #[test]
+    fn reconcile_duplicate_labels_fails_without_mutation() {
+        let mut g = Graph::new();
+        let source = g.add_node("Source", &[], &[string_port("value")]);
+        let prior_output_snapshot = g.node(source).unwrap().output_ports.clone();
+
+        let result = g.reconcile_node_ports(
+            source,
+            PortDirection::Output,
+            &[string_port("duplicate"), number_port("duplicate")],
+        );
+
+        assert_eq!(
+            result,
+            Err(GraphError::DuplicatePortLabel("duplicate".to_string()))
+        );
+        assert_eq!(g.node(source).unwrap().output_ports, prior_output_snapshot);
+        assert_eq!(g.edge_count(), 0);
+    }
+
+    // r[verify rat_nodegraph.port_reconciliation.scenario.reject]
+    #[test]
+    fn reconcile_missing_node_fails_without_allocating_port_id() {
+        let mut g = Graph::new();
+        let result =
+            g.reconcile_node_ports(NodeId(99), PortDirection::Output, &[string_port("value")]);
+        assert_eq!(result, Err(GraphError::NodeNotFound(NodeId(99))));
+
+        let node = g.add_node("After", &[], &[string_port("value")]);
+        assert_eq!(g.node(node).unwrap().output_ports[0].id, PortId(0));
+    }
+
+    // r[verify rat_nodegraph.port_reconciliation.plan.scenario.pure]
+    // r[verify rat_nodegraph.port_reconciliation.scenario.reject]
+    #[test]
+    fn reconciliation_plan_rejects_ambiguous_existing_labels_and_exhaustion() {
+        let duplicate_existing = vec![
+            Port {
+                id: PortId(0),
+                label: "duplicate".to_string(),
+                type_tag: "string".to_string(),
+                direction: PortDirection::Output,
+            },
+            Port {
+                id: PortId(1),
+                label: "duplicate".to_string(),
+                type_tag: "string".to_string(),
+                direction: PortDirection::Output,
+            },
+        ];
+        assert_eq!(
+            plan_port_reconciliation(
+                &duplicate_existing,
+                &[string_port("duplicate")],
+                PortDirection::Output,
+                2,
+            )
+            .unwrap_err(),
+            GraphError::DuplicatePortLabel("duplicate".to_string())
+        );
+        assert_eq!(
+            plan_port_reconciliation(&[], &[string_port("new")], PortDirection::Output, u64::MAX)
+                .unwrap_err(),
+            GraphError::PortIdExhausted
+        );
     }
 
     // -- serde round-trip ---------------------------------------------------

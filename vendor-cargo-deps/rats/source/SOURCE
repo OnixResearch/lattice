@@ -1,6 +1,6 @@
 name: rats
 repository: https://github.com/brittonr/rats
-revision: 5b932c689431cedb05428efe727889455ebe0beb
+revision: 3418e08e4408d6eb899dd4abc8af3fbad9499bb1
 paths:
 - docs/generated/snapshots
 - ratcore/Cargo.toml
