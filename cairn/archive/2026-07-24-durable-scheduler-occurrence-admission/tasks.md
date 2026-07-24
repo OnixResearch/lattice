@@ -13,4 +13,4 @@
 
 - [x] [serial] Update real pre-effect and post-effect death fixtures so ordinary daemon restart performs no second attempt, exact recovery reports pending, explicit retry is the only second attempt, and abandonment closes without execution. r[lattice.scheduling.scheduler_occurrence_admission]
 - [x] [serial] Document local automatic at-most-one admission, pending/abandoned uncertainty, acknowledgement requirements, single-store-owner scope, and external exactly-once non-claims. r[lattice.scheduling.scheduler_occurrence_admission]
-- [ ] [serial] Run focused scheduler/store/headless tests, operator E2E, `scripts/check.rs`, Octet, Cairn validation and gates, traceability, and bounded Nix flake checks; archive exact evidence. r[lattice.scheduling.scheduler_occurrence_admission]
+- [x] [serial] Run focused scheduler/store/headless tests, operator E2E, `scripts/check.rs`, Octet, Cairn validation and gates, traceability, and bounded Nix flake checks; archive exact evidence. r[lattice.scheduling.scheduler_occurrence_admission]
