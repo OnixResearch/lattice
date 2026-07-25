@@ -1,0 +1,78 @@
+{
+  "availability": {
+    "github_fallback_configured": false,
+    "primary_only": "verified",
+    "replica_only": "verified",
+    "unavailable_paths_diagnostic": "source.bounded_exec_identity"
+  },
+  "behavior": {
+    "bounded_process_tests": 21,
+    "cancellation": "passed",
+    "completion": "passed",
+    "deadline": "passed",
+    "failure": "passed",
+    "process_group_teardown": "passed",
+    "repository_validation_tests": 6,
+    "truncation": "passed"
+  },
+  "cargo": {
+    "github_fallback_configured": false,
+    "locked_source": "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525",
+    "manifest_url": "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git",
+    "packages": [
+      "bounded-exec",
+      "bounded-exec-core"
+    ]
+  },
+  "consumer": {
+    "repository": "lattice",
+    "source_revision": "d69ec49"
+  },
+  "crane": {
+    "cargo_source": "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525",
+    "substituted_input": "bounded-exec"
+  },
+  "evidence": [
+    "cairn/changes/consume-bounded-exec-from-radicle/evidence/source-cutover-2026-07-25.md",
+    "tests/fixtures/radicle/bounded-exec-source-admission-v1.json"
+  ],
+  "nix": {
+    "flake_url": "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525",
+    "locked_revision": "29dac88ecded94457572db3fdfaaaab95fa91525",
+    "locked_url": "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git",
+    "nar_hash": "sha256-BVmqyUYyoNpY6LfOABxwPO3DY88ZtXeKNg3TPoGCcL0=",
+    "revision_count": 3
+  },
+  "non_claims": [
+    "radicle-protocol-correctness",
+    "bounded-exec-correctness",
+    "host-sandboxing",
+    "consumer-release-readiness",
+    "octet-baseline-cleanliness",
+    "ci-correctness",
+    "third-party-source-github-independence",
+    "whole-stack-github-independence"
+  ],
+  "observed_date": "2026-07-25",
+  "producer": {
+    "onixos_acceptance_revision": "b5ba554",
+    "onixos_catalog_blake3": "f132c01a9d0edb4141201146c1dd5dc1eacfe77a2b080e6f99b2c4181d856655",
+    "publication_receipt_blake3": "6eab0250b4bfefb6f6e91ec75d9786a76ded20bc052e2e624b44c6bc5b1cc9f7",
+    "source_admission_blake3": "c7707d1fb3367e752ddde42ac1f89df1808551b9b7560b29564a959d911aabe3"
+  },
+  "receipt_type": "lattice.radicle-bounded-exec-cutover.v1",
+  "repository": {
+    "reviewed_commit": "29dac88ecded94457572db3fdfaaaab95fa91525",
+    "rid": "rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo",
+    "source_archive_blake3": "4fbbf8f0749262469f00748e04c775180488dba800303f139172656d25931927"
+  },
+  "schema_version": 1,
+  "status": "accepted",
+  "validation": {
+    "bounded_source_check": "passed",
+    "cairn_tasks_gate": "passed-before-closeout",
+    "nix_flake_check": "blocked-pre-existing-octet-baseline",
+    "octet": "blocked-pre-existing-892-finding-baseline",
+    "scripts_check": "blocked-pre-existing-traceability-fixture"
+  }
+}

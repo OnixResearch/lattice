@@ -252,6 +252,19 @@
                 '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false' \
                 "$admission" > /dev/null
 
+              cutover=${self}/evidence/radicle/bounded-exec-cutover-v1.json
+              expected_cutover_hash="$(cat ${self}/evidence/radicle/bounded-exec-cutover-v1.blake3)"
+              actual_cutover_hash="$(b3sum "$cutover" | cut -d ' ' -f 1)"
+              test "$actual_cutover_hash" = "$expected_cutover_hash"
+              nickel export --format json ${self}/evidence/radicle/bounded-exec-cutover-v1.ncl \
+                | jq -S . > "$TMPDIR/cutover-from-nickel.json"
+              cmp "$cutover" "$TMPDIR/cutover-from-nickel.json"
+              jq -e \
+                --arg rid 'rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo' \
+                --arg rev '29dac88ecded94457572db3fdfaaaab95fa91525' \
+                '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .cargo.github_fallback_configured == false and .availability.github_fallback_configured == false' \
+                "$cutover" > /dev/null
+
               forbidden_source='github.com/OnixResearch/'"bounded-exec"
               if grep --fixed-strings "$forbidden_source" \
                 ${self}/Cargo.toml ${self}/Cargo.lock ${self}/flake.nix ${self}/flake.lock; then
