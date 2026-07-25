@@ -18,6 +18,7 @@ const VENDOR_MANIFEST_SOURCE: &str = include_str!("fixtures/repository-validatio
 const VENDOR_LIB_SOURCE: &str = include_str!("fixtures/repository-validation/vendor-dependency/src/lib.rs");
 const VENDOR_RESULT_SOURCE: &str =
     include_str!("fixtures/repository-validation/vendor-dependency/src/coverage/result.rs");
+const BOUNDED_EXEC_SOURCE_ADMISSION: &str = include_str!("fixtures/radicle/bounded-exec-source-admission-v1.json");
 
 const CHECK_COMMAND: &str = "nix flake check -L --option secret-key-files ''";
 const TEST_FILTER: &str = "pkgs.lib.hasPrefix \"${sourceRoot}/tests/\" (toString path)";
@@ -35,12 +36,17 @@ const GIT_PROGRAM: &str = "git";
 const RUSTFMT_PROGRAM: &str = "rustfmt";
 const GIT_NOT_IGNORED_STATUS: i32 = 1;
 const BOUNDED_EXEC_REVISION: &str = "29dac88ecded94457572db3fdfaaaab95fa91525";
-const BOUNDED_EXEC_SSH_URL: &str = "ssh://git@github.com/OnixResearch/bounded-exec.git";
-const BOUNDED_EXEC_CARGO_PIN: &str = "bounded-exec = { git = \"ssh://git@github.com/OnixResearch/bounded-exec.git\", rev = \"29dac88ecded94457572db3fdfaaaab95fa91525\" }";
-const BOUNDED_EXEC_FLAKE_PIN: &str =
-    "url = \"git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525\";";
-const BOUNDED_EXEC_CARGO_LOCK_SOURCE: &str = "git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
+const BOUNDED_EXEC_RID: &str = "rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo";
+const BOUNDED_EXEC_HTTPS_URL: &str = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git";
+const BOUNDED_EXEC_SOURCE_ARCHIVE_BLAKE3: &str = "4fbbf8f0749262469f00748e04c775180488dba800303f139172656d25931927";
+const BOUNDED_EXEC_PUBLICATION_BLAKE3: &str = "6eab0250b4bfefb6f6e91ec75d9786a76ded20bc052e2e624b44c6bc5b1cc9f7";
+const BOUNDED_EXEC_NAR_HASH: &str = "sha256-BVmqyUYyoNpY6LfOABxwPO3DY88ZtXeKNg3TPoGCcL0=";
+const BOUNDED_EXEC_SEED_COUNT: u64 = 2;
+const BOUNDED_EXEC_CARGO_PIN: &str = "bounded-exec = { git = \"https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git\", rev = \"29dac88ecded94457572db3fdfaaaab95fa91525\" }";
+const BOUNDED_EXEC_FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525\";";
+const BOUNDED_EXEC_CARGO_LOCK_SOURCE: &str = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
 const BOUNDED_EXEC_NIX_VENDOR_SOURCE: &str = "src = bounded-exec;";
+const BOUNDED_EXEC_GITHUB_SOURCE: &str = "github.com/OnixResearch/bounded-exec";
 
 const ISSUE_SIGNING_COMMAND: &str = "signing.command_scope";
 const ISSUE_SIGNING_FLAKE_OVERRIDE: &str = "signing.flake_override";
@@ -54,6 +60,8 @@ const ISSUE_FORMAT_PRECONDITION: &str = "format.vendor_precondition";
 const ISSUE_CLIPPY_SCOPE: &str = "clippy.package_scope";
 const ISSUE_CLIPPY_PRECONDITION: &str = "clippy.vendor_precondition";
 const ISSUE_BOUNDED_EXEC_SOURCE: &str = "source.bounded_exec_identity";
+const ISSUE_BOUNDED_EXEC_EVIDENCE: &str = "source.bounded_exec_producer_evidence";
+const ISSUE_BOUNDED_EXEC_CRATES: &str = "source.bounded_exec_crate_set";
 
 #[derive(Debug, Clone, Copy)]
 struct ContractInputs<'a> {
@@ -67,6 +75,8 @@ struct ContractInputs<'a> {
     vendor_manifest: &'a str,
     vendor_lib: &'a str,
     vendor_result: &'a str,
+    bounded_exec_source_admission: &'a str,
+    bounded_exec_crates_present: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +105,8 @@ fn current_inputs() -> ContractInputs<'static> {
         vendor_manifest: VENDOR_MANIFEST_SOURCE,
         vendor_lib: VENDOR_LIB_SOURCE,
         vendor_result: VENDOR_RESULT_SOURCE,
+        bounded_exec_source_admission: BOUNDED_EXEC_SOURCE_ADMISSION,
+        bounded_exec_crates_present: true,
     }
 }
 
@@ -114,19 +126,47 @@ fn bounded_exec_lock_matches(source: &str) -> bool {
         return false;
     };
     node.pointer("/locked/rev").and_then(Value::as_str) == Some(BOUNDED_EXEC_REVISION)
-        && node.pointer("/locked/url").and_then(Value::as_str) == Some(BOUNDED_EXEC_SSH_URL)
+        && node.pointer("/locked/url").and_then(Value::as_str) == Some(BOUNDED_EXEC_HTTPS_URL)
+        && node.pointer("/locked/narHash").and_then(Value::as_str) == Some(BOUNDED_EXEC_NAR_HASH)
+        && node.pointer("/locked/type").and_then(Value::as_str) == Some("git")
         && node.pointer("/original/rev").and_then(Value::as_str) == Some(BOUNDED_EXEC_REVISION)
-        && node.pointer("/original/url").and_then(Value::as_str) == Some(BOUNDED_EXEC_SSH_URL)
+        && node.pointer("/original/url").and_then(Value::as_str) == Some(BOUNDED_EXEC_HTTPS_URL)
+        && node.pointer("/original/type").and_then(Value::as_str) == Some("git")
+}
+
+fn bounded_exec_source_admission_matches(source: &str) -> bool {
+    let Ok(admission) = serde_json::from_str::<Value>(source) else {
+        return false;
+    };
+    admission.pointer("/schema").and_then(Value::as_str) == Some("lattice.radicle-source-admission.v1")
+        && admission.pointer("/status").and_then(Value::as_str) == Some("accepted")
+        && admission.pointer("/repository/rid").and_then(Value::as_str) == Some(BOUNDED_EXEC_RID)
+        && admission.pointer("/repository/reviewed_commit").and_then(Value::as_str) == Some(BOUNDED_EXEC_REVISION)
+        && admission.pointer("/repository/source_archive_blake3").and_then(Value::as_str)
+            == Some(BOUNDED_EXEC_SOURCE_ARCHIVE_BLAKE3)
+        && admission.pointer("/publication/receipt_blake3").and_then(Value::as_str)
+            == Some(BOUNDED_EXEC_PUBLICATION_BLAKE3)
+        && admission.pointer("/onixos/publication_acceptance_revision").and_then(Value::as_str) == Some("b5ba554")
+        && admission.pointer("/sources/cargo_git").and_then(Value::as_str) == Some(BOUNDED_EXEC_HTTPS_URL)
+        && admission.pointer("/availability/seed_count").and_then(Value::as_u64) == Some(BOUNDED_EXEC_SEED_COUNT)
+        && admission.pointer("/availability/primary_only").and_then(Value::as_str) == Some("verified")
+        && admission.pointer("/availability/replica_only").and_then(Value::as_str) == Some("verified")
+        && admission.pointer("/availability/github_fallback_configured").and_then(Value::as_bool) == Some(false)
+        && !source.contains(BOUNDED_EXEC_GITHUB_SOURCE)
 }
 
 fn bounded_exec_source_matches(inputs: ContractInputs<'_>) -> bool {
     inputs.cargo.contains(BOUNDED_EXEC_CARGO_PIN)
         && !inputs.cargo.contains("bounded-exec = { path =")
+        && !inputs.cargo.contains(BOUNDED_EXEC_GITHUB_SOURCE)
         && inputs.flake.contains(BOUNDED_EXEC_FLAKE_PIN)
         && inputs.flake.contains(BOUNDED_EXEC_NIX_VENDOR_SOURCE)
         && !inputs.flake.contains("../bounded-exec")
+        && !inputs.flake.contains(BOUNDED_EXEC_GITHUB_SOURCE)
         && inputs.cargo_lock.contains(BOUNDED_EXEC_CARGO_LOCK_SOURCE)
+        && !inputs.cargo_lock.contains(BOUNDED_EXEC_GITHUB_SOURCE)
         && bounded_exec_lock_matches(inputs.flake_lock)
+        && !inputs.flake_lock.contains(BOUNDED_EXEC_GITHUB_SOURCE)
 }
 
 fn validate_contract(inputs: ContractInputs<'_>) -> BTreeSet<&'static str> {
@@ -170,6 +210,12 @@ fn validate_contract(inputs: ContractInputs<'_>) -> BTreeSet<&'static str> {
     }
     if !bounded_exec_source_matches(inputs) {
         issues.insert(ISSUE_BOUNDED_EXEC_SOURCE);
+    }
+    if !bounded_exec_source_admission_matches(inputs.bounded_exec_source_admission) {
+        issues.insert(ISSUE_BOUNDED_EXEC_EVIDENCE);
+    }
+    if !inputs.bounded_exec_crates_present {
+        issues.insert(ISSUE_BOUNDED_EXEC_CRATES);
     }
     if !inputs.vendor_lib.contains("#![deny(clippy::ptr_arg)]") || !inputs.vendor_lib.contains("&Vec<String>") {
         issues.insert(ISSUE_CLIPPY_PRECONDITION);
@@ -294,18 +340,57 @@ fn clippy_denies_owned_warnings_without_admitting_vendor_lints() {
 #[test]
 fn cargo_and_nix_resolve_the_same_immutable_bounded_exec_source() {
     let inputs = current_inputs();
+    let issues = validate_contract(inputs);
     assert!(bounded_exec_source_matches(inputs));
-    assert!(!validate_contract(inputs).contains(ISSUE_BOUNDED_EXEC_SOURCE));
+    assert!(bounded_exec_source_admission_matches(inputs.bounded_exec_source_admission));
+    assert!(!issues.contains(ISSUE_BOUNDED_EXEC_SOURCE));
+    assert!(!issues.contains(ISSUE_BOUNDED_EXEC_EVIDENCE));
 
     let mut path_substitution = inputs;
     path_substitution.cargo = "bounded-exec = { path = \"../bounded-exec\" }";
     path_substitution.flake = "bounded-exec = ../bounded-exec;";
     assert!(!bounded_exec_source_matches(path_substitution));
 
+    let mut endpoint_mismatch = inputs;
+    endpoint_mismatch.cargo = "bounded-exec = { git = \"https://example.invalid/bounded-exec.git\", rev = \"29dac88ecded94457572db3fdfaaaab95fa91525\" }";
+    assert!(!bounded_exec_source_matches(endpoint_mismatch));
+
+    let mut stale_github = inputs;
+    stale_github.cargo = "bounded-exec = { git = \"ssh://git@github.com/OnixResearch/bounded-exec.git\", rev = \"29dac88ecded94457572db3fdfaaaab95fa91525\" }";
+    assert!(!bounded_exec_source_matches(stale_github));
+
+    let revision_mismatch_source =
+        inputs.flake.replace(BOUNDED_EXEC_REVISION, "1111111111111111111111111111111111111111");
+    let mut revision_mismatch = inputs;
+    revision_mismatch.flake = &revision_mismatch_source;
+    assert!(!bounded_exec_source_matches(revision_mismatch));
+
+    let altered_lock_source = inputs
+        .flake_lock
+        .replace(BOUNDED_EXEC_NAR_HASH, "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+    let mut altered_lock = inputs;
+    altered_lock.flake_lock = &altered_lock_source;
+    assert!(!bounded_exec_source_matches(altered_lock));
+
     let mut unresolved_lock = inputs;
     unresolved_lock.cargo_lock = "";
     unresolved_lock.flake_lock = "{}";
     assert!(!bounded_exec_source_matches(unresolved_lock));
+
+    let mut missing_crates = inputs;
+    missing_crates.bounded_exec_crates_present = false;
+    assert!(validate_contract(missing_crates).contains(ISSUE_BOUNDED_EXEC_CRATES));
+
+    let mut malformed_evidence = inputs;
+    malformed_evidence.bounded_exec_source_admission = "{";
+    assert!(!bounded_exec_source_admission_matches(malformed_evidence.bounded_exec_source_admission));
+
+    let altered_evidence_source = inputs
+        .bounded_exec_source_admission
+        .replace(BOUNDED_EXEC_SOURCE_ARCHIVE_BLAKE3, BOUNDED_EXEC_PUBLICATION_BLAKE3);
+    let mut altered_evidence = inputs;
+    altered_evidence.bounded_exec_source_admission = &altered_evidence_source;
+    assert!(!bounded_exec_source_admission_matches(altered_evidence.bounded_exec_source_admission));
 }
 
 #[test]
@@ -319,6 +404,8 @@ fn repository_check_contract_mutations_fail_closed() {
     inputs.vendor_manifest = "[package]";
     inputs.vendor_lib = "pub fn lint_boundary(values: &[String]) -> usize { values.len() }";
     inputs.vendor_result = "pub const SENTINEL: &str = \"formatted\";";
+    inputs.bounded_exec_source_admission = "{}";
+    inputs.bounded_exec_crates_present = false;
     let issues = validate_contract(inputs);
 
     for code in [
@@ -334,6 +421,8 @@ fn repository_check_contract_mutations_fail_closed() {
         ISSUE_CLIPPY_SCOPE,
         ISSUE_CLIPPY_PRECONDITION,
         ISSUE_BOUNDED_EXEC_SOURCE,
+        ISSUE_BOUNDED_EXEC_EVIDENCE,
+        ISSUE_BOUNDED_EXEC_CRATES,
     ] {
         assert!(issues.contains(code));
     }

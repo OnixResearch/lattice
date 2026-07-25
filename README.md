@@ -161,6 +161,14 @@ Shell nodes, command-backed agents, and command credential providers share the p
 
 These bounds report only the observed local process outcome under the supplied policy. They do not claim sandboxing, executable authorization, hermeticity, syscall restriction, remote cancellation, whole-host cleanup, semantic correctness, or release eligibility.
 
+The dependency is pinned at `29dac88ecded94457572db3fdfaaaab95fa91525`
+from canonical Radicle project `rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo` through
+`https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git`. Cargo, Nix,
+and Crane must agree on that endpoint and revision. Acquisition fails rather
+than falling back to GitHub for Bounded Exec. This source identity does not
+prove dependency correctness, availability of unrelated inputs, consumer
+behavior, CI correctness, or release readiness.
+
 ## Verification
 
 ```bash
@@ -169,7 +177,7 @@ verus verus/example_spec.rs
 
 ## References
 
-- [bounded-exec](https://github.com/OnixResearch/bounded-exec): reviewed AGPL bounded child-process mechanics pinned at `29dac88ecded94457572db3fdfaaaab95fa91525`.
+- [bounded-exec](https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git): canonical Radicle project `rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo`, with reviewed AGPL bounded child-process mechanics pinned at `29dac88ecded94457572db3fdfaaaab95fa91525`.
 - [Pi coding agent](https://pi.dev): SDK, print, RPC, and image prompt surfaces for generic agent-node integration.
 - [Clankers](https://github.com/brittonr/clankers): Rust terminal coding agent with one-shot, daemon, MCP/ACP, context image references, and image-generation surfaces for generic agent-node integration.
 - [Trellis](../trellis/): verified-logic primitives for graph admission, job lifecycle, durable replay, effect/capability admission, and typed durable references used as design inputs for the generic pipeline runner.

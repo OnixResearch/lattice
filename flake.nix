@@ -11,7 +11,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     octet.url = "github:OnixResearch/octet";
     bounded-exec = {
-      url = "git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
+      url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
     };
   };
@@ -79,7 +79,7 @@
             || isIdentityAuditAssetPath path;
         };
 
-        boundedExecCargoSource = "git+ssh://git@github.com/OnixResearch/bounded-exec.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
+        boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         cargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -218,12 +218,48 @@
               mkdir -p "$out"
             '';
 
-        boundedExecSourceIdentityCheck = pkgs.runCommand "lattice-bounded-exec-source-identity" { } ''
-          test -f ${bounded-exec}/Cargo.toml
-          grep --fixed-strings 'license = "AGPL-3.0-or-later"' ${bounded-exec}/Cargo.toml > /dev/null
-          grep --fixed-strings 'name = "bounded-exec"' ${bounded-exec}/crates/bounded-exec/Cargo.toml > /dev/null
-          touch "$out"
-        '';
+        boundedExecSourceIdentityCheck =
+          pkgs.runCommand "lattice-bounded-exec-source-identity"
+            {
+              nativeBuildInputs = [
+                pkgs.b3sum
+                pkgs.coreutils
+                pkgs.diffutils
+                pkgs.jq
+                pkgs.nickel
+              ];
+            }
+            ''
+              source_root=${bounded-exec}
+              test -f "$source_root/Cargo.toml"
+              test -f "$source_root/crates/bounded-exec/Cargo.toml"
+              test -f "$source_root/crates/bounded-exec-core/Cargo.toml"
+              grep --fixed-strings 'license = "AGPL-3.0-or-later"' "$source_root/Cargo.toml" > /dev/null
+              grep --fixed-strings 'name = "bounded-exec"' "$source_root/crates/bounded-exec/Cargo.toml" > /dev/null
+              grep --fixed-strings 'name = "bounded-exec-core"' "$source_root/crates/bounded-exec-core/Cargo.toml" > /dev/null
+
+              admission=${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.json
+              expected_hash="$(cat ${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.blake3)"
+              actual_hash="$(b3sum "$admission" | cut -d ' ' -f 1)"
+              test "$actual_hash" = "$expected_hash"
+              nickel export --format json ${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.ncl \
+                | jq -S . > "$TMPDIR/admission-from-nickel.json"
+              cmp "$admission" "$TMPDIR/admission-from-nickel.json"
+              jq -e \
+                --arg rid 'rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo' \
+                --arg rev '29dac88ecded94457572db3fdfaaaab95fa91525' \
+                --arg source_hash '4fbbf8f0749262469f00748e04c775180488dba800303f139172656d25931927' \
+                '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false' \
+                "$admission" > /dev/null
+
+              forbidden_source='github.com/OnixResearch/'"bounded-exec"
+              if grep --fixed-strings "$forbidden_source" \
+                ${self}/Cargo.toml ${self}/Cargo.lock ${self}/flake.nix ${self}/flake.lock; then
+                echo 'Bounded Exec source retained a GitHub fallback' >&2
+                exit 1
+              fi
+              touch "$out"
+            '';
 
         traceabilityInventoryPolicyCheck =
           pkgs.runCommand "lattice-traceability-inventory-policy"

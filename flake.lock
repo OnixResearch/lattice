@@ -9,12 +9,12 @@
         "rev": "29dac88ecded94457572db3fdfaaaab95fa91525",
         "revCount": 3,
         "type": "git",
-        "url": "ssh://git@github.com/OnixResearch/bounded-exec.git"
+        "url": "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git"
       },
       "original": {
         "rev": "29dac88ecded94457572db3fdfaaaab95fa91525",
         "type": "git",
-        "url": "ssh://git@github.com/OnixResearch/bounded-exec.git"
+        "url": "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git"
       }
     },
     "cairn": {
