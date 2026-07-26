@@ -321,6 +321,18 @@
                 '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false' \
                 "$admission" > /dev/null
 
+              receipt=${self}/evidence/radicle/execution-graph-cutover-v1.json
+              expected_receipt_hash="$(cat ${self}/evidence/radicle/execution-graph-cutover-v1.blake3)"
+              actual_receipt_hash="$(b3sum "$receipt" | cut -d ' ' -f 1)"
+              test "$actual_receipt_hash" = "$expected_receipt_hash"
+              nickel export --format json ${self}/evidence/radicle/execution-graph-cutover-v1.ncl \
+                | jq -S . > "$TMPDIR/receipt-from-nickel.json"
+              cmp "$receipt" "$TMPDIR/receipt-from-nickel.json"
+              jq -e \
+                --arg cutover 'a85da0afc2f658ca29fcb8ebe6927896ca85e085' \
+                '.status == "accepted" and .consumer.cutover_revision == $cutover and .cargo.vendor_present == false and .cargo.fallback_configured == false and .validation.nix_flake_check == "passed-x86_64-linux" and .validation_baseline.new_ids == 0 and .validation_baseline.stale_ids == 0' \
+                "$receipt" > /dev/null
+
               grep --fixed-strings 'seaglass-execution-graph = { package = "execution-graph-core", git = "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git", rev = "03736f1ec46c377ff86b451260ad68aa70ff3b0b" }' ${self}/Cargo.toml > /dev/null
               grep --fixed-strings '${executionGraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq -e \

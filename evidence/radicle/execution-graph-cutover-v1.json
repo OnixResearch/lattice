@@ -1,0 +1,73 @@
+{
+  "cargo": {
+    "dependency_key": "seaglass-execution-graph",
+    "fallback_configured": false,
+    "git": "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git",
+    "locked_source": "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b#03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "package": "execution-graph-core",
+    "vendor_present": false
+  },
+  "compatibility": {
+    "direct_graph_tests": 2,
+    "runner_tests_after": 21,
+    "runner_tests_before": 21,
+    "source_admission_tests": 3,
+    "source_diff_lines": 0
+  },
+  "consumer": {
+    "baseline_revision": "c8d56ad83a57287064edb85f58808f53e4bf4536",
+    "cutover_revision": "a85da0afc2f658ca29fcb8ebe6927896ca85e085",
+    "repository": "lattice"
+  },
+  "evidence": [
+    "cairn/archive/2026-07-26-adopt-radicle-execution-graph/evidence/source-cutover-2026-07-26.md",
+    "tests/fixtures/radicle/execution-graph-source-admission-v1.json"
+  ],
+  "nix": {
+    "crane_source": "execution-graph",
+    "input": "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "locked_revision": "03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "nar_hash": "sha256-SzdJGsS631Hk3CbPLThz+2YPgvdoB1cXb3BPusJTX8I="
+  },
+  "non_claims": [
+    "source-correctness",
+    "workflow-correctness",
+    "scheduler-fairness",
+    "effect-safety",
+    "persistence-correctness",
+    "radicle-availability",
+    "release-readiness",
+    "whole-stack-github-independence"
+  ],
+  "observed_date": "2026-07-26",
+  "producer": {
+    "onix_admission_blake3": "f69725f837567bcb2a86fa4b0b6f9a5bfa413b34c78cb3b8bd35f07707e9ed61",
+    "onixos_acceptance_revision": "04d20e0cd880030ae1745c12d2b7f0c3988fe58c",
+    "publication_receipt_blake3": "5573a000f71f1992ed3aa6ddb1197aca29b2b551ef58643b5bd930bef78270cf",
+    "source_admission_blake3": "06e3d56202412f4ed7c59152b85de53ace97d958be8383353974a5348972e6f8"
+  },
+  "receipt_type": "lattice.radicle-execution-graph-cutover.v1",
+  "repository": {
+    "reviewed_commit": "03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "rid": "rad:z2oYsb9jGTyp68BKYhzpivY1eK58a",
+    "source_archive_blake3": "4b5aa3756369236fc82fbbf501d35993cfa208f142694cdd30ca370d6241192c"
+  },
+  "schema_version": 1,
+  "status": "accepted",
+  "validation": {
+    "cairn": "passed",
+    "commit_hook": "passed",
+    "nix_flake_check": "passed-x86_64-linux",
+    "octet": "passed",
+    "scripts_check": "passed"
+  },
+  "validation_baseline": {
+    "accepted_hash": "b3:0056baa6ca2ace924ae9d98c8a1e6f028fbcdc3af99a838af140b5eecfd337b2",
+    "lint_location_inventory": "equal",
+    "new_ids": 0,
+    "previous_hash": "b3:ff87ad266a61563c76bc4f5835896a080c6d3580a1eb514c1cdf49bda63394be",
+    "records": 1141,
+    "stale_ids": 0,
+    "unique_ids": 892
+  }
+}
