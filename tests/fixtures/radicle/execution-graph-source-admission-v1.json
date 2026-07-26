@@ -1,0 +1,65 @@
+{
+  "availability": {
+    "aspen_only": "verified",
+    "desktop_only": "verified",
+    "github_fallback_configured": false,
+    "https": "verified",
+    "receive_pack_status": 404,
+    "seed_count": 2,
+    "unknown_rid_status": 404
+  },
+  "compatibility": {
+    "consumer_baseline": "c8d56ad83a57287064edb85f58808f53e4bf4536",
+    "reviewed_lib_blake3": "91450b94f6256c71057507b6ae97f63e505dc57377198be38087530bedefccb4",
+    "runner_tests": 21,
+    "source_diff_lines": 0,
+    "vendor_lib_blake3": "91450b94f6256c71057507b6ae97f63e505dc57377198be38087530bedefccb4"
+  },
+  "consumer": {
+    "phase": "pre-cutover-admission",
+    "repository": "lattice"
+  },
+  "non_claims": [
+    "source-correctness",
+    "workflow-correctness",
+    "scheduler-fairness",
+    "effect-safety",
+    "persistence-correctness",
+    "radicle-availability",
+    "release-readiness",
+    "whole-stack-github-independence"
+  ],
+  "observed_date": "2026-07-26",
+  "onix": {
+    "acceptance_revision": "a41a4fb6d69b6f2e4028d33e54c5650ab11c906d",
+    "receipt_blake3": "f69725f837567bcb2a86fa4b0b6f9a5bfa413b34c78cb3b8bd35f07707e9ed61",
+    "receipt_type": "onix.radicle-execution-graph-source-admission.v1"
+  },
+  "onixos": {
+    "acceptance_evidence": "onixos:cairn/archive/2026-07-25-admit-execution-graph-radicle-source/evidence/source-acceptance-2026-07-26.md",
+    "acceptance_revision": "04d20e0cd880030ae1745c12d2b7f0c3988fe58c"
+  },
+  "publication": {
+    "delegate_threshold": 2,
+    "identity_revision": "d407356b5fd5465c62aca4d7d6c61156947cbac1",
+    "publication_revision": "fffc6968f6e17c235bcfa708fb00749a379c15ff",
+    "receipt_blake3": "5573a000f71f1992ed3aa6ddb1197aca29b2b551ef58643b5bd930bef78270cf",
+    "receipt_type": "execution-graph.radicle-publication.v1",
+    "signed_refs_feature": "parent"
+  },
+  "receipt_type": "lattice.radicle-execution-graph-source-admission.v1",
+  "repository": {
+    "license": "AGPL-3.0-or-later",
+    "reviewed_commit": "03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "rid": "rad:z2oYsb9jGTyp68BKYhzpivY1eK58a",
+    "source_archive_blake3": "4b5aa3756369236fc82fbbf501d35993cfa208f142694cdd30ca370d6241192c"
+  },
+  "schema_version": 1,
+  "sources": {
+    "cargo_git": "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git",
+    "cargo_locked_source": "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b#03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "nix_git": "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b",
+    "nix_nar_hash": "sha256-SzdJGsS631Hk3CbPLThz+2YPgvdoB1cXb3BPusJTX8I="
+  },
+  "status": "accepted"
+}

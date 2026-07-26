@@ -415,7 +415,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "f05f3ef4191db523c0902548398fa2680a6f9cbfaba0f5c25b43cbcf29d7f4c0"
+          "blake3": "1fa0ee688dc5c199aadf5b1c8995a604ac12899bea07d17b47f58a0bca6fcc15"
         },
         {
           "path": "flake.nix",
@@ -427,7 +427,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.package-clippy-no-deps-with-deny-fixture"
@@ -439,7 +439,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "f05f3ef4191db523c0902548398fa2680a6f9cbfaba0f5c25b43cbcf29d7f4c0"
+          "blake3": "1fa0ee688dc5c199aadf5b1c8995a604ac12899bea07d17b47f58a0bca6fcc15"
         },
         {
           "path": "flake.nix",
@@ -451,7 +451,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.vendor-clippy-deny-excluded"
@@ -463,7 +463,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "edb59a609ee99e0e68888f0c670f163c5101859bea4fac393858a370cb001b4c"
+          "blake3": "38aae62ff54ea91ca9139ec380fe17ac29e43d26465be9efd8aaabe75ed50e05"
         },
         {
           "path": "flake.nix",
@@ -471,7 +471,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.check-only-signing-override-and-external-policy"
@@ -483,7 +483,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "edb59a609ee99e0e68888f0c670f163c5101859bea4fac393858a370cb001b4c"
+          "blake3": "38aae62ff54ea91ca9139ec380fe17ac29e43d26465be9efd8aaabe75ed50e05"
         },
         {
           "path": "flake.nix",
@@ -491,7 +491,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.missing-key-overridden-for-full-check"
@@ -503,7 +503,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "edb59a609ee99e0e68888f0c670f163c5101859bea4fac393858a370cb001b4c"
+          "blake3": "38aae62ff54ea91ca9139ec380fe17ac29e43d26465be9efd8aaabe75ed50e05"
         },
         {
           "path": "flake.nix",
@@ -511,7 +511,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.flake-signing-policy-absent"
@@ -531,7 +531,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.package-format-excludes-vendor-fixture"
@@ -551,7 +551,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.nonconforming-vendor-format-excluded"
@@ -571,7 +571,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.nix-nextest-compiles-tracked-test-fixtures"
@@ -591,7 +591,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.filtered-json-fixture-compiles"
@@ -603,7 +603,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "f05f3ef4191db523c0902548398fa2680a6f9cbfaba0f5c25b43cbcf29d7f4c0"
+          "blake3": "1fa0ee688dc5c199aadf5b1c8995a604ac12899bea07d17b47f58a0bca6fcc15"
         },
         {
           "path": "flake.nix",
@@ -619,7 +619,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.git-and-nix-nested-source-admission"
@@ -631,7 +631,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "f05f3ef4191db523c0902548398fa2680a6f9cbfaba0f5c25b43cbcf29d7f4c0"
+          "blake3": "1fa0ee688dc5c199aadf5b1c8995a604ac12899bea07d17b47f58a0bca6fcc15"
         },
         {
           "path": "flake.nix",
@@ -647,7 +647,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "aa8cb84dce15c9c49c16ee2984a01866516719f312267af7e5ad8d0c0bf5506b"
+          "blake3": "2dbf039bab2daeea5b344e7b81a3ba715fb16353a36fe5d5e335c0e63e271ff1"
         }
       ],
       "rationale_code": "assertions.nested-output-name-admitted"
