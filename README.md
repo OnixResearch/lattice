@@ -7,13 +7,14 @@ nix develop          # enter devshell
 pre-commit install   # install the Octet pre-commit hook
 scripts/check.rs        # run operator E2E, fmt, tests, and clippy with repo-local target artifacts
 scripts/operator-e2e.rs # exercise TUI PTY, webhook TCP, scheduler process, and orchestration recovery boundaries
-octet-precommit-check  # run Octet at deny/error level against octet-baseline.json
-cargo octet check    # inspect raw Octet output
+octet-precommit-check  # run the fail-closed Octet stable-ID gate
+cargo octet check    # inspect raw warning-level Octet output
 cargo check          # quick compile check
 nix flake check -L --option secret-key-files '' # full CI; check outputs do not require a host signing secret
 ```
 
-The Octet hook runs the lib target profile, keeps every configured Octet lint at `deny`, and accepts the current checked-in `octet-baseline.json` debt. New unaccepted Octet finding IDs fail the hook.
+<!-- r[verify lattice.repository_validation.baselined_octet_gate.scenario.boundary] -->
+The Octet hook runs the lib target profile with every registered lint explicitly observed at `warn`, no disabled or allowed lint entries, and the checked-in `octet-baseline.json` as the admission set. The hook requires a successful Cargo child, complete agreement with all 892 reviewed stable identities, and zero new or stale identities. An isolated Nix fixture injects a new `todo!()` finding and proves that the same hook rejects it. Direct `cargo octet check` output is review evidence only; it does not grant repository-check or release admission.
 
 ## Durable scheduler occurrences
 
@@ -50,12 +51,14 @@ The PTY checks assert semantic surfaces rather than byte-identical ANSI frames. 
 The maintained inventory partitions Cairn's exact missing-requirement set without turning inventory rows into Tracey evidence. Generate the failing coverage receipt first, then regenerate or check the BLAKE3-bound report:
 
 ```bash
-cairn traceability coverage --root . > target/traceability-coverage.json # expected to exit nonzero while debt remains
+nix run path:../cairn#cairn -- traceability coverage --root . \
+  --policy cairn-policy/generated/cairn-policy.json \
+  > target/traceability-coverage.json # expected to exit nonzero while debt remains
 ./scripts/traceability-inventory.rs generate target/traceability-coverage.json
 ./scripts/traceability-inventory.rs check target/traceability-coverage.json
 ```
 
-The typed review policy lives at `cairn-policy/traceability-inventory.ncl`; the generated report lives at `cairn-policy/generated/traceability-debt-inventory.json`. Reviewed candidates bind safe relative evidence paths and current file-byte BLAKE3 hashes. Rows without an explicit decision remain `unassessed`, which does not claim that behavior or evidence is absent.
+The typed review policy lives at `cairn-policy/traceability-inventory.ncl`; the generated report lives at `cairn-policy/generated/traceability-debt-inventory.json`. The current repository-policy receipt contains exactly 12 missing Radicle-cutover identifiers and no dangling markers. Reviewed candidates bind safe relative evidence paths and current file-byte BLAKE3 hashes. Rows without an explicit decision remain `unassessed`, which does not claim that behavior or evidence is absent, and inventory refresh does not satisfy or promote those requirements.
 
 ## Examples
 
@@ -186,3 +189,5 @@ verus verus/example_spec.rs
 - [FarmTable](https://github.com/scion-frontiers/farmtable): graph-native ready-task, dependency, critical-path, bottleneck, and lifecycle separation used as an execution-graph architecture reference.
 - [cap-std](https://github.com/bytecodealliance/cap-std): portable capability-directory implementation used to keep local file effects descriptor-relative and reject traversal or symlink escapes.
 - [Animus](https://github.com/OnixResearch/animus): authority-free adapter contracts, deterministic bounded agent loop, and Rust-revalidated Steel fabric used beneath Lattice's generic agent boundary.
+- [Aspen Octet burn-down guard](../aspen/scripts/octet-burndown.scm): strict probe/validate/progress and exact-policy-restoration reference for guarded agent rounds; not a Lattice runtime dependency.
+- [mc Ralph Cairn drain loop](../../mc/scripts/ralph-drain-cairns.scm): plan-first bounded work selection and sequential Pi-round reference; not a Lattice runtime dependency.

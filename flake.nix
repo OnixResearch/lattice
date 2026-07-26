@@ -156,13 +156,28 @@
               exit "$octet_status"
             fi
 
+            # r[impl lattice.repository_validation.baselined_octet_gate]
+            # r[impl lattice.repository_validation.baselined_octet_gate.scenario.accepted]
             if jq --exit-status '
-              .status == "clean"
-              or (
-                .baseline != null
-                and (.baseline.new_total | tostring) == "0"
-                and (.baseline.current_total | tonumber) > 0
-                and (.baseline.accepted_current | tonumber) > 0
+              (.cargo_process_exit.classification == "success")
+              and (.cargo_process_exit.code == 0)
+              and (
+                (
+                  .status == "clean"
+                  and (
+                    .baseline == null
+                    or (.baseline.new_total | tonumber) == 0
+                  )
+                )
+                or (
+                  .status == "warning-only"
+                  and .baseline != null
+                  and (.baseline.new_total | tonumber) == 0
+                  and (.baseline.stale_total | tonumber) == 0
+                  and (.baseline.current_total | tonumber) > 0
+                  and (.baseline.accepted_total | tonumber) == (.baseline.current_total | tonumber)
+                  and (.baseline.accepted_current | tonumber) == (.baseline.current_total | tonumber)
+                )
               )
             ' "$status_file" > /dev/null; then
               exit "$success_status"
@@ -200,7 +215,10 @@
         octetCheck =
           pkgs.runCommand "octet-consumer-check"
             {
-              nativeBuildInputs = nativeBuildInputs ++ [ octetPreCommitCheck ];
+              nativeBuildInputs = nativeBuildInputs ++ [
+                octetPreCommitCheck
+                pkgs.jq
+              ];
               inherit buildInputs;
             }
             ''
@@ -214,7 +232,38 @@
               mkdir -p "$CARGO_HOME"
               cp "${octetVendorDir}/config.toml" "$CARGO_HOME/config.toml"
 
+              # r[verify lattice.repository_validation.baselined_octet_gate.scenario.accepted]
               OCTET_ARTIFACT_DIR="$PWD/target/octet-check" octet-precommit-check
+
+              positive_root="$PWD"
+              negative_root="$positive_root/../negative-source"
+              cp -r ${self} "$negative_root"
+              chmod -R u+w "$negative_root"
+              printf '\npub fn octet_negative_fixture() { todo!("negative fixture"); }\n' >> "$negative_root/src/lib.rs"
+
+              # r[verify lattice.repository_validation.baselined_octet_gate.scenario.new_finding]
+              expected_rejection_status=1
+              set +e
+              (
+                cd "$negative_root"
+                OCTET_ARTIFACT_DIR="$negative_root/target/octet-negative" \
+                  OCTET_CARGO_TARGET_DIR="$negative_root/target/octet-negative-cargo" \
+                  octet-precommit-check > "$negative_root/negative.log" 2>&1
+              )
+              negative_status="$?"
+              set -e
+              if [ "$negative_status" -ne "$expected_rejection_status" ]; then
+                cat "$negative_root/negative.log" >&2
+                echo "Octet negative fixture returned $negative_status; expected $expected_rejection_status" >&2
+                exit "$expected_rejection_status"
+              fi
+              jq --exit-status '
+                (.cargo_process_exit.classification == "success")
+                and (.cargo_process_exit.code == 0)
+                and (.baseline != null)
+                and (.baseline.new_total | tonumber) > 0
+              ' "$negative_root/target/octet-negative/status.json" > /dev/null
+
               mkdir -p "$out"
             '';
 

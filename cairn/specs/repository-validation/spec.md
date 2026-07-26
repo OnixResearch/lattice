@@ -85,7 +85,7 @@ r[lattice.repository_validation.traceability_sources.scenario.marker-reconciliat
 - THEN Lattice MUST add an exact accepted requirement, bind only to an already accepted requirement the evidence supports, or remove the unsupported marker while preserving unrelated missing findings
 
 ### Requirement: Maintained traceability debt inventory
-r[lattice.repository_validation.traceability_debt_inventory] Lattice MUST derive a deterministic, BLAKE3-bound inventory from the exact Cairn missing-requirement set and an explicitly reviewed typed policy without promoting inventory rows into requirement evidence.
+r[lattice.repository_validation.traceability_debt_inventory] Lattice MUST derive a deterministic, BLAKE3-bound inventory from the exact current Cairn missing-requirement set and an explicitly reviewed typed policy without promoting inventory rows into requirement evidence.
 
 #### Scenario: Complete deterministic partition
 r[lattice.repository_validation.traceability_debt_inventory.scenario.complete]
@@ -580,7 +580,7 @@ r[lattice.repository_validation.repository_checks_audit.scenario.fail_closed]
 - THEN it MUST return deterministic issue codes and MUST NOT accept the audit
 
 ### Requirement: Repository-check evidence completion
-r[lattice.repository_validation.repository_checks_completion] Lattice MUST maintain direct adversarial evidence for all 11 reviewed repository-validation rows without promoting selected markers or changing unrelated linkage.
+r[lattice.repository_validation.repository_checks_completion] Lattice MUST maintain direct adversarial evidence for all 11 reviewed repository-validation rows, including current accepted byte identities, without promoting selected markers or changing unrelated linkage.
 
 #### Scenario: Check-scoped signing remains external
 r[lattice.repository_validation.repository_checks_completion.scenario.signing]
@@ -600,11 +600,11 @@ r[lattice.repository_validation.repository_checks_completion.scenario.ownership]
 - WHEN flake format and Clippy checks run
 - THEN they MUST check package `lattice`, Clippy MUST deny repository-owned warnings, and dependency lint admission MUST remain disabled
 
-#### Scenario: Exactly 11 rows become exact
+#### Scenario: Exactly 11 rows remain exact
 r[lattice.repository_validation.repository_checks_completion.scenario.exact]
 - GIVEN the reviewed 315-item inventory and the 11-ID repository-validation tranche
-- WHEN completion validation runs
-- THEN exactly those 11 rows MUST be exact, BLAKE3-bound to current safe evidence, and marker-free while every unrelated row remains unchanged
+- WHEN completion validation runs after an accepted source transition
+- THEN exactly those 11 rows MUST remain exact, BLAKE3-bound to current safe evidence, and marker-free while every unrelated row remains unchanged
 
 #### Scenario: Repository-check completion drift fails closed
 r[lattice.repository_validation.repository_checks_completion.scenario.fail_closed]
@@ -1145,3 +1145,24 @@ r[lattice.repository_validation.radicle_bounded_exec_behavior.scenario.non-claim
 - GIVEN Cargo and Nix successfully fetch and build the Radicle-backed dependency
 - WHEN migration evidence is rendered
 - THEN Lattice MUST NOT claim Radicle protocol correctness, Bounded Exec correctness, host sandboxing, third-party GitHub independence, or release readiness from that result
+
+### Requirement: Baselined Octet admission remains fail closed
+r[lattice.repository_validation.baselined_octet_gate] Lattice MUST run every configured Octet lint without disabled or allowed entries through a complete warning-level observation and MUST reject every stable finding identity absent from the checked reviewed baseline.
+
+#### Scenario: Reviewed identities remain admitted
+r[lattice.repository_validation.baselined_octet_gate.scenario.accepted]
+- GIVEN a successful complete Cargo child and a runner-generated baseline for the exact warning-level config identity
+- WHEN the canonical Octet wrapper observes only reviewed stable finding identities
+- THEN it SHALL report a nonempty current set, zero new identities, zero stale identities, and successful admission without claiming the accepted findings are correct or harmless
+
+#### Scenario: A new finding fails the canonical gate
+r[lattice.repository_validation.baselined_octet_gate.scenario.new_finding]
+- GIVEN an isolated source fixture introduces a stable finding identity absent from the reviewed baseline
+- WHEN the same canonical Octet wrapper evaluates the fixture without changing policy or baseline bytes
+- THEN it SHALL exit unsuccessfully and report at least one new identity even though the warning-level Cargo child completes
+
+#### Scenario: Observation and admission authority remain distinct
+r[lattice.repository_validation.baselined_octet_gate.scenario.boundary]
+- GIVEN direct warning-level Octet output and the baseline-aware canonical wrapper are both available
+- WHEN repository validation or release checks run
+- THEN only the wrapper SHALL grant finding-set admission, while direct output remains review evidence and MUST NOT imply correctness, complete analysis, traceability satisfaction, or release eligibility
