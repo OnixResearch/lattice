@@ -3,11 +3,15 @@
 //! The pure core converts between `Workflow` and a portable data model. Nickel
 //! evaluation and filesystem access stay in shell helpers.
 
+mod choregraph;
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 
+pub use choregraph::lower_portable_workflow_with_choregraph;
+use choregraph_nickel::FrontendIssueCode;
 use rat_nodegraph::model::PortSpec;
 use serde::Deserialize;
 use serde::Serialize;
@@ -275,6 +279,10 @@ pub struct PortableTriggerInputBinding {
 pub enum WorkflowFormatError {
     Nickel(String),
     Json(String),
+    ChoregraphInputEncoding,
+    ChoregraphLimitEncoding,
+    ChoregraphLowering(FrontendIssueCode),
+    ChoregraphLoweringContract,
     InvalidTimestamp(String),
     DuplicateNodeId(u64),
     DuplicatePortId(u64),
@@ -359,6 +367,12 @@ impl std::fmt::Display for WorkflowFormatError {
         match self {
             Self::Nickel(message) => write!(f, "Nickel evaluation failed: {message}"),
             Self::Json(message) => write!(f, "workflow JSON decode failed: {message}"),
+            Self::ChoregraphInputEncoding => write!(f, "Choregraph lowering input encoding failed"),
+            Self::ChoregraphLimitEncoding => write!(f, "Choregraph lowering limit encoding failed"),
+            Self::ChoregraphLowering(code) => {
+                write!(f, "Choregraph lowering rejected the workflow: {}", choregraph_nickel::summary(*code))
+            }
+            Self::ChoregraphLoweringContract => write!(f, "Choregraph lowering returned no diagnostic"),
             Self::InvalidTimestamp(value) => write!(f, "invalid workflow timestamp: {value}"),
             Self::DuplicateNodeId(node_id) => write!(f, "duplicate node id: {node_id}"),
             Self::DuplicatePortId(port_id) => write!(f, "duplicate port id: {port_id}"),
@@ -1985,10 +1999,12 @@ fn quoted(value: &str) -> String {
 
 // r[impl n8nclone.workflow_format.nickel.import]
 // r[impl n8nclone.workflow_format.markdown_agent_prompts]
+// r[impl lattice.choregraph_adoption.lowering]
 pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormatError> {
     let json = config::load_nickel_as_json(path).map_err(WorkflowFormatError::Nickel)?;
     let portable = serde_json::from_value(json).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
+    lower_portable_workflow_with_choregraph(&portable)?;
     let resolved_agent_prompts = load_markdown_agent_prompts(path, &portable)?;
     portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
 }

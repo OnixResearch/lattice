@@ -18,11 +18,11 @@ The Octet hook runs the lib target profile with every registered lint explicitly
 
 ## Choregraph machine source
 
-Lattice selects `choregraph-core` and the conversion-only `choregraph-seaglass` adapter from `rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF` at revision `fc47c5f4ecbb7b4341af690fa42199f25d57f54c`. Cargo, Nix, and Crane use the same exact source. The former vendored execution-graph implementation is removed.
+Lattice selects `choregraph-core`, `choregraph-nickel`, and the conversion-only `choregraph-seaglass` adapter from `rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF` at revision `81b260da2256147ec82cb5dd44c0a0c1dcb7500d`. Cargo, Nix, and Crane use the same exact source. The former vendored execution-graph implementation is removed.
 
 Choregraph owns graph admission, ordering, readiness, lifecycle, resume, analytics, and bounded replay decisions. Lattice retains Nickel evaluation, product decoding, runtime selection, effects, persistence, retries, triggers, diagnostics, UI, and evidence.
 
-Direct `choregraph-nickel` integration remains blocked because the immutable candidate pins `blake3` `1.8.2`, while the selected Animus packages require `1.8.5`. Lattice does not weaken or replace either reviewed source.
+Nickel workflow import converts decoded values into a bounded in-memory `lattice-workflow-v1` input. The pure `choregraph-nickel` lowerer must admit that input before Lattice completes product decoding. The lowerer performs no file, process, network, clock, policy, persistence, or runtime action.
 
 ## Durable scheduler occurrences
 
@@ -192,7 +192,7 @@ verus verus/example_spec.rs
 - [Pi coding agent](https://pi.dev): SDK, print, RPC, and image prompt surfaces for generic agent-node integration.
 - [Clankers](https://github.com/brittonr/clankers): Rust terminal coding agent with one-shot, daemon, MCP/ACP, context image references, and image-generation surfaces for generic agent-node integration.
 - [Trellis](../trellis/): verified-logic primitives for graph admission, job lifecycle, durable replay, effect/capability admission, and typed durable references used as design inputs for the generic pipeline runner.
-- [Choregraph](https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git): verified graph and machine source pinned at `fc47c5f4ecbb7b4341af690fa42199f25d57f54c`.
+- [Choregraph](https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git): verified graph, lowering, and machine source pinned at `81b260da2256147ec82cb5dd44c0a0c1dcb7500d`.
 - [execution-graph](https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git): independent compatibility consumer and rollback reference.
 - [Seaglass](https://github.com/brittonr/seaglass): original compatibility vocabulary and conformance baseline.
 - [Callee](https://github.com/baldaworks/callee): Markdown-defined provider-backed roles and bounded `Sequential`/`Loop` composition used as an authoring and orchestration reference.

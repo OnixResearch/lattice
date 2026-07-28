@@ -66,16 +66,16 @@
     "choregraph": {
       "flake": false,
       "locked": {
-        "lastModified": 1785214010,
-        "narHash": "sha256-U5OVBeMdD9yLy+bwA1fkV4mOeBY9YaQrtx1PdaFg8+s=",
+        "lastModified": 1785256565,
+        "narHash": "sha256-Wp7ZBrTXgQYvG62JSbi1nM2CeZx0mBFrK0tygwDpTSc=",
         "ref": "refs/heads/main",
-        "rev": "fc47c5f4ecbb7b4341af690fa42199f25d57f54c",
-        "revCount": 30,
+        "rev": "81b260da2256147ec82cb5dd44c0a0c1dcb7500d",
+        "revCount": 35,
         "type": "git",
         "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       },
       "original": {
-        "rev": "fc47c5f4ecbb7b4341af690fa42199f25d57f54c",
+        "rev": "81b260da2256147ec82cb5dd44c0a0c1dcb7500d",
         "type": "git",
         "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       }

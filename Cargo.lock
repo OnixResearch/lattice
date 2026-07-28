@@ -695,15 +695,26 @@ dependencies = [
 [[package]]
 name = "choregraph-core"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c#fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
 dependencies = [
  "vstd",
 ]
 
 [[package]]
+name = "choregraph-nickel"
+version = "0.1.0"
+source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
+dependencies = [
+ "blake3",
+ "choregraph-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "choregraph-seaglass"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c#fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
 dependencies = [
  "choregraph-core",
 ]
@@ -2333,6 +2344,7 @@ dependencies = [
  "bytes",
  "cap-std",
  "choregraph-core",
+ "choregraph-nickel",
  "choregraph-seaglass",
  "chrono",
  "clap",

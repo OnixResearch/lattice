@@ -4,6 +4,8 @@ mod common;
 
 use std::process::Command;
 
+use choregraph_nickel::FrontendIssueCode;
+use choregraph_nickel::LoweredSourceFormat;
 use lattice::agent_node::AgentOutputMode;
 use lattice::agent_node::AgentTarget;
 use lattice::control_flow::ConditionBranch;
@@ -24,6 +26,7 @@ use lattice::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
 use lattice::workflow_format::PortableEdge;
 use lattice::workflow_format::WorkflowFormatError;
 use lattice::workflow_format::load_workflow_nickel_file;
+use lattice::workflow_format::lower_portable_workflow_with_choregraph;
 use lattice::workflow_format::portable_to_workflow;
 use lattice::workflow_format::workflow_to_nickel;
 use lattice::workflow_format::workflow_to_portable;
@@ -130,6 +133,39 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
         _ => panic!("expected shell config"),
     }
     assert!(workflow.graph.node(target).is_some());
+}
+
+// r[verify lattice.choregraph_adoption.lowering]
+#[test]
+fn decoded_workflow_lowers_in_memory_through_choregraph() {
+    let (workflow, _source, _target) = common::two_node_pipeline();
+    let portable = workflow_to_portable(&workflow);
+
+    let lowered = lower_portable_workflow_with_choregraph(&portable).expect("decoded workflow lowers");
+
+    assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV1);
+    assert_eq!(lowered.machine.node_ids().len(), IMPORTED_NODE_COUNT);
+    assert_eq!(lowered.machine.edges().len(), IMPORTED_EDGE_COUNT);
+    assert_eq!(lowered.import_closure.import_count, 0);
+}
+
+// r[verify lattice.choregraph_adoption.lowering]
+#[test]
+fn decoded_workflow_cycle_fails_choregraph_admission() {
+    let (workflow, source, target) = common::two_node_pipeline();
+    let mut portable = workflow_to_portable(&workflow);
+    let source_node = portable.nodes.iter().find(|node| node.id == source.0).expect("source node exported");
+    let target_node = portable.nodes.iter().find(|node| node.id == target.0).expect("target node exported");
+    let reverse_source = target_node.output_ports.first().expect("target output exported").id;
+    let reverse_target = source_node.input_ports.first().expect("source input exported").id;
+    portable.edges.push(PortableEdge {
+        source: reverse_source,
+        target: reverse_target,
+    });
+
+    let error = lower_portable_workflow_with_choregraph(&portable).expect_err("cycle rejected");
+
+    assert_eq!(error, WorkflowFormatError::ChoregraphLowering(FrontendIssueCode::MachineAdmissionRejected),);
 }
 
 // r[verify n8nclone.workflow_format.generic_pipeline_ir]

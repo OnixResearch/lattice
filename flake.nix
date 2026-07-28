@@ -15,7 +15,7 @@
       flake = false;
     };
     choregraph = {
-      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
+      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
       flake = false;
     };
   };
@@ -85,7 +85,7 @@
         };
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
-        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c#fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
+        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
         cargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -354,12 +354,12 @@
                 .admission.schema == "lattice.choregraph-source-admission.v1"
                 and .admission.status == "accepted"
                 and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
-                and .admission.revision == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+                and .admission.revision == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
                 and .admission.cargo_revision == .admission.revision
                 and .admission.nix_revision == .admission.revision
-                and .admission.source_archive_blake3 == "dcb1faf95a7487145496ce986ae1639908600ace5bd77c4d96a37a530a7538a5"
-                and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
-                and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
+                and .admission.source_archive_blake3 == "41adfbdae4bc5b688ef92ab11cd39ed9c8f572bf6214f522d9b4a1290e5f84d5"
+                and .admission.release_bundle_blake3 == "6912c485313908411040fa533bd75a1cfd2611d7589605268ae111b3ba1472bc"
+                and .admission.candidate_blake3 == "c493ef88a648eb30b621e74fa5c0f7294df9048501a379395403ad3dcd8a4c65"
                 and ([.admission.prerequisites[]] | all(. == true))
                 and ([.admission.evidence[]] | all(. == true))
                 and .admission.forbidden_fallbacks == ["floating", "github", "sibling", "vendor", "runtime"]
@@ -374,21 +374,36 @@
 
               grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
               grep --fixed-strings 'git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'rev = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"' ${self}/Cargo.toml > /dev/null
               test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
+              test "$(grep --count '^name = "choregraph-nickel"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
               grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq --exit-status '
-                .nodes.choregraph.locked.rev == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
-                and .nodes.choregraph.original.rev == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+                .nodes.choregraph.locked.rev == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
+                and .nodes.choregraph.original.rev == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
               ' ${self}/flake.lock > /dev/null
 
               test -f ${choregraph}/crates/choregraph-core/Cargo.toml
+              test -f ${choregraph}/crates/choregraph-nickel/Cargo.toml
               test -f ${choregraph}/crates/choregraph-seaglass/Cargo.toml
               grep --fixed-strings 'GNU AFFERO GENERAL PUBLIC LICENSE' ${choregraph}/LICENSE > /dev/null
               test ! -e ${self}/vendor-cargo-deps/seaglass-execution-graph
               test "$(grep -R -l 'seaglass_execution_graph' ${self}/src --include='*.rs')" = \
                 "${self}/src/engine/runner.rs"
+              grep -R -l 'choregraph_nickel' ${self}/src --include='*.rs' | sort > "$TMPDIR/choregraph-import-files"
+              printf '%s\n%s\n' \
+                "${self}/src/workflow_format.rs" \
+                "${self}/src/workflow_format/choregraph.rs" \
+                > "$TMPDIR/expected-choregraph-import-files"
+              cmp "$TMPDIR/expected-choregraph-import-files" "$TMPDIR/choregraph-import-files"
+              grep --fixed-strings 'lower_portable_workflow_with_choregraph(&portable)?;' \
+                ${self}/src/workflow_format.rs > /dev/null
+              if grep -E 'std::fs|std::process|std::net|std::env|Path|Command|read_to_string|read_dir|tokio::|async|unsafe' \
+                ${self}/src/workflow_format/choregraph.rs; then
+                echo 'Choregraph lowering core contains forbidden shell authority' >&2
+                exit 1
+              fi
               if grep -E 'github[.]com.*choregraph|path[[:space:]]*=.*seaglass-execution-graph|vendor-cargo-deps/seaglass-execution-graph' \
                 ${self}/Cargo.toml; then
                 echo 'forbidden Choregraph fallback remains' >&2
