@@ -397,7 +397,7 @@
                 "${self}/src/workflow_format/choregraph.rs" \
                 > "$TMPDIR/expected-choregraph-import-files"
               cmp "$TMPDIR/expected-choregraph-import-files" "$TMPDIR/choregraph-import-files"
-              grep --fixed-strings 'lower_portable_workflow_with_choregraph(&portable)?;' \
+              grep --fixed-strings 'choregraph::lower_portable(&portable)?;' \
                 ${self}/src/workflow_format.rs > /dev/null
               if grep -E 'std::fs|std::process|std::net|std::env|Path|Command|read_to_string|read_dir|tokio::|async|unsafe' \
                 ${self}/src/workflow_format/choregraph.rs; then

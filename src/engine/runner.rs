@@ -622,7 +622,7 @@ fn shared_step_states(
     states.iter().map(|(node_id, state)| (node_id.to_string(), *state)).collect()
 }
 
-const fn runner_step_state(state: PersistedStepState) -> RunnerStepState {
+const fn persisted_step_state(state: PersistedStepState) -> RunnerStepState {
     match state {
         PersistedStepState::Pending => RunnerStepState::Pending,
         PersistedStepState::Ready => RunnerStepState::Ready,
@@ -633,15 +633,17 @@ const fn runner_step_state(state: PersistedStepState) -> RunnerStepState {
     }
 }
 
+fn binding_uses_supported_schemas(binding: &PersistedMachineBinding) -> bool {
+    let is_legacy_schema = binding.old_schema == LEGACY_MACHINE_STATE_SCHEMA;
+    let is_choregraph_schema = binding.new_schema == CHOREGRAPH_MACHINE_STATE_SCHEMA;
+    is_legacy_schema && is_choregraph_schema
+}
+
 fn validate_persisted_binding(
     expected: &PersistedMachineBinding,
     observed: &PersistedMachineBinding,
 ) -> Result<(), PersistedStateIssue> {
-    if observed.old_schema != LEGACY_MACHINE_STATE_SCHEMA
-        || observed.new_schema != CHOREGRAPH_MACHINE_STATE_SCHEMA
-        || expected.old_schema != LEGACY_MACHINE_STATE_SCHEMA
-        || expected.new_schema != CHOREGRAPH_MACHINE_STATE_SCHEMA
-    {
+    if !binding_uses_supported_schemas(observed) || !binding_uses_supported_schemas(expected) {
         return Err(PersistedStateIssue::UnsupportedSchema);
     }
     if observed.workflow_revision != expected.workflow_revision {
@@ -651,6 +653,24 @@ fn validate_persisted_binding(
         return Err(PersistedStateIssue::StaleMachineIdentity);
     }
     Ok(())
+}
+
+fn migrate_step_records(
+    expected: &PersistedMachineBinding,
+    expected_nodes: &BTreeSet<RunnerNodeId>,
+    records: &[PersistedStepStateRecord],
+) -> Result<BTreeMap<RunnerNodeId, RunnerStepState>, PersistedStateIssue> {
+    let mut states = BTreeMap::new();
+    for record in records {
+        validate_persisted_binding(expected, &record.binding)?;
+        if !expected_nodes.contains(&record.node_id) {
+            return Err(PersistedStateIssue::ForeignNode);
+        }
+        if states.insert(record.node_id, persisted_step_state(record.state)).is_some() {
+            return Err(PersistedStateIssue::AmbiguousNode);
+        }
+    }
+    Ok(states)
 }
 
 // r[impl lattice.choregraph_adoption.persistence]
@@ -664,17 +684,7 @@ pub fn migrate_persisted_states(
     if records.len() != expected_nodes.len() {
         return Err(PersistedStateIssue::PartialState);
     }
-
-    let mut states = BTreeMap::new();
-    for record in records {
-        validate_persisted_binding(expected, &record.binding)?;
-        if !expected_nodes.contains(&record.node_id) {
-            return Err(PersistedStateIssue::ForeignNode);
-        }
-        if states.insert(record.node_id, runner_step_state(record.state)).is_some() {
-            return Err(PersistedStateIssue::AmbiguousNode);
-        }
-    }
+    let states = migrate_step_records(expected, &expected_nodes, records)?;
     if states.len() != expected_nodes.len() {
         return Err(PersistedStateIssue::PartialState);
     }
@@ -691,6 +701,27 @@ const fn core_action(action: RunnerStepAction) -> choregraph_core::Action {
     }
 }
 
+fn replay_events(events: &[PersistedMachineEvent]) -> Vec<choregraph_core::Event> {
+    events
+        .iter()
+        .map(|event| choregraph_core::Event::new(event.node_id.to_string(), core_action(event.action)))
+        .collect()
+}
+
+fn replay_bindings(
+    identity: PersistedReplayIdentity,
+) -> (choregraph_core::ReplayBindings, choregraph_core::ReplayBindings) {
+    let expected = choregraph_core::ReplayBindings::new(
+        choregraph_core::TraceBinding::from_bytes(identity.expected_machine),
+        choregraph_core::TraceBinding::from_bytes(identity.expected_initial_state),
+    );
+    let observed = choregraph_core::ReplayBindings::new(
+        choregraph_core::TraceBinding::from_bytes(identity.observed_machine),
+        choregraph_core::TraceBinding::from_bytes(identity.observed_initial_state),
+    );
+    (expected, observed)
+}
+
 // r[impl lattice.choregraph_adoption.replay]
 pub fn replay_persisted_events(
     plan: &RunnerWorkflow,
@@ -701,25 +732,17 @@ pub fn replay_persisted_events(
     let shared_plan = admitted_execution_plan(plan).map_err(PersistedReplayError::Graph)?;
     let initial_state = seaglass_execution_graph::expand_state(&shared_plan, &shared_step_states(states))
         .map_err(PersistedReplayError::State)?;
-    let core_events = events
-        .iter()
-        .map(|event| choregraph_core::Event::new(event.node_id.to_string(), core_action(event.action)))
-        .collect::<Vec<_>>();
-    let expected_bindings = choregraph_core::ReplayBindings::new(
-        choregraph_core::TraceBinding::from_bytes(identity.expected_machine),
-        choregraph_core::TraceBinding::from_bytes(identity.expected_initial_state),
-    );
-    let observed_bindings = choregraph_core::ReplayBindings::new(
-        choregraph_core::TraceBinding::from_bytes(identity.observed_machine),
-        choregraph_core::TraceBinding::from_bytes(identity.observed_initial_state),
-    );
+    let core_events = replay_events(events);
+    let (expected_bindings, observed_bindings) = replay_bindings(identity);
     let trace = choregraph_core::BoundedTrace::new(observed_bindings, &core_events);
     let input = choregraph_core::ReplayInput::new(
         shared_plan.machine(),
         &initial_state,
         expected_bindings,
         trace,
-        choregraph_core::ReplayLimits::default(),
+        choregraph_core::ReplayLimits {
+            max_events: choregraph_core::DEFAULT_MAX_TRACE_EVENTS,
+        },
     );
     Ok(choregraph_core::replay(input))
 }

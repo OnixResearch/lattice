@@ -138,6 +138,17 @@ pub(crate) fn safe_message_for_rejection(code: RejectionCode) -> &'static str {
     }
 }
 
+#[cfg(target_pointer_width = "64")]
 pub(crate) fn count_as_u64(count: usize) -> u64 {
-    u64::try_from(count).unwrap_or(u64::MAX)
+    u64::from_ne_bytes(count.to_ne_bytes())
+}
+
+#[cfg(target_pointer_width = "32")]
+pub(crate) fn count_as_u64(count: usize) -> u64 {
+    u64::from(u32::from_ne_bytes(count.to_ne_bytes()))
+}
+
+#[cfg(target_pointer_width = "16")]
+pub(crate) fn count_as_u64(count: usize) -> u64 {
+    u64::from(u16::from_ne_bytes(count.to_ne_bytes()))
 }

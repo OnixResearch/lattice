@@ -28,3 +28,9 @@ Lattice does not edit the immutable Choregraph source, casually alter the review
 The existing Lattice Nickel evaluator and product decoder remain authoritative. Decoded runner values enter the published conversion-only `choregraph-seaglass` adapter and the Choregraph machine core.
 
 The `lattice.choregraph_adoption.lowering` requirement and its combined task remain open until reviewed source releases align this dependency. This blocker does not reopen the removed graph implementation.
+
+## Resolution — 2026-07-28
+
+Choregraph revision `81b260da2256147ec82cb5dd44c0a0c1dcb7500d` uses a reviewed compatible BLAKE3 requirement. Lattice's generated lock selects BLAKE3 `1.8.5` for Choregraph and Animus.
+
+Lattice now passes decoded workflow values to the pure `choregraph-nickel` lowerer. No dependency override, subprocess, sibling path, vendor copy, or fallback was added.

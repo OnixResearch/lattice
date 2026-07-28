@@ -5,7 +5,7 @@
 - [x] [serial] Verify exact Choregraph source, license, archive, release bundle, proofs, trusted surface, Kamacite artifacts, frontend boundary, and conformance evidence. r[lattice.choregraph_adoption.source]
 - [x] [parallel] Reject floating, GitHub, sibling, vendor-fallback, stale, skipped-proof, mismatched, license-incompatible, or overclaimed Choregraph inputs. r[lattice.choregraph_adoption.source]
 - [x] [serial] Add the exact Choregraph crates for dual-run and production use, then align Cargo and Nix through generated lock changes. r[lattice.choregraph_adoption.source_alignment]
-- [ ] [depends:choregraph-source] Implement pure conversion from Lattice decoded values into Choregraph lowering inputs. r[lattice.choregraph_adoption.lowering]
+- [x] [depends:choregraph-source] Implement pure conversion from Lattice decoded values into Choregraph lowering inputs. r[lattice.choregraph_adoption.lowering]
 - [x] [depends:choregraph-source] Implement pure conversion from Lattice decoded values into Choregraph machine inputs. r[lattice.choregraph_adoption.adapter]
 - [x] [parallel] Dual-run admission, order, dependency, group, readiness, lifecycle, terminal, resume, replay, and intent behavior. r[lattice.choregraph_adoption.parity]
 - [x] [parallel] Add persisted pending, ready, running, completed, failed, cancelled, malformed, foreign, stale, partial, ambiguous, and replay-without-dispatch migration fixtures. r[lattice.choregraph_adoption.persistence] r[lattice.choregraph_adoption.replay]

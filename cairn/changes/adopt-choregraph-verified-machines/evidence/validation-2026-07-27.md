@@ -31,6 +31,16 @@ Lattice does not override Octet's rustc-private toolchain or claim lint coverage
 
 Direct `choregraph-nickel` integration remains blocked by the exact BLAKE3 dependency conflict recorded in `nickel-lowering-blocker-2026-07-27.md`. The pure-lowering task remains open.
 
+## Resolution — 2026-07-28
+
+The compiler and dependency blockers are resolved by exact published Choregraph revision `81b260da2256147ec82cb5dd44c0a0c1dcb7500d`.
+
+Octet now analyzes the full configured library scope. Its current run reports 1,141 finding occurrences. The migration check matched all 1,141 old semantic findings and found zero additions or removals. The maintained wrapper accepts 892 current stable identities with zero new and zero stale identities.
+
+The raw Octet child still uses deny-level lints and therefore records `integration-failure` after emitting the complete accepted finding set. The maintained wrapper passes by exact baseline policy. This evidence does not call the raw result clean.
+
+The pure lowering implementation and current validation are recorded in `lowering-validation-2026-07-28.md`.
+
 ## Claim boundary
 
 These results support the checked machine cutover only. They do not prove whole-Lattice correctness, effect safety, verifier soundness, successful Choregraph Nickel lowering, complete Octet coverage, or release eligibility.

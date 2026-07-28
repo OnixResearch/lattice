@@ -26,7 +26,6 @@ use lattice::workflow_format::MAX_MARKDOWN_AGENT_PROMPT_BYTES;
 use lattice::workflow_format::PortableEdge;
 use lattice::workflow_format::WorkflowFormatError;
 use lattice::workflow_format::load_workflow_nickel_file;
-use lattice::workflow_format::lower_portable_workflow_with_choregraph;
 use lattice::workflow_format::portable_to_workflow;
 use lattice::workflow_format::workflow_to_nickel;
 use lattice::workflow_format::workflow_to_portable;
@@ -141,7 +140,7 @@ fn decoded_workflow_lowers_in_memory_through_choregraph() {
     let (workflow, _source, _target) = common::two_node_pipeline();
     let portable = workflow_to_portable(&workflow);
 
-    let lowered = lower_portable_workflow_with_choregraph(&portable).expect("decoded workflow lowers");
+    let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
 
     assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV1);
     assert_eq!(lowered.machine.node_ids().len(), IMPORTED_NODE_COUNT);
@@ -163,7 +162,7 @@ fn decoded_workflow_cycle_fails_choregraph_admission() {
         target: reverse_target,
     });
 
-    let error = lower_portable_workflow_with_choregraph(&portable).expect_err("cycle rejected");
+    let error = lattice::workflow_format::choregraph::lower_portable(&portable).expect_err("cycle rejected");
 
     assert_eq!(error, WorkflowFormatError::ChoregraphLowering(FrontendIssueCode::MachineAdmissionRejected),);
 }
