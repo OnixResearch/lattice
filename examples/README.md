@@ -25,7 +25,9 @@ They are useful for demos, import/export validation, and headless regression tes
 
 ## Orchestrations
 
-`examples/orchestrations/llm-review-loop.ncl` wraps the Markdown-backed LLM operating graph in durable multi-round policy: immutable workflow identity, operator approval, bounded rounds/agent calls/tokens/duration, trigger identities, and replay-safe event history.
+`examples/orchestrations/llm-review-loop.ncl` adds a durable multi-round policy to the Markdown-backed LLM operating graph.
+
+The policy defines an immutable workflow identity, operator approval, resource bounds, trigger identities, and replay-safe event history.
 
 Regenerate it after changing the referenced workflow topology or portable configuration:
 
@@ -62,7 +64,9 @@ This example is one Lattice agent node, not an Animus workflow orchestrator. Too
 
 ## Webhook cookbook
 
-`webhook-cookbook.ncl` demonstrates the webhook listener path without storing plaintext secret material in the workflow. The workflow references `env:LATTICE_WEBHOOK_TOKEN`; set that environment variable from your secret manager before dry-run or listener startup.
+`webhook-cookbook.ncl` demonstrates the webhook listener path. It does not store plaintext secret material in the workflow.
+
+The workflow references `env:LATTICE_WEBHOOK_TOKEN`. Set this variable from your secret manager before a dry run or listener startup.
 
 ```bash
 lattice --config ./demo/config.ncl --init
@@ -71,7 +75,7 @@ LATTICE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" lattice --config ./demo/config.ncl webhoo
 LATTICE_WEBHOOK_TOKEN="$WEBHOOK_TOKEN" lattice --config ./demo/config.ncl webhook-listen --bind 127.0.0.1:8787
 ```
 
-Send an accepted request from another terminal by passing the same environment-backed token at runtime rather than writing it into the workflow:
+From another terminal, send an accepted request with the same environment-backed token:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8787/hooks/cookbook-lead \
