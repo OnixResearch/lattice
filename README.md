@@ -16,6 +16,14 @@ nix flake check -L --option secret-key-files '' # full CI; check outputs do not 
 <!-- r[verify lattice.repository_validation.baselined_octet_gate.scenario.boundary] -->
 The Octet hook runs the lib target profile with every registered lint explicitly observed at `warn`, no disabled or allowed lint entries, and the checked-in `octet-baseline.json` as the admission set. The hook requires a successful Cargo child, complete agreement with all 892 reviewed stable identities, and zero new or stale identities. An isolated Nix fixture injects a new `todo!()` finding and proves that the same hook rejects it. Direct `cargo octet check` output is review evidence only; it does not grant repository-check or release admission.
 
+## Choregraph machine source
+
+Lattice selects `choregraph-core` and the conversion-only `choregraph-seaglass` adapter from `rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF` at revision `fc47c5f4ecbb7b4341af690fa42199f25d57f54c`. Cargo, Nix, and Crane use the same exact source. The former vendored execution-graph implementation is removed.
+
+Choregraph owns graph admission, ordering, readiness, lifecycle, resume, analytics, and bounded replay decisions. Lattice retains Nickel evaluation, product decoding, runtime selection, effects, persistence, retries, triggers, diagnostics, UI, and evidence.
+
+Direct `choregraph-nickel` integration remains blocked because the immutable candidate pins `blake3` `1.8.2`, while the selected Animus packages require `1.8.5`. Lattice does not weaken or replace either reviewed source.
+
 ## Durable scheduler occurrences
 
 Before workflow effects, the scheduler now commits a domain-separated BLAKE3 identity for the exact `(schedule_id, due_epoch_ms)` occurrence. One redb transaction verifies the due slot, reserves the globally unique run ID, records the workflow revision and pending attempt, and advances the schedule. Ordinary daemon restart therefore cannot automatically admit that occurrence again.
@@ -85,7 +93,7 @@ lattice --config examples/config/openai-compatible-agent.ncl run llm-operating-g
 
 ## Bounded Animus leaf agents
 
-[`examples/config/animus-agent.ncl`](examples/config/animus-agent.ncl) routes the additive `animus` target through a fixed BLAKE3-identified two-turn Steel loop. Animus decides only the inner model/response sequence for one generic agent node. Lattice retains provider credentials, transport limits, workflow and Seaglass graph semantics, effects, budgets, events, persistence, triggers, approvals, and durable orchestration.
+[`examples/config/animus-agent.ncl`](examples/config/animus-agent.ncl) routes the additive `animus` target through a fixed BLAKE3-identified two-turn Steel loop. Animus decides only the inner model/response sequence for one generic agent node. Lattice retains provider credentials, transport limits, Choregraph adapter boundaries, effects, budgets, events, persistence, triggers, approvals, and durable orchestration.
 
 The first slice performs exactly one OpenAI-compatible model dispatch and supports text or JSON output. It exposes no tool definitions, tool capabilities, arbitrary Steel programs, profile loading, sessions, provider fallback, Animus DAGs, or Animus persistence. Returned metadata contains bounded identities and counts, not prompts, responses, credentials, or a second provenance ledger.
 
@@ -99,7 +107,7 @@ The checked-in Animus snapshot is reproducibly refreshed from its reviewed revis
 
 ## Durable agent orchestration
 
-Lattice can coordinate immutable workflow revisions across explicit rounds with operator authority, budget reservations, crash recovery, and side-effect-free replay. Each round remains an acyclic workflow admitted through the Seaglass-backed runner. Agent output may propose a successor revision, but it cannot mutate graphs, credentials, triggers, runtime abilities, or budgets without an authorized hash-bound approval.
+Lattice can coordinate immutable workflow revisions across explicit rounds with operator authority, budget reservations, crash recovery, and side-effect-free replay. Each round remains an acyclic workflow admitted through the Choregraph-backed runner. Agent output may propose a successor revision, but it cannot mutate graphs, credentials, triggers, runtime abilities, or budgets without an authorized hash-bound approval.
 
 The checked-in [`llm-review-loop`](examples/orchestrations/llm-review-loop.ncl) definition wraps the Markdown-backed LLM operating graph with bounded rounds, agent invocations, tokens, duration, schedule/webhook trigger identities, and `operator:local` approval authority.
 
@@ -184,7 +192,9 @@ verus verus/example_spec.rs
 - [Pi coding agent](https://pi.dev): SDK, print, RPC, and image prompt surfaces for generic agent-node integration.
 - [Clankers](https://github.com/brittonr/clankers): Rust terminal coding agent with one-shot, daemon, MCP/ACP, context image references, and image-generation surfaces for generic agent-node integration.
 - [Trellis](../trellis/): verified-logic primitives for graph admission, job lifecycle, durable replay, effect/capability admission, and typed durable references used as design inputs for the generic pipeline runner.
-- [Execution Graph](https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git): canonical Radicle source for the dependency-light graph mechanism pinned at reviewed commit `03736f1ec46c377ff86b451260ad68aa70ff3b0b`; Lattice retains all workflow, scheduler, effect, persistence, evidence, and release authority.
+- [Choregraph](https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git): verified graph and machine source pinned at `fc47c5f4ecbb7b4341af690fa42199f25d57f54c`.
+- [execution-graph](https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git): independent compatibility consumer and rollback reference.
+- [Seaglass](https://github.com/brittonr/seaglass): original compatibility vocabulary and conformance baseline.
 - [Callee](https://github.com/baldaworks/callee): Markdown-defined provider-backed roles and bounded `Sequential`/`Loop` composition used as an authoring and orchestration reference.
 - [FarmTable](https://github.com/scion-frontiers/farmtable): graph-native ready-task, dependency, critical-path, bottleneck, and lifecycle separation used as an execution-graph architecture reference.
 - [cap-std](https://github.com/bytecodealliance/cap-std): portable capability-directory implementation used to keep local file effects descriptor-relative and reject traversal or symlink escapes.

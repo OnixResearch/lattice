@@ -1,0 +1,15 @@
+## Tasks
+
+- [x] [serial] Complete and record the accepted execution-graph and Nickel evaluator source baselines before Choregraph changes. r[lattice.choregraph_adoption.prerequisites]
+- [x] [serial] Inventory every graph, readiness, lifecycle, resume, replay, persisted-state, event, and effect-intent call site. r[lattice.choregraph_adoption.inventory]
+- [x] [serial] Verify exact Choregraph source, license, archive, release bundle, proofs, trusted surface, Kamacite artifacts, frontend boundary, and conformance evidence. r[lattice.choregraph_adoption.source]
+- [x] [parallel] Reject floating, GitHub, sibling, vendor-fallback, stale, skipped-proof, mismatched, license-incompatible, or overclaimed Choregraph inputs. r[lattice.choregraph_adoption.source]
+- [x] [serial] Add the exact Choregraph crates for dual-run and production use, then align Cargo and Nix through generated lock changes. r[lattice.choregraph_adoption.source_alignment]
+- [ ] [depends:choregraph-source] Implement pure conversion from Lattice decoded values into Choregraph lowering inputs. r[lattice.choregraph_adoption.lowering]
+- [x] [depends:choregraph-source] Implement pure conversion from Lattice decoded values into Choregraph machine inputs. r[lattice.choregraph_adoption.adapter]
+- [x] [parallel] Dual-run admission, order, dependency, group, readiness, lifecycle, terminal, resume, replay, and intent behavior. r[lattice.choregraph_adoption.parity]
+- [x] [parallel] Add persisted pending, ready, running, completed, failed, cancelled, malformed, foreign, stale, partial, ambiguous, and replay-without-dispatch migration fixtures. r[lattice.choregraph_adoption.persistence] r[lattice.choregraph_adoption.replay]
+- [x] [serial] Route production machine decisions only through Choregraph and remove duplicate and temporary dual-run logic. r[lattice.choregraph_adoption.single_implementation]
+- [x] [serial] Verify Lattice retains product, evaluator-shell, runtime, effect, persistence, retry, trigger, diagnostic, and evidence authority. r[lattice.choregraph_adoption.authority]
+- [x] [serial] Test the recorded VCS rollback with no hidden runtime or source fallback. r[lattice.choregraph_adoption.rollback]
+- [ ] [serial] Run focused tests again, `scripts/check.rs`, Octet, Cairn validation and gates, source and duplicate checks, and bounded Nix checks. r[lattice.choregraph_adoption.validation]

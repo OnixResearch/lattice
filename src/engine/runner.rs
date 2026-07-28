@@ -22,6 +22,76 @@ pub type RunnerStepState = seaglass_execution_graph::StepState;
 /// Error returned when a runner step lifecycle transition is invalid.
 pub type RunnerTransitionError = seaglass_execution_graph::StepTransitionError;
 
+pub const LEGACY_MACHINE_STATE_SCHEMA: &str = "seaglass.execution-graph.state.v1";
+pub const CHOREGRAPH_MACHINE_STATE_SCHEMA: &str = choregraph_core::MACHINE_SCHEMA_V1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedMachineBinding {
+    pub old_schema: String,
+    pub new_schema: String,
+    pub workflow_revision: String,
+    pub machine_identity: String,
+}
+
+impl PersistedMachineBinding {
+    pub fn expected(workflow_revision: impl Into<String>, machine_identity: impl Into<String>) -> Self {
+        Self {
+            old_schema: LEGACY_MACHINE_STATE_SCHEMA.to_string(),
+            new_schema: CHOREGRAPH_MACHINE_STATE_SCHEMA.to_string(),
+            workflow_revision: workflow_revision.into(),
+            machine_identity: machine_identity.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersistedStepState {
+    Pending,
+    Ready,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedStepStateRecord {
+    pub binding: PersistedMachineBinding,
+    pub node_id: RunnerNodeId,
+    pub state: PersistedStepState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PersistedStateIssue {
+    UnsupportedSchema,
+    StaleWorkflowRevision,
+    StaleMachineIdentity,
+    ForeignNode,
+    AmbiguousNode,
+    PartialState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersistedReplayIdentity {
+    pub expected_machine: [u8; choregraph_core::TRACE_BINDING_BYTES],
+    pub expected_initial_state: [u8; choregraph_core::TRACE_BINDING_BYTES],
+    pub observed_machine: [u8; choregraph_core::TRACE_BINDING_BYTES],
+    pub observed_initial_state: [u8; choregraph_core::TRACE_BINDING_BYTES],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersistedMachineEvent {
+    pub node_id: RunnerNodeId,
+    pub action: RunnerStepAction,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PersistedReplayError {
+    Graph(RunnerDiagnostic),
+    State(seaglass_execution_graph::StateConversionError),
+}
+
 use crate::agent_node;
 use crate::engine::value::Value;
 use crate::engine::value::ValueData;
@@ -522,6 +592,7 @@ pub fn is_terminal_step_state(state: RunnerStepState) -> bool {
     seaglass_execution_graph::is_terminal_state(state)
 }
 
+// r[impl lattice.choregraph_adoption.adapter]
 fn admitted_execution_plan(plan: &RunnerWorkflow) -> Result<seaglass_execution_graph::ExecutionPlan, RunnerDiagnostic> {
     seaglass_execution_graph::admit_graph(&shared_execution_graph(plan)).map_err(|diagnostics| {
         diagnostics.first().map_or_else(invalid_shared_graph_diagnostic, shared_graph_diagnostic)
@@ -549,6 +620,108 @@ fn shared_step_states(
     states: &BTreeMap<RunnerNodeId, RunnerStepState>,
 ) -> BTreeMap<String, seaglass_execution_graph::StepState> {
     states.iter().map(|(node_id, state)| (node_id.to_string(), *state)).collect()
+}
+
+const fn runner_step_state(state: PersistedStepState) -> RunnerStepState {
+    match state {
+        PersistedStepState::Pending => RunnerStepState::Pending,
+        PersistedStepState::Ready => RunnerStepState::Ready,
+        PersistedStepState::Running => RunnerStepState::Running,
+        PersistedStepState::Completed => RunnerStepState::Completed,
+        PersistedStepState::Failed => RunnerStepState::Failed,
+        PersistedStepState::Cancelled => RunnerStepState::Cancelled,
+    }
+}
+
+fn validate_persisted_binding(
+    expected: &PersistedMachineBinding,
+    observed: &PersistedMachineBinding,
+) -> Result<(), PersistedStateIssue> {
+    if observed.old_schema != LEGACY_MACHINE_STATE_SCHEMA
+        || observed.new_schema != CHOREGRAPH_MACHINE_STATE_SCHEMA
+        || expected.old_schema != LEGACY_MACHINE_STATE_SCHEMA
+        || expected.new_schema != CHOREGRAPH_MACHINE_STATE_SCHEMA
+    {
+        return Err(PersistedStateIssue::UnsupportedSchema);
+    }
+    if observed.workflow_revision != expected.workflow_revision {
+        return Err(PersistedStateIssue::StaleWorkflowRevision);
+    }
+    if observed.machine_identity != expected.machine_identity {
+        return Err(PersistedStateIssue::StaleMachineIdentity);
+    }
+    Ok(())
+}
+
+// r[impl lattice.choregraph_adoption.persistence]
+pub fn migrate_persisted_states(
+    plan: &RunnerWorkflow,
+    expected: &PersistedMachineBinding,
+    records: &[PersistedStepStateRecord],
+) -> Result<BTreeMap<RunnerNodeId, RunnerStepState>, PersistedStateIssue> {
+    validate_persisted_binding(expected, expected)?;
+    let expected_nodes = plan.nodes.iter().map(|node| node.id).collect::<BTreeSet<_>>();
+    if records.len() != expected_nodes.len() {
+        return Err(PersistedStateIssue::PartialState);
+    }
+
+    let mut states = BTreeMap::new();
+    for record in records {
+        validate_persisted_binding(expected, &record.binding)?;
+        if !expected_nodes.contains(&record.node_id) {
+            return Err(PersistedStateIssue::ForeignNode);
+        }
+        if states.insert(record.node_id, runner_step_state(record.state)).is_some() {
+            return Err(PersistedStateIssue::AmbiguousNode);
+        }
+    }
+    if states.len() != expected_nodes.len() {
+        return Err(PersistedStateIssue::PartialState);
+    }
+    Ok(states)
+}
+
+const fn core_action(action: RunnerStepAction) -> choregraph_core::Action {
+    match action {
+        RunnerStepAction::MarkReady => choregraph_core::Action::MarkReady,
+        RunnerStepAction::Start => choregraph_core::Action::Start,
+        RunnerStepAction::Complete => choregraph_core::Action::Complete,
+        RunnerStepAction::Fail => choregraph_core::Action::Fail,
+        RunnerStepAction::Cancel => choregraph_core::Action::Cancel,
+    }
+}
+
+// r[impl lattice.choregraph_adoption.replay]
+pub fn replay_persisted_events(
+    plan: &RunnerWorkflow,
+    states: &BTreeMap<RunnerNodeId, RunnerStepState>,
+    identity: PersistedReplayIdentity,
+    events: &[PersistedMachineEvent],
+) -> Result<choregraph_core::ReplayDecision, PersistedReplayError> {
+    let shared_plan = admitted_execution_plan(plan).map_err(PersistedReplayError::Graph)?;
+    let initial_state = seaglass_execution_graph::expand_state(&shared_plan, &shared_step_states(states))
+        .map_err(PersistedReplayError::State)?;
+    let core_events = events
+        .iter()
+        .map(|event| choregraph_core::Event::new(event.node_id.to_string(), core_action(event.action)))
+        .collect::<Vec<_>>();
+    let expected_bindings = choregraph_core::ReplayBindings::new(
+        choregraph_core::TraceBinding::from_bytes(identity.expected_machine),
+        choregraph_core::TraceBinding::from_bytes(identity.expected_initial_state),
+    );
+    let observed_bindings = choregraph_core::ReplayBindings::new(
+        choregraph_core::TraceBinding::from_bytes(identity.observed_machine),
+        choregraph_core::TraceBinding::from_bytes(identity.observed_initial_state),
+    );
+    let trace = choregraph_core::BoundedTrace::new(observed_bindings, &core_events);
+    let input = choregraph_core::ReplayInput::new(
+        shared_plan.machine(),
+        &initial_state,
+        expected_bindings,
+        trace,
+        choregraph_core::ReplayLimits::default(),
+    );
+    Ok(choregraph_core::replay(input))
 }
 
 fn parse_node_ids(node_ids: &[String]) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {

@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     crane.url = "github:ipetkov/crane";
     rust-overlay = {
-      url = "github:oxalica/rust-overlay";
+      url = "github:oxalica/rust-overlay/3c38e1e1ba9c8d7030f7b5a801398ea7d8a6fdc0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
@@ -14,8 +14,8 @@
       url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
     };
-    execution-graph = {
-      url = "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b";
+    choregraph = {
+      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
       flake = false;
     };
   };
@@ -29,7 +29,7 @@
       flake-utils,
       octet,
       bounded-exec,
-      execution-graph,
+      choregraph,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -85,7 +85,7 @@
         };
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
-        executionGraphCargoSource = "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b#03736f1ec46c377ff86b451260ad68aa70ff3b0b";
+        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fc47c5f4ecbb7b4341af690fa42199f25d57f54c#fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
         cargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -94,9 +94,9 @@
               checkout.overrideAttrs (_old: {
                 src = bounded-exec;
               })
-            else if builtins.all (package: package.source == executionGraphCargoSource) packages then
+            else if builtins.all (package: package.source == choregraphCargoSource) packages then
               checkout.overrideAttrs (_old: {
-                src = execution-graph;
+                src = choregraph;
               })
             else
               checkout;
@@ -333,60 +333,67 @@
               touch "$out"
             '';
 
-        # r[verify lattice.execution_graph_external_adoption.source.scenario.accepted]
-        # r[verify lattice.execution_graph_external_adoption.source.scenario.rejected]
-        # r[verify lattice.execution_graph_external_adoption.cutover.scenario.accepted]
-        executionGraphSourceIdentityCheck =
-          pkgs.runCommand "lattice-execution-graph-source-identity"
+        # r[verify lattice.choregraph_adoption.source]
+        # r[verify lattice.choregraph_adoption.source_alignment]
+        # r[verify lattice.choregraph_adoption.single_implementation]
+        choregraphSourceIdentityCheck =
+          pkgs.runCommand "lattice-choregraph-source-identity"
             {
               nativeBuildInputs = [
-                pkgs.b3sum
                 pkgs.coreutils
-                pkgs.diffutils
+                pkgs.gnugrep
                 pkgs.jq
                 pkgs.nickel
               ];
             }
             ''
-              source_root=${execution-graph}
-              test -f "$source_root/Cargo.toml"
-              test -f "$source_root/src/lib.rs"
-              grep --fixed-strings 'name = "execution-graph-core"' "$source_root/Cargo.toml" > /dev/null
-              grep --fixed-strings 'license = "AGPL-3.0-or-later"' "$source_root/Cargo.toml" > /dev/null
-              test "$(b3sum "$source_root/src/lib.rs" | cut -d ' ' -f 1)" = '91450b94f6256c71057507b6ae97f63e505dc57377198be38087530bedefccb4'
+              set -eu
+              admission=${self}/tests/fixtures/radicle/choregraph-source-admission-v1.ncl
+              nickel export --format json "$admission" > "$TMPDIR/admission.json"
+              jq --exit-status '
+                .admission.schema == "lattice.choregraph-source-admission.v1"
+                and .admission.status == "accepted"
+                and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
+                and .admission.revision == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+                and .admission.cargo_revision == .admission.revision
+                and .admission.nix_revision == .admission.revision
+                and .admission.source_archive_blake3 == "dcb1faf95a7487145496ce986ae1639908600ace5bd77c4d96a37a530a7538a5"
+                and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
+                and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
+                and ([.admission.prerequisites[]] | all(. == true))
+                and ([.admission.evidence[]] | all(. == true))
+                and .admission.forbidden_fallbacks == ["floating", "github", "sibling", "vendor", "runtime"]
+                and (.admission.non_claims | length) == 5
+              ' "$TMPDIR/admission.json" > /dev/null
+              if nickel export --format json \
+                ${self}/tests/fixtures/radicle/negative/choregraph-floating-source.ncl \
+                > "$TMPDIR/invalid.json"; then
+                echo 'floating Choregraph source unexpectedly passed' >&2
+                exit 1
+              fi
+
+              grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"' ${self}/Cargo.toml > /dev/null
+              test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
+              test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
+              grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
+              jq --exit-status '
+                .nodes.choregraph.locked.rev == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+                and .nodes.choregraph.original.rev == "fc47c5f4ecbb7b4341af690fa42199f25d57f54c"
+              ' ${self}/flake.lock > /dev/null
+
+              test -f ${choregraph}/crates/choregraph-core/Cargo.toml
+              test -f ${choregraph}/crates/choregraph-seaglass/Cargo.toml
+              grep --fixed-strings 'GNU AFFERO GENERAL PUBLIC LICENSE' ${choregraph}/LICENSE > /dev/null
               test ! -e ${self}/vendor-cargo-deps/seaglass-execution-graph
-
-              admission=${self}/tests/fixtures/radicle/execution-graph-source-admission-v1.json
-              expected_hash="$(cat ${self}/tests/fixtures/radicle/execution-graph-source-admission-v1.blake3)"
-              actual_hash="$(b3sum "$admission" | cut -d ' ' -f 1)"
-              test "$actual_hash" = "$expected_hash"
-              nickel export --format json ${self}/tests/fixtures/radicle/execution-graph-source-admission-v1.ncl \
-                | jq -S . > "$TMPDIR/admission-from-nickel.json"
-              cmp "$admission" "$TMPDIR/admission-from-nickel.json"
-              jq -e \
-                --arg rid 'rad:z2oYsb9jGTyp68BKYhzpivY1eK58a' \
-                --arg rev '03736f1ec46c377ff86b451260ad68aa70ff3b0b' \
-                --arg source_hash '4b5aa3756369236fc82fbbf501d35993cfa208f142694cdd30ca370d6241192c' \
-                '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false' \
-                "$admission" > /dev/null
-
-              receipt=${self}/evidence/radicle/execution-graph-cutover-v1.json
-              expected_receipt_hash="$(cat ${self}/evidence/radicle/execution-graph-cutover-v1.blake3)"
-              actual_receipt_hash="$(b3sum "$receipt" | cut -d ' ' -f 1)"
-              test "$actual_receipt_hash" = "$expected_receipt_hash"
-              nickel export --format json ${self}/evidence/radicle/execution-graph-cutover-v1.ncl \
-                | jq -S . > "$TMPDIR/receipt-from-nickel.json"
-              cmp "$receipt" "$TMPDIR/receipt-from-nickel.json"
-              jq -e \
-                --arg cutover 'a85da0afc2f658ca29fcb8ebe6927896ca85e085' \
-                '.status == "accepted" and .consumer.cutover_revision == $cutover and .cargo.vendor_present == false and .cargo.fallback_configured == false and .validation.nix_flake_check == "passed-x86_64-linux" and .validation_baseline.new_ids == 0 and .validation_baseline.stale_ids == 0' \
-                "$receipt" > /dev/null
-
-              grep --fixed-strings 'seaglass-execution-graph = { package = "execution-graph-core", git = "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git", rev = "03736f1ec46c377ff86b451260ad68aa70ff3b0b" }' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings '${executionGraphCargoSource}' ${self}/Cargo.lock > /dev/null
-              jq -e \
-                '.nodes["execution-graph"].locked.rev == "03736f1ec46c377ff86b451260ad68aa70ff3b0b" and .nodes["execution-graph"].locked.url == "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git" and .nodes["execution-graph"].locked.narHash == "sha256-SzdJGsS631Hk3CbPLThz+2YPgvdoB1cXb3BPusJTX8I="' \
-                ${self}/flake.lock > /dev/null
+              test "$(grep -R -l 'seaglass_execution_graph' ${self}/src --include='*.rs')" = \
+                "${self}/src/engine/runner.rs"
+              if grep -E 'github[.]com.*choregraph|path[[:space:]]*=.*seaglass-execution-graph|vendor-cargo-deps/seaglass-execution-graph' \
+                ${self}/Cargo.toml; then
+                echo 'forbidden Choregraph fallback remains' >&2
+                exit 1
+              fi
               touch "$out"
             '';
 
@@ -466,8 +473,8 @@
           # Exact published process-runner source identity
           bounded-exec-source = boundedExecSourceIdentityCheck;
 
-          # Exact published graph-mechanism source identity
-          execution-graph-source = executionGraphSourceIdentityCheck;
+          # Exact Choregraph source and single adapter path
+          choregraph-source = choregraphSourceIdentityCheck;
 
           # Typed traceability inventory policy and negative fixture
           traceability-inventory-policy = traceabilityInventoryPolicyCheck;
@@ -488,7 +495,7 @@
               octetPreCommitCheck
             ];
 
-          # Ensure the nightly toolchain is available
+          # Use the exact toolchain required by the admitted Choregraph source
           inputsFrom = [ lattice ];
         };
       }

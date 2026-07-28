@@ -1728,7 +1728,7 @@ fn process_result_to_exit_code(result: HeadlessProcessResult) -> ExitCode {
 }
 
 fn count_to_u64(count: usize) -> u64 {
-    u64::try_from(count).map_or(u64::MAX, |value| value)
+    u64::try_from(count).unwrap_or(u64::MAX)
 }
 
 fn shellexpand(path: &str) -> PathBuf {

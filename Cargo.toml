@@ -63,7 +63,8 @@ nickel-lang-core = "0.17.0"
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
-seaglass-execution-graph = { package = "execution-graph-core", git = "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git", rev = "03736f1ec46c377ff86b451260ad68aa70ff3b0b" }
+choregraph-core = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c" }
+seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c" }
 rat-nodegraph = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
 rat-widgets = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-widgets" }
 rat-keymap = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-keymap" }

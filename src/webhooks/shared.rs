@@ -139,5 +139,5 @@ pub(crate) fn safe_message_for_rejection(code: RejectionCode) -> &'static str {
 }
 
 pub(crate) fn count_as_u64(count: usize) -> u64 {
-    u64::try_from(count).map_or(u64::MAX, |value| value)
+    u64::try_from(count).unwrap_or(u64::MAX)
 }
