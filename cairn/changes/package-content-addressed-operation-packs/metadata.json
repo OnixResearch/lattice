@@ -1,0 +1,6 @@
+{
+  "depends_on": [
+    "introduce-typed-operation-contracts",
+    "persist-versioned-operation-data"
+  ]
+}
