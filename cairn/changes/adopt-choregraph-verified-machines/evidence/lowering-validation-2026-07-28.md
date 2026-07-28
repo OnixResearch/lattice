@@ -44,9 +44,21 @@ The regenerated baseline has identity `b3:a590a1553486861cec652bdc1df4831b5afece
 
 The raw child records `integration-failure` because deny-level accepted findings make Cargo exit after emitting 1,141 findings. The maintained wrapper passes by exact baseline policy. This is full lint coverage with accepted debt, not a clean raw Octet result.
 
-## Remaining final gate
+## Broad Nix gate
 
-The broad Nix flake check and final Cairn lifecycle synchronization remain before archive.
+`nix flake check -L --option secret-key-files ''` passed all checks on `x86_64-linux`. Nix reported the other default flake systems as incompatible and omitted them. This result does not claim cross-system validation.
+
+## Lifecycle dependency correction
+
+The original metadata named two independent external-source roadmap changes as hard dependencies. Neither change is implemented. Choregraph supersedes the planned external graph cutover and deliberately retains Lattice's evaluator shell.
+
+The stale dependencies were removed instead of marking unimplemented tasks complete or archiving false evidence. Both roadmap changes remain active and independent.
+
+## Cairn sync and traceability
+
+Cairn synced all 13 Choregraph adoption requirements and their 13 scenarios into `cairn/specs/choregraph-adoption/spec.md` after the dependency correction. The accepted-spec shape test also passed after the reviewed sync added an ID to each scenario.
+
+Tracey then reported 952 referenced requirements out of 964, with no dangling identifiers. All 26 Choregraph adoption requirement and scenario IDs are referenced. The 12 remaining gaps belong to the independent Bounded Exec Radicle-source change.
 
 ## Claim boundary
 

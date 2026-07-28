@@ -1,6 +1,3 @@
 {
-  "depends_on": [
-    "adopt-radicle-execution-graph",
-    "adopt-radicle-nickel-eval"
-  ]
+  "depends_on": []
 }

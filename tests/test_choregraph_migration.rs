@@ -72,6 +72,7 @@ fn persisted_state_migration_accepts_all_supported_states() {
 
 #[test]
 // r[verify lattice.choregraph_adoption.persistence]
+// r[verify lattice.choregraph_adoption.persistence.scenario.stale]
 fn persisted_state_migration_rejects_stale_foreign_partial_and_ambiguous_records() {
     let (workflow, source, target) = common::two_node_pipeline();
     let plan = build_runner_plan(&workflow).plan.expect("runner plan builds");
@@ -129,6 +130,7 @@ fn persisted_state_migration_rejects_stale_foreign_partial_and_ambiguous_records
 
 #[test]
 // r[verify lattice.choregraph_adoption.replay]
+// r[verify lattice.choregraph_adoption.replay.scenario.intent]
 fn replay_reconstructs_state_without_intents_and_rejects_stale_bindings() {
     let (workflow, source, _target) = common::two_node_pipeline();
     let plan = build_runner_plan(&workflow).plan.expect("runner plan builds");

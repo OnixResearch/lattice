@@ -12,4 +12,4 @@
 - [x] [serial] Route production machine decisions only through Choregraph and remove duplicate and temporary dual-run logic. r[lattice.choregraph_adoption.single_implementation]
 - [x] [serial] Verify Lattice retains product, evaluator-shell, runtime, effect, persistence, retry, trigger, diagnostic, and evidence authority. r[lattice.choregraph_adoption.authority]
 - [x] [serial] Test the recorded VCS rollback with no hidden runtime or source fallback. r[lattice.choregraph_adoption.rollback]
-- [ ] [serial] Run focused tests again, `scripts/check.rs`, Octet, Cairn validation and gates, source and duplicate checks, and bounded Nix checks. r[lattice.choregraph_adoption.validation]
+- [x] [serial] Run focused tests again, `scripts/check.rs`, Octet, Cairn validation and gates, source and duplicate checks, and bounded Nix checks. r[lattice.choregraph_adoption.validation]

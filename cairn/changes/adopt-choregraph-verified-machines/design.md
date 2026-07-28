@@ -8,7 +8,9 @@ Completion requires accepted prerequisites, exact Choregraph evidence, complete 
 
 ## Prerequisites
 
-The local execution-graph and Nickel evaluator adoption changes must complete first. Choregraph must then provide an immutable source, AGPL-compatible license, source archive, release bundle, single-step and trace proof results, trusted-surface manifest, Kamacite artifacts, restricted Nickel boundary, and Lattice conformance evidence.
+The accepted execution-graph behavior baseline and Nickel evaluator source baseline must complete first. The independent Radicle execution-graph and Nickel-evaluator roadmap changes are not dependencies: Choregraph replaces the graph decision path, while Lattice retains its evaluator shell.
+
+Choregraph must provide an immutable source, AGPL-compatible license, source archive, release bundle, single-step and trace proof results, trusted-surface manifest, Kamacite artifacts, restricted Nickel boundary, and Lattice conformance evidence.
 
 Upstream evidence proves linkage only. Lattice runs its own integration and runtime checks.
 
