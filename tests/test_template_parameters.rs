@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
+use lattice::config::AppConfig;
 use lattice::config::DEFAULT_NODE_TEMPLATE_FILES;
 use lattice::config::NodeTemplate;
 use lattice::config::PortTemplate;
@@ -15,12 +16,19 @@ use lattice::config::default_config_ncl;
 use lattice::config::load_node_templates_with_diagnostics;
 use lattice::config::render_template_command;
 use lattice::config::validate_template_parameters;
+use lattice::engine::workflow::NodeConfig;
+use lattice::tui::App;
+use lattice::tui::app::AddNodeStep;
 use pretty_assertions::assert_eq;
 
 const TEMPLATE_NAME: &str = "grep";
+const COMPLEX_CUT_FIELD_TEMPLATE_NAME: &str = "complex-cut-field";
+const COMPLEX_SORT_LINES_TEMPLATE_NAME: &str = "complex-sort-lines";
+const COMPLEX_UNIQUE_LINES_TEMPLATE_NAME: &str = "complex-unique-lines";
 const HEAD_TEMPLATE_NAME: &str = "head";
 const REPLACE_TEMPLATE_NAME: &str = "replace";
 const WORD_COUNT_TEMPLATE_NAME: &str = "word-count";
+const PARAM_FIELD: &str = "field";
 const PARAM_PATTERN: &str = "pattern";
 const PARAM_REPLACEMENT: &str = "replacement";
 const PARAM_LIMIT: &str = "limit";
@@ -35,8 +43,13 @@ const INVALID_BOOL_VALUE: &str = "yes";
 const NUMBER_MIN: f64 = 1.0;
 const NUMBER_MAX: f64 = 10.0;
 const ABOVE_NUMBER_MAX_VALUE: &str = "11";
+const ABOVE_FIELD_MAX_VALUE: &str = "21";
+const FIELD_MAX_VALUE: &str = "20";
 const RENDERED_PARAMETERIZED_COMMAND: &str = "grep -E 'needle' | head -n 5 # true";
+const RENDERED_DEFAULT_CUT_FIELD_COMMAND: &str = "cut -d ' ' -f 1";
 const RENDERED_DEFAULT_HEAD_COMMAND: &str = "head -n 10";
+const RENDERED_DEFAULT_SORT_LINES_COMMAND: &str = "sort ";
+const RENDERED_DEFAULT_UNIQUE_LINES_COMMAND: &str = "uniq ";
 const RENDERED_DEFAULT_WORD_COUNT_COMMAND: &str = "wc -l";
 const RENDERED_REPLACE_COMMAND: &str = "sed 's/needle/thread/g'";
 const CONFIG_FILE_NAME: &str = "config.ncl";
@@ -46,7 +59,11 @@ const MISMATCHED_DEFAULT_FILE_NAME: &str = "mismatched-default.ncl";
 const OPERATOR_CONFIG_CONTENTS: &str = "# operator-authored config\n{ data_dir = \"/srv/lattice\" }\n";
 const OPERATOR_TEMPLATE_CONTENTS: &str = "# operator-authored template\n{ name = \"custom\" }\n";
 const SINGLE_DIAGNOSTIC_COUNT: usize = 1;
+const CUT_FIELD_PARAMETER_INDEX: usize = 1;
 const DEFAULT_TEMPLATE_NAMES: &[&str] = &[
+    COMPLEX_CUT_FIELD_TEMPLATE_NAME,
+    COMPLEX_SORT_LINES_TEMPLATE_NAME,
+    COMPLEX_UNIQUE_LINES_TEMPLATE_NAME,
     TEMPLATE_NAME,
     HEAD_TEMPLATE_NAME,
     REPLACE_TEMPLATE_NAME,
@@ -115,6 +132,30 @@ fn template_by_name<'a>(templates: &'a [NodeTemplate], name: &str) -> &'a NodeTe
     templates.iter().find(|template| template.name == name).expect("default template should load")
 }
 
+fn app_with_default_template_catalog() -> (tempfile::TempDir, App) {
+    let temp_dir = tempfile::tempdir().expect("temporary TUI catalog directory");
+    let templates_dir = temp_dir.path().join(TEMPLATES_DIR_NAME);
+    std::fs::create_dir(&templates_dir).expect("TUI template directory created");
+    write_default_template_catalog(&templates_dir);
+    let result = load_node_templates_with_diagnostics(&templates_dir);
+    assert!(result.diagnostics.is_empty());
+
+    let config = AppConfig {
+        data_dir: temp_dir.path().join("data"),
+        ..AppConfig::default()
+    };
+    let mut app = App::new(config);
+    app.set_node_templates(result.templates);
+    (temp_dir, app)
+}
+
+fn template_index(app: &App, name: &str) -> usize {
+    app.node_templates
+        .iter()
+        .position(|template| template.name == name)
+        .expect("default template should be available to TUI")
+}
+
 // r[verify n8nclone.node_templates.parameters.schema]
 // r[verify n8nclone.node_templates.parameters.schema.load]
 #[test]
@@ -160,7 +201,10 @@ fn default_template_catalog_renders_default_and_required_values() {
     let temp_dir = tempfile::tempdir().expect("temporary template directory");
     write_default_template_catalog(temp_dir.path());
     let result = load_node_templates_with_diagnostics(temp_dir.path());
+    let cut_field = template_by_name(&result.templates, COMPLEX_CUT_FIELD_TEMPLATE_NAME);
     let head = template_by_name(&result.templates, HEAD_TEMPLATE_NAME);
+    let sort_lines = template_by_name(&result.templates, COMPLEX_SORT_LINES_TEMPLATE_NAME);
+    let unique_lines = template_by_name(&result.templates, COMPLEX_UNIQUE_LINES_TEMPLATE_NAME);
     let word_count = template_by_name(&result.templates, WORD_COUNT_TEMPLATE_NAME);
     let replace = template_by_name(&result.templates, REPLACE_TEMPLATE_NAME);
     let replace_values = HashMap::from([
@@ -168,7 +212,19 @@ fn default_template_catalog_renders_default_and_required_values() {
         (PARAM_REPLACEMENT.to_string(), REPLACEMENT_VALUE.to_string()),
     ]);
 
+    assert_eq!(
+        render_template_command(cut_field, &HashMap::new()),
+        Ok(RENDERED_DEFAULT_CUT_FIELD_COMMAND.to_string())
+    );
     assert_eq!(render_template_command(head, &HashMap::new()), Ok(RENDERED_DEFAULT_HEAD_COMMAND.to_string()));
+    assert_eq!(
+        render_template_command(sort_lines, &HashMap::new()),
+        Ok(RENDERED_DEFAULT_SORT_LINES_COMMAND.to_string())
+    );
+    assert_eq!(
+        render_template_command(unique_lines, &HashMap::new()),
+        Ok(RENDERED_DEFAULT_UNIQUE_LINES_COMMAND.to_string())
+    );
     assert_eq!(
         render_template_command(word_count, &HashMap::new()),
         Ok(RENDERED_DEFAULT_WORD_COUNT_COMMAND.to_string())
@@ -201,6 +257,64 @@ fn cli_init_writes_default_template_catalog() {
     let result = load_node_templates_with_diagnostics(&templates_dir);
     assert!(result.diagnostics.is_empty());
     assert_eq!(sorted_template_names(&result.templates), DEFAULT_TEMPLATE_NAMES);
+}
+
+#[test]
+fn fresh_catalog_advanced_template_can_be_created_from_tui() {
+    let (_temp_dir, mut app) = app_with_default_template_catalog();
+    let cut_field_index = template_index(&app, COMPLEX_CUT_FIELD_TEMPLATE_NAME);
+
+    app.open_add_node_flow();
+    app.start_template_node_flow();
+    app.add_node_flow.selected_template = cut_field_index;
+    app.confirm_add_node_flow();
+    assert_eq!(app.add_node_flow.step, AddNodeStep::TemplateParameter);
+    app.confirm_add_node_flow();
+    app.confirm_add_node_flow();
+
+    assert_eq!(app.workflow.graph.node_count(), 1);
+    let node_id = app.graph_state.focused.expect("advanced template node focused");
+    let node = app.workflow.graph.node(node_id).expect("advanced template node exists");
+    assert_eq!(node.label, COMPLEX_CUT_FIELD_TEMPLATE_NAME);
+    match app.workflow.node_config(node_id).expect("advanced template node config exists") {
+        NodeConfig::Shell { command, .. } => assert_eq!(command, RENDERED_DEFAULT_CUT_FIELD_COMMAND),
+        other => panic!("expected shell node config, got {other:?}"),
+    }
+    assert!(!app.is_add_node_flow_open());
+}
+
+#[test]
+fn fresh_catalog_advanced_template_rejects_invalid_tui_parameter() {
+    let (_temp_dir, mut app) = app_with_default_template_catalog();
+    let cut_field_index = template_index(&app, COMPLEX_CUT_FIELD_TEMPLATE_NAME);
+
+    app.open_add_node_flow();
+    app.start_template_node_flow();
+    app.add_node_flow.selected_template = cut_field_index;
+    app.confirm_add_node_flow();
+    app.confirm_add_node_flow();
+    app.add_node_flow.parameter_values[CUT_FIELD_PARAMETER_INDEX] = ABOVE_FIELD_MAX_VALUE.to_string();
+    app.confirm_add_node_flow();
+
+    assert_eq!(app.workflow.graph.node_count(), 0);
+    assert_eq!(app.add_node_flow.step, AddNodeStep::TemplateParameter);
+    assert!(app.is_add_node_flow_open());
+}
+
+#[test]
+fn default_cut_field_template_rejects_field_above_maximum() {
+    let temp_dir = tempfile::tempdir().expect("temporary template directory");
+    write_default_template_catalog(temp_dir.path());
+    let result = load_node_templates_with_diagnostics(temp_dir.path());
+    let cut_field = template_by_name(&result.templates, COMPLEX_CUT_FIELD_TEMPLATE_NAME);
+    let values = HashMap::from([(PARAM_FIELD.to_string(), ABOVE_FIELD_MAX_VALUE.to_string())]);
+
+    let error = render_template_command(cut_field, &values).expect_err("field above maximum rejected");
+
+    assert_eq!(error, TemplateRenderError::NumberAboveMaximum {
+        name: PARAM_FIELD.to_string(),
+        max: FIELD_MAX_VALUE.to_string(),
+    });
 }
 
 // r[verify lattice.config.init_no_clobber]

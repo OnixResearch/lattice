@@ -78,6 +78,9 @@ const TEMPLATE_STDIN_TEXT: &str = "alpha\nneedle\nneedle beta\n";
 const TEMPLATE_STDIN_PORT_LABEL: &str = "stdin";
 const TEMPLATE_STDOUT_PORT_LABEL: &str = "stdout";
 const TEMPLATE_EXIT_PORT_LABEL: &str = "exit";
+const TEMPLATE_COMPLEX_CUT_FIELD_NAME: &str = "complex-cut-field";
+const TEMPLATE_COMPLEX_SORT_LINES_NAME: &str = "complex-sort-lines";
+const TEMPLATE_COMPLEX_UNIQUE_LINES_NAME: &str = "complex-unique-lines";
 const TEMPLATE_GREP_NAME: &str = "grep";
 const TEMPLATE_HEAD_NAME: &str = "head";
 const TEMPLATE_REPLACE_NAME: &str = "replace";
@@ -86,6 +89,7 @@ const PARAM_PATTERN: &str = "pattern";
 const PARAM_REPLACEMENT: &str = "replacement";
 const PARAM_NEEDLE_VALUE: &str = "needle";
 const PARAM_THREAD_VALUE: &str = "thread";
+const CUT_FIELD_EXPECTED_STDOUT: &str = "alpha\nneedle\nneedle\n";
 const GREP_EXPECTED_STDOUT: &str = "needle\nneedle beta\n";
 const REPLACE_EXPECTED_STDOUT: &str = "alpha\nthread\nthread beta\n";
 const WORD_COUNT_EXPECTED_TOKEN: &str = "3";
@@ -119,6 +123,21 @@ const REPLACE_TEMPLATE_VALUES: &[(&str, &str)] = &[
 ];
 const DEFAULTED_TEMPLATE_VALUES: &[(&str, &str)] = &[];
 const DEFAULT_TEMPLATE_HEADLESS_CASES: &[TemplateHeadlessCase] = &[
+    TemplateHeadlessCase {
+        name: TEMPLATE_COMPLEX_CUT_FIELD_NAME,
+        values: DEFAULTED_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(CUT_FIELD_EXPECTED_STDOUT),
+    },
+    TemplateHeadlessCase {
+        name: TEMPLATE_COMPLEX_SORT_LINES_NAME,
+        values: DEFAULTED_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(TEMPLATE_STDIN_TEXT),
+    },
+    TemplateHeadlessCase {
+        name: TEMPLATE_COMPLEX_UNIQUE_LINES_NAME,
+        values: DEFAULTED_TEMPLATE_VALUES,
+        expected_stdout: ExpectedStdout::Exact(TEMPLATE_STDIN_TEXT),
+    },
     TemplateHeadlessCase {
         name: TEMPLATE_GREP_NAME,
         values: GREP_TEMPLATE_VALUES,

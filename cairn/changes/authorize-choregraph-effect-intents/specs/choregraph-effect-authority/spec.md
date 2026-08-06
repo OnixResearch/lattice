@@ -12,13 +12,19 @@ r[lattice.choregraph_effect_authority.baseline.scenario.unknown]
 - THEN implementation MUST remain blocked.
 
 ### Requirement: Exact intent binding
-r[lattice.choregraph_effect_authority.binding] Every authorization request MUST bind machine, workflow revision, run, node, transition, operation, resource, ability, request, payload, policy, and authority identities.
+r[lattice.choregraph_effect_authority.binding] Every authorization request MUST bind machine, workflow revision, run, node, transition, operation, resource, ability, request, payload, policy, and authority identities. A scope-protected request MUST also bind collaboration scope, scope revision, membership epoch, audience, required consent decision, and scope-snapshot identities.
 
 #### Scenario: Run identity differs
 r[lattice.choregraph_effect_authority.binding.scenario.run-mismatch]
 - GIVEN an authority receipt for another run
 - WHEN binding validation runs
 - THEN the intent MUST be denied.
+
+#### Scenario: Scope identity differs
+r[lattice.choregraph_effect_authority.binding.scenario.scope-mismatch]
+- GIVEN a scope-protected intent and a snapshot for another scope, revision, membership epoch, audience, consent decision, resource, ability, or request
+- WHEN binding validation runs
+- THEN the intent MUST be denied before a product effect.
 
 ### Requirement: Policy is separate from graph data
 r[lattice.choregraph_effect_authority.policy] Basalt authorization policy MUST be reviewed separately from graph-authored capability requirements and MUST have an exact BLAKE3 identity.
@@ -37,6 +43,27 @@ r[lattice.choregraph_effect_authority.basalt.scenario.ability]
 - GIVEN a valid intent without a matching admitted ability
 - WHEN Basalt enforcement runs
 - THEN the product effect MUST NOT execute.
+
+### Requirement: Scope-protected effects require current scope facts
+r[lattice.choregraph_effect_authority.scope_currentness] Before each scope-protected effect, Lattice MUST validate the exact scope, scope revision, membership epoch, audience, required consent decision, resource, ability, request, immutable snapshot identity, and current external decision facts. A trigger receipt, prior snapshot, UI audience, `RunOwner`, or earlier allowance MUST NOT satisfy dispatch currentness.
+
+#### Scenario: Membership changed after trigger admission
+r[lattice.choregraph_effect_authority.scope_currentness.scenario.membership-removed]
+- GIVEN trigger admission used an earlier membership epoch and a selected member was later removed
+- WHEN the protected effect reaches dispatch
+- THEN Lattice MUST deny without invoking the product adapter.
+
+#### Scenario: Current scope facts match
+r[lattice.choregraph_effect_authority.scope_currentness.scenario.current]
+- GIVEN the scope snapshot and external decisions match the current protected intent, audience, membership, consent, resource, ability, and request
+- WHEN dispatch authorization runs
+- THEN Lattice MAY continue to Basalt evaluation and the existing durable attempt boundary.
+
+#### Scenario: Unscoped policy is fabricated
+r[lattice.choregraph_effect_authority.scope_currentness.scenario.unscoped]
+- GIVEN a protected resource requires collaboration-scope facts but the intent presents an unscoped value
+- WHEN dispatch authorization runs
+- THEN Lattice MUST deny rather than infer scope from execution ownership, trigger metadata, or resource labels.
 
 ### Requirement: Durable pre-effect attempt
 r[lattice.choregraph_effect_authority.durability] Lattice MUST reserve and persist the bound intent and local attempt identity before invoking a product effect.
@@ -102,7 +129,7 @@ r[lattice.choregraph_effect_authority.source.scenario.ssh]
 - THEN release readiness MUST report a blocker rather than skip checks.
 
 ### Requirement: Positive and negative authority fixtures
-r[lattice.choregraph_effect_authority.fixtures] Tests MUST include exact allowed cases and missing, mismatched, stale, revoked, replayed, root, path, adapter, duplicate, and crash failures.
+r[lattice.choregraph_effect_authority.fixtures] Tests MUST include exact allowed unscoped and scope-protected cases plus missing, mismatched, stale policy, stale scope, removed or expired membership, wrong audience, withdrawn consent, revoked, replayed, root, path, adapter, duplicate, and crash failures.
 
 #### Scenario: Authority corpus runs
 r[lattice.choregraph_effect_authority.fixtures.scenario.corpus]
@@ -120,7 +147,7 @@ r[lattice.choregraph_effect_authority.validation.scenario.crash]
 - THEN release readiness MUST fail.
 
 ### Requirement: Authority claim boundary
-r[lattice.choregraph_effect_authority.non_claims] Passing checks MUST NOT claim key truth, revocation freshness, replay-store durability, UCAN cryptographic correctness, operating-system correctness, external effect success, exactly-once behavior, or whole-workflow correctness.
+r[lattice.choregraph_effect_authority.non_claims] Passing checks MUST NOT claim human identity truth, membership-store correctness, consent-policy sufficiency, key truth, global revocation freshness, replay-store durability, UCAN cryptographic correctness, operating-system correctness, external effect success, exactly-once behavior, or whole-workflow correctness.
 
 #### Scenario: Authorized effect completes
 r[lattice.choregraph_effect_authority.non_claims.scenario.scope]

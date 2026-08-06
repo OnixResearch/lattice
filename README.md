@@ -321,5 +321,6 @@ verus verus/example_spec.rs
 - [Swamp](https://github.com/swamp-club/swamp) — durable operation and manual-gate reference.
 - [Aspen Octet burn-down guard](../aspen/scripts/octet-burndown.scm) — guarded-round burn-down reference; not a Lattice runtime dependency.
 - [mc Ralph Cairn drain loop](../../mc/scripts/ralph-drain-cairns.scm) — bounded drain-loop reference; not a Lattice runtime dependency.
+- [universal-weave](https://github.com/transkatgirl/universal-weave) — Loom-style branching tree/DAG primitives. Design reference only for future branching-run exploration in the TUI. Not a dependency: the run DAG stays with Choregraph, and records stay in redb with BLAKE3 identity.
 
 Lattice does not adopt Swamp dynamic TypeScript loading, YAML/CEL authoring, plaintext secrets, or registry metadata as authority.

@@ -518,10 +518,17 @@ pub struct DefaultNodeTemplateFile {
     pub contents: &'static str,
 }
 
+const COMPLEX_CUT_FIELD_TEMPLATE_FILE_NAME: &str = "complex-cut-field.ncl";
+const COMPLEX_SORT_LINES_TEMPLATE_FILE_NAME: &str = "complex-sort-lines.ncl";
+const COMPLEX_UNIQUE_LINES_TEMPLATE_FILE_NAME: &str = "complex-unique-lines.ncl";
 const GREP_TEMPLATE_FILE_NAME: &str = "grep.ncl";
 const HEAD_TEMPLATE_FILE_NAME: &str = "head.ncl";
 const REPLACE_TEMPLATE_FILE_NAME: &str = "replace.ncl";
 const WORD_COUNT_TEMPLATE_FILE_NAME: &str = "word-count.ncl";
+
+const COMPLEX_CUT_FIELD_TEMPLATE_NCL: &str = include_str!("../../examples/templates/complex-cut-field.ncl");
+const COMPLEX_SORT_LINES_TEMPLATE_NCL: &str = include_str!("../../examples/templates/complex-sort-lines.ncl");
+const COMPLEX_UNIQUE_LINES_TEMPLATE_NCL: &str = include_str!("../../examples/templates/complex-unique-lines.ncl");
 
 const GREP_TEMPLATE_NCL: &str = r#"{
   name = "grep",
@@ -633,6 +640,18 @@ const WORD_COUNT_TEMPLATE_NCL: &str = r#"{
 "#;
 
 pub const DEFAULT_NODE_TEMPLATE_FILES: &[DefaultNodeTemplateFile] = &[
+    DefaultNodeTemplateFile {
+        file_name: COMPLEX_CUT_FIELD_TEMPLATE_FILE_NAME,
+        contents: COMPLEX_CUT_FIELD_TEMPLATE_NCL,
+    },
+    DefaultNodeTemplateFile {
+        file_name: COMPLEX_SORT_LINES_TEMPLATE_FILE_NAME,
+        contents: COMPLEX_SORT_LINES_TEMPLATE_NCL,
+    },
+    DefaultNodeTemplateFile {
+        file_name: COMPLEX_UNIQUE_LINES_TEMPLATE_FILE_NAME,
+        contents: COMPLEX_UNIQUE_LINES_TEMPLATE_NCL,
+    },
     DefaultNodeTemplateFile {
         file_name: GREP_TEMPLATE_FILE_NAME,
         contents: GREP_TEMPLATE_NCL,
