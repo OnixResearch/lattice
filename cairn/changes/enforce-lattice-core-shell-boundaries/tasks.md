@@ -2,7 +2,7 @@
 
 ## Phase 1: Baseline and ownership
 
-- [ ] [serial] Record focused workflow, scheduler-occurrence, replay, orchestration, serialization, and compatibility test results before source moves. r[lattice.repository_validation.fcis_compatibility]
+- [x] [serial] Record focused workflow, scheduler-occurrence, replay, orchestration, serialization, and compatibility test results before source moves. r[lattice.repository_validation.fcis_compatibility]
 - [ ] [serial] Inventory candidate core types, active-change ownership, public callers, persisted forms, BLAKE3 identities, and every host dependency used by the candidate cohort. r[lattice.repository_validation.fcis_crate_boundary]
 - [ ] [parallel] Define the reviewed core, shell, adapter, and forbidden-dependency topology with an explicit API and dependency budget. r[lattice.repository_validation.fcis_architecture_guard]
 
@@ -10,7 +10,7 @@
 
 - [ ] [serial] Add `lattice-core` with owned workflow, scheduler-admission, and replay DTOs plus deterministic functions. r[lattice.repository_validation.fcis_crate_boundary]
 - [ ] [serial] Move selected orchestration decisions after reconciling source ownership with active scheduler and orchestration pilots. r[lattice.repository_validation.fcis_crate_boundary]
-- [ ] [serial] Replace core wall-clock reads with explicit timestamp inputs and keep clock-reading convenience adapters in the shell package. r[lattice.repository_validation.fcis_explicit_facts]
+- [x] [serial] Replace core wall-clock reads with explicit timestamp inputs and keep clock-reading convenience adapters in the shell package. r[lattice.repository_validation.fcis_explicit_facts]
 - [ ] [serial] Keep redb, filesystem, environment, HTTP, process, credential, Tokio, Nickel, CLI, and TUI work in the shell package. r[lattice.repository_validation.fcis_crate_boundary]
 
 ## Phase 3: Compatibility and tests

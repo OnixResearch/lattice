@@ -33,8 +33,14 @@ pub struct WorkflowMeta {
 }
 
 impl WorkflowMeta {
+    /// Shell convenience constructor that reads the wall clock.
     pub fn new(name: impl Into<String>) -> Self {
-        let now = chrono::Utc::now();
+        Self::new_at(name, chrono::Utc::now())
+    }
+
+    /// Deterministic constructor that derives created and modified from a supplied
+    /// temporal fact instead of reading an ambient clock.
+    pub fn new_at(name: impl Into<String>, now: chrono::DateTime<chrono::Utc>) -> Self {
         Self {
             name: name.into(),
             description: String::new(),
@@ -194,6 +200,16 @@ pub struct Workflow {
     pub triggers: Vec<TriggerDefinition>,
 }
 
+/// Error for stale or contradictory temporal observations supplied to core constructors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemporalError {
+    /// The supplied timestamp precedes the workflow creation time and is contradictory.
+    StaleModified {
+        created: chrono::DateTime<chrono::Utc>,
+        supplied: chrono::DateTime<chrono::Utc>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MutationError {
     NodeNotFound(NodeId),
@@ -221,14 +237,20 @@ pub struct ConditionBranchReconciliationPlan {
 }
 
 impl Workflow {
+    /// Shell convenience constructor that reads the wall clock.
     pub fn new(name: impl Into<String>) -> Self {
+        Self::new_at(name, chrono::Utc::now())
+    }
+
+    /// Deterministic constructor that builds an empty workflow from supplied temporal facts.
+    pub fn new_at(name: impl Into<String>, now: chrono::DateTime<chrono::Utc>) -> Self {
         let mut graph = Graph::new();
         graph.dag_mode = true;
         // Accept "any" type on either side of an edge.
         graph.set_compatibility(Box::new(|src, tgt| src == tgt || src == "any" || tgt == "any"));
 
         Self {
-            meta: WorkflowMeta::new(name),
+            meta: WorkflowMeta::new_at(name, now),
             graph,
             configs: HashMap::new(),
             credentials: HashMap::new(),
@@ -465,9 +487,22 @@ impl Workflow {
         self.runner.insert(id.0, settings);
     }
 
-    /// Touch the modified timestamp.
+    /// Shell convenience that updates the modified timestamp from the wall clock.
     pub fn touch(&mut self) {
-        self.meta.modified = chrono::Utc::now();
+        let _ = self.touch_at(chrono::Utc::now());
+    }
+
+    /// Update the modified timestamp from an explicit supplied observation.
+    /// Rejects stale or contradictory facts instead of silently applying them.
+    pub fn touch_at(&mut self, now: chrono::DateTime<chrono::Utc>) -> Result<(), TemporalError> {
+        if now < self.meta.created {
+            return Err(TemporalError::StaleModified {
+                created: self.meta.created,
+                supplied: now,
+            });
+        }
+        self.meta.modified = now;
+        Ok(())
     }
 }
 
@@ -482,6 +517,55 @@ mod tests {
             label: label.to_string(),
             predicate: ConditionPredicate::Always,
         }
+    }
+
+    fn utc(rfc3339: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(rfc3339)
+            .expect("valid rfc3339")
+            .with_timezone(&chrono::Utc)
+    }
+
+    #[test]
+    fn workflow_meta_create_and_modify_derive_from_supplied_time() {
+        let fixed = utc("2026-01-02T03:04:05Z");
+        let meta = WorkflowMeta::new_at("timed", fixed);
+        assert_eq!(meta.created, fixed);
+        assert_eq!(meta.modified, fixed);
+    }
+
+    #[test]
+    fn workflow_new_at_builds_from_supplied_time_without_a_clock() {
+        let fixed = utc("2026-02-03T04:05:06Z");
+        let workflow = Workflow::new_at("timed", fixed);
+        assert_eq!(workflow.meta.created, fixed);
+        assert_eq!(workflow.meta.modified, fixed);
+    }
+
+    #[test]
+    fn touch_at_applies_the_supplied_observation() {
+        let created = utc("2026-01-02T03:04:05Z");
+        let touched = utc("2026-01-02T04:00:00Z");
+        let mut workflow = Workflow::new_at("timed", created);
+        workflow.touch_at(touched).expect("later timestamp is valid");
+        assert_eq!(workflow.meta.modified, touched);
+    }
+
+    #[test]
+    fn touch_at_rejects_a_stale_timestamp_without_mutating() {
+        let created = utc("2026-01-02T03:04:05Z");
+        let stale = created - chrono::Duration::seconds(5);
+        let mut workflow = Workflow::new_at("guarded", created);
+        let before = workflow.meta.modified;
+
+        assert_eq!(
+            workflow.touch_at(stale),
+            Err(TemporalError::StaleModified {
+                created,
+                supplied: stale,
+            })
+        );
+        assert_eq!(workflow.meta.modified, before);
+        assert_eq!(workflow.meta.modified, created);
     }
 
     #[test]
