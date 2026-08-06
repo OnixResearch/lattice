@@ -5,7 +5,7 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [workspace]
-members = ["."]
+members = [".", "crates/budget-ledger-core"]
 default-members = ["."]
 exclude = ["vendor-cargo-deps/animus"]
 resolver = "3"
@@ -33,6 +33,7 @@ name = "lattice"
 path = "src/main.rs"
 
 [dependencies]
+budget-ledger-core = { path = "crates/budget-ledger-core" }
 tokio = { version = "1.50", features = ["full"] }
 futures = "0.3.32"
 async-trait = "0.1.89"

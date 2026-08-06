@@ -1,0 +1,12 @@
+[package]
+name = "budget-ledger-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure multidimensional orchestration budget reservation and settlement ledger"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+
+[lints]
+workspace = true

@@ -582,6 +582,13 @@ version = "0.1.0"
 source = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525"
 
 [[package]]
+name = "budget-ledger-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2333,6 +2340,7 @@ dependencies = [
  "bolero",
  "bolero-generator",
  "bounded-exec",
+ "budget-ledger-core",
  "bytes",
  "cap-std",
  "choregraph-core",

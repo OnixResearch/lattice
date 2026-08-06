@@ -61,53 +61,15 @@ pub struct RetryPolicy {
     pub max_observed_failure_retries: u64,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BudgetDimensions {
-    pub rounds: bool,
-    pub agent_invocations: bool,
-    pub tokens: bool,
-    pub monetary_microunits: bool,
-    pub duration_millis: bool,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BudgetCharge {
-    pub rounds: u64,
-    pub agent_invocations: u64,
-    pub tokens: u64,
-    pub monetary_microunits: u64,
-    pub duration_millis: u64,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BudgetChargePlan {
-    pub rounds: Option<u64>,
-    pub agent_invocations: Option<u64>,
-    pub tokens: Option<u64>,
-    pub monetary_microunits: Option<u64>,
-    pub duration_millis: Option<u64>,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BudgetLimits {
-    pub rounds: u64,
-    pub agent_invocations: u64,
-    pub tokens: u64,
-    pub monetary_microunits: u64,
-    pub duration_millis: u64,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BudgetPolicy {
-    pub enforced: BudgetDimensions,
-    pub limits: BudgetLimits,
-    pub per_round_upper_bound: BudgetCharge,
-}
+pub use budget_ledger_core::BudgetCharge;
+pub use budget_ledger_core::BudgetChargePlan;
+pub use budget_ledger_core::BudgetDimensions;
+pub use budget_ledger_core::BudgetLedger;
+pub use budget_ledger_core::BudgetLimits;
+pub use budget_ledger_core::BudgetPolicy;
+pub use budget_ledger_core::BudgetReservation;
+pub use budget_ledger_core::BudgetSettlement;
+pub use budget_ledger_core::remaining_budget;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -150,20 +112,6 @@ pub struct OrchestrationDefinition {
     pub authority: AuthorityPolicy,
     pub triggers: Vec<OrchestrationTriggerBinding>,
     pub redaction: RedactionPolicy,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BudgetReservation {
-    pub reservation_id: String,
-    pub charge: BudgetCharge,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BudgetLedger {
-    pub policy: BudgetPolicy,
-    pub consumed: BudgetCharge,
-    pub reservations: BTreeMap<String, BudgetReservation>,
-    pub breached: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1310,32 +1258,13 @@ fn matching_dispatch_mut<'a>(
 }
 
 // r[impl lattice.agent_orchestration.budgets]
+// r[impl lattice.budget_ledger_incubation.boundary]
 pub fn reserve_budget(
     ledger: &mut BudgetLedger,
     reservation_id: &str,
     plan: BudgetChargePlan,
 ) -> Result<BudgetCharge, OrchestrationDiagnostic> {
-    if ledger.reservations.contains_key(reservation_id) {
-        return Err(diagnostic(
-            OrchestrationDiagnosticCode::DuplicateReservation,
-            "budget reservation identity was already admitted",
-        ));
-    }
-    let charge = admitted_charge(&ledger.policy, plan)?;
-    let reserved = total_reserved(&ledger.reservations)?;
-    let committed = checked_add_charge(ledger.consumed, reserved)?;
-    let requested = checked_add_charge(committed, charge)?;
-    ensure_within_limits(&ledger.policy, requested)?;
-    ledger.reservations.insert(reservation_id.to_string(), BudgetReservation {
-        reservation_id: reservation_id.to_string(),
-        charge,
-    });
-    Ok(charge)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BudgetSettlement {
-    pub breached: bool,
+    budget_ledger_core::reserve_budget(ledger, reservation_id, plan).map_err(ledger_error)
 }
 
 pub fn settle_budget(
@@ -1343,120 +1272,30 @@ pub fn settle_budget(
     reservation_id: &str,
     observed: BudgetCharge,
 ) -> Result<BudgetSettlement, OrchestrationDiagnostic> {
-    let reservation = ledger.reservations.remove(reservation_id).ok_or_else(|| {
-        diagnostic(
+    budget_ledger_core::settle_budget(ledger, reservation_id, observed).map_err(ledger_error)
+}
+
+fn ledger_error(error: budget_ledger_core::LedgerError) -> OrchestrationDiagnostic {
+    match error {
+        budget_ledger_core::LedgerError::MissingBudgetBound { label } => diagnostic(
+            OrchestrationDiagnosticCode::MissingBudgetBound,
+            format!("enforced {label} budget has no admitted upper bound"),
+        ),
+        budget_ledger_core::LedgerError::BudgetExceeded { label } => {
+            diagnostic(OrchestrationDiagnosticCode::BudgetExceeded, format!("{label} budget is exhausted"))
+        }
+        budget_ledger_core::LedgerError::BudgetOverflow { label } => {
+            diagnostic(OrchestrationDiagnosticCode::BudgetOverflow, format!("{label} budget accounting overflowed"))
+        }
+        budget_ledger_core::LedgerError::DuplicateReservation => diagnostic(
+            OrchestrationDiagnosticCode::DuplicateReservation,
+            "budget reservation identity was already admitted",
+        ),
+        budget_ledger_core::LedgerError::MissingReservation => diagnostic(
             OrchestrationDiagnosticCode::MissingReservation,
             "budget settlement does not match a pending reservation",
-        )
-    })?;
-    let is_breached = charge_exceeds(observed, reservation.charge);
-    ledger.consumed = checked_add_charge(ledger.consumed, observed)?;
-    if is_breached || ensure_within_limits(&ledger.policy, ledger.consumed).is_err() {
-        ledger.breached = true;
+        ),
     }
-    Ok(BudgetSettlement {
-        breached: ledger.breached,
-    })
-}
-
-fn admitted_charge(policy: &BudgetPolicy, plan: BudgetChargePlan) -> Result<BudgetCharge, OrchestrationDiagnostic> {
-    Ok(BudgetCharge {
-        rounds: admitted_dimension(policy.enforced.rounds, plan.rounds, "rounds")?,
-        agent_invocations: admitted_dimension(
-            policy.enforced.agent_invocations,
-            plan.agent_invocations,
-            "agent invocations",
-        )?,
-        tokens: admitted_dimension(policy.enforced.tokens, plan.tokens, "tokens")?,
-        monetary_microunits: admitted_dimension(
-            policy.enforced.monetary_microunits,
-            plan.monetary_microunits,
-            "monetary microunits",
-        )?,
-        duration_millis: admitted_dimension(
-            policy.enforced.duration_millis,
-            plan.duration_millis,
-            "duration milliseconds",
-        )?,
-    })
-}
-
-fn admitted_dimension(enforced: bool, planned: Option<u64>, label: &str) -> Result<u64, OrchestrationDiagnostic> {
-    if enforced {
-        planned.ok_or_else(|| {
-            diagnostic(
-                OrchestrationDiagnosticCode::MissingBudgetBound,
-                format!("enforced {label} budget has no admitted upper bound"),
-            )
-        })
-    } else {
-        Ok(planned.unwrap_or_default())
-    }
-}
-
-fn total_reserved(reservations: &BTreeMap<String, BudgetReservation>) -> Result<BudgetCharge, OrchestrationDiagnostic> {
-    reservations
-        .values()
-        .try_fold(BudgetCharge::default(), |total, reservation| checked_add_charge(total, reservation.charge))
-}
-
-fn checked_add_charge(left: BudgetCharge, right: BudgetCharge) -> Result<BudgetCharge, OrchestrationDiagnostic> {
-    Ok(BudgetCharge {
-        rounds: checked_add_dimension(left.rounds, right.rounds, "rounds")?,
-        agent_invocations: checked_add_dimension(left.agent_invocations, right.agent_invocations, "agent invocations")?,
-        tokens: checked_add_dimension(left.tokens, right.tokens, "tokens")?,
-        monetary_microunits: checked_add_dimension(
-            left.monetary_microunits,
-            right.monetary_microunits,
-            "monetary microunits",
-        )?,
-        duration_millis: checked_add_dimension(left.duration_millis, right.duration_millis, "duration milliseconds")?,
-    })
-}
-
-fn checked_add_dimension(left: u64, right: u64, label: &str) -> Result<u64, OrchestrationDiagnostic> {
-    left.checked_add(right).ok_or_else(|| {
-        diagnostic(OrchestrationDiagnosticCode::BudgetOverflow, format!("{label} budget accounting overflowed"))
-    })
-}
-
-fn ensure_within_limits(policy: &BudgetPolicy, charge: BudgetCharge) -> Result<(), OrchestrationDiagnostic> {
-    ensure_dimension(policy.enforced.rounds, charge.rounds, policy.limits.rounds, "rounds")?;
-    ensure_dimension(
-        policy.enforced.agent_invocations,
-        charge.agent_invocations,
-        policy.limits.agent_invocations,
-        "agent invocations",
-    )?;
-    ensure_dimension(policy.enforced.tokens, charge.tokens, policy.limits.tokens, "tokens")?;
-    ensure_dimension(
-        policy.enforced.monetary_microunits,
-        charge.monetary_microunits,
-        policy.limits.monetary_microunits,
-        "monetary microunits",
-    )?;
-    ensure_dimension(
-        policy.enforced.duration_millis,
-        charge.duration_millis,
-        policy.limits.duration_millis,
-        "duration milliseconds",
-    )
-}
-
-fn ensure_dimension(enforced: bool, value: u64, limit: u64, label: &str) -> Result<(), OrchestrationDiagnostic> {
-    if enforced && value > limit {
-        Err(diagnostic(OrchestrationDiagnosticCode::BudgetExceeded, format!("{label} budget is exhausted")))
-    } else {
-        Ok(())
-    }
-}
-
-fn charge_exceeds(observed: BudgetCharge, reserved: BudgetCharge) -> bool {
-    observed.rounds > reserved.rounds
-        || observed.agent_invocations > reserved.agent_invocations
-        || observed.tokens > reserved.tokens
-        || observed.monetary_microunits > reserved.monetary_microunits
-        || observed.duration_millis > reserved.duration_millis
 }
 
 fn build_event(
@@ -1696,43 +1535,6 @@ pub fn render_status_text(instance: &OrchestrationInstance) -> String {
         LOCAL_CHAIN_EVIDENCE_SCOPE,
         REMOTE_EFFECT_EVIDENCE_SCOPE,
     )
-}
-
-fn remaining_budget(ledger: &BudgetLedger) -> BudgetCharge {
-    debug_assert!(ledger.reservations.values().all(|reservation| !reservation.reservation_id.is_empty()));
-    let reserved = ledger
-        .reservations
-        .values()
-        .fold(BudgetCharge::default(), |total, reservation| saturating_add_charge(total, reservation.charge));
-    BudgetCharge {
-        rounds: ledger.policy.limits.rounds.saturating_sub(ledger.consumed.rounds.saturating_add(reserved.rounds)),
-        agent_invocations: ledger
-            .policy
-            .limits
-            .agent_invocations
-            .saturating_sub(ledger.consumed.agent_invocations.saturating_add(reserved.agent_invocations)),
-        tokens: ledger.policy.limits.tokens.saturating_sub(ledger.consumed.tokens.saturating_add(reserved.tokens)),
-        monetary_microunits: ledger
-            .policy
-            .limits
-            .monetary_microunits
-            .saturating_sub(ledger.consumed.monetary_microunits.saturating_add(reserved.monetary_microunits)),
-        duration_millis: ledger
-            .policy
-            .limits
-            .duration_millis
-            .saturating_sub(ledger.consumed.duration_millis.saturating_add(reserved.duration_millis)),
-    }
-}
-
-fn saturating_add_charge(left: BudgetCharge, right: BudgetCharge) -> BudgetCharge {
-    BudgetCharge {
-        rounds: left.rounds.saturating_add(right.rounds),
-        agent_invocations: left.agent_invocations.saturating_add(right.agent_invocations),
-        tokens: left.tokens.saturating_add(right.tokens),
-        monetary_microunits: left.monetary_microunits.saturating_add(right.monetary_microunits),
-        duration_millis: left.duration_millis.saturating_add(right.duration_millis),
-    }
 }
 
 fn next_action(instance: &OrchestrationInstance) -> &'static str {
