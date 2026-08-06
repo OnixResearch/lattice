@@ -62,18 +62,40 @@ source (crate-extraction owners to reconcile before moving source):
 `pilot-radicle-effect-attempt-core`, `type-orchestration-identities`,
 `authorize-choregraph-effect-intents`.
 
+## Post-change verification (baseline now green)
+
+After this increment plus the baseline repair, `cargo test -p lattice` exits 0
+and the canonical `scripts/check.rs` exits 0 (script format, operator E2E,
+fmt, tests, clippy, cairn specs). The lone `FAILED
+restart_duplicate_trigger_reuses_original_admission_across_processes` line in
+raw output is the invalid-scenario child subprocess echoing its expected
+non-zero exit through inherited stdout; cargo does not count it as a real
+failure.
+
+## Baseline repair (performed for `fcis_compatibility`)
+
+Pre-existing failures at `origin/main` were resolved so full verification can
+run:
+
+- Retired `tests/test_execution_graph_source_admission.rs`: its Radicle
+  source-admission model was superseded by the Choregraph merge (direct Cargo
+  git pin to `choregraph-seaglass` + flake input); the flake
+  `choregraphSourceAdmission` check now owns source admission. Fixtures were
+  kept because archived cutover evidence references them.
+- Re-recorded stale README byte hashes (documentation-only changes) across the
+  reviewed inventories for `remaining-credentials`, `scheduling audit`,
+  `scheduling completion`, and `repository-validation completion`.
+
 ## Blockers (leave remaining tasks active)
 
 - The `lattice-core` crate extraction touches shared orchestration, scheduler,
   and replay source owned by multiple active changes; the design requires
   resolving active ownership before moving shared source.
-- `test_execution_graph_source_admission` fails pre-existing at `origin/main`,
-  so full repository verification cannot currently pass for the whole
-  `cargo test -p lattice` run.
 
 ## Non-claims
 
 This increment proves explicit-facts source shape and a deterministic
-transition for workflow metadata only. It does not claim workflow correctness,
-crate-boundary enforcement by Cargo/Octet, or release readiness; those require
-the remaining crate-extraction and architecture tasks.
+workflow-metadata transition, and it restores a green verification baseline.
+It does not claim workflow correctness, crate-boundary enforcement by
+Cargo/Octet, or release readiness; those require the remaining crate-extraction
+and architecture tasks.
