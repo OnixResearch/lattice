@@ -1436,14 +1436,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "execution-graph-core"
-version = "0.1.0"
-source = "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b#03736f1ec46c377ff86b451260ad68aa70ff3b0b"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "fancy-regex"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2351,7 +2343,6 @@ dependencies = [
  "criterion",
  "crossterm 0.29.0",
  "dirs-next",
- "execution-graph-core",
  "futures",
  "hex",
  "home",
