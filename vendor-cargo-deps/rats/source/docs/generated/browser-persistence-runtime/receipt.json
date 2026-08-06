@@ -1,0 +1,38 @@
+{
+  "adapter": "met-hooks.use_local_storage_checked.v1",
+  "browser": "Chromium 149.0.7827.53",
+  "bundle_hash": "0598b4075aba4f12bcf8b366af42963ad0df39a8",
+  "capability_hash": "0b448ffcd8f5967fa360f398a9a8251a581551b78dfd41bc4c3e229ba3a32784",
+  "command_hash": "7ba2f39ad59eaabdb9864a62497ff053752b7628",
+  "direct_scenarios": [
+    "missing",
+    "valid-initial-read",
+    "explicit-changed-write",
+    "same-origin-reload",
+    "clear",
+    "malformed-preserved"
+  ],
+  "fixture": "met-storage-runtime-fixture",
+  "key_class": "fixed-frontend-local-preference-v1",
+  "non_claims": [
+    "not Amethystate browser support",
+    "not database durability, secrets, sync, every browser or quota policy",
+    "not downstream recovery, authority, release, accessibility, or security evidence"
+  ],
+  "origin_class": "isolated-loopback-same-origin",
+  "result": "pass",
+  "runner": "x86_64-unknown-linux-gnu",
+  "schema": "rats.browser-persistence-runtime.v1",
+  "simulated_scenarios": [
+    "denied-security",
+    "quota",
+    "unavailable-storage"
+  ],
+  "source_hash": "ca9f7c19cdfdf1308fc083e671b633e7e62dabfd",
+  "source_revision": "ab4a6a6786ed0c480585676cba7dc785f103f4fc",
+  "target": "wasm32-unknown-unknown",
+  "untested_scenarios": [
+    "wrong-origin"
+  ],
+  "value_class": "bounded-level-3-7-8"
+}

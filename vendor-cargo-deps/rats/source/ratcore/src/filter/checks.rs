@@ -23,11 +23,7 @@ pub struct QueryError {
 }
 
 impl QueryError {
-    pub(super) fn new(
-        code: QueryErrorCode,
-        field: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub(super) fn new(code: QueryErrorCode, field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             field: field.into(),
@@ -52,11 +48,7 @@ pub fn validate_query(schema: &QuerySchema, query: &Query) -> Result<(), QueryEr
         for field in &search.fields {
             let spec = require_field(schema, field)?;
             if !matches!(spec.value_type, FieldType::Text | FieldType::Tags) {
-                return Err(QueryError::new(
-                    QueryErrorCode::TypeMismatch,
-                    field,
-                    "search fields must be text or tags",
-                ));
+                return Err(QueryError::new(QueryErrorCode::TypeMismatch, field, "search fields must be text or tags"));
             }
         }
     }
@@ -97,11 +89,7 @@ fn validate_predicate(schema: &QuerySchema, predicate: &Predicate) -> Result<(),
     while let Some(current) = pending.pop() {
         match current {
             Predicate::Always => {}
-            Predicate::Field {
-                field,
-                operator,
-                value,
-            } => validate_field_predicate(schema, field, *operator, value)?,
+            Predicate::Field { field, operator, value } => validate_field_predicate(schema, field, *operator, value)?,
             Predicate::And(children) | Predicate::Or(children) => pending.extend(children.iter()),
             Predicate::Not(child) => pending.push(child),
         }
@@ -117,11 +105,7 @@ fn validate_field_predicate(
 ) -> Result<(), QueryError> {
     let spec = require_field(schema, field)?;
     if !spec.operators.contains(&operator) {
-        return Err(QueryError::new(
-            QueryErrorCode::UnsupportedOperator,
-            field,
-            "operator is not supported by field",
-        ));
+        return Err(QueryError::new(QueryErrorCode::UnsupportedOperator, field, "operator is not supported by field"));
     }
     if spec.value_type != value.field_type() {
         return Err(QueryError::new(
@@ -134,11 +118,7 @@ fn validate_field_predicate(
 }
 
 fn require_field<'a>(schema: &'a QuerySchema, field: &str) -> Result<&'a FieldSpec, QueryError> {
-    schema.field(field).ok_or_else(|| {
-        QueryError::new(
-            QueryErrorCode::UnknownField,
-            field,
-            "field is not present in query schema",
-        )
-    })
+    schema
+        .field(field)
+        .ok_or_else(|| QueryError::new(QueryErrorCode::UnknownField, field, "field is not present in query schema"))
 }

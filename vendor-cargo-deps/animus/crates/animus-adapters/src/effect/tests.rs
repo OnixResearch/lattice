@@ -18,26 +18,20 @@ fn safe_hash_accepts_lowercase_blake3_hex() {
 fn safe_hash_rejects_uppercase_hex() {
     let error = SafeHash::new(UPPERCASE_HASH).expect_err("uppercase effect hash should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::InvalidEvidenceHash {
-            field: super::audit::test_support::HASH_FIELD.as_str(),
-            reason: super::audit::test_support::HASH_NOT_HEX_REASON,
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::InvalidEvidenceHash {
+        field: super::audit::test_support::HASH_FIELD.as_str(),
+        reason: super::audit::test_support::HASH_NOT_HEX_REASON,
+    });
 }
 
 #[test]
 fn safe_hash_rejects_wrong_length() {
     let error = SafeHash::new(SHORT_HASH).expect_err("short effect hash should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::InvalidEvidenceHash {
-            field: super::audit::test_support::HASH_FIELD.as_str(),
-            reason: super::audit::test_support::HASH_LENGTH_REASON,
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::InvalidEvidenceHash {
+        field: super::audit::test_support::HASH_FIELD.as_str(),
+        reason: super::audit::test_support::HASH_LENGTH_REASON,
+    });
 }
 
 #[test]
@@ -79,14 +73,9 @@ fn completed_service_outcome_carries_completed_receipt() {
 
 fn blocking_receipt(outcome: OutcomeKind) -> Receipt {
     Receipt::new(
-        ReceiptDraft::new(
-            ServiceKind::ToolExecutor,
-            CapabilityClass::ToolExecution,
-            outcome,
-            blocking_reason(outcome),
-        )
-        .with_payload_count(NO_PAYLOADS)
-        .with_redaction(RedactionMarker::PayloadNotCaptured),
+        ReceiptDraft::new(ServiceKind::ToolExecutor, CapabilityClass::ToolExecution, outcome, blocking_reason(outcome))
+            .with_payload_count(NO_PAYLOADS)
+            .with_redaction(RedactionMarker::PayloadNotCaptured),
     )
 }
 

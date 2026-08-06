@@ -14,8 +14,7 @@ pub(super) const WORKSPACE_READONLY: &str = "readonly-workspace";
 pub(super) const MODEL_PROFILE: &str = "standard-reasoning";
 pub(super) const TIMEOUT: &str = "standard";
 pub(super) const SUMMARY_SCHEMA: &str = "review-summary";
-pub(super) const CONTENT_HASH: &str =
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const CONTENT_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) const MAX_TURNS: u32 = 4;
 pub(super) const ZERO_TURNS: u32 = 0;
 pub(super) const DETAIL_CHARS: u32 = 10;

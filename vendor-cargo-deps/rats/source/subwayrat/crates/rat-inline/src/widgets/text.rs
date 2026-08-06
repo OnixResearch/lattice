@@ -1,6 +1,5 @@
 //! Basic styled text widget with word wrapping.
 
-use crate::widget::InlineWidget;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -8,6 +7,8 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::widgets::Wrap;
+
+use crate::widget::InlineWidget;
 
 /// A simple styled text widget for inline rendering.
 ///
@@ -54,8 +55,7 @@ impl InlineWidget for InlineText {
     }
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let paragraph = Paragraph::new(Line::styled(self.content.clone(), self.style))
-            .wrap(Wrap { trim: false });
+        let paragraph = Paragraph::new(Line::styled(self.content.clone(), self.style)).wrap(Wrap { trim: false });
         paragraph.render(area, buf);
     }
 }

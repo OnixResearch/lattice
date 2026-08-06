@@ -2,7 +2,9 @@ mod graph;
 pub(super) mod hash;
 mod types;
 
-pub use types::{Issue, Request, Status};
+pub use types::Issue;
+pub use types::Request;
+pub use types::Status;
 
 /// Pure workspace plan safe to inspect before host adapter execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,12 +23,7 @@ pub struct Plan {
 impl Plan {
     fn denied(request: Request<'_>, issue: Issue) -> Self {
         let selected = graph::find_descriptor(request.descriptors, request.selected_workspace_id);
-        Self::from_parts(
-            request.selected_workspace_id,
-            selected,
-            issue,
-            alloc::vec::Vec::new(),
-        )
+        Self::from_parts(request.selected_workspace_id, selected, issue, alloc::vec::Vec::new())
     }
 
     fn unsupported(
@@ -34,21 +31,11 @@ impl Plan {
         selected: &super::intent::Descriptor,
         capability_gaps: alloc::vec::Vec<super::adapter::Capability>,
     ) -> Self {
-        Self::from_parts(
-            request.selected_workspace_id,
-            Some(selected),
-            Issue::UnsupportedCapability,
-            capability_gaps,
-        )
+        Self::from_parts(request.selected_workspace_id, Some(selected), Issue::UnsupportedCapability, capability_gaps)
     }
 
     fn ready(request: Request<'_>, selected: &super::intent::Descriptor) -> Self {
-        Self::from_parts(
-            request.selected_workspace_id,
-            Some(selected),
-            Issue::None,
-            alloc::vec::Vec::new(),
-        )
+        Self::from_parts(request.selected_workspace_id, Some(selected), Issue::None, alloc::vec::Vec::new())
     }
 
     fn from_parts(
@@ -63,36 +50,20 @@ impl Plan {
             Status::Denied
         };
         let selected_workspace_id = alloc::string::String::from(selected_workspace_id);
-        let parent_workspace_id = selected
-            .and_then(super::intent::Descriptor::parent_workspace_id)
-            .map(alloc::string::String::from);
-        let descriptor_hash = selected.map_or_else(
-            || hash::parts(&[hash::SCHEMA, "missing", selected_workspace_id.as_str()]),
-            hash::descriptor,
-        );
+        let parent_workspace_id =
+            selected.and_then(super::intent::Descriptor::parent_workspace_id).map(alloc::string::String::from);
+        let descriptor_hash = selected
+            .map_or_else(|| hash::parts(&[hash::SCHEMA, "missing", selected_workspace_id.as_str()]), hash::descriptor);
         let source_hash = selected.map_or_else(
-            || {
-                hash::parts(&[
-                    hash::SCHEMA,
-                    "missing-source",
-                    selected_workspace_id.as_str(),
-                ])
-            },
+            || hash::parts(&[hash::SCHEMA, "missing-source", selected_workspace_id.as_str()]),
             |descriptor| hash::parts(&[hash::SCHEMA, "source", descriptor.source_id()]),
         );
         let operation_hash = selected.map_or_else(
-            || {
-                hash::parts(&[
-                    hash::SCHEMA,
-                    "missing-operation",
-                    selected_workspace_id.as_str(),
-                ])
-            },
+            || hash::parts(&[hash::SCHEMA, "missing-operation", selected_workspace_id.as_str()]),
             hash::operation,
         );
-        let required_capabilities = selected.map_or_else(alloc::vec::Vec::new, |descriptor| {
-            descriptor.required_capabilities().to_vec()
-        });
+        let required_capabilities =
+            selected.map_or_else(alloc::vec::Vec::new, |descriptor| descriptor.required_capabilities().to_vec());
         Self {
             status,
             issue,
@@ -171,17 +142,11 @@ impl Plan {
 #[must_use]
 pub fn evaluate(request: Request<'_>) -> Plan {
     debug_assert!(!request.selected_workspace_id.is_empty());
-    debug_assert!(
-        request
-            .descriptors
-            .iter()
-            .all(|descriptor| !descriptor.workspace_id().is_empty())
-    );
+    debug_assert!(request.descriptors.iter().all(|descriptor| !descriptor.workspace_id().is_empty()));
     if let Some(issue) = graph_issue(request) {
         return Plan::denied(request, issue);
     }
-    let Some(selected) = graph::find_descriptor(request.descriptors, request.selected_workspace_id)
-    else {
+    let Some(selected) = graph::find_descriptor(request.descriptors, request.selected_workspace_id) else {
         return Plan::denied(request, Issue::MissingWorkspace);
     };
     if let Some(issue) = adapter_issue(request.adapter) {
@@ -220,9 +185,7 @@ fn adapter_issue(adapter: &super::adapter::Capabilities) -> Option<Issue> {
 
 fn operation_issue(request: Request<'_>, selected: &super::intent::Descriptor) -> Option<Issue> {
     if selected.operation() == super::rules::Operation::Commit {
-        if selected.parent_workspace_id().is_none()
-            && selected.commit_target() == super::rules::CommitTarget::Parent
-        {
+        if selected.parent_workspace_id().is_none() && selected.commit_target() == super::rules::CommitTarget::Parent {
             return Some(Issue::MissingParent);
         }
         if graph::has_child(request.descriptors, selected.workspace_id()) {

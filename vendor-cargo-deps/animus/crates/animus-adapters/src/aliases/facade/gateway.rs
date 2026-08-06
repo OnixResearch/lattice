@@ -49,18 +49,34 @@ pub type RemoteAdmissionReceipt = AdmissionReceipt;
 /// Admission validation error.
 pub type RemoteAdmissionError = AdmissionError;
 
-pub use backend::{
-    REMOTE_SERVER_RECEIPT_LEAK_MARKERS, RemoteServerAdmissionDecision, RemoteServerAdmissionError,
-    RemoteServerAdmissionOutcome, RemoteServerAdmissionPolicy, RemoteServerAdmissionPolicyDraft,
-    RemoteServerAdmissionReason, RemoteServerAdmissionReceipt, RemoteServerAdmissionRequest,
-    RemoteServerAuthOutcome, RemoteServerCredentialSourceAvailability, RemoteServerDescriptor,
-    RemoteServerDescriptorDraft, RemoteServerEndpointIdentityClass, RemoteServerFailureClass,
-    RemoteServerFingerprintPolicy, RemoteServerFingerprintStatus, RemoteServerHandshakeSummary,
-    RemoteServerHandshakeSummaryDraft, RemoteServerObservedTls, RemoteServerPlatformRole,
-    RemoteServerProtocolRole, RemoteServerProtocolVersionStatus, RemoteServerSecretSourceClass,
-    RemoteServerTlsRequirement, RemoteServerTransportKind, evaluate_remote_server_admission,
-    validate_remote_server_admission_receipt_text,
-};
+pub use backend::REMOTE_SERVER_RECEIPT_LEAK_MARKERS;
+pub use backend::RemoteServerAdmissionDecision;
+pub use backend::RemoteServerAdmissionError;
+pub use backend::RemoteServerAdmissionOutcome;
+pub use backend::RemoteServerAdmissionPolicy;
+pub use backend::RemoteServerAdmissionPolicyDraft;
+pub use backend::RemoteServerAdmissionReason;
+pub use backend::RemoteServerAdmissionReceipt;
+pub use backend::RemoteServerAdmissionRequest;
+pub use backend::RemoteServerAuthOutcome;
+pub use backend::RemoteServerCredentialSourceAvailability;
+pub use backend::RemoteServerDescriptor;
+pub use backend::RemoteServerDescriptorDraft;
+pub use backend::RemoteServerEndpointIdentityClass;
+pub use backend::RemoteServerFailureClass;
+pub use backend::RemoteServerFingerprintPolicy;
+pub use backend::RemoteServerFingerprintStatus;
+pub use backend::RemoteServerHandshakeSummary;
+pub use backend::RemoteServerHandshakeSummaryDraft;
+pub use backend::RemoteServerObservedTls;
+pub use backend::RemoteServerPlatformRole;
+pub use backend::RemoteServerProtocolRole;
+pub use backend::RemoteServerProtocolVersionStatus;
+pub use backend::RemoteServerSecretSourceClass;
+pub use backend::RemoteServerTlsRequirement;
+pub use backend::RemoteServerTransportKind;
+pub use backend::evaluate_remote_server_admission;
+pub use backend::validate_remote_server_admission_receipt_text;
 
 pub(super) const AUDIENCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("remote_admission_audience");

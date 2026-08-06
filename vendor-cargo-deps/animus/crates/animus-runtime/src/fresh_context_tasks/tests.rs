@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,12 +7,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -107,16 +103,8 @@ fn descriptor_and_result_validation_reject_malformed_and_unsafe_data() {
         ..result(FreshTaskResultStatus::Completed)
     };
     let diagnostics = validate_fresh_task_result(&result).expect_err("unsafe result");
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == FreshTaskDiagnosticKind::MalformedResult })
-    );
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == FreshTaskDiagnosticKind::UnsafeResult })
-    );
+    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == FreshTaskDiagnosticKind::MalformedResult }));
+    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == FreshTaskDiagnosticKind::UnsafeResult }));
 }
 
 #[test]
@@ -133,10 +121,7 @@ fn cancelled_task_receipt_is_bounded() {
     };
 
     assert_eq!(receipt.status, FreshTaskResultStatus::Cancelled);
-    assert_eq!(
-        receipt.cancellation_reason,
-        FreshTaskCancellationReason::Timeout
-    );
+    assert_eq!(receipt.cancellation_reason, FreshTaskCancellationReason::Timeout);
     assert_eq!(receipt.transcript_embedding, FreshTaskInheritance::Isolated);
     assert_eq!(receipt.output_hash.algorithm, BLAKE3_ALGORITHM);
 }

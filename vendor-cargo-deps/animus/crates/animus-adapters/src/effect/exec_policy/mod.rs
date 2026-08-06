@@ -8,21 +8,28 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-pub use eval::{Evaluation, Request, RuleEvidence, evaluate};
+pub use eval::Evaluation;
+pub use eval::Request;
+pub use eval::RuleEvidence;
+pub use eval::evaluate;
 pub use fault::Error;
-pub use shell::{Analysis, AnalysisKind, analyze_wrapper};
-pub use types::{
-    CommandIntent, CommandIntentDraft, Decision, Rule, RuleDraft, SandboxContext,
-    SandboxContextDraft,
-};
+pub use shell::Analysis;
+pub use shell::AnalysisKind;
+pub use shell::analyze_wrapper;
+pub use types::CommandIntent;
+pub use types::CommandIntentDraft;
+pub use types::Decision;
+pub use types::Rule;
+pub use types::RuleDraft;
+pub use types::SandboxContext;
+pub use types::SandboxContextDraft;
 
 pub(super) type Collection<T> = alloc::vec::Vec<T>;
 pub(super) type Text = alloc::string::String;
 
 pub(super) const COMMAND_ARG_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("exec_policy_command_arg");
-pub(super) const RULE_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("exec_policy_rule_id");
+pub(super) const RULE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("exec_policy_rule_id");
 pub(super) const DECISION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("exec_policy_decision");
 pub(super) const RATIONALE_FIELD: crate::validation::FieldName =
@@ -61,22 +68,14 @@ const _: () = assert!(MAX_RULE_EXAMPLES > 0);
 const _: () = assert!(DECISION_RANK_ALLOW < DECISION_RANK_PROMPT);
 const _: () = assert!(DECISION_RANK_PROMPT < DECISION_RANK_FORBID);
 
-pub(super) fn required_text(
-    field: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<Text, Error> {
+pub(super) fn required_text(field: crate::validation::FieldName, value: Option<&str>) -> Result<Text, Error> {
     match value {
         Some(raw) => normalized_text(field, raw),
-        None => Err(Error::MissingField {
-            field: field.as_str(),
-        }),
+        None => Err(Error::MissingField { field: field.as_str() }),
     }
 }
 
-pub(super) fn normalized_text(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<Text, Error> {
+pub(super) fn normalized_text(field: crate::validation::FieldName, value: &str) -> Result<Text, Error> {
     crate::validation::normalized_adapter_field(field, value).map_err(Error::from)
 }
 

@@ -1,11 +1,8 @@
 /// Validates edge-case fixtures against accepted fixture IDs.
 #[must_use]
-pub fn validate(fixtures: &[super::Fixture], accepted_fixture_ids: &[&str]) -> super::Report {
+pub fn validate(fixtures: &[super::Fixture], accepted_fixture_ids: &[super::super::FixtureId]) -> super::Report {
     let mut issues = Vec::with_capacity(fixtures.len());
-    let accepted = accepted_fixture_ids
-        .iter()
-        .copied()
-        .collect::<std::collections::BTreeSet<_>>();
+    let accepted = accepted_fixture_ids.iter().cloned().collect::<std::collections::BTreeSet<_>>();
     let mut seen_fixtures = std::collections::BTreeSet::new();
     debug_assert!(issues.capacity() >= fixtures.len());
     debug_assert!(accepted.len() <= accepted_fixture_ids.len());
@@ -30,12 +27,12 @@ pub fn validate(fixtures: &[super::Fixture], accepted_fixture_ids: &[&str]) -> s
 
 fn fixture_issues(
     fixture: &super::Fixture,
-    accepted: &std::collections::BTreeSet<&str>,
+    accepted: &std::collections::BTreeSet<super::super::FixtureId>,
 ) -> Vec<super::Issue> {
     let issue_bound = fixture.states.len().saturating_add(1);
     let mut issues = Vec::with_capacity(issue_bound);
     debug_assert!(issues.capacity() >= issue_bound);
-    if fixture.fixture_id.trim().is_empty() || fixture.coverage_reference.trim().is_empty() {
+    if fixture.fixture_id.as_str().trim().is_empty() || fixture.coverage_reference.trim().is_empty() {
         issues.push(super::Issue::new(
             super::IssueCode::MissingRequiredField,
             fixture.fixture_id.clone(),
@@ -43,7 +40,7 @@ fn fixture_issues(
             "edge fixture ID and coverage reference are required",
         ));
     }
-    if !accepted.contains(fixture.fixture_id.as_str()) {
+    if !accepted.contains(&fixture.fixture_id) {
         issues.push(super::Issue::new(
             super::IssueCode::StaleCoverageReference,
             fixture.fixture_id.clone(),
@@ -57,7 +54,7 @@ fn fixture_issues(
             issues.push(super::Issue::new(
                 super::IssueCode::DuplicateStateId,
                 fixture.fixture_id.clone(),
-                state.id.clone(),
+                state.id.to_string(),
                 "duplicate edge state ID",
             ));
         }
@@ -71,24 +68,19 @@ fn state_issues(fixture: &super::Fixture, state: &super::State) -> Vec<super::Is
     let mut issues = Vec::with_capacity(issue_bound);
     debug_assert!(issues.capacity() >= issue_bound);
     debug_assert!(state.diagnostics.len() <= issue_bound.saturating_add(state.diagnostics.len()));
-    if state.id.trim().is_empty() || state.label.trim().is_empty() {
+    if state.id.as_str().trim().is_empty() || state.label.trim().is_empty() {
         issues.push(super::Issue::new(
             super::IssueCode::MissingRequiredField,
             fixture.fixture_id.clone(),
-            state.id.clone(),
+            state.id.to_string(),
             "edge state ID and label are required",
         ));
     }
-    if requires_diagnostic(state.kind)
-        && state
-            .diagnostics
-            .iter()
-            .all(|diagnostic| diagnostic.trim().is_empty())
-    {
+    if requires_diagnostic(state.kind) && state.diagnostics.iter().all(|diagnostic| diagnostic.trim().is_empty()) {
         issues.push(super::Issue::new(
             super::IssueCode::MissingDiagnostic,
             fixture.fixture_id.clone(),
-            state.id.clone(),
+            state.id.to_string(),
             "invalid, malformed, and unsupported edge states require diagnostics",
         ));
     }
@@ -96,19 +88,12 @@ fn state_issues(fixture: &super::Fixture, state: &super::State) -> Vec<super::Is
         issues.push(super::Issue::new(
             super::IssueCode::MissingRendererSupport,
             fixture.fixture_id.clone(),
-            state.id.clone(),
+            state.id.to_string(),
             "edge state requires renderer support metadata",
         ));
     }
     for renderer in &state.renderers {
-        if !renderer.visible
-            && renderer
-                .reason
-                .as_deref()
-                .unwrap_or_default()
-                .trim()
-                .is_empty()
-        {
+        if !renderer.visible && renderer.reason.as_deref().unwrap_or_default().trim().is_empty() {
             issues.push(super::Issue::new(
                 super::IssueCode::MissingUnsupportedReason,
                 fixture.fixture_id.clone(),
@@ -121,8 +106,5 @@ fn state_issues(fixture: &super::Fixture, state: &super::State) -> Vec<super::Is
 }
 
 fn requires_diagnostic(kind: super::Kind) -> bool {
-    matches!(
-        kind,
-        super::KIND_INVALID | super::KIND_MALFORMED | super::KIND_UNSUPPORTED
-    )
+    matches!(kind, super::KIND_INVALID | super::KIND_MALFORMED | super::KIND_UNSUPPORTED)
 }

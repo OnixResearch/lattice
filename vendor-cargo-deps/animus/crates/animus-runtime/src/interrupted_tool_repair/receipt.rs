@@ -1,10 +1,8 @@
 //! Metadata-only interrupted-tool repair receipts.
 
-const INTERRUPTED_TOOL_RECEIPT_HASH_DOMAIN: &str =
-    super::data::INTERRUPTED_TOOL_RECEIPT_HASH_DOMAIN;
+const INTERRUPTED_TOOL_RECEIPT_HASH_DOMAIN: &str = super::data::INTERRUPTED_TOOL_RECEIPT_HASH_DOMAIN;
 const INTERRUPTED_TOOL_REPAIR_SCHEMA: &str = super::data::INTERRUPTED_TOOL_REPAIR_SCHEMA;
-const FIELD_RECEIPT: super::core::RepairField =
-    super::core::RepairField("interrupted_tool_repair_receipt");
+const FIELD_RECEIPT: super::core::RepairField = super::core::RepairField("interrupted_tool_repair_receipt");
 
 type InterruptedToolReason = super::data::InterruptedToolReason;
 type InterruptedToolRepairApplicationOutcome = super::data::InterruptedToolRepairApplicationOutcome;
@@ -14,7 +12,8 @@ type InterruptedToolRepairPlan = super::data::InterruptedToolRepairPlan;
 type InterruptedToolRepairReceipt = super::data::InterruptedToolRepairReceipt;
 type InterruptedToolRepairSensitiveDraft<'a> = super::data::InterruptedToolRepairSensitiveDraft<'a>;
 const REDACTION_MARKER: &str = "raw-transcript-tool-and-provider-material-omitted";
-const NON_CLAIM: &str = "repair does not prove interruption cause, provider acceptance, or exactly-once external effects";
+const NON_CLAIM: &str =
+    "repair does not prove interruption cause, provider acceptance, or exactly-once external effects";
 
 /// Projects a bounded receipt from an immutable plan and host application outcome.
 ///
@@ -30,20 +29,12 @@ pub fn project_interrupted_tool_repair_receipt(
 ) -> Result<InterruptedToolRepairReceipt, InterruptedToolRepairError> {
     reject_sensitive(sensitive)?;
     validate_sources(plan, outcome)?;
-    let action_count = u32::try_from(plan.actions.len()).map_err(|_error| {
-        super::core::error(InterruptedToolRepairIssue::InvalidInput, FIELD_RECEIPT)
-    })?;
-    let mut reason_classes = plan
-        .actions
-        .iter()
-        .map(|action| action.reason)
-        .collect::<Vec<InterruptedToolReason>>();
+    let action_count = u32::try_from(plan.actions.len())
+        .map_err(|_error| super::core::error(InterruptedToolRepairIssue::InvalidInput, FIELD_RECEIPT))?;
+    let mut reason_classes = plan.actions.iter().map(|action| action.reason).collect::<Vec<InterruptedToolReason>>();
     reason_classes.sort_unstable();
     reason_classes.dedup();
-    let reason_labels = reason_classes
-        .iter()
-        .map(|reason| reason.as_str().to_string())
-        .collect::<Vec<_>>();
+    let reason_labels = reason_classes.iter().map(|reason| reason.as_str().to_string()).collect::<Vec<_>>();
     let receipt_hash = super::core::hash_owned_parts(
         INTERRUPTED_TOOL_RECEIPT_HASH_DOMAIN,
         [
@@ -90,27 +81,17 @@ fn validate_sources(
     super::core::lowercase_blake3(outcome.old_leaf_hash.as_str(), FIELD_RECEIPT)?;
     super::core::lowercase_blake3(outcome.new_leaf_hash.as_str(), FIELD_RECEIPT)?;
     if outcome.plan_hash != plan.plan_hash || outcome.old_leaf_hash != plan.old_leaf_hash {
-        return Err(super::core::error(
-            InterruptedToolRepairIssue::InvalidInput,
-            FIELD_RECEIPT,
-        ));
+        return Err(super::core::error(InterruptedToolRepairIssue::InvalidInput, FIELD_RECEIPT));
     }
-    if outcome.status.permits_provider_continuation()
-        && outcome.new_leaf_hash != plan.proposed_new_leaf_hash
-    {
-        return Err(super::core::error(
-            InterruptedToolRepairIssue::StaleLeaf,
-            FIELD_RECEIPT,
-        ));
+    if outcome.status.permits_provider_continuation() && outcome.new_leaf_hash != plan.proposed_new_leaf_hash {
+        return Err(super::core::error(InterruptedToolRepairIssue::StaleLeaf, FIELD_RECEIPT));
     }
     debug_assert_eq!(outcome.plan_hash, plan.plan_hash);
     debug_assert_eq!(outcome.old_leaf_hash, plan.old_leaf_hash);
     Ok(())
 }
 
-fn reject_sensitive(
-    sensitive: InterruptedToolRepairSensitiveDraft<'_>,
-) -> Result<(), InterruptedToolRepairError> {
+fn reject_sensitive(sensitive: InterruptedToolRepairSensitiveDraft<'_>) -> Result<(), InterruptedToolRepairError> {
     let has_private_material = [
         sensitive.raw_prompt,
         sensitive.raw_tool_arguments,
@@ -124,10 +105,7 @@ fn reject_sensitive(
     .into_iter()
     .any(|value| value.is_some());
     if has_private_material {
-        return Err(super::core::error(
-            InterruptedToolRepairIssue::ReceiptLeak,
-            FIELD_RECEIPT,
-        ));
+        return Err(super::core::error(InterruptedToolRepairIssue::ReceiptLeak, FIELD_RECEIPT));
     }
     debug_assert!(!has_private_material);
     debug_assert!(sensitive.raw_prompt.is_none());

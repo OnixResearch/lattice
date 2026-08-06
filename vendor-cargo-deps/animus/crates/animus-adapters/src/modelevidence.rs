@@ -19,9 +19,12 @@
     )
 )]
 
-use crate::validation::{self, AdapterContractError, FieldName};
 use alloc::string::String;
 use alloc::vec::Vec;
+
+use crate::validation::AdapterContractError;
+use crate::validation::FieldName;
+use crate::validation::{self};
 
 const REPORT_ID_FIELD: FieldName = FieldName::new("model_evidence_report_id");
 const EVIDENCE_KIND_FIELD: FieldName = FieldName::new("model_evidence_kind");
@@ -405,8 +408,7 @@ impl ModelArtifactIdentity {
     /// or the observed hash differs from the expected model hash.
     pub fn new(draft: ModelArtifactIdentityDraft<'_>) -> Result<Self, ModelEvidenceError> {
         let mut diagnostics = Vec::new();
-        let model_label =
-            validate_safe_label(MODEL_LABEL_FIELD, draft.model_label, &mut diagnostics);
+        let model_label = validate_safe_label(MODEL_LABEL_FIELD, draft.model_label, &mut diagnostics);
         let model_hash = validate_hash(
             "model_evidence_model_hash",
             draft.model_hash,
@@ -609,8 +611,7 @@ impl ModelEvidenceReport {
         decision_label: &str,
     ) -> Result<crate::safe::receipt::Record, ModelEvidenceError> {
         let mut diagnostics = Vec::new();
-        let decision_label =
-            validate_safe_label(ADMISSION_LABEL_FIELD, decision_label, &mut diagnostics);
+        let decision_label = validate_safe_label(ADMISSION_LABEL_FIELD, decision_label, &mut diagnostics);
         if !diagnostics.is_empty() {
             return Err(ModelEvidenceError { diagnostics });
         }
@@ -666,11 +667,7 @@ impl ModelEvidenceError {
 
 impl core::fmt::Display for ModelEvidenceError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            formatter,
-            "model evidence validation failed with {} diagnostic(s)",
-            self.diagnostics.len()
-        )
+        write!(formatter, "model evidence validation failed with {} diagnostic(s)", self.diagnostics.len())
     }
 }
 
@@ -716,11 +713,7 @@ pub fn validate_model_evidence_report(
             None
         }
     };
-    let verifier_identity = validate_safe_label(
-        VERIFIER_IDENTITY_FIELD,
-        draft.verifier_identity,
-        &mut diagnostics,
-    );
+    let verifier_identity = validate_safe_label(VERIFIER_IDENTITY_FIELD, draft.verifier_identity, &mut diagnostics);
     let input_corpus_hash = validate_hash(
         "model_evidence_input_corpus_hash",
         draft.input_corpus_hash,
@@ -733,20 +726,17 @@ pub fn validate_model_evidence_report(
     let non_claims = validate_non_claims(draft.non_claims, &mut diagnostics);
 
     if diagnostics.is_empty() {
-        return assemble_model_evidence_report(
-            draft,
-            ModelEvidenceAssembleParts {
-                report_id,
-                evidence_kind,
-                model,
-                property_scope,
-                verifier_kind,
-                verifier_identity,
-                input_corpus_hash,
-                capability_labels,
-                non_claims,
-            },
-        );
+        return assemble_model_evidence_report(draft, ModelEvidenceAssembleParts {
+            report_id,
+            evidence_kind,
+            model,
+            property_scope,
+            verifier_kind,
+            verifier_identity,
+            input_corpus_hash,
+            capability_labels,
+            non_claims,
+        });
     }
     Err(ModelEvidenceError { diagnostics })
 }
@@ -870,10 +860,7 @@ fn build_model_evidence_report_receipt(
     })
 }
 
-fn validate_property_scope(
-    value: &str,
-    diagnostics: &mut Vec<ModelEvidenceDiagnostic>,
-) -> Option<String> {
+fn validate_property_scope(value: &str, diagnostics: &mut Vec<ModelEvidenceDiagnostic>) -> Option<String> {
     let scope = validate_safe_label(PROPERTY_SCOPE_FIELD, value, diagnostics);
     if scope.is_none() {
         diagnostics.push(ModelEvidenceDiagnostic::new(
@@ -915,10 +902,7 @@ fn validate_status_freshness_and_benchmark(
     }
 }
 
-fn validate_supplied_diagnostics(
-    supplied: &[ModelEvidenceDiagnostic],
-    diagnostics: &mut Vec<ModelEvidenceDiagnostic>,
-) {
+fn validate_supplied_diagnostics(supplied: &[ModelEvidenceDiagnostic], diagnostics: &mut Vec<ModelEvidenceDiagnostic>) {
     if supplied.is_empty() {
         diagnostics.push(ModelEvidenceDiagnostic::new(
             ModelEvidenceValidationIssue::MissingDiagnostics,
@@ -934,12 +918,7 @@ fn validate_supplied_diagnostics(
         ));
     }
     for diagnostic in supplied.iter().take(MAX_DIAGNOSTICS) {
-        validate_bounded_safe_text(
-            DIAGNOSTIC_FIELD,
-            diagnostic.message(),
-            MAX_DIAGNOSTIC_CHARS,
-            diagnostics,
-        );
+        validate_bounded_safe_text(DIAGNOSTIC_FIELD, diagnostic.message(), MAX_DIAGNOSTIC_CHARS, diagnostics);
     }
 }
 
@@ -968,10 +947,7 @@ fn validate_capability_labels(
             "model evidence capability labels must remain advisory",
         ));
     }
-    if diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.field() == "model_evidence_capabilities")
-    {
+    if diagnostics.iter().any(|diagnostic| diagnostic.field() == "model_evidence_capabilities") {
         return None;
     }
     let mut capabilities = values.to_vec();
@@ -994,10 +970,7 @@ fn validate_non_claims(
             break;
         }
     }
-    if diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.field() == "model_evidence_non_claims")
-    {
+    if diagnostics.iter().any(|diagnostic| diagnostic.field() == "model_evidence_non_claims") {
         return None;
     }
     let mut non_claims = values.to_vec();
@@ -1050,24 +1023,12 @@ fn build_receipt(
     let label_refs = label_storage.iter().map(String::as_str).collect::<Vec<_>>();
     let counts = [
         crate::safe::receipt::BoundedCountDraft::new(FIELD_RESULT_COUNT, RESULT_COUNT),
-        crate::safe::receipt::BoundedCountDraft::new(
-            FIELD_SUPPORTING_EVIDENCE_COUNT,
-            input.supporting_evidence_count,
-        ),
-        crate::safe::receipt::BoundedCountDraft::new(
-            FIELD_DIAGNOSTIC_COUNT,
-            input.diagnostic_count,
-        ),
-        crate::safe::receipt::BoundedCountDraft::new(
-            FIELD_CAPABILITY_COUNT,
-            input.capability_count,
-        ),
+        crate::safe::receipt::BoundedCountDraft::new(FIELD_SUPPORTING_EVIDENCE_COUNT, input.supporting_evidence_count),
+        crate::safe::receipt::BoundedCountDraft::new(FIELD_DIAGNOSTIC_COUNT, input.diagnostic_count),
+        crate::safe::receipt::BoundedCountDraft::new(FIELD_CAPABILITY_COUNT, input.capability_count),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_NON_CLAIM_COUNT, input.non_claim_count),
     ];
-    let hashes = [
-        input.model.model_hash().clone(),
-        input.input_corpus_hash.clone(),
-    ];
+    let hashes = [input.model.model_hash().clone(), input.input_corpus_hash.clone()];
     let redactions = [
         crate::safe::receipt::Redaction::OutputBounded,
         crate::safe::receipt::Redaction::PayloadHashOnly,
@@ -1106,18 +1067,8 @@ fn receipt_labels(input: &ReceiptInput<'_>) -> Vec<String> {
         String::from(input.result_status.as_str()),
         String::from(input.freshness.as_str()),
     ];
-    labels.extend(
-        input
-            .capabilities
-            .iter()
-            .map(|label| String::from(label.as_str())),
-    );
-    labels.extend(
-        input
-            .non_claims
-            .iter()
-            .map(|claim| String::from(claim.as_str())),
-    );
+    labels.extend(input.capabilities.iter().map(|label| String::from(label.as_str())));
+    labels.extend(input.non_claims.iter().map(|claim| String::from(claim.as_str())));
     if let Some(extra_label) = input.extra_label {
         labels.push(String::from(extra_label));
     }
@@ -1201,9 +1152,7 @@ fn validate_bounded_safe_text(
 
 fn is_safe_text(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
-    !UNSAFE_TEXT_MARKERS
-        .iter()
-        .any(|marker| lower.contains(marker))
+    !UNSAFE_TEXT_MARKERS.iter().any(|marker| lower.contains(marker))
 }
 
 fn len_to_u32(value: usize) -> u32 {
@@ -1272,30 +1221,21 @@ mod tests {
         // r[verify model-evidence-adapters.positive]
         // r[verify model-evidence-adapters.report-dto]
         let fixture = Fixture::new();
-        let bound = validate_model_evidence_report(fixture.draft())
-            .expect("valid bound report should pass");
+        let bound = validate_model_evidence_report(fixture.draft()).expect("valid bound report should pass");
         assert_eq!(bound.evidence_kind(), ModelEvidenceKind::BoundReport);
         assert_eq!(bound.model().model_hash().as_str(), MODEL_HASH_A);
 
         let mut conversion = fixture.draft();
         conversion.evidence_kind = "conversion-report";
         conversion.verifier_kind = "mly-conversion";
-        let conversion = validate_model_evidence_report(conversion)
-            .expect("valid conversion report should pass");
-        assert_eq!(
-            conversion.evidence_kind(),
-            ModelEvidenceKind::ConversionReport
-        );
+        let conversion = validate_model_evidence_report(conversion).expect("valid conversion report should pass");
+        assert_eq!(conversion.evidence_kind(), ModelEvidenceKind::ConversionReport);
 
         let mut kernel = fixture.draft();
         kernel.evidence_kind = "kernel-proof-summary";
         kernel.verifier_kind = "kernel-proof";
-        let kernel =
-            validate_model_evidence_report(kernel).expect("valid kernel proof report should pass");
-        assert_eq!(
-            kernel.evidence_kind(),
-            ModelEvidenceKind::KernelProofSummary
-        );
+        let kernel = validate_model_evidence_report(kernel).expect("valid kernel proof report should pass");
+        assert_eq!(kernel.evidence_kind(), ModelEvidenceKind::KernelProofSummary);
         assert!(PROHIBITED_MODEL_EVIDENCE_EFFECTS.contains(&"GPU access"));
     }
 
@@ -1303,24 +1243,13 @@ mod tests {
     fn model_evidence_advisory_receipt_preserves_non_claim_labels() {
         // r[verify model-evidence-adapters.validation]
         let fixture = Fixture::new();
-        let report = validate_model_evidence_report(fixture.draft())
-            .expect("valid model evidence report should pass");
+        let report = validate_model_evidence_report(fixture.draft()).expect("valid model evidence report should pass");
         let receipt = report
             .advisory_decision_receipt(ADMISSION_LABEL)
             .expect("advisory receipt should preserve non-claims");
 
-        assert!(
-            receipt
-                .labels()
-                .iter()
-                .any(|label| label == ModelEvidenceNonClaim::OutputCorrectness.as_str())
-        );
-        assert!(
-            receipt
-                .labels()
-                .iter()
-                .any(|label| label == ADMISSION_LABEL)
-        );
+        assert!(receipt.labels().iter().any(|label| label == ModelEvidenceNonClaim::OutputCorrectness.as_str()));
+        assert!(receipt.labels().iter().any(|label| label == ADMISSION_LABEL));
     }
 
     #[test]
@@ -1330,17 +1259,11 @@ mod tests {
         let fixture = Fixture::new();
         let mut stale = fixture.draft();
         stale.freshness = ModelEvidenceFreshness::Stale;
-        assert_issue(
-            validate_model_evidence_report(stale),
-            ModelEvidenceValidationIssue::StaleFreshness,
-        );
+        assert_issue(validate_model_evidence_report(stale), ModelEvidenceValidationIssue::StaleFreshness);
 
         let mut mismatch = fixture.draft();
         mismatch.model.observed_model_hash = MODEL_HASH_B;
-        assert_issue(
-            validate_model_evidence_report(mismatch),
-            ModelEvidenceValidationIssue::MismatchedModel,
-        );
+        assert_issue(validate_model_evidence_report(mismatch), ModelEvidenceValidationIssue::MismatchedModel);
 
         let mut unsupported_verifier = fixture.draft();
         unsupported_verifier.verifier_kind = "unsupported-verifier";
@@ -1360,37 +1283,22 @@ mod tests {
         benchmark_only.evidence_kind = "benchmark-summary";
         benchmark_only.verifier_kind = "benchmark-harness";
         benchmark_only.supporting_evidence_count = ZERO_COUNT;
-        assert_issue(
-            validate_model_evidence_report(benchmark_only),
-            ModelEvidenceValidationIssue::BenchmarkOnly,
-        );
+        assert_issue(validate_model_evidence_report(benchmark_only), ModelEvidenceValidationIssue::BenchmarkOnly);
 
         let mut weakened_non_claim = fixture.draft();
         weakened_non_claim.non_claims = &[];
-        assert_issue(
-            validate_model_evidence_report(weakened_non_claim),
-            ModelEvidenceValidationIssue::MissingNonClaim,
-        );
+        assert_issue(validate_model_evidence_report(weakened_non_claim), ModelEvidenceValidationIssue::MissingNonClaim);
 
         let overclaim_capabilities = [ModelEvidenceCapabilityLabel::ProductionSafety];
         let mut overclaim = fixture.draft();
         overclaim.capability_labels = &overclaim_capabilities;
-        assert_issue(
-            validate_model_evidence_report(overclaim),
-            ModelEvidenceValidationIssue::CapabilityOverclaim,
-        );
+        assert_issue(validate_model_evidence_report(overclaim), ModelEvidenceValidationIssue::CapabilityOverclaim);
     }
 
-    fn assert_issue(
-        result: Result<ModelEvidenceReport, ModelEvidenceError>,
-        issue: ModelEvidenceValidationIssue,
-    ) {
+    fn assert_issue(result: Result<ModelEvidenceReport, ModelEvidenceError>, issue: ModelEvidenceValidationIssue) {
         let error = result.expect_err("fixture should fail");
         assert!(
-            error
-                .diagnostics()
-                .iter()
-                .any(|diagnostic| diagnostic.issue() == issue),
+            error.diagnostics().iter().any(|diagnostic| diagnostic.issue() == issue),
             "expected issue {issue:?}, got {:?}",
             error.diagnostics()
         );

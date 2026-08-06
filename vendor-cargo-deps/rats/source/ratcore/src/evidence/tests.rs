@@ -36,9 +36,7 @@ impl DemoTarget {
 
 impl ReplayTarget for DemoTarget {
     fn focus_targets(&self) -> std::collections::BTreeSet<String> {
-        [TARGET_EDITOR.to_string(), TARGET_TREE.to_string()]
-            .into_iter()
-            .collect()
+        [TARGET_EDITOR.to_string(), TARGET_TREE.to_string()].into_iter().collect()
     }
 
     fn focused_target(&self) -> Option<String> {
@@ -76,10 +74,7 @@ impl ReplayTarget for DemoTarget {
         std::collections::BTreeMap::from([
             ("focus".to_string(), self.focus.clone()),
             ("text".to_string(), self.text.clone()),
-            (
-                "size".to_string(),
-                format!("{}x{}", self.width, self.height),
-            ),
+            ("size".to_string(), format!("{}x{}", self.width, self.height)),
         ])
     }
 
@@ -88,10 +83,7 @@ impl ReplayTarget for DemoTarget {
     }
 
     fn diagnostic_events(&self) -> std::collections::BTreeSet<String> {
-        (!self.text.is_empty())
-            .then(|| DIAGNOSTIC_READY.to_string())
-            .into_iter()
-            .collect()
+        (!self.text.is_empty()).then(|| DIAGNOSTIC_READY.to_string()).into_iter().collect()
     }
 }
 
@@ -108,10 +100,7 @@ fn replays_valid_script_and_hashes_snapshots() {
             action_id: ACTION_SAVE.to_string(),
         })
         .with_assertion(ReplayAssertion::new("text", "hi!"))
-        .with_snapshot(ReplaySnapshotExpectation::new(
-            SNAPSHOT_RENDER,
-            expected_render,
-        ));
+        .with_snapshot(ReplaySnapshotExpectation::new(SNAPSHOT_RENDER, expected_render));
 
     let outcome = run_replay(&script, &mut target);
 
@@ -157,24 +146,9 @@ fn reports_stale_focus_disabled_action_and_bounds() {
 
     let outcome = run_replay(&script, &mut target);
 
-    assert!(
-        outcome
-            .issues
-            .iter()
-            .any(|issue| issue.code == ReplayIssueCode::StaleFocus)
-    );
-    assert!(
-        outcome
-            .issues
-            .iter()
-            .any(|issue| issue.code == ReplayIssueCode::DisabledAction)
-    );
-    assert!(
-        outcome
-            .issues
-            .iter()
-            .any(|issue| issue.code == ReplayIssueCode::OutOfBoundsMouse)
-    );
+    assert!(outcome.issues.iter().any(|issue| issue.code == ReplayIssueCode::StaleFocus));
+    assert!(outcome.issues.iter().any(|issue| issue.code == ReplayIssueCode::DisabledAction));
+    assert!(outcome.issues.iter().any(|issue| issue.code == ReplayIssueCode::OutOfBoundsMouse));
 }
 
 #[test]
@@ -286,18 +260,8 @@ fn reports_assertion_and_snapshot_mismatch() {
 
     let outcome = run_replay(&script, &mut target);
 
-    assert!(
-        outcome
-            .issues
-            .iter()
-            .any(|issue| issue.code == ReplayIssueCode::AssertionMismatch)
-    );
-    assert!(
-        outcome
-            .issues
-            .iter()
-            .any(|issue| issue.code == ReplayIssueCode::SnapshotMismatch)
-    );
+    assert!(outcome.issues.iter().any(|issue| issue.code == ReplayIssueCode::AssertionMismatch));
+    assert!(outcome.issues.iter().any(|issue| issue.code == ReplayIssueCode::SnapshotMismatch));
 }
 
 fn assert_issue(outcome: &ReplayReport, code: ReplayIssueCode) {

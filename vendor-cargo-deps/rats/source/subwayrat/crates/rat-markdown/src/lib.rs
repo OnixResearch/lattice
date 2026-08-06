@@ -79,18 +79,14 @@ impl MarkdownStyle {
             base,
             code_block: Style::default().fg(Color::Rgb(180, 220, 140)),
             code_fence: Style::default().fg(Color::Rgb(100, 100, 100)),
-            inline_code: Style::default()
-                .fg(Color::Rgb(230, 190, 80))
-                .bg(Color::Rgb(45, 45, 45)),
+            inline_code: Style::default().fg(Color::Rgb(230, 190, 80)).bg(Color::Rgb(45, 45, 45)),
             bold: base.add_modifier(Modifier::BOLD),
             italic: base.add_modifier(Modifier::ITALIC),
             bold_italic: base.add_modifier(Modifier::BOLD | Modifier::ITALIC),
             heading: base.add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             subheading: base.add_modifier(Modifier::BOLD),
             list_marker: Style::default().fg(Color::Rgb(100, 100, 100)),
-            blockquote: Style::default()
-                .fg(Color::Rgb(160, 160, 160))
-                .add_modifier(Modifier::ITALIC),
+            blockquote: Style::default().fg(Color::Rgb(160, 160, 160)).add_modifier(Modifier::ITALIC),
             hrule: Style::default().fg(Color::Rgb(80, 80, 80)),
         }
     }
@@ -147,10 +143,7 @@ fn render_code_block_line(
                 Span::styled(s.text, style)
             })
             .collect();
-        if hl_spans
-            .iter()
-            .all(|s| matches!(s.style.fg, None | Some(Color::Reset)))
-        {
+        if hl_spans.iter().all(|s| matches!(s.style.fg, None | Some(Color::Reset))) {
             // Highlighter didn't produce colors — fall back to code_block style
             spans.push(Span::styled(line.to_string(), style.code_block));
         } else {
@@ -180,21 +173,12 @@ fn try_render_horizontal_rule(line: &str, style: &MarkdownStyle) -> Option<Line<
 /// Try to render a heading (# H1, ## H2, ### H3, etc.).
 fn try_render_heading(line: &str, style: &MarkdownStyle) -> Option<Line<'static>> {
     if let Some(content) = line.strip_prefix("# ") {
-        Some(Line::from(Span::styled(
-            content.trim().to_string(),
-            style.heading,
-        )))
+        Some(Line::from(Span::styled(content.trim().to_string(), style.heading)))
     } else if let Some(content) = line.strip_prefix("## ") {
-        Some(Line::from(Span::styled(
-            content.trim().to_string(),
-            style.subheading,
-        )))
+        Some(Line::from(Span::styled(content.trim().to_string(), style.subheading)))
     } else if line.starts_with("### ") || line.starts_with("#### ") {
         let content = line.trim_start_matches('#').trim();
-        Some(Line::from(Span::styled(
-            content.to_string(),
-            style.subheading,
-        )))
+        Some(Line::from(Span::styled(content.to_string(), style.subheading)))
     } else {
         None
     }
@@ -244,31 +228,20 @@ fn try_render_list_item(line: &str, style: &MarkdownStyle) -> Option<Line<'stati
 /// Each returned `Line` corresponds to one visual line of output.
 /// The caller is responsible for adding any border prefix (e.g. `"│ "`)
 /// before each line.
-pub fn render_markdown(
-    text: &str,
-    style: &MarkdownStyle,
-    highlighter: &dyn SyntaxHighlighter,
-) -> Vec<Line<'static>> {
+pub fn render_markdown(text: &str, style: &MarkdownStyle, highlighter: &dyn SyntaxHighlighter) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut in_code_block = false;
     let mut code_lang = String::new();
 
     for raw_line in text.lines() {
         // ── Code fences ──────────────────────────────
-        if let Some(fence_line) =
-            try_render_code_fence(raw_line, &mut in_code_block, &mut code_lang, style)
-        {
+        if let Some(fence_line) = try_render_code_fence(raw_line, &mut in_code_block, &mut code_lang, style) {
             lines.push(fence_line);
             continue;
         }
 
         if in_code_block {
-            lines.push(render_code_block_line(
-                raw_line,
-                &code_lang,
-                style,
-                highlighter,
-            ));
+            lines.push(render_code_block_line(raw_line, &code_lang, style, highlighter));
             continue;
         }
 
@@ -452,10 +425,7 @@ fn try_render_emphasis(
     {
         flush_buf(buf, spans, style.base);
         let inner: String = chars[i + 2..close].iter().collect();
-        spans.push(Span::styled(
-            inner,
-            style.base.add_modifier(Modifier::CROSSED_OUT),
-        ));
+        spans.push(Span::styled(inner, style.base.add_modifier(Modifier::CROSSED_OUT)));
         return Some(close + 2);
     }
 
@@ -562,10 +532,7 @@ fn try_render_link(
         }
         if k < len {
             flush_buf(buf, spans, style.base);
-            spans.push(Span::styled(
-                link_text,
-                style.base.add_modifier(Modifier::UNDERLINED),
-            ));
+            spans.push(Span::styled(link_text, style.base.add_modifier(Modifier::UNDERLINED)));
             return Some(k + 1);
         }
     }
@@ -589,22 +556,14 @@ mod tests {
         let style = test_style();
         render_markdown(text, &style, &PlainHighlighter)
             .iter()
-            .map(|line| {
-                line.spans
-                    .iter()
-                    .map(|s| s.content.as_ref())
-                    .collect::<String>()
-            })
+            .map(|line| line.spans.iter().map(|s| s.content.as_ref()).collect::<String>())
             .collect()
     }
 
     /// Helper: render inline spans and return the text content of each span.
     fn inline_texts(text: &str) -> Vec<String> {
         let style = test_style();
-        render_inline_spans(text, &style)
-            .iter()
-            .map(|s| s.content.to_string())
-            .collect()
+        render_inline_spans(text, &style).iter().map(|s| s.content.to_string()).collect()
     }
 
     // ── Block-level tests ────────────────────────────
@@ -637,10 +596,7 @@ mod tests {
     fn code_block() {
         let input = "before\n```rust\nfn main() {}\n```\nafter";
         let lines = plain_lines(input);
-        assert_eq!(
-            lines,
-            vec!["before", "─── rust ", "  fn main() {}", "───", "after"]
-        );
+        assert_eq!(lines, vec!["before", "─── rust ", "  fn main() {}", "───", "after"]);
     }
 
     #[test]

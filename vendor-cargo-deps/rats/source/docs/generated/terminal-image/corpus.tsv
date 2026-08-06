@@ -1,0 +1,20 @@
+case	fixture_strategy	expected_class	external_bytes	claim
+empty	zero-byte slice	EmptyInput	0	admission only
+encoded-over	generated small vector under lowered checked profile	OversizedInput	0	encoded byte boundary
+zero-terminal	normal generated PNG plus zero cell dimension	InvalidRequest	0	request boundary
+unsupported-signature	bounded BMP signature seed	UnsupportedFormat	0	format allowlist
+format-policy	generated PNG under JPEG-only profile	UnsupportedFormat	0	profile admission
+truncated	in-memory generated PNG truncated halfway	DecodeFailed	0	selected Sixel decoder failure normalization
+animated-gif	in-memory generated bounded two-frame GIF	UnsupportedFormat	0	animation playback is not admitted
+source-width	generated 20x2 PNG under width-10 profile	SourceDimensionsExceeded	0	metadata/source bound
+aggregate-decode	generated 8x8 PNG under 256-byte aggregate profile	DecodedBudgetExceeded	0	decode plus target reserve
+base64-output	generated PNG under 32-byte prepared profile	OutputBudgetExceeded	0	framing expansion
+kitty-chunks	deterministic generated 128x128 nonuniform PNG under one-chunk profile	OutputBudgetExceeded	0	chunk expansion
+sixel-work	generated 2x2 PNG under one-unit work profile	OutputBudgetExceeded WorkUnits	0	palette-index work admission
+sixel-valid	generated 2x2 opaque red PNG	accepted staged payload	0 before writer	finite deterministic preparation only
+placeholder	explicit None request containing sensitive marker	accepted content-free count label	0 before writer	privacy allowlist only
+writer-short	accepted Kitty staged bytes; three-byte writes	complete	exact prepared length	writer loop only
+writer-interrupted	accepted Kitty staged bytes; one Interrupted error	complete	exact prepared length	interrupt normalization only
+writer-zero-fail	accepted prepared bytes; immediate BrokenPipe	WriterFailed bytes=0	0	pre-effect failure
+writer-partial-fail	accepted prepared bytes; five bytes then BrokenPipe	WriterFailed bytes=5	5	partial-effect reporting; no retry authorization
+writer-flush-fail	accepted prepared bytes; flush BrokenPipe	WriterFailed bytes=prepared length	prepared length	flush failure is a potentially visible complete prefix

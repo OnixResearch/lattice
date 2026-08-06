@@ -1,5 +1,8 @@
 use super::forms::ContextReferenceKind;
-use crate::prompt::base::{ALL_CONTEXT_KINDS, ALL_LOCAL_KINDS, ZERO_ALLOWED_KINDS, ZERO_COUNT};
+use crate::prompt::base::ALL_CONTEXT_KINDS;
+use crate::prompt::base::ALL_LOCAL_KINDS;
+use crate::prompt::base::ZERO_ALLOWED_KINDS;
+use crate::prompt::base::ZERO_COUNT;
 
 /// Policy decision reached before resolver dispatch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

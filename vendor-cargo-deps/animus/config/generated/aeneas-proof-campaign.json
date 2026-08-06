@@ -1,0 +1,297 @@
+{
+  "campaign_catalog": {
+    "campaigns": [
+      {
+        "activation": "explicit",
+        "authority": "none",
+        "campaign_id": "aeneas-proof-campaign",
+        "profile_schema": "animus.aeneas-proof-campaign.v1",
+        "skill_id": "aeneas-proof-campaign"
+      }
+    ],
+    "schema": "animus.proof-campaign-catalog.v1"
+  },
+  "campaign_profile": {
+    "artifact_roles": [
+      "source",
+      "statement_candidate",
+      "generated_model",
+      "generated_manifest",
+      "maintained_theorem",
+      "statement_review",
+      "proof_receipt",
+      "verification_receipt",
+      "bounded_log"
+    ],
+    "authority": "none",
+    "budgets": {
+      "log_bytes": 262144,
+      "output_bytes": 1048576,
+      "proof_time_ms": 1800000,
+      "retained_artifacts": 64,
+      "retrieval_items": 128,
+      "stage_calls": 64,
+      "tool_calls": 128
+    },
+    "campaign_id": "aeneas-proof-campaign",
+    "completion_gate_ref": "host.authoritative-completion",
+    "forbidden_receipt_fields": [
+      "raw_prompt",
+      "hidden_reasoning",
+      "credential",
+      "private_path",
+      "source_body",
+      "proof_body",
+      "tool_arguments",
+      "tool_output",
+      "provider_payload",
+      "unbounded_log"
+    ],
+    "model_runtime_profile_ref": "compat-default",
+    "non_claims": [
+      "campaign conformance does not prove theorem truth",
+      "campaign conformance does not prove verifier soundness",
+      "supplied separation dimensions do not prove reviewer independence",
+      "generated and maintained identities do not prove source/model equivalence",
+      "statement approval does not prove requirement adequacy",
+      "a proved candidate does not prove product correctness or release readiness",
+      "campaign receipts do not grant authoritative completion"
+    ],
+    "receipt_fields": [
+      "profile_identity",
+      "skill_identity",
+      "plan_identity",
+      "role_identity",
+      "assignment_identity",
+      "subject_identity",
+      "statement_identity",
+      "model_identity",
+      "budget_identity",
+      "stage_identity",
+      "bounded_counts",
+      "outcome",
+      "evidence_identities",
+      "issue_classes",
+      "redaction_markers"
+    ],
+    "recipe_workflow_ref": "goose.recipe.workflow",
+    "roles": [
+      {
+        "assignment": "statement-author",
+        "capability_ceiling": [
+          "source.read",
+          "statement.write"
+        ],
+        "class": "implementation",
+        "evidence_ceiling": [
+          "statement_candidate"
+        ],
+        "input_contract": "requirement-and-source",
+        "model_profile_ref": "compat-default",
+        "mutation": "statement",
+        "output_contract": "statement-candidate",
+        "semantic_role_ref": "implementer",
+        "separation_policy_ref": "subject-bound",
+        "service_ceiling": []
+      },
+      {
+        "assignment": "statement-reviewer",
+        "capability_ceiling": [
+          "source.read",
+          "statement.review"
+        ],
+        "class": "review",
+        "evidence_ceiling": [
+          "statement_review"
+        ],
+        "input_contract": "statement-candidate",
+        "model_profile_ref": "compat-default",
+        "mutation": "none",
+        "output_contract": "statement-approval",
+        "semantic_role_ref": "reviewer",
+        "separation_policy_ref": "independent-review",
+        "service_ceiling": []
+      },
+      {
+        "assignment": "prover",
+        "capability_ceiling": [
+          "source.read",
+          "theorem.write",
+          "proof.request"
+        ],
+        "class": "implementation",
+        "evidence_ceiling": [
+          "generated_model",
+          "generated_manifest",
+          "maintained_theorem",
+          "proof_receipt",
+          "bounded_log"
+        ],
+        "input_contract": "approved-statement-and-model",
+        "model_profile_ref": "compat-default",
+        "mutation": "maintained_theorem",
+        "output_contract": "proof-candidate",
+        "semantic_role_ref": "implementer",
+        "separation_policy_ref": "subject-bound",
+        "service_ceiling": [
+          "octet-aeneas-generation",
+          "octet-aeneas-proof"
+        ]
+      },
+      {
+        "assignment": "verifier",
+        "capability_ceiling": [
+          "artifact.read",
+          "verification.request"
+        ],
+        "class": "verification",
+        "evidence_ceiling": [
+          "verification_receipt"
+        ],
+        "input_contract": "proof-receipt",
+        "model_profile_ref": "compat-default",
+        "mutation": "none",
+        "output_contract": "verification-report",
+        "semantic_role_ref": "verifier",
+        "separation_policy_ref": "independent-verifier",
+        "service_ceiling": [
+          "octet-artifact-verify"
+        ]
+      }
+    ],
+    "safe_receipt_ref": "animus.safe-receipt.v1",
+    "schema": "animus.aeneas-proof-campaign.v1",
+    "services": [
+      {
+        "claims_verifier_soundness": false,
+        "host_owned": true,
+        "network_authority": "denied",
+        "service_id": "octet-aeneas-generation"
+      },
+      {
+        "claims_verifier_soundness": false,
+        "host_owned": true,
+        "network_authority": "denied",
+        "service_id": "octet-aeneas-proof"
+      },
+      {
+        "claims_verifier_soundness": false,
+        "host_owned": true,
+        "network_authority": "denied",
+        "service_id": "octet-artifact-verify"
+      }
+    ],
+    "skill": {
+      "canonical": true,
+      "progressive_disclosure": true,
+      "replaces_runtime_policy": false,
+      "skill_id": "aeneas-proof-campaign",
+      "source_blake3": "f8f4d41384958e468c952289e8a548d78b7f6e69616abedd0ed629dfec327492",
+      "source_path": "skills/aeneas-proof-campaign/SKILL.md"
+    },
+    "stages": [
+      {
+        "assignment": "statement-author",
+        "depends_on": [],
+        "input_contract": "requirement-and-source",
+        "output_contract": "statement-candidate",
+        "service_ref": "none",
+        "stage_id": "author-statement",
+        "writes": [
+          "statement_candidate"
+        ]
+      },
+      {
+        "assignment": "statement-reviewer",
+        "depends_on": [
+          "author-statement"
+        ],
+        "input_contract": "statement-candidate",
+        "output_contract": "statement-approval",
+        "service_ref": "none",
+        "stage_id": "review-statement",
+        "writes": [
+          "statement_review"
+        ]
+      },
+      {
+        "assignment": "prover",
+        "depends_on": [
+          "review-statement"
+        ],
+        "input_contract": "approved-source",
+        "output_contract": "generated-model",
+        "service_ref": "octet-aeneas-generation",
+        "stage_id": "generate-model",
+        "writes": [
+          "generated_model",
+          "generated_manifest"
+        ]
+      },
+      {
+        "assignment": "prover",
+        "depends_on": [
+          "generate-model"
+        ],
+        "input_contract": "approved-statement-and-model",
+        "output_contract": "maintained-theorem",
+        "service_ref": "none",
+        "stage_id": "maintain-theorem",
+        "writes": [
+          "maintained_theorem"
+        ]
+      },
+      {
+        "assignment": "prover",
+        "depends_on": [
+          "maintain-theorem"
+        ],
+        "input_contract": "fresh-proof-candidate",
+        "output_contract": "proof-receipt",
+        "service_ref": "octet-aeneas-proof",
+        "stage_id": "request-proof",
+        "writes": [
+          "proof_receipt",
+          "bounded_log"
+        ]
+      },
+      {
+        "assignment": "verifier",
+        "depends_on": [
+          "request-proof"
+        ],
+        "input_contract": "proof-receipt",
+        "output_contract": "verification-report",
+        "service_ref": "octet-artifact-verify",
+        "stage_id": "verify-proof",
+        "writes": [
+          "verification_receipt"
+        ]
+      }
+    ],
+    "terminal_outcomes": [
+      "proved",
+      "blocked",
+      "counterexample",
+      "invalid_statement",
+      "invalid_model",
+      "budget_exhausted",
+      "tool_failure",
+      "denied",
+      "cancelled",
+      "abstained"
+    ],
+    "tool_catalog_ref": "animus.tool-catalog.v1"
+  },
+  "schema": "animus.aeneas-proof-campaign-bundle.v1",
+  "skill_manifest": {
+    "canonical": true,
+    "runtime_policy_authority": "none",
+    "safe_metadata_only": true,
+    "schema": "animus.safe-skill-manifest.v1",
+    "skill_id": "aeneas-proof-campaign",
+    "source_blake3": "f8f4d41384958e468c952289e8a548d78b7f6e69616abedd0ed629dfec327492",
+    "source_count": 1,
+    "source_path": "skills/aeneas-proof-campaign/SKILL.md"
+  }
+}

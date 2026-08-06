@@ -1,8 +1,8 @@
 use super::forms::ContextReference;
-use super::rules::{
-    ContextReferencePolicyDecision, ContextReferenceStatus, ContextResolverKind,
-    ContextTruncationState,
-};
+use super::rules::ContextReferencePolicyDecision;
+use super::rules::ContextReferenceStatus;
+use super::rules::ContextResolverKind;
+use super::rules::ContextTruncationState;
 
 /// Candidate fragment returned by an injected host resolver.
 #[derive(Clone, Debug, Eq, PartialEq)]

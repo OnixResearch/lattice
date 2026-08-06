@@ -1,0 +1,8 @@
+fixture=workspace-shell.negative
+renderer=subwayrat-tui
+generator=workspace-shell-replay-snapshots-v1
+logical-size=80x24
+scenario=workspace shell negative
+state-blake3=0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5
+workspace-snapshot-blake3=0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5
+diagnostics=DisabledAction,UnsupportedWaitPredicate,OutOfBoundsMouse,ImpossibleGeometry

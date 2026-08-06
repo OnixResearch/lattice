@@ -53,9 +53,7 @@ pub fn pointer_mouse_renderer_artifacts() -> Vec<PointerMouseRendererArtifact> {
     artifacts_for_rows(&evidence.rows)
 }
 
-fn artifacts_for_rows(
-    rows: &[super::fixtures::PointerMouseReplayProofRow],
-) -> Vec<PointerMouseRendererArtifact> {
+fn artifacts_for_rows(rows: &[super::fixtures::PointerMouseReplayProofRow]) -> Vec<PointerMouseRendererArtifact> {
     let mut artifacts = Vec::with_capacity(rows.len().saturating_mul(RENDERER_ARTIFACTS_PER_ROW));
     for row in rows {
         artifacts.push(render_tui_artifact(row));
@@ -64,9 +62,7 @@ fn artifacts_for_rows(
     artifacts
 }
 
-fn render_tui_artifact(
-    row: &super::fixtures::PointerMouseReplayProofRow,
-) -> PointerMouseRendererArtifact {
+fn render_tui_artifact(row: &super::fixtures::PointerMouseReplayProofRow) -> PointerMouseRendererArtifact {
     debug_assert!(!row.fixture_id.is_empty());
     debug_assert!(!row.route_summary_hash.is_empty());
     let path = artifact_path(ArtifactPathInput {
@@ -85,18 +81,10 @@ fn render_tui_artifact(
         row.diagnostics,
     )
     .into_bytes();
-    PointerMouseRendererArtifact::new(
-        row.fixture_id.clone(),
-        RENDERER_SUBWAYRAT_TUI,
-        ADAPTER_SUBWAYRAT,
-        path,
-        bytes,
-    )
+    PointerMouseRendererArtifact::new(row.fixture_id.clone(), RENDERER_SUBWAYRAT_TUI, ADAPTER_SUBWAYRAT, path, bytes)
 }
 
-fn render_dom_artifact(
-    row: &super::fixtures::PointerMouseReplayProofRow,
-) -> PointerMouseRendererArtifact {
+fn render_dom_artifact(row: &super::fixtures::PointerMouseReplayProofRow) -> PointerMouseRendererArtifact {
     debug_assert!(!row.fixture_id.is_empty());
     debug_assert!(!row.state_hash.is_empty());
     let path = artifact_path(ArtifactPathInput {
@@ -115,13 +103,7 @@ fn render_dom_artifact(
         html_escape(&row.diagnostics),
     )
     .into_bytes();
-    PointerMouseRendererArtifact::new(
-        row.fixture_id.clone(),
-        RENDERER_METEORITE_DOM,
-        ADAPTER_METEORITE,
-        path,
-        bytes,
-    )
+    PointerMouseRendererArtifact::new(row.fixture_id.clone(), RENDERER_METEORITE_DOM, ADAPTER_METEORITE, path, bytes)
 }
 
 struct ArtifactPathInput<'a> {
@@ -130,17 +112,9 @@ struct ArtifactPathInput<'a> {
 }
 
 fn artifact_path(input: ArtifactPathInput<'_>) -> String {
-    format!(
-        "{ARTIFACT_ROOT}/{}.{}",
-        input.fixture_id.replace('.', "-"),
-        input.suffix,
-    )
+    format!("{ARTIFACT_ROOT}/{}.{}", input.fixture_id.replace('.', "-"), input.suffix,)
 }
 
 fn html_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }

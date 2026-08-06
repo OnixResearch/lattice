@@ -15,21 +15,17 @@ const SECRET_TOKEN: &str = "token-value";
 const PIPE_WRAPPER_SOURCE: &str = "cargo test | tee log";
 
 fn sandbox() -> animus_adapters::ExecPolicySandboxContext {
-    animus_adapters::ExecPolicySandboxContext::new(
-        &animus_adapters::ExecPolicySandboxContextDraft {
-            active_sandbox: Some(SANDBOX),
-            requested_capability: Some(CAPABILITY),
-            escalation_reason: Some(REASON),
-        },
-    )
+    animus_adapters::ExecPolicySandboxContext::new(&animus_adapters::ExecPolicySandboxContextDraft {
+        active_sandbox: Some(SANDBOX),
+        requested_capability: Some(CAPABILITY),
+        escalation_reason: Some(REASON),
+    })
     .expect("sandbox context should validate")
 }
 
 fn command(argv: &'static [&'static str]) -> animus_adapters::ExecPolicyCommandIntent {
-    animus_adapters::ExecPolicyCommandIntent::new(&animus_adapters::ExecPolicyCommandIntentDraft {
-        argv,
-    })
-    .expect("command should validate")
+    animus_adapters::ExecPolicyCommandIntent::new(&animus_adapters::ExecPolicyCommandIntentDraft { argv })
+        .expect("command should validate")
 }
 
 fn event_for(

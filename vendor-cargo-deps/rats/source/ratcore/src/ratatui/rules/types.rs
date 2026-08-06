@@ -21,8 +21,7 @@ pub(super) const FEATURE_LAYOUT_CACHE: &str = "layout-cache";
 pub(super) const FEATURE_UNSTABLE: &str = "unstable";
 pub(super) const FEATURE_MACROS: &str = "macros";
 pub(super) const WEB_INCOMPATIBLE_FEATURES: &[&str] = &[FEATURE_CROSSTERM];
-pub(super) const KNOWN_POLICY_STATUSES: &[&str] =
-    &[POLICY_APPROVED, POLICY_FORBIDDEN, POLICY_REQUIRES_CHANGE];
+pub(super) const KNOWN_POLICY_STATUSES: &[&str] = &[POLICY_APPROVED, POLICY_FORBIDDEN, POLICY_REQUIRES_CHANGE];
 pub(super) const BASELINE_POLICY_ROW_COUNT: usize = 10;
 
 /// Whether a `Ratatui` feature use participates in web/Ratzilla builds.

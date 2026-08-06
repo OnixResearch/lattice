@@ -1,11 +1,7 @@
-const PRESENTATION_TITLE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("presentation_title");
-const DISPLAY_AGENT_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("display_agent_name");
-const ACTIVITY_TEXT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("activity_text");
-const CUSTOM_STATE_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("custom_state_label");
+const PRESENTATION_TITLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("presentation_title");
+const DISPLAY_AGENT_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("display_agent_name");
+const ACTIVITY_TEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("activity_text");
+const CUSTOM_STATE_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("custom_state_label");
 
 /// Presentation-only status metadata.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

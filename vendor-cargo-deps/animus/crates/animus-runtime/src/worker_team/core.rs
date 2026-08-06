@@ -15,9 +15,7 @@ mod text;
 /// # Errors
 ///
 /// Returns [`DelegationFailure`](super::DelegationFailure) when the packet is malformed.
-pub fn validate_context_packet(
-    packet: &super::WorkerContextPacket,
-) -> Result<(), super::DelegationFailure> {
+pub fn validate_context_packet(packet: &super::WorkerContextPacket) -> Result<(), super::DelegationFailure> {
     context::validate(packet)
 }
 
@@ -26,9 +24,7 @@ pub fn validate_context_packet(
 /// # Errors
 ///
 /// Returns [`DelegationFailure`](super::DelegationFailure) when the draft is invalid.
-pub fn validate_task(
-    draft: super::WorkerTaskDraft,
-) -> Result<super::WorkerTask, super::DelegationFailure> {
+pub fn validate_task(draft: super::WorkerTaskDraft) -> Result<super::WorkerTask, super::DelegationFailure> {
     task::validate(draft)
 }
 
@@ -36,17 +32,14 @@ pub fn validate_task(
 ///
 /// # Errors
 ///
-/// Returns [`DelegationFailure`](super::DelegationFailure) when reports are empty, invalid, or conflicting.
+/// Returns [`DelegationFailure`](super::DelegationFailure) when reports are empty, invalid, or
+/// conflicting.
 pub fn merge_reports(
     task: &super::WorkerTask,
     reports: &[super::Report],
 ) -> Result<super::ReportMergeOutcome, super::DelegationFailure> {
     debug_assert!(!task.output_schema().required_fields.is_empty());
-    debug_assert!(
-        reports
-            .iter()
-            .all(|report| report.fields.len() <= super::MAX_REPORT_FIELDS)
-    );
+    debug_assert!(reports.iter().all(|report| report.fields.len() <= super::MAX_REPORT_FIELDS));
     validate_non_empty_slice(super::WORKER_REPORT_FIELD, reports)?;
     for report in reports {
         validate_report(report, task.output_schema())?;
@@ -75,7 +68,8 @@ pub fn validate_report(
 ///
 /// # Errors
 ///
-/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or enqueueing fails.
+/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or
+/// enqueueing fails.
 pub fn enqueue_task(
     service: Option<&mut dyn super::WorkerService>,
     task: &super::WorkerTask,
@@ -87,7 +81,8 @@ pub fn enqueue_task(
 ///
 /// # Errors
 ///
-/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or status lookup fails.
+/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or status
+/// lookup fails.
 pub fn request_status(
     service: Option<&mut dyn super::WorkerService>,
     handle: &super::WorkerHandle,
@@ -99,7 +94,8 @@ pub fn request_status(
 ///
 /// # Errors
 ///
-/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or cancellation fails.
+/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or
+/// cancellation fails.
 pub fn request_cancel(
     service: Option<&mut dyn super::WorkerService>,
     handle: &super::WorkerHandle,
@@ -111,7 +107,8 @@ pub fn request_cancel(
 ///
 /// # Errors
 ///
-/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or collection fails.
+/// Returns [`DelegationFailure`](super::DelegationFailure) when no service is injected or
+/// collection fails.
 pub fn collect_report(
     service: Option<&mut dyn super::WorkerService>,
     handle: &super::WorkerHandle,
@@ -131,23 +128,14 @@ fn injected(
     })
 }
 
-pub(crate) fn validate_label(
-    field: &'static str,
-    value: impl AsRef<str>,
-) -> Result<String, super::DelegationFailure> {
+pub(crate) fn validate_label(field: &'static str, value: impl AsRef<str>) -> Result<String, super::DelegationFailure> {
     text::validate_label(field, value)
 }
 
-pub(crate) fn validate_text(
-    field: &'static str,
-    value: impl AsRef<str>,
-) -> Result<String, super::DelegationFailure> {
+pub(crate) fn validate_text(field: &'static str, value: impl AsRef<str>) -> Result<String, super::DelegationFailure> {
     text::validate_body(field, value)
 }
 
-pub(crate) fn validate_non_empty_slice<T>(
-    field: &'static str,
-    values: &[T],
-) -> Result<(), super::DelegationFailure> {
+pub(crate) fn validate_non_empty_slice<T>(field: &'static str, values: &[T]) -> Result<(), super::DelegationFailure> {
     text::validate_non_empty_slice(field, values)
 }

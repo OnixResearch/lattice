@@ -15,60 +15,40 @@
     )
 )]
 
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-const BOARD_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_board_label");
-const TASK_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_task_id");
-const TITLE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_task_title");
-const BODY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_task_body");
-const ACTOR_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_actor_label");
-const POLICY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_policy_label");
-const TENANT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_tenant_label");
-const ASSIGNEE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_assignee_label");
-const PARENT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_parent_id");
-const CHILD_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_child_id");
+const BOARD_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_board_label");
+const TASK_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_task_id");
+const TITLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_task_title");
+const BODY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_task_body");
+const ACTOR_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_actor_label");
+const POLICY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_policy_label");
+const TENANT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_tenant_label");
+const ASSIGNEE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_assignee_label");
+const PARENT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_parent_id");
+const CHILD_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_child_id");
 const ROOT_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("orchestration_root_capability");
-const TARGET_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_target_label");
-const APPROVAL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_approval_label");
-const HANDOFF_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_handoff_id");
+const TARGET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_target_label");
+const APPROVAL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_approval_label");
+const HANDOFF_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_handoff_id");
 const HANDOFF_BODY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("orchestration_handoff_body");
-const SUMMARY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_summary");
-const REASON_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_reason");
-const CONTEXT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_context");
-const NEXT_ACTION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_next_action");
-const SEQUENCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_sequence");
-const REVISION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_task_revision");
-const METADATA_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_metadata");
+const SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_summary");
+const REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_reason");
+const CONTEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_context");
+const NEXT_ACTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_next_action");
+const SEQUENCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_sequence");
+const REVISION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_task_revision");
+const METADATA_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_metadata");
 const REDACTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("orchestration_redaction_marker");
 const CONTRACT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("orchestration_contract_identity");
-const FAMILY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("orchestration_family_label");
+const FAMILY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("orchestration_family_label");
 const HASH_SEPARATOR: &str = "\u{1f}";
 const UNSAFE_RAW_PROMPT: &str = "RAW_PROMPT:";
 const UNSAFE_PROVIDER_PAYLOAD: &str = "PROVIDER_PAYLOAD:";
@@ -193,12 +173,8 @@ impl core::fmt::Display for OrchestrationError {
             Self::InvalidGraph => formatter.write_str("orchestration task graph is invalid"),
             Self::UnsafeHandoff => formatter.write_str("orchestration handoff is unsafe"),
             Self::CrossTenantLeak => formatter.write_str("orchestration crosses tenant boundary"),
-            Self::OutOfScopeMutation => {
-                formatter.write_str("orchestration mutation is outside workspace scope")
-            }
-            Self::UnsupportedOperation => {
-                formatter.write_str("orchestration operation is unsupported")
-            }
+            Self::OutOfScopeMutation => formatter.write_str("orchestration mutation is outside workspace scope"),
+            Self::UnsupportedOperation => formatter.write_str("orchestration operation is unsupported"),
             Self::SchemaMismatch => formatter.write_str("orchestration schema mismatch"),
             Self::UnsafeEvidence { field, marker } => {
                 write!(formatter, "{field} contains unsafe marker {marker}")
@@ -208,18 +184,12 @@ impl core::fmt::Display for OrchestrationError {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} must contain at most {max_items} items; got {actual_items}"
-            ),
+            } => write!(formatter, "{field} must contain at most {max_items} items; got {actual_items}"),
             Self::NonMonotonicSequence {
                 field,
                 min_value,
                 actual_value,
-            } => write!(
-                formatter,
-                "{field} must be at least {min_value}; got {actual_value}"
-            ),
+            } => write!(formatter, "{field} must be at least {min_value}; got {actual_value}"),
         }
     }
 }
@@ -401,10 +371,7 @@ impl OrchestrationMutationIntent {
     /// # Errors
     ///
     /// Returns [`OrchestrationError`] when labels are empty or unsafe.
-    pub fn new(
-        target_label: &str,
-        approval_label: Option<&str>,
-    ) -> Result<Self, OrchestrationError> {
+    pub fn new(target_label: &str, approval_label: Option<&str>) -> Result<Self, OrchestrationError> {
         Ok(Self {
             target_label: safe_text(TARGET_FIELD, target_label)?,
             approval_label: optional_safe_text(APPROVAL_FIELD, approval_label)?,
@@ -449,23 +416,12 @@ pub fn validate_orchestration_workspace_mutation(
 ) -> Result<OrchestrationWorkspaceAdmission, OrchestrationError> {
     let target = safe_text(TARGET_FIELD, mutation.target_label())?;
     assert!(!target.is_empty());
-    let scope_target_count = scope
-        .writable_targets()
-        .len()
-        .saturating_add(scope.approval_required_targets().len());
+    let scope_target_count = scope.writable_targets().len().saturating_add(scope.approval_required_targets().len());
     assert!(scope_target_count > 0);
-    if scope
-        .writable_targets()
-        .iter()
-        .any(|allowed| allowed == &target)
-    {
+    if scope.writable_targets().iter().any(|allowed| allowed == &target) {
         return Ok(OrchestrationWorkspaceAdmission::Allowed);
     }
-    if scope
-        .approval_required_targets()
-        .iter()
-        .any(|guarded| guarded == &target)
-    {
+    if scope.approval_required_targets().iter().any(|guarded| guarded == &target) {
         if let Some(approval_label) = mutation.approval_label() {
             let _approval = safe_text(APPROVAL_FIELD, approval_label)?;
             return Ok(OrchestrationWorkspaceAdmission::Allowed);
@@ -508,11 +464,7 @@ impl OrchestrationComment {
     /// Returns [`OrchestrationError`] when fields are unsafe, metadata is
     /// oversized, or the sequence is below the accepted minimum.
     pub fn new(input: &OrchestrationCommentInput<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
         Ok(Self {
             actor_label: safe_text(ACTOR_FIELD, input.actor_label)?,
             sequence: input.sequence,
@@ -586,11 +538,7 @@ impl OrchestrationHeartbeat {
     /// Returns [`OrchestrationError`] when fields are unsafe, metadata is
     /// oversized, or the sequence is below the accepted minimum.
     pub fn new(input: &OrchestrationHeartbeatInput<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
         Ok(Self {
             actor_label: safe_text(ACTOR_FIELD, input.actor_label)?,
             sequence: input.sequence,
@@ -670,11 +618,7 @@ impl OrchestrationBlockRecord {
     /// Returns [`OrchestrationError`] when fields are unsafe, metadata is
     /// oversized, or the sequence is below the accepted minimum.
     pub fn new(input: &OrchestrationBlockRecordInput<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
         Ok(Self {
             actor_label: safe_text(ACTOR_FIELD, input.actor_label)?,
             sequence: input.sequence,
@@ -765,16 +709,8 @@ impl OrchestrationCompletion {
     /// Returns [`OrchestrationError`] when fields are unsafe, metadata is
     /// oversized, or sequence/revision values are below accepted minimums.
     pub fn new(input: &OrchestrationCompletionInput<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
-        validate_minimum(
-            REVISION_FIELD.as_str(),
-            input.task_revision,
-            MIN_ORCHESTRATION_REVISION,
-        )?;
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
+        validate_minimum(REVISION_FIELD.as_str(), input.task_revision, MIN_ORCHESTRATION_REVISION)?;
         Ok(Self {
             actor_label: safe_text(ACTOR_FIELD, input.actor_label)?,
             sequence: input.sequence,
@@ -888,32 +824,12 @@ impl OrchestrationTaskDraft {
     /// Returns [`OrchestrationError`] when fields are unsafe, collections are
     /// oversized, or the revision is below the accepted minimum.
     pub fn new(input: OrchestrationTaskDraftInput<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            REVISION_FIELD.as_str(),
-            input.revision,
-            MIN_ORCHESTRATION_REVISION,
-        )?;
-        validate_collection_count(
-            PARENT_FIELD,
-            input.parent_ids.len(),
-            MAX_ORCHESTRATION_LINKS,
-        )?;
+        validate_minimum(REVISION_FIELD.as_str(), input.revision, MIN_ORCHESTRATION_REVISION)?;
+        validate_collection_count(PARENT_FIELD, input.parent_ids.len(), MAX_ORCHESTRATION_LINKS)?;
         validate_collection_count(CHILD_FIELD, input.child_ids.len(), MAX_ORCHESTRATION_LINKS)?;
-        validate_collection_count(
-            SUMMARY_FIELD,
-            input.comments.len(),
-            MAX_ORCHESTRATION_RECORDS,
-        )?;
-        validate_collection_count(
-            SUMMARY_FIELD,
-            input.heartbeats.len(),
-            MAX_ORCHESTRATION_RECORDS,
-        )?;
-        validate_collection_count(
-            REASON_FIELD,
-            input.block_records.len(),
-            MAX_ORCHESTRATION_RECORDS,
-        )?;
+        validate_collection_count(SUMMARY_FIELD, input.comments.len(), MAX_ORCHESTRATION_RECORDS)?;
+        validate_collection_count(SUMMARY_FIELD, input.heartbeats.len(), MAX_ORCHESTRATION_RECORDS)?;
+        validate_collection_count(REASON_FIELD, input.block_records.len(), MAX_ORCHESTRATION_RECORDS)?;
         Ok(Self {
             task_id: safe_text(TASK_ID_FIELD, input.task_id)?,
             title: safe_text(TITLE_FIELD, input.title)?,
@@ -1092,11 +1008,7 @@ impl OrchestrationContextHandoff {
     /// Returns [`OrchestrationError`] when fields are unsafe, metadata is
     /// oversized, or the sequence is below the accepted minimum.
     pub fn new(input: &OrchestrationContextHandoffDraft<'_>) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
         Ok(Self {
             handoff_id: safe_text(HANDOFF_ID_FIELD, input.handoff_id)?,
             task_id: safe_text(TASK_ID_FIELD, input.task_id)?,
@@ -1158,11 +1070,7 @@ impl OrchestrationOperationMetadata {
     /// # Errors
     ///
     /// Returns [`OrchestrationError`] when labels are empty or unsafe.
-    pub fn new(
-        actor_label: &str,
-        policy_label: &str,
-        tenant_label: Option<&str>,
-    ) -> Result<Self, OrchestrationError> {
+    pub fn new(actor_label: &str, policy_label: &str, tenant_label: Option<&str>) -> Result<Self, OrchestrationError> {
         Ok(Self {
             actor: safe_text(ACTOR_FIELD, actor_label)?,
             policy: safe_text(POLICY_FIELD, policy_label)?,
@@ -1202,10 +1110,7 @@ impl OrchestrationTaskGraphLoadRequest {
     /// # Errors
     ///
     /// Returns [`OrchestrationError`] when labels are empty or unsafe.
-    pub fn new(
-        board_label: &str,
-        metadata: OrchestrationOperationMetadata,
-    ) -> Result<Self, OrchestrationError> {
+    pub fn new(board_label: &str, metadata: OrchestrationOperationMetadata) -> Result<Self, OrchestrationError> {
         Ok(Self {
             board_label: safe_text(BOARD_LABEL_FIELD, board_label)?,
             metadata,
@@ -1235,10 +1140,7 @@ pub struct OrchestrationHandoffAppendRequest {
 impl OrchestrationHandoffAppendRequest {
     /// Builds a handoff append request.
     #[must_use]
-    pub const fn new(
-        handoff: OrchestrationContextHandoff,
-        metadata: OrchestrationOperationMetadata,
-    ) -> Self {
+    pub const fn new(handoff: OrchestrationContextHandoff, metadata: OrchestrationOperationMetadata) -> Self {
         Self { handoff, metadata }
     }
 
@@ -1473,19 +1375,9 @@ impl OrchestrationLifecycleEvidence {
     ///
     /// Returns [`OrchestrationError`] when labels, summaries, redactions, or
     /// hashes are unsafe, or the sequence is below the accepted minimum.
-    pub fn new(
-        input: &OrchestrationLifecycleEvidenceInput<'_>,
-    ) -> Result<Self, OrchestrationError> {
-        validate_minimum(
-            SEQUENCE_FIELD.as_str(),
-            input.sequence,
-            MIN_ORCHESTRATION_SEQUENCE,
-        )?;
-        validate_collection_count(
-            REDACTION_FIELD,
-            input.redaction_markers.len(),
-            MAX_ORCHESTRATION_REDACTIONS,
-        )?;
+    pub fn new(input: &OrchestrationLifecycleEvidenceInput<'_>) -> Result<Self, OrchestrationError> {
+        validate_minimum(SEQUENCE_FIELD.as_str(), input.sequence, MIN_ORCHESTRATION_SEQUENCE)?;
+        validate_collection_count(REDACTION_FIELD, input.redaction_markers.len(), MAX_ORCHESTRATION_REDACTIONS)?;
         Ok(Self {
             kind: input.kind,
             actor_label: safe_text(ACTOR_FIELD, input.actor_label)?,
@@ -1646,11 +1538,7 @@ impl OrchestrationReceipt {
         if family_label != ORCHESTRATION_FAMILY_LABEL {
             return Err(OrchestrationError::SchemaMismatch);
         }
-        validate_collection_count(
-            REDACTION_FIELD,
-            draft.redaction_markers.len(),
-            MAX_ORCHESTRATION_REDACTIONS,
-        )?;
+        validate_collection_count(REDACTION_FIELD, draft.redaction_markers.len(), MAX_ORCHESTRATION_REDACTIONS)?;
         let board_label = safe_text(BOARD_LABEL_FIELD, draft.board_label)?;
         let task_label = optional_safe_text(TASK_ID_FIELD, draft.task_label)?;
         let policy_label = safe_text(POLICY_FIELD, draft.policy_label)?;
@@ -1939,11 +1827,7 @@ fn validate_graph_links(tasks: &[OrchestrationTaskDraft]) -> Result<(), Orchestr
             let Some(parent) = find_task(tasks, parent_id.as_str()) else {
                 return Err(OrchestrationError::InvalidGraph);
             };
-            if !parent
-                .child_ids()
-                .iter()
-                .any(|child| child == task.task_id())
-            {
+            if !parent.child_ids().iter().any(|child| child == task.task_id()) {
                 return Err(OrchestrationError::InvalidGraph);
             }
         }
@@ -1951,11 +1835,7 @@ fn validate_graph_links(tasks: &[OrchestrationTaskDraft]) -> Result<(), Orchestr
             let Some(child) = find_task(tasks, child_id.as_str()) else {
                 return Err(OrchestrationError::InvalidGraph);
             };
-            if !child
-                .parent_ids()
-                .iter()
-                .any(|parent| parent == task.task_id())
-            {
+            if !child.parent_ids().iter().any(|parent| parent == task.task_id()) {
                 return Err(OrchestrationError::InvalidGraph);
             }
         }
@@ -1973,9 +1853,7 @@ fn validate_unique_links(links: &[String]) -> Result<(), OrchestrationError> {
     Ok(())
 }
 
-fn validate_tenant_dependencies(
-    tasks: &[OrchestrationTaskDraft],
-) -> Result<(), OrchestrationError> {
+fn validate_tenant_dependencies(tasks: &[OrchestrationTaskDraft]) -> Result<(), OrchestrationError> {
     for task in tasks {
         for parent_id in task.parent_ids() {
             let Some(parent) = find_task(tasks, parent_id.as_str()) else {
@@ -1989,10 +1867,7 @@ fn validate_tenant_dependencies(
     Ok(())
 }
 
-fn find_task<'a>(
-    tasks: &'a [OrchestrationTaskDraft],
-    task_id: &str,
-) -> Option<&'a OrchestrationTaskDraft> {
+fn find_task<'a>(tasks: &'a [OrchestrationTaskDraft], task_id: &str) -> Option<&'a OrchestrationTaskDraft> {
     tasks.iter().find(|task| task.task_id() == task_id)
 }
 
@@ -2000,10 +1875,7 @@ fn tenant_mismatch(left: Option<&str>, right: Option<&str>) -> bool {
     matches!((left, right), (Some(left), Some(right)) if left != right)
 }
 
-fn safe_text(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<String, OrchestrationError> {
+fn safe_text(field: crate::validation::FieldName, value: &str) -> Result<String, OrchestrationError> {
     let normalized = crate::validation::normalized_adapter_field(field, value)?;
     reject_unsafe_text(field, normalized.as_str())?;
     Ok(normalized)
@@ -2022,23 +1894,15 @@ fn safe_text_list(
     allow_empty: bool,
 ) -> Result<Vec<String>, OrchestrationError> {
     if !allow_empty && values.is_empty() {
-        return Err(OrchestrationError::EmptyCollection {
-            field: field.as_str(),
-        });
+        return Err(OrchestrationError::EmptyCollection { field: field.as_str() });
     }
     validate_collection_count(field, values.len(), MAX_ORCHESTRATION_LINKS)?;
     values.iter().map(|value| safe_text(field, value)).collect()
 }
 
 #[cfg_attr(animus_octet, allow(tigerstyle::unbounded_collection_growth))]
-fn safe_metadata(
-    metadata: &BTreeMap<String, String>,
-) -> Result<BTreeMap<String, String>, OrchestrationError> {
-    validate_collection_count(
-        METADATA_FIELD,
-        metadata.len(),
-        MAX_ORCHESTRATION_METADATA_FIELDS,
-    )?;
+fn safe_metadata(metadata: &BTreeMap<String, String>) -> Result<BTreeMap<String, String>, OrchestrationError> {
+    validate_collection_count(METADATA_FIELD, metadata.len(), MAX_ORCHESTRATION_METADATA_FIELDS)?;
     let mut safe = BTreeMap::new();
     for (key, value) in metadata {
         let safe_key = safe_text(METADATA_FIELD, key.as_str())?;
@@ -2048,10 +1912,7 @@ fn safe_metadata(
     Ok(safe)
 }
 
-fn reject_unsafe_text(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<(), OrchestrationError> {
+fn reject_unsafe_text(field: crate::validation::FieldName, value: &str) -> Result<(), OrchestrationError> {
     for marker in UNSAFE_TEXT_MARKERS {
         if contains_unsafe_marker(value, marker) {
             return Err(OrchestrationError::UnsafeEvidence {
@@ -2088,11 +1949,7 @@ fn validate_collection_count(
 }
 
 #[cfg_attr(animus_octet, allow(tigerstyle::ambiguous_params))]
-fn validate_minimum(
-    field: &'static str,
-    actual_value: u64,
-    min_value: u64,
-) -> Result<(), OrchestrationError> {
+fn validate_minimum(field: &'static str, actual_value: u64, min_value: u64) -> Result<(), OrchestrationError> {
     if actual_value < min_value {
         return Err(OrchestrationError::NonMonotonicSequence {
             field,
@@ -2105,9 +1962,10 @@ fn validate_minimum(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
     use alloc::vec;
+
+    use super::*;
 
     const BOARD: &str = "board-main";
     const TASK: &str = "task-main";
@@ -2148,10 +2006,8 @@ mod tests {
             request: &OrchestrationHandoffAppendRequest,
         ) -> Result<OrchestrationReceipt, OrchestrationError> {
             assert_eq!(request.handoff().handoff_id(), HANDOFF);
-            self.appended = self
-                .appended
-                .checked_add(EXPECTED_SINGLE_ITEM)
-                .expect("fixture append count remains bounded");
+            self.appended =
+                self.appended.checked_add(EXPECTED_SINGLE_ITEM).expect("fixture append count remains bounded");
             safe_receipt(OrchestrationOperationKind::AppendHandoff)
         }
 
@@ -2175,14 +2031,9 @@ mod tests {
             &mut self,
             request: &OrchestrationLifecycleEvidenceRequest,
         ) -> Result<OrchestrationReceipt, OrchestrationError> {
-            assert_eq!(
-                request.evidence().kind(),
-                OrchestrationLifecycleEvidenceKind::Heartbeat
-            );
-            self.recorded = self
-                .recorded
-                .checked_add(EXPECTED_SINGLE_ITEM)
-                .expect("fixture record count remains bounded");
+            assert_eq!(request.evidence().kind(), OrchestrationLifecycleEvidenceKind::Heartbeat);
+            self.recorded =
+                self.recorded.checked_add(EXPECTED_SINGLE_ITEM).expect("fixture record count remains bounded");
             safe_receipt(OrchestrationOperationKind::RecordLifecycleEvidence)
         }
     }
@@ -2235,21 +2086,14 @@ mod tests {
         // r[verify agent_harness_runtime.orchestration_adapters.verification]
         let mut host = NoopHost::default();
         let load_request = load_request();
-        let graph = load_orchestration_task_graph(Some(&mut host), &load_request)
-            .expect("service should load graph");
+        let graph = load_orchestration_task_graph(Some(&mut host), &load_request).expect("service should load graph");
         assert_eq!(graph.tasks().len(), EXPECTED_TWO_ITEMS);
 
         let append_request = append_request();
-        let append_receipt = append_orchestration_handoff(Some(&mut host), &append_request)
-            .expect("service should append handoff");
-        assert_eq!(
-            append_receipt.operation(),
-            OrchestrationOperationKind::AppendHandoff
-        );
-        assert_eq!(
-            append_receipt.redaction_markers().len(),
-            EXPECTED_SINGLE_ITEM
-        );
+        let append_receipt =
+            append_orchestration_handoff(Some(&mut host), &append_request).expect("service should append handoff");
+        assert_eq!(append_receipt.operation(), OrchestrationOperationKind::AppendHandoff);
+        assert_eq!(append_receipt.redaction_markers().len(), EXPECTED_SINGLE_ITEM);
         assert_eq!(host.appended, EXPECTED_SINGLE_ITEM);
 
         let scheduling_request = OrchestrationSchedulingAdmissionRequest::new(
@@ -2263,11 +2107,10 @@ mod tests {
             .expect("scheduling should be admitted");
         assert_eq!(admission, OrchestrationSchedulingAdmission::Admitted);
 
-        let cancellation_request =
-            OrchestrationCancellationRequest::new(BOARD, TASK, "operator-requested", metadata())
-                .expect("cancellation request should validate");
-        let cancellation = cancel_orchestration_task(Some(&mut host), &cancellation_request)
-            .expect("cancellation should be admitted");
+        let cancellation_request = OrchestrationCancellationRequest::new(BOARD, TASK, "operator-requested", metadata())
+            .expect("cancellation request should validate");
+        let cancellation =
+            cancel_orchestration_task(Some(&mut host), &cancellation_request).expect("cancellation should be admitted");
         assert_eq!(cancellation, OrchestrationCancellationOutcome::Cancelled);
 
         let evidence_hash = blake3_orchestration_hash(&["heartbeat", TASK]);
@@ -2280,9 +2123,8 @@ mod tests {
             redaction_markers: &[REDACTION],
         })
         .expect("lifecycle evidence should validate");
-        let evidence_request =
-            OrchestrationLifecycleEvidenceRequest::new(BOARD, TASK, evidence, metadata())
-                .expect("evidence request should validate");
+        let evidence_request = OrchestrationLifecycleEvidenceRequest::new(BOARD, TASK, evidence, metadata())
+            .expect("evidence request should validate");
         let receipt = record_orchestration_lifecycle_evidence(Some(&mut host), &evidence_request)
             .expect("evidence should record");
         assert_eq!(receipt.status(), OrchestrationStatusClass::Recorded);
@@ -2294,8 +2136,8 @@ mod tests {
     fn fail_closed_for_missing_denied_unavailable_and_rejected_services() {
         // r[verify agent_harness_runtime.orchestration_adapters.fail_closed]
         // r[verify agent_harness_runtime.orchestration_adapters.verification]
-        let missing = load_orchestration_task_graph(None, &load_request())
-            .expect_err("missing service must fail closed");
+        let missing =
+            load_orchestration_task_graph(None, &load_request()).expect_err("missing service must fail closed");
         assert_eq!(missing, OrchestrationError::MissingService);
 
         let mut denied = FailingHost {
@@ -2308,9 +2150,8 @@ mod tests {
         let mut unavailable = FailingHost {
             error: OrchestrationError::BackendUnavailable,
         };
-        let unavailable_error =
-            append_orchestration_handoff(Some(&mut unavailable), &append_request())
-                .expect_err("unavailable service must fail closed");
+        let unavailable_error = append_orchestration_handoff(Some(&mut unavailable), &append_request())
+            .expect_err("unavailable service must fail closed");
         assert_eq!(unavailable_error, OrchestrationError::BackendUnavailable);
 
         let mut rejected_host = FailingHost {
@@ -2323,9 +2164,8 @@ mod tests {
             metadata(),
         )
         .expect("scheduling request should validate");
-        let rejected_error =
-            admit_orchestration_scheduling(Some(&mut rejected_host), &scheduling_request)
-                .expect_err("unsupported operation must fail closed");
+        let rejected_error = admit_orchestration_scheduling(Some(&mut rejected_host), &scheduling_request)
+            .expect_err("unsupported operation must fail closed");
         assert_eq!(rejected_error, OrchestrationError::UnsupportedOperation);
     }
 
@@ -2344,20 +2184,16 @@ mod tests {
             .checked_add(1)
             .expect("redaction overflow fixture count remains bounded");
         let redaction_marker_overflow = alloc::vec![REDACTION; redaction_marker_overflow_count];
-        let redaction_overflow_error =
-            OrchestrationLifecycleEvidence::new(&OrchestrationLifecycleEvidenceInput {
-                kind: OrchestrationLifecycleEvidenceKind::Heartbeat,
-                actor_label: ACTOR,
-                sequence: FIRST_SEQUENCE,
-                summary: "worker heartbeat redacted",
-                evidence_hash: blake3_orchestration_hash(&["heartbeat", TASK]).as_str(),
-                redaction_markers: &redaction_marker_overflow,
-            })
-            .expect_err("oversized redaction list should fail");
-        assert!(matches!(
-            redaction_overflow_error,
-            OrchestrationError::TooManyItems { .. }
-        ));
+        let redaction_overflow_error = OrchestrationLifecycleEvidence::new(&OrchestrationLifecycleEvidenceInput {
+            kind: OrchestrationLifecycleEvidenceKind::Heartbeat,
+            actor_label: ACTOR,
+            sequence: FIRST_SEQUENCE,
+            summary: "worker heartbeat redacted",
+            evidence_hash: blake3_orchestration_hash(&["heartbeat", TASK]).as_str(),
+            redaction_markers: &redaction_marker_overflow,
+        })
+        .expect_err("oversized redaction list should fail");
+        assert!(matches!(redaction_overflow_error, OrchestrationError::TooManyItems { .. }));
 
         let cross_tenant = cross_tenant_graph().expect_err("cross tenant dependency should fail");
         assert_eq!(cross_tenant, OrchestrationError::CrossTenantLeak);
@@ -2371,10 +2207,7 @@ mod tests {
         let guarded = OrchestrationMutationIntent::new(GUARDED_TARGET, None)
             .and_then(|mutation| validate_orchestration_workspace_mutation(&scope, &mutation))
             .expect("guarded target should request approval");
-        assert_eq!(
-            guarded,
-            OrchestrationWorkspaceAdmission::RequiresHostApproval
-        );
+        assert_eq!(guarded, OrchestrationWorkspaceAdmission::RequiresHostApproval);
         let approved = OrchestrationMutationIntent::new(GUARDED_TARGET, Some(APPROVAL))
             .and_then(|mutation| validate_orchestration_workspace_mutation(&scope, &mutation))
             .expect("approved guarded target should pass");
@@ -2394,10 +2227,7 @@ mod tests {
             metadata: &empty_metadata(),
         })
         .expect_err("raw prompt marker should fail");
-        assert!(matches!(
-            unsafe_handoff,
-            OrchestrationError::UnsafeEvidence { .. }
-        ));
+        assert!(matches!(unsafe_handoff, OrchestrationError::UnsafeEvidence { .. }));
 
         let leak = validate_orchestration_receipt_text("HOST_DATABASE_ROW: private row")
             .expect_err("host database evidence should fail");
@@ -2471,23 +2301,16 @@ mod tests {
     }
 
     fn workspace_scope() -> OrchestrationWorkspaceScope {
-        OrchestrationWorkspaceScope::new(
-            OrchestrationWorkspaceKind::Directory,
-            ROOT,
-            &[TARGET],
-            &[GUARDED_TARGET],
-        )
-        .expect("workspace scope should validate")
+        OrchestrationWorkspaceScope::new(OrchestrationWorkspaceKind::Directory, ROOT, &[TARGET], &[GUARDED_TARGET])
+            .expect("workspace scope should validate")
     }
 
     fn metadata() -> OrchestrationOperationMetadata {
-        OrchestrationOperationMetadata::new(ACTOR, POLICY, Some(TENANT_ALPHA))
-            .expect("metadata should validate")
+        OrchestrationOperationMetadata::new(ACTOR, POLICY, Some(TENANT_ALPHA)).expect("metadata should validate")
     }
 
     fn load_request() -> OrchestrationTaskGraphLoadRequest {
-        OrchestrationTaskGraphLoadRequest::new(BOARD, metadata())
-            .expect("load request should validate")
+        OrchestrationTaskGraphLoadRequest::new(BOARD, metadata()).expect("load request should validate")
     }
 
     fn append_request() -> OrchestrationHandoffAppendRequest {
@@ -2503,9 +2326,7 @@ mod tests {
         OrchestrationHandoffAppendRequest::new(handoff, metadata())
     }
 
-    fn safe_receipt(
-        operation: OrchestrationOperationKind,
-    ) -> Result<OrchestrationReceipt, OrchestrationError> {
+    fn safe_receipt(operation: OrchestrationOperationKind) -> Result<OrchestrationReceipt, OrchestrationError> {
         assert!(!BOARD.is_empty());
         assert!(!TASK.is_empty());
         let dto_hash = blake3_orchestration_hash(&[operation.as_str(), BOARD, TASK]);

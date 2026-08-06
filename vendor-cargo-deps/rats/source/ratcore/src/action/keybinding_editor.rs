@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+
 use super::*;
-use std::collections::{BTreeMap, BTreeSet};
 
 const EMPTY_QUERY: &str = "";
 
@@ -7,7 +9,7 @@ const EMPTY_QUERY: &str = "";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeybindingDefault {
     /// Action identifier.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Default shortcut.
     pub shortcut: ActionShortcut,
 }
@@ -15,7 +17,7 @@ pub struct KeybindingDefault {
 impl KeybindingDefault {
     /// Creates a default shortcut entry.
     #[must_use]
-    pub fn new(action_id: impl Into<String>, shortcut: ActionShortcut) -> Self {
+    pub fn new(action_id: impl Into<ActionId>, shortcut: ActionShortcut) -> Self {
         Self {
             action_id: action_id.into(),
             shortcut,
@@ -27,7 +29,7 @@ impl KeybindingDefault {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeybindingOverride {
     /// Action identifier.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Override shortcut; `None` means the action was explicitly cleared.
     pub shortcut: Option<ActionShortcut>,
 }
@@ -35,7 +37,7 @@ pub struct KeybindingOverride {
 impl KeybindingOverride {
     /// Creates an assigned override.
     #[must_use]
-    pub fn assign(action_id: impl Into<String>, shortcut: ActionShortcut) -> Self {
+    pub fn assign(action_id: impl Into<ActionId>, shortcut: ActionShortcut) -> Self {
         Self {
             action_id: action_id.into(),
             shortcut: Some(shortcut),
@@ -44,7 +46,7 @@ impl KeybindingOverride {
 
     /// Creates a clear override.
     #[must_use]
-    pub fn clear(action_id: impl Into<String>) -> Self {
+    pub fn clear(action_id: impl Into<ActionId>) -> Self {
         Self {
             action_id: action_id.into(),
             shortcut: None,
@@ -103,9 +105,9 @@ pub struct KeybindingEditorDiagnostic {
     /// Machine-readable diagnostic code.
     pub code: KeybindingEditorDiagnosticCode,
     /// Primary action identifier.
-    pub action_id: Option<String>,
+    pub action_id: Option<ActionId>,
     /// Conflicting action identifiers.
-    pub related_action_ids: Vec<String>,
+    pub related_action_ids: Vec<ActionId>,
     /// Human-readable message.
     pub message: String,
 }
@@ -115,8 +117,8 @@ impl KeybindingEditorDiagnostic {
     #[must_use]
     pub fn new(
         code: KeybindingEditorDiagnosticCode,
-        action_id: Option<String>,
-        related_action_ids: Vec<String>,
+        action_id: Option<ActionId>,
+        related_action_ids: Vec<ActionId>,
         message: impl Into<String>,
     ) -> Self {
         Self {
@@ -132,7 +134,7 @@ impl KeybindingEditorDiagnostic {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeybindingEditorRow {
     /// Action identifier.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// Action category.
@@ -168,24 +170,24 @@ pub enum ShortcutEditCommand {
     /// Assign a captured shortcut.
     Assign {
         /// Action identifier.
-        action_id: String,
+        action_id: ActionId,
         /// Shortcut to assign.
         shortcut: ActionShortcut,
     },
     /// Clear the current shortcut.
     Clear {
         /// Action identifier.
-        action_id: String,
+        action_id: ActionId,
     },
     /// Reset to default shortcut.
     Reset {
         /// Action identifier.
-        action_id: String,
+        action_id: ActionId,
     },
     /// Renderer reported an unsupported key capture.
     UnsupportedKey {
         /// Action identifier.
-        action_id: String,
+        action_id: ActionId,
         /// Unsupported key label.
         key: String,
     },
@@ -240,10 +242,7 @@ pub fn build_keybinding_editor_model(
         .collect();
     let changed_count = all_rows.iter().filter(|row| row.changed).count();
     let normalized_query = search_query.trim().to_ascii_lowercase();
-    let rows = all_rows
-        .into_iter()
-        .filter(|row| query_matches(row, &normalized_query))
-        .collect();
+    let rows = all_rows.into_iter().filter(|row| query_matches(row, &normalized_query)).collect();
     if snapshot.actions().is_empty() {
         diagnostics.push(KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::EmptyRegistry,
@@ -271,13 +270,11 @@ pub fn apply_shortcut_edit(
     search_query: &str,
 ) -> ShortcutEditOutcome {
     let mut next_overrides = overrides.to_vec();
-    let diagnostic =
-        validate_shortcut_command(snapshot, defaults, &next_overrides, reserved, &command);
+    let diagnostic = validate_shortcut_command(snapshot, defaults, &next_overrides, reserved, &command);
     if diagnostic.is_none() {
         apply_valid_command(&mut next_overrides, command);
     }
-    let model =
-        build_keybinding_editor_model(snapshot, defaults, &next_overrides, reserved, search_query);
+    let model = build_keybinding_editor_model(snapshot, defaults, &next_overrides, reserved, search_query);
     ShortcutEditOutcome {
         overrides: next_overrides,
         model,
@@ -308,11 +305,7 @@ fn validate_editor_inputs(
     reserved: &[ReservedShortcut],
 ) -> Vec<KeybindingEditorDiagnostic> {
     let mut diagnostics = Vec::new();
-    let action_ids: BTreeSet<_> = snapshot
-        .actions()
-        .iter()
-        .map(|action| action.id.as_str())
-        .collect();
+    let action_ids: BTreeSet<_> = snapshot.actions().iter().map(|action| &action.id).collect();
     diagnostics.extend(unknown_default_diagnostics(defaults, &action_ids));
     diagnostics.extend(unknown_override_diagnostics(overrides, &action_ids));
     diagnostics.extend(duplicate_override_diagnostics(overrides));
@@ -347,11 +340,11 @@ fn validate_editor_inputs(
 
 fn unknown_default_diagnostics(
     defaults: &[KeybindingDefault],
-    action_ids: &BTreeSet<&str>,
+    action_ids: &BTreeSet<&ActionId>,
 ) -> Vec<KeybindingEditorDiagnostic> {
     defaults
         .iter()
-        .filter(|default| !action_ids.contains(default.action_id.as_str()))
+        .filter(|default| !action_ids.contains(&default.action_id))
         .map(|default| {
             KeybindingEditorDiagnostic::new(
                 KeybindingEditorDiagnosticCode::UnknownAction,
@@ -365,11 +358,11 @@ fn unknown_default_diagnostics(
 
 fn unknown_override_diagnostics(
     overrides: &[KeybindingOverride],
-    action_ids: &BTreeSet<&str>,
+    action_ids: &BTreeSet<&ActionId>,
 ) -> Vec<KeybindingEditorDiagnostic> {
     overrides
         .iter()
-        .filter(|override_entry| !action_ids.contains(override_entry.action_id.as_str()))
+        .filter(|override_entry| !action_ids.contains(&override_entry.action_id))
         .map(|override_entry| {
             KeybindingEditorDiagnostic::new(
                 KeybindingEditorDiagnosticCode::UnknownAction,
@@ -381,9 +374,7 @@ fn unknown_override_diagnostics(
         .collect()
 }
 
-fn duplicate_override_diagnostics(
-    overrides: &[KeybindingOverride],
-) -> Vec<KeybindingEditorDiagnostic> {
+fn duplicate_override_diagnostics(overrides: &[KeybindingOverride]) -> Vec<KeybindingEditorDiagnostic> {
     let mut seen = BTreeSet::new();
     let mut diagnostics = Vec::new();
     for override_entry in overrides {
@@ -403,7 +394,7 @@ fn current_shortcuts(
     snapshot: &ActionRegistrySnapshot,
     defaults: &[KeybindingDefault],
     overrides: &[KeybindingOverride],
-) -> BTreeMap<String, Option<ActionShortcut>> {
+) -> BTreeMap<ActionId, Option<ActionShortcut>> {
     let mut current = BTreeMap::new();
     for action in snapshot.actions() {
         current.insert(action.id.clone(), action.shortcut.clone());
@@ -412,19 +403,16 @@ fn current_shortcuts(
         current.insert(default.action_id.clone(), Some(default.shortcut.clone()));
     }
     for override_entry in overrides {
-        current.insert(
-            override_entry.action_id.clone(),
-            override_entry.shortcut.clone(),
-        );
+        current.insert(override_entry.action_id.clone(), override_entry.shortcut.clone());
     }
     current
 }
 
 fn conflict_diagnostics(
     snapshot: &ActionRegistrySnapshot,
-    current: &BTreeMap<String, Option<ActionShortcut>>,
+    current: &BTreeMap<ActionId, Option<ActionShortcut>>,
 ) -> Vec<KeybindingEditorDiagnostic> {
-    let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut grouped: BTreeMap<String, Vec<ActionId>> = BTreeMap::new();
     for action in snapshot.actions() {
         if !snapshot.is_active(action) {
             continue;
@@ -432,10 +420,7 @@ fn conflict_diagnostics(
         let Some(Some(shortcut)) = current.get(&action.id) else {
             continue;
         };
-        grouped
-            .entry(shortcut_key(shortcut))
-            .or_default()
-            .push(action.id.clone());
+        grouped.entry(shortcut_key(shortcut)).or_default().push(action.id.clone());
     }
     grouped
         .into_iter()
@@ -454,17 +439,12 @@ fn conflict_diagnostics(
 }
 
 fn reserved_diagnostics(
-    current: &BTreeMap<String, Option<ActionShortcut>>,
+    current: &BTreeMap<ActionId, Option<ActionShortcut>>,
     reserved: &[ReservedShortcut],
 ) -> Vec<KeybindingEditorDiagnostic> {
     let reserved_keys: BTreeMap<_, _> = reserved
         .iter()
-        .map(|reserved_shortcut| {
-            (
-                shortcut_key(&reserved_shortcut.shortcut),
-                reserved_shortcut.reason.clone(),
-            )
-        })
+        .map(|reserved_shortcut| (shortcut_key(&reserved_shortcut.shortcut), reserved_shortcut.reason.clone()))
         .collect();
     current
         .iter()
@@ -485,7 +465,7 @@ fn editor_row(
     snapshot: &ActionRegistrySnapshot,
     action: &ActionDescriptor,
     defaults: &[KeybindingDefault],
-    current: &BTreeMap<String, Option<ActionShortcut>>,
+    current: &BTreeMap<ActionId, Option<ActionShortcut>>,
     diagnostics: &[KeybindingEditorDiagnostic],
 ) -> KeybindingEditorRow {
     let default_shortcut = defaults
@@ -513,10 +493,7 @@ fn editor_row(
 
 fn query_matches(row: &KeybindingEditorRow, normalized_query: &str) -> bool {
     normalized_query == EMPTY_QUERY
-        || row
-            .action_id
-            .to_ascii_lowercase()
-            .contains(normalized_query)
+        || row.action_id.as_str().to_ascii_lowercase().contains(normalized_query)
         || row.label.to_ascii_lowercase().contains(normalized_query)
         || row.category.to_ascii_lowercase().contains(normalized_query)
 }
@@ -529,21 +506,18 @@ fn validate_shortcut_command(
     command: &ShortcutEditCommand,
 ) -> Option<KeybindingEditorDiagnostic> {
     match command {
-        ShortcutEditCommand::Assign {
-            action_id,
-            shortcut,
-        } => validate_assign_command(snapshot, defaults, overrides, reserved, action_id, shortcut),
+        ShortcutEditCommand::Assign { action_id, shortcut } => {
+            validate_assign_command(snapshot, defaults, overrides, reserved, action_id, shortcut)
+        }
         ShortcutEditCommand::Clear { action_id } | ShortcutEditCommand::Reset { action_id } => {
             validate_action_editable(snapshot, action_id)
         }
-        ShortcutEditCommand::UnsupportedKey { action_id, key } => {
-            Some(KeybindingEditorDiagnostic::new(
-                KeybindingEditorDiagnosticCode::UnsupportedKey,
-                Some(action_id.clone()),
-                Vec::new(),
-                format!("unsupported key capture: {key}"),
-            ))
-        }
+        ShortcutEditCommand::UnsupportedKey { action_id, key } => Some(KeybindingEditorDiagnostic::new(
+            KeybindingEditorDiagnosticCode::UnsupportedKey,
+            Some(action_id.clone()),
+            Vec::new(),
+            format!("unsupported key capture: {key}"),
+        )),
     }
 }
 
@@ -552,7 +526,7 @@ fn validate_assign_command(
     defaults: &[KeybindingDefault],
     overrides: &[KeybindingOverride],
     reserved: &[ReservedShortcut],
-    action_id: &str,
+    action_id: &ActionId,
     shortcut: &ActionShortcut,
 ) -> Option<KeybindingEditorDiagnostic> {
     if let Some(diagnostic) = validate_action_editable(snapshot, action_id) {
@@ -561,58 +535,47 @@ fn validate_assign_command(
     if shortcut.key.trim().is_empty() {
         return Some(KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::EmptyCapture,
-            Some(action_id.to_string()),
+            Some(action_id.clone()),
             Vec::new(),
             "shortcut capture is empty",
         ));
     }
-    if shortcut
-        .modifiers
-        .iter()
-        .any(|modifier| modifier.trim().is_empty())
-    {
+    if shortcut.modifiers.iter().any(|modifier| modifier.trim().is_empty()) {
         return Some(KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::MalformedModifier,
-            Some(action_id.to_string()),
+            Some(action_id.clone()),
             Vec::new(),
             "shortcut capture contains an empty modifier",
         ));
     }
-    if let Some(reserved_shortcut) = reserved.iter().find(|reserved_shortcut| {
-        shortcut_key(&reserved_shortcut.shortcut) == shortcut_key(shortcut)
-    }) {
+    if let Some(reserved_shortcut) = reserved
+        .iter()
+        .find(|reserved_shortcut| shortcut_key(&reserved_shortcut.shortcut) == shortcut_key(shortcut))
+    {
         return Some(KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::ReservedShortcut,
-            Some(action_id.to_string()),
+            Some(action_id.clone()),
             Vec::new(),
             reserved_shortcut.reason.clone(),
         ));
     }
     let mut next_overrides = overrides.to_vec();
-    upsert_override(
-        &mut next_overrides,
-        KeybindingOverride::assign(action_id.to_string(), shortcut.clone()),
-    );
+    upsert_override(&mut next_overrides, KeybindingOverride::assign(action_id.clone(), shortcut.clone()));
     let current = current_shortcuts(snapshot, defaults, &next_overrides);
-    conflict_diagnostics(snapshot, &current)
-        .into_iter()
-        .find(|diagnostic| {
-            diagnostic.action_id.as_deref() == Some(action_id)
-                || diagnostic
-                    .related_action_ids
-                    .iter()
-                    .any(|id| id == action_id)
-        })
+    conflict_diagnostics(snapshot, &current).into_iter().find(|diagnostic| {
+        diagnostic.action_id.as_ref() == Some(action_id)
+            || diagnostic.related_action_ids.iter().any(|id| id == action_id)
+    })
 }
 
 fn validate_action_editable(
     snapshot: &ActionRegistrySnapshot,
-    action_id: &str,
+    action_id: &ActionId,
 ) -> Option<KeybindingEditorDiagnostic> {
     let Some(action) = snapshot.action(action_id) else {
         return Some(KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::UnknownAction,
-            Some(action_id.to_string()),
+            Some(action_id.clone()),
             Vec::new(),
             "shortcut command references unknown action",
         ));
@@ -620,7 +583,7 @@ fn validate_action_editable(
     (!snapshot.is_active(action)).then(|| {
         KeybindingEditorDiagnostic::new(
             KeybindingEditorDiagnosticCode::DisabledAction,
-            Some(action_id.to_string()),
+            Some(action_id.clone()),
             Vec::new(),
             "disabled action cannot be rebound",
         )
@@ -628,7 +591,7 @@ fn validate_action_editable(
 }
 
 fn validate_shortcut_shape(
-    action_id: Option<String>,
+    action_id: Option<ActionId>,
     shortcut: &ActionShortcut,
     malformed_code: KeybindingEditorDiagnosticCode,
 ) -> Vec<KeybindingEditorDiagnostic> {
@@ -641,11 +604,7 @@ fn validate_shortcut_shape(
             "shortcut key is empty",
         ));
     }
-    if shortcut
-        .modifiers
-        .iter()
-        .any(|modifier| modifier.trim().is_empty())
-    {
+    if shortcut.modifiers.iter().any(|modifier| modifier.trim().is_empty()) {
         diagnostics.push(KeybindingEditorDiagnostic::new(
             malformed_code,
             action_id,
@@ -658,10 +617,7 @@ fn validate_shortcut_shape(
 
 fn apply_valid_command(overrides: &mut Vec<KeybindingOverride>, command: ShortcutEditCommand) {
     match command {
-        ShortcutEditCommand::Assign {
-            action_id,
-            shortcut,
-        } => {
+        ShortcutEditCommand::Assign { action_id, shortcut } => {
             upsert_override(overrides, KeybindingOverride::assign(action_id, shortcut));
         }
         ShortcutEditCommand::Clear { action_id } => {
@@ -704,14 +660,13 @@ mod tests {
 
     fn registry() -> ActionRegistrySnapshot {
         build_registry(vec![
-            ActionDescriptor::new("file.save", "Save", ActionSource::new("test"))
-                .with_shortcut(shortcut("s")),
-            ActionDescriptor::new("file.open", "Open", ActionSource::new("test"))
-                .with_shortcut(shortcut("o")),
-            ActionDescriptor::new("file.disabled", "Disabled", ActionSource::new("test"))
-                .with_enablement(ActionEnablement::Disabled {
+            ActionDescriptor::new("file.save", "Save", ActionSource::new("test")).with_shortcut(shortcut("s")),
+            ActionDescriptor::new("file.open", "Open", ActionSource::new("test")).with_shortcut(shortcut("o")),
+            ActionDescriptor::new("file.disabled", "Disabled", ActionSource::new("test")).with_enablement(
+                ActionEnablement::Disabled {
                     reason: "not available".to_string(),
-                }),
+                },
+            ),
         ])
         .snapshot
     }
@@ -723,10 +678,7 @@ mod tests {
 
         assert_eq!(model.rows.len(), 1);
         assert_eq!(model.rows[0].action_id, "file.save");
-        assert_eq!(
-            model.rows[0].current_shortcut_label,
-            Some("Ctrl+k".to_string())
-        );
+        assert_eq!(model.rows[0].current_shortcut_label, Some("Ctrl+k".to_string()));
         assert_eq!(model.changed_count, 1);
     }
 
@@ -737,10 +689,7 @@ mod tests {
             &empty_registry,
             &[KeybindingDefault::new("missing", shortcut("m"))],
             &[
-                KeybindingOverride::assign(
-                    "missing",
-                    ActionShortcut::global("", vec!["Ctrl".to_string()]),
-                ),
+                KeybindingOverride::assign("missing", ActionShortcut::global("", vec!["Ctrl".to_string()])),
                 KeybindingOverride::clear("missing"),
             ],
             &[ReservedShortcut::new(shortcut("r"), "reserved")],
@@ -754,27 +703,48 @@ mod tests {
             EMPTY_QUERY,
         );
 
-        assert!(model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::EmptyRegistry
-        }));
-        assert!(model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::UnknownAction
-        }));
-        assert!(model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::DuplicateOverride
-        }));
-        assert!(model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::MalformedOverride
-        }));
-        assert!(disabled_model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::DisabledAction
-        }));
-        assert!(disabled_model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::ReservedShortcut
-        }));
-        assert!(disabled_model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == KeybindingEditorDiagnosticCode::ShortcutConflict
-        }));
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::EmptyRegistry })
+        );
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::UnknownAction })
+        );
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::DuplicateOverride })
+        );
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::MalformedOverride })
+        );
+        assert!(
+            disabled_model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::DisabledAction })
+        );
+        assert!(
+            disabled_model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::ReservedShortcut })
+        );
+        assert!(
+            disabled_model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == KeybindingEditorDiagnosticCode::ShortcutConflict })
+        );
     }
 
     #[test]
@@ -785,7 +755,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Assign {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
                 shortcut: shortcut("k"),
             },
             EMPTY_QUERY,
@@ -796,7 +766,7 @@ mod tests {
             &assigned.overrides,
             &[],
             ShortcutEditCommand::Clear {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
             },
             EMPTY_QUERY,
         );
@@ -806,7 +776,7 @@ mod tests {
             &cleared.overrides,
             &[],
             ShortcutEditCommand::Reset {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
             },
             EMPTY_QUERY,
         );
@@ -826,7 +796,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Assign {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
                 shortcut: ActionShortcut::global("", vec!["Ctrl".to_string()]),
             },
             EMPTY_QUERY,
@@ -837,7 +807,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Assign {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
                 shortcut: ActionShortcut::global("k", vec!["".to_string()]),
             },
             EMPTY_QUERY,
@@ -848,7 +818,7 @@ mod tests {
             &[],
             &reserved,
             ShortcutEditCommand::Assign {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
                 shortcut: shortcut("r"),
             },
             EMPTY_QUERY,
@@ -859,7 +829,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Assign {
-                action_id: "file.open".to_string(),
+                action_id: ActionId::new("file.open"),
                 shortcut: shortcut("s"),
             },
             EMPTY_QUERY,
@@ -870,7 +840,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Clear {
-                action_id: "missing".to_string(),
+                action_id: ActionId::new("missing"),
             },
             EMPTY_QUERY,
         );
@@ -880,7 +850,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::Reset {
-                action_id: "file.disabled".to_string(),
+                action_id: ActionId::new("file.disabled"),
             },
             EMPTY_QUERY,
         );
@@ -890,7 +860,7 @@ mod tests {
             &[],
             &[],
             ShortcutEditCommand::UnsupportedKey {
-                action_id: "file.save".to_string(),
+                action_id: ActionId::new("file.save"),
                 key: "Hyper".to_string(),
             },
             EMPTY_QUERY,

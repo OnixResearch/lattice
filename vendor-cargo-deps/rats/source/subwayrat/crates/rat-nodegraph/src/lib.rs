@@ -7,15 +7,19 @@
 //!
 //! # Architecture
 //!
-//! - [`model`] — Pure data structures (`Graph`, `Node`, `Port`, `Edge`). No
-//!   ratatui dependency. Supports serde behind a feature flag.
-//! - [`view`] — `NodeGraphWidget` (implements `StatefulWidget`) and
-//!   `NodeGraphState`. Renders nodes as bordered boxes with port markers,
-//!   edges as Manhattan-routed box-drawing lines. Interaction via
-//!   `handle_mouse_click`, `handle_mouse_drag`, `handle_key` which return
-//!   `GraphAction` events.
-//! - [`layout`] — `auto_layout()` positions nodes using a layered algorithm
-//!   with configurable direction, spacing, and snap-to-grid.
+//! - [`model`] — Pure data structures (`Graph`, `Node`, `Port`, `Edge`). No ratatui dependency.
+//!   Supports serde behind a feature flag.
+//! - [`view`] — `NodeGraphWidget` (implements `StatefulWidget`) and `NodeGraphState`. Renders nodes
+//!   as bordered boxes with port markers, edges as Manhattan-routed box-drawing lines. Interaction
+//!   via `handle_mouse_click`, `handle_mouse_drag`, `handle_key` which return `GraphAction` events.
+//! - [`layout`] — `auto_layout()` positions nodes using a layered algorithm with configurable
+//!   direction, spacing, and snap-to-grid.
+//!
+//! Graph topology, positions, selection, and actions remain authoritative here.
+//! The deferred evaluation in `docs/scene-intent-evaluation.md` identified
+//! Manhattan paint/hit geometry as a possible immutable projection, but did not
+//! add a shared scene API. Geometry should first be reused locally rather than
+//! creating another mutable graph model.
 //!
 //! # Quick start
 //!

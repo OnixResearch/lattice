@@ -1,0 +1,17 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [
+    "config/agent-check-registry.ncl"
+  ],
+  "destination": "clippy.toml",
+  "family_id": "animus.repo.clippy",
+  "format": "toml",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "clippy_config",
+  "source": "config/repo.ncl"
+}

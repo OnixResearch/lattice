@@ -31,12 +31,8 @@ fn rect() -> PointerRect {
 #[test]
 fn terminal_adapter_normalizes_supported_and_unsupported_events() {
     let drag = normalize_subwayrat_mouse_input(
-        SubwayratMouseInput::new(
-            point(),
-            SubwayratMouseKind::Drag,
-            SubwayratMouseButton::Left,
-        )
-        .with_captured_target("splitter"),
+        SubwayratMouseInput::new(point(), SubwayratMouseKind::Drag, SubwayratMouseButton::Left)
+            .with_captured_target("splitter"),
     )
     .expect("terminal drag is supported");
     let scroll = normalize_subwayrat_mouse_input(SubwayratMouseInput::new(
@@ -52,7 +48,7 @@ fn terminal_adapter_normalizes_supported_and_unsupported_events() {
     ));
 
     assert_eq!(drag.phase, PointerPhase::DragUpdate);
-    assert_eq!(drag.captured_target, Some("splitter".to_string()));
+    assert_eq!(drag.captured_target, Some(PointerTargetId::new("splitter")));
     assert_eq!(scroll.phase, PointerPhase::Wheel);
     assert!(scroll.wheel_delta.is_some());
     assert!(matches!(
@@ -66,12 +62,9 @@ fn terminal_adapter_normalizes_supported_and_unsupported_events() {
 
 #[test]
 fn ratzilla_adapter_keeps_movement_and_enter_exit_supported() {
-    let moved = normalize_ratzilla_mouse_input(RatzillaPointerInput::new(
-        point(),
-        RatzillaMouseKind::Moved,
-        NO_BUTTON_NUMBER,
-    ))
-    .expect("movement is supported");
+    let moved =
+        normalize_ratzilla_mouse_input(RatzillaPointerInput::new(point(), RatzillaMouseKind::Moved, NO_BUTTON_NUMBER))
+            .expect("movement is supported");
     let entered = normalize_ratzilla_mouse_input(RatzillaPointerInput::new(
         point(),
         RatzillaMouseKind::Entered,
@@ -106,12 +99,8 @@ fn ratzilla_adapter_keeps_movement_and_enter_exit_supported() {
 fn ratzilla_adapter_preserves_modifier_metadata() {
     let modifiers = ctrl_shift_modifiers();
     let event = normalize_ratzilla_mouse_input(
-        RatzillaPointerInput::new(
-            point(),
-            RatzillaMouseKind::SingleClick,
-            PRIMARY_BUTTON_NUMBER,
-        )
-        .with_modifiers(modifiers),
+        RatzillaPointerInput::new(point(), RatzillaMouseKind::SingleClick, PRIMARY_BUTTON_NUMBER)
+            .with_modifiers(modifiers),
     )
     .expect("modified Ratzilla click is supported");
 
@@ -121,24 +110,17 @@ fn ratzilla_adapter_preserves_modifier_metadata() {
 
 #[test]
 fn dom_adapter_normalizes_context_wheel_drag_and_unsupported_paths() {
-    let context = normalize_dom_pointer_input(DomPointerInput::new(
-        point(),
-        DomPointerKind::ContextMenu,
-        PointerButton::Primary,
-    ))
-    .expect("context menu is supported");
+    let context =
+        normalize_dom_pointer_input(DomPointerInput::new(point(), DomPointerKind::ContextMenu, PointerButton::Primary))
+            .expect("context menu is supported");
     let wheel = normalize_dom_pointer_input(
-        DomPointerInput::new(point(), DomPointerKind::Wheel, PointerButton::None).with_wheel_delta(
-            PointerWheelDelta::new(ORIGIN, WHEEL_DELTA, PointerWheelUnit::Pixels),
-        ),
+        DomPointerInput::new(point(), DomPointerKind::Wheel, PointerButton::None)
+            .with_wheel_delta(PointerWheelDelta::new(ORIGIN, WHEEL_DELTA, PointerWheelUnit::Pixels)),
     )
     .expect("wheel is supported");
-    let drag = normalize_dom_pointer_input(DomPointerInput::new(
-        point(),
-        DomPointerKind::DragEnd,
-        PointerButton::Primary,
-    ))
-    .expect("drag end is supported");
+    let drag =
+        normalize_dom_pointer_input(DomPointerInput::new(point(), DomPointerKind::DragEnd, PointerButton::Primary))
+            .expect("drag end is supported");
     let unsupported = normalize_dom_pointer_input(DomPointerInput::new(
         point(),
         DomPointerKind::Unsupported("browser-gesture".to_string()),
@@ -171,12 +153,7 @@ fn rendered_regions_derive_hit_maps_without_geometry_drift() {
             .with_diagnostic("disabled by renderer"),
     ]);
     let disabled = route_pointer_event(
-        &PointerEvent::new(
-            point(),
-            PointerButton::Primary,
-            PointerPhase::Down,
-            PointerSource::Mouse,
-        ),
+        &PointerEvent::new(point(), PointerButton::Primary, PointerPhase::Down, PointerSource::Mouse),
         &disabled_map,
     );
 

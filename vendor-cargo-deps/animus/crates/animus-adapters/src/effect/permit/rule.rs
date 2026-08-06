@@ -100,11 +100,7 @@ impl Policy {
         self.hash.as_str()
     }
 
-    pub(super) fn matches_request(
-        &self,
-        action: super::super::GuardedAction,
-        resource_label: &str,
-    ) -> bool {
+    pub(super) fn matches_request(&self, action: super::super::GuardedAction, resource_label: &str) -> bool {
         self.action == action && self.resource_label == resource_label
     }
 }

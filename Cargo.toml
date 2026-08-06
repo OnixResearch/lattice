@@ -7,7 +7,11 @@ license = "AGPL-3.0-or-later"
 [workspace]
 members = [".", "crates/budget-ledger-core"]
 default-members = ["."]
-exclude = ["vendor-cargo-deps/animus"]
+exclude = [
+  "vendor-cargo-deps/animus",
+  "vendor-cargo-deps/host-control",
+  "vendor-cargo-deps/host-control/crates/host-control-core",
+]
 resolver = "3"
 
 [workspace.package]

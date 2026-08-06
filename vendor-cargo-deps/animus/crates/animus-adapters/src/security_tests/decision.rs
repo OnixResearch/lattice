@@ -2,11 +2,7 @@ use super::*;
 
 #[test]
 fn benign_review_allows_with_safe_receipt() {
-    let input = review_input(
-        SecurityActionClass::ReadOnly,
-        &[SAFE_ARGUMENT],
-        &[CONTEXT_SUMMARY],
-    );
+    let input = review_input(SecurityActionClass::ReadOnly, &[SAFE_ARGUMENT], &[CONTEXT_SUMMARY]);
     let scan = scan_review_input(&input);
     let review = advisory(SecurityAdvisoryOutcome::Allow);
     let decision = bind_security_review(&SecurityReviewBinding {
@@ -22,18 +18,12 @@ fn benign_review_allows_with_safe_receipt() {
     assert_eq!(decision.issue(), SecurityDecisionIssue::None);
     assert_eq!(decision.receipt().status(), SecurityDecisionStatus::Allowed);
     assert_eq!(decision.receipt().finding_count(), 0);
-    assert!(
-        validate_security_review_receipt_text(&alloc::format!("{:?}", decision.receipt())).is_ok()
-    );
+    assert!(validate_security_review_receipt_text(&alloc::format!("{:?}", decision.receipt())).is_ok());
 }
 
 #[test]
 fn reviewer_allow_cannot_grant_authority_bypass_sandbox_or_suppress_confirmation() {
-    let input = review_input(
-        SecurityActionClass::ReadOnly,
-        &[SAFE_ARGUMENT],
-        &[CONTEXT_SUMMARY],
-    );
+    let input = review_input(SecurityActionClass::ReadOnly, &[SAFE_ARGUMENT], &[CONTEXT_SUMMARY]);
     let scan = scan_review_input(&input);
     let allow = advisory(SecurityAdvisoryOutcome::Allow);
     let missing_authority = with_permission(&input, &scan, &allow, denied_authority());
@@ -41,39 +31,19 @@ fn reviewer_allow_cannot_grant_authority_bypass_sandbox_or_suppress_confirmation
     let missing_confirmation = with_permission(&input, &scan, &allow, denied_confirmation());
 
     assert_eq!(missing_authority.status(), SecurityDecisionStatus::Denied);
-    assert_eq!(
-        missing_authority.issue(),
-        SecurityDecisionIssue::MissingAuthority
-    );
+    assert_eq!(missing_authority.issue(), SecurityDecisionIssue::MissingAuthority);
     assert!(!missing_authority.dispatch_allowed());
     assert_eq!(missing_sandbox.status(), SecurityDecisionStatus::Denied);
-    assert_eq!(
-        missing_sandbox.issue(),
-        SecurityDecisionIssue::SandboxDenied
-    );
-    assert_eq!(
-        missing_confirmation.status(),
-        SecurityDecisionStatus::RequiresConfirmation
-    );
-    assert_eq!(
-        missing_confirmation.issue(),
-        SecurityDecisionIssue::ConfirmationRequired
-    );
+    assert_eq!(missing_sandbox.issue(), SecurityDecisionIssue::SandboxDenied);
+    assert_eq!(missing_confirmation.status(), SecurityDecisionStatus::RequiresConfirmation);
+    assert_eq!(missing_confirmation.issue(), SecurityDecisionIssue::ConfirmationRequired);
     assert!(!missing_confirmation.dispatch_allowed());
 }
 
 #[test]
 fn fail_behavior_denies_high_risk_outage_and_allows_low_risk_fallback() {
-    let high_risk = review_input(
-        SecurityActionClass::NetworkTransfer,
-        &["unknown-upload-domain"],
-        &[CONTEXT_SUMMARY],
-    );
-    let low_risk = review_input(
-        SecurityActionClass::ReadOnly,
-        &[SAFE_ARGUMENT],
-        &[CONTEXT_SUMMARY],
-    );
+    let high_risk = review_input(SecurityActionClass::NetworkTransfer, &["unknown-upload-domain"], &[CONTEXT_SUMMARY]);
+    let low_risk = review_input(SecurityActionClass::ReadOnly, &[SAFE_ARGUMENT], &[CONTEXT_SUMMARY]);
     let outage = SecurityScanReport::unavailable(SecurityScannerStatus::Timeout);
     let low_scan = scan_review_input(&low_risk);
     let unavailable_review = advisory(SecurityAdvisoryOutcome::Unavailable);
@@ -93,10 +63,7 @@ fn fail_behavior_denies_high_risk_outage_and_allows_low_risk_fallback() {
     });
 
     assert_eq!(high_decision.status(), SecurityDecisionStatus::Denied);
-    assert_eq!(
-        high_decision.issue(),
-        SecurityDecisionIssue::ReviewUnavailable
-    );
+    assert_eq!(high_decision.issue(), SecurityDecisionIssue::ReviewUnavailable);
     assert!(low_decision.dispatch_allowed());
     assert_eq!(low_decision.issue(), SecurityDecisionIssue::None);
 }
@@ -104,16 +71,8 @@ fn fail_behavior_denies_high_risk_outage_and_allows_low_risk_fallback() {
 #[test]
 fn blocking_finding_stops_dispatch_and_receipt_is_redacted() {
     let input = SecurityReviewInput::validate(&SecurityReviewInputDraft {
-        raw_evidence: &[
-            RAW_PROMPT_SENTINEL,
-            CREDENTIAL_SENTINEL,
-            PRIVATE_PATH_SENTINEL,
-        ],
-        ..draft(
-            SecurityActionClass::FilesystemMutation,
-            &["recursive-delete"],
-            &[CONTEXT_SUMMARY],
-        )
+        raw_evidence: &[RAW_PROMPT_SENTINEL, CREDENTIAL_SENTINEL, PRIVATE_PATH_SENTINEL],
+        ..draft(SecurityActionClass::FilesystemMutation, &["recursive-delete"], &[CONTEXT_SUMMARY])
     })
     .expect("dangerous input should validate with hashed raw evidence");
     let scan = scan_review_input(&input);
@@ -139,18 +98,9 @@ fn blocking_finding_stops_dispatch_and_receipt_is_redacted() {
 
 #[test]
 fn receipt_validation_rejects_leaking_text() {
-    assert_eq!(
-        validate_security_review_receipt_text(RAW_PROMPT_SENTINEL),
-        Err(SecurityReceiptLeak::RawPrompt)
-    );
-    assert_eq!(
-        validate_security_review_receipt_text(CREDENTIAL_SENTINEL),
-        Err(SecurityReceiptLeak::Credential)
-    );
-    assert_eq!(
-        validate_security_review_receipt_text(PRIVATE_PATH_SENTINEL),
-        Err(SecurityReceiptLeak::PrivatePath)
-    );
+    assert_eq!(validate_security_review_receipt_text(RAW_PROMPT_SENTINEL), Err(SecurityReceiptLeak::RawPrompt));
+    assert_eq!(validate_security_review_receipt_text(CREDENTIAL_SENTINEL), Err(SecurityReceiptLeak::Credential));
+    assert_eq!(validate_security_review_receipt_text(PRIVATE_PATH_SENTINEL), Err(SecurityReceiptLeak::PrivatePath));
 }
 
 fn with_permission(

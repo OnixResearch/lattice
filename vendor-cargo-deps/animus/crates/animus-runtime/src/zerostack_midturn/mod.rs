@@ -5,7 +5,8 @@
 //! provider calls, token estimation, summarizer execution, ledger persistence,
 //! files, clocks, tools, and continuation side effects.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
+// drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -13,12 +14,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -28,19 +24,29 @@
 mod core;
 mod data;
 
-pub use core::{
-    artifactize_zerostack_tool_output, blake3_zerostack_midturn_fingerprint,
-    calculate_zerostack_prompt_pressure, plan_zerostack_midturn_compaction,
-    validate_zerostack_midturn_summary,
-};
-pub use data::{
-    ZerostackCachedTokenRule, ZerostackInjectedServiceState, ZerostackMidturnDecision,
-    ZerostackMidturnDiagnostic, ZerostackMidturnDiagnosticKind, ZerostackMidturnFingerprint,
-    ZerostackMidturnPlan, ZerostackMidturnPolicy, ZerostackMidturnServices,
-    ZerostackMidturnSummary, ZerostackMidturnSummaryKind, ZerostackMidturnValidationResult,
-    ZerostackPromptPressure, ZerostackProviderUsage, ZerostackRouteMetadata,
-    ZerostackToolArtifactDescriptor, ZerostackToolArtifactPolicy,
-};
+pub use core::artifactize_zerostack_tool_output;
+pub use core::blake3_zerostack_midturn_fingerprint;
+pub use core::calculate_zerostack_prompt_pressure;
+pub use core::plan_zerostack_midturn_compaction;
+pub use core::validate_zerostack_midturn_summary;
+
+pub use data::ZerostackCachedTokenRule;
+pub use data::ZerostackInjectedServiceState;
+pub use data::ZerostackMidturnDecision;
+pub use data::ZerostackMidturnDiagnostic;
+pub use data::ZerostackMidturnDiagnosticKind;
+pub use data::ZerostackMidturnFingerprint;
+pub use data::ZerostackMidturnPlan;
+pub use data::ZerostackMidturnPolicy;
+pub use data::ZerostackMidturnServices;
+pub use data::ZerostackMidturnSummary;
+pub use data::ZerostackMidturnSummaryKind;
+pub use data::ZerostackMidturnValidationResult;
+pub use data::ZerostackPromptPressure;
+pub use data::ZerostackProviderUsage;
+pub use data::ZerostackRouteMetadata;
+pub use data::ZerostackToolArtifactDescriptor;
+pub use data::ZerostackToolArtifactPolicy;
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const EMPTY_COUNT: usize = 0;

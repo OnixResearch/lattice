@@ -19,8 +19,7 @@ pub type RetrievalEvidenceStatus = crate::resource::retrieval::facts::EvidenceSt
 /// Validated evidence summary used for repeat/stop planning.
 pub type RetrievalEvidenceSummary = crate::resource::retrieval::facts::EvidenceSummary;
 /// Borrowed evidence summary used for repeat/stop planning.
-pub type RetrievalEvidenceSummaryDraft<'a> =
-    crate::resource::retrieval::facts::EvidenceSummaryDraft<'a>;
+pub type RetrievalEvidenceSummaryDraft<'a> = crate::resource::retrieval::facts::EvidenceSummaryDraft<'a>;
 /// Admission result for a retrieval-capable resource.
 pub type RetrievalResourceAdmission = crate::resource::retrieval::contract::Admission;
 /// Host retrieval policy applied to one resource descriptor.
@@ -43,10 +42,7 @@ pub fn admit_retrieval_resource(
 
 /// Plans whether retrieval should stop, repeat, or request missing input.
 #[must_use]
-pub fn plan_retrieval(
-    budget: &RetrievalBudget,
-    evidence: &RetrievalEvidenceSummary,
-) -> RetrievalDecision {
+pub fn plan_retrieval(budget: &RetrievalBudget, evidence: &RetrievalEvidenceSummary) -> RetrievalDecision {
     crate::resource::retrieval::facts::plan(budget, evidence)
 }
 /// MCP App adoption decision under the public facade naming scheme.
@@ -185,7 +181,8 @@ pub type WorkspaceCleanupPolicy = crate::workspace::rules::CleanupPolicy;
 pub type WorkspaceCommitTarget = crate::workspace::rules::CommitTarget;
 /// Conflict behavior for workspace commit planning under the public facade naming scheme.
 pub type WorkspaceConflictPolicy = crate::workspace::rules::ConflictPolicy;
-/// Policy for ignored or local files in speculative workspaces under the public facade naming scheme.
+/// Policy for ignored or local files in speculative workspaces under the public facade naming
+/// scheme.
 pub type WorkspaceFileInclusionPolicy = crate::workspace::rules::FileInclusionPolicy;
 /// Requested workspace operation under the public facade naming scheme.
 pub type WorkspaceOperation = crate::workspace::rules::Operation;
@@ -196,8 +193,7 @@ pub type WorkspaceRestoreMetadataDraft<'a> = crate::workspace::isolation::Restor
 /// Validated isolated task workspace under the public facade naming scheme.
 pub type IsolatedTaskWorkspace = crate::workspace::isolation::IsolatedTaskWorkspace;
 /// Borrowed isolated task workspace input under the public facade naming scheme.
-pub type IsolatedTaskWorkspaceDraft<'a> =
-    crate::workspace::isolation::IsolatedTaskWorkspaceDraft<'a>;
+pub type IsolatedTaskWorkspaceDraft<'a> = crate::workspace::isolation::IsolatedTaskWorkspaceDraft<'a>;
 /// Automation run kind under the public facade naming scheme.
 pub type WorkspaceAutomationKind = crate::workspace::automation::AutomationKind;
 /// Automation sandbox profile under the public facade naming scheme.
@@ -205,8 +201,7 @@ pub type WorkspaceAutomationSandboxProfile = crate::workspace::automation::Autom
 /// Validated automation run contract under the public facade naming scheme.
 pub type WorkspaceAutomationRunContract = crate::workspace::automation::AutomationRunContract;
 /// Borrowed automation run contract input under the public facade naming scheme.
-pub type WorkspaceAutomationRunContractDraft<'a> =
-    crate::workspace::automation::AutomationRunContractDraft<'a>;
+pub type WorkspaceAutomationRunContractDraft<'a> = crate::workspace::automation::AutomationRunContractDraft<'a>;
 /// Safe automation event kind under the public facade naming scheme.
 pub type WorkspaceAutomationEventKind = crate::workspace::automation::AutomationEventKind;
 /// Safe automation event under the public facade naming scheme.
@@ -220,29 +215,22 @@ pub type WorkspaceHandoffConflictStatus = crate::workspace::handoff::HandoffConf
 /// Snapshot handoff record under the public facade naming scheme.
 pub type WorkspaceSnapshotHandoffRecord = crate::workspace::handoff::SnapshotHandoffRecord;
 /// Borrowed snapshot handoff input under the public facade naming scheme.
-pub type WorkspaceSnapshotHandoffRecordDraft<'a> =
-    crate::workspace::handoff::SnapshotHandoffRecordDraft<'a>;
+pub type WorkspaceSnapshotHandoffRecordDraft<'a> = crate::workspace::handoff::SnapshotHandoffRecordDraft<'a>;
 /// Ignored-file redaction class under the public facade naming scheme.
-pub type WorkspaceIgnoredFileRedactionClass =
-    crate::workspace::inclusion::IgnoredFileRedactionClass;
+pub type WorkspaceIgnoredFileRedactionClass = crate::workspace::inclusion::IgnoredFileRedactionClass;
 /// Ignored-file redaction approval under the public facade naming scheme.
-pub type WorkspaceIgnoredFileRedactionApproval =
-    crate::workspace::inclusion::IgnoredFileRedactionApproval;
+pub type WorkspaceIgnoredFileRedactionApproval = crate::workspace::inclusion::IgnoredFileRedactionApproval;
 /// Ignored-file allowlist entry under the public facade naming scheme.
-pub type WorkspaceIgnoredFileAllowlistEntry =
-    crate::workspace::inclusion::IgnoredFileAllowlistEntry;
+pub type WorkspaceIgnoredFileAllowlistEntry = crate::workspace::inclusion::IgnoredFileAllowlistEntry;
 /// Borrowed ignored-file allowlist input under the public facade naming scheme.
-pub type WorkspaceIgnoredFileAllowlistEntryDraft<'a> =
-    crate::workspace::inclusion::IgnoredFileAllowlistEntryDraft<'a>;
+pub type WorkspaceIgnoredFileAllowlistEntryDraft<'a> = crate::workspace::inclusion::IgnoredFileAllowlistEntryDraft<'a>;
 /// Ignored-file materialization request under the public facade naming scheme.
 pub type WorkspaceIgnoredFileMaterializationRequest<'a> =
     crate::workspace::inclusion::IgnoredFileMaterializationRequest<'a>;
 /// Ignored-file materialization decision under the public facade naming scheme.
-pub type WorkspaceIgnoredFileMaterializationDecision =
-    crate::workspace::inclusion::IgnoredFileMaterializationDecision;
+pub type WorkspaceIgnoredFileMaterializationDecision = crate::workspace::inclusion::IgnoredFileMaterializationDecision;
 /// Ignored-file materialization status under the public facade naming scheme.
-pub type WorkspaceIgnoredFileMaterializationStatus =
-    crate::workspace::inclusion::IgnoredFileMaterializationStatus;
+pub type WorkspaceIgnoredFileMaterializationStatus = crate::workspace::inclusion::IgnoredFileMaterializationStatus;
 /// Ignored-file materialization denial reason under the public facade naming scheme.
 pub type WorkspaceIgnoredFileDenialReason = crate::workspace::inclusion::IgnoredFileDenialReason;
 

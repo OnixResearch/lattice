@@ -31,23 +31,17 @@ impl FocusGraph {
         self.validate()?;
         let eligible = self.eligible_ids();
         if eligible.is_empty() {
-            return Err(FocusError::new(
-                FocusErrorCode::NoEligibleTarget,
-                None,
-                "no eligible focus target",
-            ));
+            return Err(FocusError::new(FocusErrorCode::NoEligibleTarget, None, "no eligible focus target"));
         }
         let previous = self.active.clone();
-        let current_index = previous
-            .as_ref()
-            .and_then(|id| eligible.iter().position(|candidate| candidate == id));
+        let current_index = previous.as_ref().and_then(|id| eligible.iter().position(|candidate| candidate == id));
         let next_index = next_index(current_index, eligible.len(), direction);
         self.active = Some(eligible[next_index].clone());
         let transition = self.transition(previous);
         Ok((self.clone(), transition))
     }
 
-    pub(super) fn eligible_ids(&self) -> Vec<String> {
+    pub(super) fn eligible_ids(&self) -> Vec<FocusNodeId> {
         self.order
             .iter()
             .filter_map(|id| self.nodes.get(id))
@@ -58,17 +52,15 @@ impl FocusGraph {
     }
 
     pub(super) fn node_allowed_by_modal(&self, node: &FocusNode) -> bool {
-        self.modal_scope
-            .as_ref()
-            .is_none_or(|scope_id| self.scope_contains(scope_id, &node.scope))
+        self.modal_scope.as_ref().is_none_or(|scope_id| self.scope_contains(scope_id, &node.scope))
     }
 
-    fn scope_contains(&self, ancestor: &str, child: &str) -> bool {
+    fn scope_contains(&self, ancestor: &FocusScopeId, child: &FocusScopeId) -> bool {
         if ancestor == child {
             return true;
         }
         let mut seen = std::collections::BTreeSet::new();
-        let mut cursor = Some(child.to_string());
+        let mut cursor = Some(child.clone());
         while let Some(scope_id) = cursor.as_ref() {
             if !seen.insert(scope_id.clone()) {
                 return false;
@@ -76,7 +68,7 @@ impl FocusGraph {
             let Some(scope) = self.scopes.get(scope_id) else {
                 return false;
             };
-            if scope.parent.as_deref() == Some(ancestor) {
+            if scope.parent.as_ref() == Some(ancestor) {
                 return true;
             }
             cursor.clone_from(&scope.parent);

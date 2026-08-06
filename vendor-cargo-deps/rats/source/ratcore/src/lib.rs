@@ -6,6 +6,9 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::module_name_repetitions)]
 
+#[macro_use]
+mod identity;
+
 #[path = "action/registry.rs"]
 mod nexus_core;
 /// Renderer-neutral action registry and projection helpers.
@@ -24,20 +27,33 @@ mod adapter_core;
 mod arrange_core;
 #[path = "attention/core.rs"]
 mod attention_core;
+#[path = "validated/core.rs"]
+mod boundary_core;
 #[path = "calendar/date.rs"]
 pub mod caldate;
-#[path = "docking/drag.rs"]
-mod docking_drag_core;
+
+/// Shared validated priority cookie used by agenda and tag consumers.
+pub mod priority {
+    pub use crate::priority_core::*;
+}
+#[path = "priority.rs"]
+mod priority_core;
+/// Focused finite and bounded values shared by workspace boundaries.
+pub mod validated_values {
+    pub use crate::boundary_core::*;
+}
 #[path = "docking/shell.rs"]
-mod docking_shell_core;
+mod chrome_contract_core;
 #[path = "docking/pointer.rs"]
 mod panel_bridge_core;
+#[path = "docking/drag.rs"]
+mod pointer_state_core;
 /// Renderer-neutral docking and panel layout core.
 pub mod docking {
     pub use crate::arrange_core::*;
-    pub use crate::docking_drag_core::*;
-    pub use crate::docking_shell_core::*;
+    pub use crate::chrome_contract_core::*;
     pub use crate::panel_bridge_core::*;
+    pub use crate::pointer_state_core::*;
 }
 /// Renderer-neutral focus graph and accessibility metadata.
 pub mod focus {
@@ -51,14 +67,36 @@ pub mod fuzzy {
 }
 #[path = "animation.rs"]
 mod animation_core;
+/// Renderer-neutral command palette model and reducer.
+pub mod command_palette;
+#[path = "interaction/core.rs"]
+mod interaction_core;
+/// Renderer-neutral bounded prompt sessions and supplied completion snapshots.
+pub mod prompt_completion {
+    pub use crate::interaction_core::*;
+}
 #[path = "evidence/core.rs"]
 mod evidence_core;
+#[path = "headless/core.rs"]
+mod shared_behavior;
+/// Executable renderer-neutral component contracts and tabs behavior.
+pub mod headless_components {
+    pub use crate::shared_behavior::*;
+}
+#[path = "simulation/core.rs"]
+mod simcore;
+/// Provider-neutral deterministic-simulation controls, probes, state, and oracles.
+pub mod deterministic_simulation {
+    pub use crate::simcore::*;
+}
 #[path = "notification/activity.rs"]
 mod notification_activity_core;
 /// Shared desktop notifications, activity history, and status projections.
 pub mod notification_activity_center {
     pub use crate::notification_activity_core::*;
 }
+#[path = "generated/theme/adaptive.rs"]
+pub mod generated_adaptive_theme_tokens;
 #[path = "generated/theme/tokens.rs"]
 pub mod generated_theme_tokens;
 pub mod inline;
@@ -104,10 +142,14 @@ pub mod terminal_ide_kit {
 }
 #[path = "renderer/capabilities.rs"]
 mod capability_core;
+#[path = "host_portability.rs"]
+mod host_portability_core;
 #[path = "renderer/parity.rs"]
 mod parity_core;
 #[path = "subwayrat_web/core.rs"]
 mod sr_core;
+#[path = "renderer/taxonomy.rs"]
+mod targeting_core;
 #[path = "ratatui/coverage.rs"]
 mod tui_cov_core;
 #[path = "ratatui/rules/core.rs"]
@@ -120,6 +162,14 @@ pub mod subwayrat_web_renderer {
 pub mod renderer_parity {
     pub use crate::capability_core::*;
     pub use crate::parity_core::*;
+}
+/// Typed renderer families, targets, evidence adapters, scopes, and lifecycle policy.
+pub mod renderer_target_policy {
+    pub use crate::targeting_core::*;
+}
+/// Host-family, exact-target, capability, effect, ownership, and evidence policy.
+pub mod host_portability {
+    pub use crate::host_portability_core::*;
 }
 /// `Ratatui` API-family coverage inventory and feature-policy validation.
 pub mod ratatui_integration {

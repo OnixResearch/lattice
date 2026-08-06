@@ -3,20 +3,13 @@
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
-const IDENTITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("manifest_identity");
-const VERSION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("manifest_version");
-const TOOLSET_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("toolset_kind");
-const RUNTIME_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("runtime_kind");
-const TRUST_STATUS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("manifest_trust_status");
-const PROVENANCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("manifest_provenance");
-const TOOL_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("declared_tool_name");
+const IDENTITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("manifest_identity");
+const VERSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("manifest_version");
+const TOOLSET_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("toolset_kind");
+const RUNTIME_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("runtime_kind");
+const TRUST_STATUS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("manifest_trust_status");
+const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("manifest_provenance");
+const TOOL_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("declared_tool_name");
 const TOOL_DESCRIPTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("declared_tool_description");
 const TOOL_SCHEMA_FIELD: crate::validation::FieldName =
@@ -25,22 +18,17 @@ const TOOL_RESULT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("declared_tool_result_contract_identity");
 const TOOL_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("declared_tool_capability");
-const CAPABILITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("capability");
+const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("capability");
 const LAUNCH_COMMAND_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("launch_command_label");
-const LAUNCH_ARGUMENT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("launch_argument");
+const LAUNCH_ARGUMENT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("launch_argument");
 const WORKING_DIRECTORY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("working_directory_mode");
 const ENVIRONMENT_ALLOWLIST_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("environment_allowlist_name");
-const WRITABLE_ROOT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("writable_root");
-const SANDBOX_MODE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("sandbox_mode");
-const NETWORK_POLICY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("network_policy");
+const WRITABLE_ROOT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("writable_root");
+const SANDBOX_MODE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("sandbox_mode");
+const NETWORK_POLICY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("network_policy");
 
 const RUNTIME_KIND_HOST: &str = "host";
 const RUNTIME_KIND_STDIO: &str = "stdio";
@@ -64,8 +52,7 @@ const PATH_ESCAPE_SEGMENT: &str = "..";
 const WINDOWS_DRIVE_SEPARATOR: u8 = b':';
 const WINDOWS_DRIVE_SEPARATOR_INDEX: usize = 1;
 const PROMPT_GUIDELINE_COUNT: usize = 1;
-const INJECTED_EXECUTOR_GUIDELINE: &str =
-    "Use only host-injected executors for this manifest tool.";
+const INJECTED_EXECUTOR_GUIDELINE: &str = "Use only host-injected executors for this manifest tool.";
 
 /// Descriptor-side effects that manifest validation explicitly does not perform.
 pub const PROHIBITED_PLUGIN_MANIFEST_EFFECTS: &[&str] = &[
@@ -99,15 +86,11 @@ impl PluginDescriptor {
         let runtime_kind = validation::parse_runtime_kind(&runtime_text)?;
         let provenance = validation::validate_provenance(draft.provenance)?;
         let trust_status = validation::validate_trust_status(draft.trust_status)?;
-        let declared_tools = validation::validate_tools(
-            draft.declared_tools,
-            built_in_tool_names,
-            existing_catalog_tool_names,
-        )?;
+        let declared_tools =
+            validation::validate_tools(draft.declared_tools, built_in_tool_names, existing_catalog_tool_names)?;
         let compatibility = action::check::validate_manifest_compatibility(&draft.compatibility)?;
         let declared_roles = action::check::validate_roles(draft.declared_roles, &compatibility)?;
-        let capabilities =
-            validation::validate_required_texts(CAPABILITY_FIELD, draft.capabilities)?;
+        let capabilities = validation::validate_required_texts(CAPABILITY_FIELD, draft.capabilities)?;
         let launch_policy = validation::validate_launch_policy(runtime_kind, &draft.launch_policy)?;
         let sandbox = validation::validate_sandbox_requirements(&draft.sandbox)?;
         validation::assert_network_sandbox_combination(sandbox.network, sandbox.mode)?;
@@ -169,11 +152,7 @@ impl PluginDescriptor {
         Ok(definitions)
     }
 
-    fn definition_status(
-        &self,
-        tool_name: &str,
-        injected_executor_names: &[&str],
-    ) -> crate::tool::DefinitionStatus {
+    fn definition_status(&self, tool_name: &str, injected_executor_names: &[&str]) -> crate::tool::DefinitionStatus {
         if self.trust_status != TrustStatus::Trusted {
             return crate::tool::DefinitionStatus::Inactive;
         }
@@ -191,19 +170,38 @@ mod error;
 mod types;
 mod validation;
 
-pub use action::{
-    PluginCompatibility, PluginCompatibilityDraft, PluginDiagnostic, PluginDiagnosticKind,
-    PluginDiagnosticSeverity, PluginHostCompatibilityDraft, PluginInvocationContext,
-    PluginInvocationContextDraft, PluginInvocationContextLeak, PluginRegistryOperationDraft,
-    PluginRegistryOperationKind, PluginRegistryPlan, PluginRegistryPlanStatus, PluginRole,
-    PluginRoleDraft, PluginRoleKind,
-};
-pub use types::{
-    LaunchPolicy, LaunchPolicyDraft, NetworkPolicy, PluginDescriptor, PluginDescriptorDraft,
-    RedactionPolicy, RedactionPolicyDraft, RuntimeKind, SandboxMode, SandboxRequirements,
-    SandboxRequirementsDraft, ToolDescriptor, ToolDescriptorDraft, ToolsetKind, TrustStatus,
-    WorkingDirectoryMode,
-};
+pub use action::PluginCompatibility;
+pub use action::PluginCompatibilityDraft;
+pub use action::PluginDiagnostic;
+pub use action::PluginDiagnosticKind;
+pub use action::PluginDiagnosticSeverity;
+pub use action::PluginHostCompatibilityDraft;
+pub use action::PluginInvocationContext;
+pub use action::PluginInvocationContextDraft;
+pub use action::PluginInvocationContextLeak;
+pub use action::PluginRegistryOperationDraft;
+pub use action::PluginRegistryOperationKind;
+pub use action::PluginRegistryPlan;
+pub use action::PluginRegistryPlanStatus;
+pub use action::PluginRole;
+pub use action::PluginRoleDraft;
+pub use action::PluginRoleKind;
+pub use types::LaunchPolicy;
+pub use types::LaunchPolicyDraft;
+pub use types::NetworkPolicy;
+pub use types::PluginDescriptor;
+pub use types::PluginDescriptorDraft;
+pub use types::RedactionPolicy;
+pub use types::RedactionPolicyDraft;
+pub use types::RuntimeKind;
+pub use types::SandboxMode;
+pub use types::SandboxRequirements;
+pub use types::SandboxRequirementsDraft;
+pub use types::ToolDescriptor;
+pub use types::ToolDescriptorDraft;
+pub use types::ToolsetKind;
+pub use types::TrustStatus;
+pub use types::WorkingDirectoryMode;
 
 /// Descriptor manifest validation error.
 pub type PluginDescriptorError = self::error::ValidationFailure;

@@ -1,7 +1,11 @@
-use super::{
-    HANDOFF_DETAIL_FIELD, HANDOFF_STATUS_FIELD, HANDOFF_SUMMARY_FIELD, MIN_DETAIL_BOUND_CHARS,
-    SubagentError, SubagentReturnMode, Text, required_text,
-};
+use super::HANDOFF_DETAIL_FIELD;
+use super::HANDOFF_STATUS_FIELD;
+use super::HANDOFF_SUMMARY_FIELD;
+use super::MIN_DETAIL_BOUND_CHARS;
+use super::SubagentError;
+use super::SubagentReturnMode;
+use super::Text;
+use super::required_text;
 
 /// Untrusted subagent handoff data.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -65,34 +69,19 @@ impl SubagentHandoff {
 /// # Panics
 ///
 /// Panics if stable handoff field names are accidentally emptied at compile time.
-pub fn build_subagent_handoff(
-    draft: &SubagentHandoffDraft<'_>,
-) -> Result<SubagentHandoff, SubagentError> {
-    assert!(
-        !HANDOFF_STATUS_FIELD.as_str().is_empty(),
-        "handoff status field is stable"
-    );
-    assert!(
-        !HANDOFF_SUMMARY_FIELD.as_str().is_empty(),
-        "handoff summary field is stable"
-    );
+pub fn build_subagent_handoff(draft: &SubagentHandoffDraft<'_>) -> Result<SubagentHandoff, SubagentError> {
+    assert!(!HANDOFF_STATUS_FIELD.as_str().is_empty(), "handoff status field is stable");
+    assert!(!HANDOFF_SUMMARY_FIELD.as_str().is_empty(), "handoff summary field is stable");
     let return_mode = SubagentReturnMode::parse(draft.return_mode)?;
     let status = required_text(HANDOFF_STATUS_FIELD, draft.status)?;
     let summary = required_text(HANDOFF_SUMMARY_FIELD, draft.summary)?;
     let detail_ref = match return_mode {
         SubagentReturnMode::SummaryOnly | SubagentReturnMode::StatusPlusSummary => None,
         SubagentReturnMode::FullDetailWithBounds => {
-            if draft.max_detail_chars < MIN_DETAIL_BOUND_CHARS
-                || draft.detail_chars > draft.max_detail_chars
-            {
+            if draft.max_detail_chars < MIN_DETAIL_BOUND_CHARS || draft.detail_chars > draft.max_detail_chars {
                 return Err(SubagentError::DetailBoundsExceeded);
             }
-            Some(required_text(
-                HANDOFF_DETAIL_FIELD,
-                draft
-                    .detail_ref
-                    .ok_or(SubagentError::MissingDetailReference)?,
-            )?)
+            Some(required_text(HANDOFF_DETAIL_FIELD, draft.detail_ref.ok_or(SubagentError::MissingDetailReference)?)?)
         }
     };
     Ok(SubagentHandoff {

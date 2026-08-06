@@ -1,0 +1,8 @@
+schema=typed-docking-evidence-v1
+identity.panel=editor
+identity.legacy-zone=center
+identity.migrated-node=center
+ratio.exact=7/20 ratio.legacy=0.350000
+insertion.requested=9 insertion.checked=None insertion.clamped=2
+flexible-layout-v1={"root":{"Zone":{"id":"center","content":{"panels":["editor"],"active_panel":"editor","metadata":{}},"constraints":null}}}
+legacy-layout-v1={"zones":{},"floating_panels":{},"panel_configs":{}}

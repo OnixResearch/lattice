@@ -1,17 +1,13 @@
 #![allow(unknown_lints, path_segment_repetition)]
 
-const SNAPSHOT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_snapshot_id");
+const SNAPSHOT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_snapshot_id");
 const RESTORE_MANIFEST_HASH_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_restore_manifest_hash");
-const RESTORE_HINT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_restore_hint");
+const RESTORE_HINT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_restore_hint");
 const REQUIRED_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_required_capability");
-const ADAPTER_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_adapter_kind");
-const ADAPTER_STATE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_adapter_state");
+const ADAPTER_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_adapter_kind");
+const ADAPTER_STATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_adapter_state");
 
 /// Restore metadata preserved before isolated workspace cleanup or handoff.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,14 +25,10 @@ impl RestoreMetadata {
     /// Returns [`crate::AdapterContractError`] when any field is empty, malformed,
     /// or too long for adapter-boundary metadata.
     pub fn new(draft: RestoreMetadataDraft<'_>) -> Result<Self, crate::AdapterContractError> {
-        let snapshot_id =
-            crate::validation::normalized_adapter_field(SNAPSHOT_ID_FIELD, draft.snapshot_id)?;
-        let manifest_hash = crate::validation::normalized_adapter_field(
-            RESTORE_MANIFEST_HASH_FIELD,
-            draft.manifest_hash,
-        )?;
-        let restore_hint =
-            crate::validation::normalized_adapter_field(RESTORE_HINT_FIELD, draft.restore_hint)?;
+        let snapshot_id = crate::validation::normalized_adapter_field(SNAPSHOT_ID_FIELD, draft.snapshot_id)?;
+        let manifest_hash =
+            crate::validation::normalized_adapter_field(RESTORE_MANIFEST_HASH_FIELD, draft.manifest_hash)?;
+        let restore_hint = crate::validation::normalized_adapter_field(RESTORE_HINT_FIELD, draft.restore_hint)?;
         Ok(Self {
             snapshot_id,
             manifest_hash,
@@ -93,8 +85,7 @@ impl IsolatedTaskWorkspace {
     /// Returns [`crate::AdapterContractError`] when snapshot metadata is malformed,
     /// the adapter is unavailable or unsupported, or a required capability is absent.
     pub fn new(draft: IsolatedTaskWorkspaceDraft<'_>) -> Result<Self, crate::AdapterContractError> {
-        let snapshot_id =
-            crate::validation::normalized_adapter_field(SNAPSHOT_ID_FIELD, draft.snapshot_id)?;
+        let snapshot_id = crate::validation::normalized_adapter_field(SNAPSHOT_ID_FIELD, draft.snapshot_id)?;
         reject_snapshot_mismatch(SnapshotMatchInput {
             snapshot_id: snapshot_id.as_str(),
             restore_snapshot_id: draft.restore_metadata.snapshot_id(),
@@ -179,9 +170,7 @@ struct SnapshotMatchInput<'a> {
     restore_snapshot_id: &'a str,
 }
 
-fn reject_snapshot_mismatch(
-    input: SnapshotMatchInput<'_>,
-) -> Result<(), crate::AdapterContractError> {
+fn reject_snapshot_mismatch(input: SnapshotMatchInput<'_>) -> Result<(), crate::AdapterContractError> {
     if input.snapshot_id == input.restore_snapshot_id {
         return Ok(());
     }
@@ -191,9 +180,7 @@ fn reject_snapshot_mismatch(
     })
 }
 
-fn reject_unavailable_adapter(
-    adapter: &super::adapter::Capabilities,
-) -> Result<(), crate::AdapterContractError> {
+fn reject_unavailable_adapter(adapter: &super::adapter::Capabilities) -> Result<(), crate::AdapterContractError> {
     if matches!(adapter.kind(), super::adapter::Kind::Unsupported) {
         return Err(crate::AdapterContractError::UnsupportedWorkspaceValue {
             field: ADAPTER_KIND_FIELD.as_str(),

@@ -84,10 +84,7 @@ fn normalized_mutation_calls(
     for call in calls {
         states.push(MutationCallState {
             call_id: super::required_text(super::MUTATION_CALL_FIELD, call.call_id)?,
-            mutation_targets: super::normalized_label_set(
-                super::MUTATION_TARGET_FIELD,
-                call.mutation_targets,
-            )?,
+            mutation_targets: super::normalized_label_set(super::MUTATION_TARGET_FIELD, call.mutation_targets)?,
         });
     }
     Ok(states)
@@ -107,6 +104,5 @@ fn latest_conflicting_call(
 }
 
 fn has_target_overlap(left: &[super::Text], right: &[super::Text]) -> bool {
-    left.iter()
-        .any(|left_target| right.iter().any(|right_target| right_target == left_target))
+    left.iter().any(|left_target| right.iter().any(|right_target| right_target == left_target))
 }

@@ -1,4 +1,5 @@
-use super::{RecipeRetryCheck, RecipeRetryPolicy};
+use super::RecipeRetryCheck;
+use super::RecipeRetryPolicy;
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
@@ -73,11 +74,9 @@ impl RecipeRetryPlan {
 /// Builds a retry plan from validated metadata and active host denials.
 #[must_use]
 pub fn plan_recipe_retry(draft: RecipeRetryPlanDraft<'_>) -> RecipeRetryPlan {
-    let mut requests: Collection<RecipeRetryRequest> =
-        Collection::with_capacity(draft.policy.checks().len());
+    let mut requests: Collection<RecipeRetryRequest> = Collection::with_capacity(draft.policy.checks().len());
     for check in draft.policy.checks() {
-        let status =
-            classify_retry_request(check, draft.denied_capabilities, draft.denied_sandboxes);
+        let status = classify_retry_request(check, draft.denied_capabilities, draft.denied_sandboxes);
         requests.push(RecipeRetryRequest {
             label: Text::from(check.label()),
             status,
@@ -90,18 +89,12 @@ fn classify_retry_request(
     denied_capabilities: &[&str],
     denied_sandboxes: &[&str],
 ) -> RecipeRetryRequestStatus {
-    if denied_capabilities
-        .iter()
-        .any(|denied| *denied == check.capability())
-    {
+    if denied_capabilities.iter().any(|denied| *denied == check.capability()) {
         return RecipeRetryRequestStatus::Denied {
             reason: RecipeRetryDenialReason::Capability,
         };
     }
-    if denied_sandboxes
-        .iter()
-        .any(|denied| *denied == check.sandbox())
-    {
+    if denied_sandboxes.iter().any(|denied| *denied == check.sandbox()) {
         return RecipeRetryRequestStatus::Denied {
             reason: RecipeRetryDenialReason::Sandbox,
         };

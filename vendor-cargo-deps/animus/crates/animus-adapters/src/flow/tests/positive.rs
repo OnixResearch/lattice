@@ -10,17 +10,11 @@ fn workflow_manifest_accepts_typed_recipe_with_toolsets() {
     assert_eq!(workflow.parameters().len(), PARAMETER_COUNT);
     assert_eq!(workflow.model_profile(), MODEL_PROFILE);
     assert_eq!(workflow.toolsets()[FIRST_ITEM_INDEX], TOOLSET_READONLY);
-    assert_eq!(
-        workflow.validation_gates()[FIRST_ITEM_INDEX],
-        VALIDATION_GATE
-    );
+    assert_eq!(workflow.validation_gates()[FIRST_ITEM_INDEX], VALIDATION_GATE);
     assert_eq!(workflow.retry_policy().max_attempts(), RETRY_ATTEMPTS);
     assert_eq!(workflow.response_schema().name(), RESPONSE_SCHEMA);
     assert_eq!(workflow.provenance().status(), RecipeTrustStatus::Admitted);
-    assert_eq!(
-        workflow.provenance().identity_hash().len(),
-        TRUST_HASH_CHARS
-    );
+    assert_eq!(workflow.provenance().identity_hash().len(), TRUST_HASH_CHARS);
 }
 
 #[test]
@@ -34,18 +28,8 @@ fn parameter_binding_accepts_declared_variables_defaults_and_file_refs() {
     })
     .expect("binding should validate");
 
-    assert!(
-        binding
-            .template_variables()
-            .iter()
-            .any(|variable| variable == TOPIC_PARAM)
-    );
-    assert!(
-        binding
-            .template_variables()
-            .iter()
-            .any(|variable| variable == "recipe.identity")
-    );
+    assert!(binding.template_variables().iter().any(|variable| variable == TOPIC_PARAM));
+    assert!(binding.template_variables().iter().any(|variable| variable == "recipe.identity"));
     assert!(binding.bound_parameters().iter().any(|input| {
         input.name() == MODE_PARAM
             && input.value() == MODE_REVIEW
@@ -74,8 +58,7 @@ fn structured_output_accepts_required_fields() {
         ],
     };
 
-    let outcome = validate_recipe_output(workflow.response_schema(), &output)
-        .expect("output fields should parse");
+    let outcome = validate_recipe_output(workflow.response_schema(), &output).expect("output fields should parse");
 
     assert_eq!(outcome.status(), RecipeAutomationStatus::Success);
     assert_eq!(outcome.failure_reason(), None);
@@ -95,16 +78,10 @@ fn retry_plan_records_pending_and_denied_host_effect_requests() {
         denied_sandboxes: &[],
     });
 
-    assert_eq!(
-        pending.requests()[FIRST_ITEM_INDEX].status(),
-        RecipeRetryRequestStatus::PendingHostEffect
-    );
-    assert_eq!(
-        denied.requests()[FIRST_ITEM_INDEX].status(),
-        RecipeRetryRequestStatus::Denied {
-            reason: RecipeRetryDenialReason::Capability,
-        }
-    );
+    assert_eq!(pending.requests()[FIRST_ITEM_INDEX].status(), RecipeRetryRequestStatus::PendingHostEffect);
+    assert_eq!(denied.requests()[FIRST_ITEM_INDEX].status(), RecipeRetryRequestStatus::Denied {
+        reason: RecipeRetryDenialReason::Capability,
+    });
 }
 
 #[test]
@@ -127,31 +104,12 @@ fn recipe_dag_accepts_parallel_fanin_subrecipe_and_retry_plan() {
 
     assert_eq!(plan.steps().len(), dag_workflow_draft().dag_steps.len());
     assert_eq!(plan.batches().len(), DAG_BATCH_COUNT);
-    assert_eq!(
-        plan.batches()[FIRST_ITEM_INDEX].step_ids().len(),
-        DAG_FIRST_BATCH_WIDTH
-    );
-    assert!(
-        plan.batches()[FIRST_ITEM_INDEX]
-            .step_ids()
-            .iter()
-            .any(|step| step == DAG_STEP_RESEARCH_A)
-    );
-    assert!(
-        plan.batches()[FIRST_ITEM_INDEX]
-            .step_ids()
-            .iter()
-            .any(|step| step == DAG_STEP_RESEARCH_B)
-    );
-    assert_eq!(
-        plan.batches()[DAG_SYNTHESIS_BATCH_INDEX].step_ids()[FIRST_ITEM_INDEX],
-        DAG_STEP_SYNTHESIZE
-    );
+    assert_eq!(plan.batches()[FIRST_ITEM_INDEX].step_ids().len(), DAG_FIRST_BATCH_WIDTH);
+    assert!(plan.batches()[FIRST_ITEM_INDEX].step_ids().iter().any(|step| step == DAG_STEP_RESEARCH_A));
+    assert!(plan.batches()[FIRST_ITEM_INDEX].step_ids().iter().any(|step| step == DAG_STEP_RESEARCH_B));
+    assert_eq!(plan.batches()[DAG_SYNTHESIS_BATCH_INDEX].step_ids()[FIRST_ITEM_INDEX], DAG_STEP_SYNTHESIZE);
     assert_eq!(plan.blocked_steps(), &[]);
-    assert_eq!(
-        plan.receipt().schema_label(),
-        "animus.recipe-dag.receipt.v1"
-    );
+    assert_eq!(plan.receipt().schema_label(), "animus.recipe-dag.receipt.v1");
     assert_eq!(plan.receipt().identity_hash().len(), DAG_RECEIPT_HASH_CHARS);
     assert_eq!(plan.receipt().issue_codes()[FIRST_ITEM_INDEX], "none");
 }
@@ -159,14 +117,11 @@ fn recipe_dag_accepts_parallel_fanin_subrecipe_and_retry_plan() {
 #[test]
 fn recipe_dag_admission_blocks_denied_subrecipes_without_execution() {
     let workflow = dag_workflow();
-    let plan = plan_recipe_dag(
-        &workflow,
-        RecipeDagAdmission {
-            capabilities: &[],
-            validation_gates: &[],
-            subrecipes: &[SUBRECIPE],
-        },
-    )
+    let plan = plan_recipe_dag(&workflow, RecipeDagAdmission {
+        capabilities: &[],
+        validation_gates: &[],
+        subrecipes: &[SUBRECIPE],
+    })
     .expect("admission labels should be safe")
     .expect("DAG plan should be present");
 
@@ -175,10 +130,5 @@ fn recipe_dag_admission_blocks_denied_subrecipes_without_execution() {
             && blocked.reason() == RecipeDagBlockReason::SubrecipeDenied
             && blocked.detail() == SUBRECIPE
     }));
-    assert!(
-        plan.receipt()
-            .issue_codes()
-            .iter()
-            .any(|code| code == "RECIPE_DAG_SUBRECIPE_DENIED")
-    );
+    assert!(plan.receipt().issue_codes().iter().any(|code| code == "RECIPE_DAG_SUBRECIPE_DENIED"));
 }

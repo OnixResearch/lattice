@@ -1,12 +1,18 @@
 //! Inline widget wrapper for rat-markdown rendered content.
 
-use crate::widget::InlineWidget;
-use rat_markdown::{MarkdownStyle, PlainHighlighter, SyntaxHighlighter, render_markdown};
+use rat_markdown::MarkdownStyle;
+use rat_markdown::PlainHighlighter;
+use rat_markdown::SyntaxHighlighter;
+use rat_markdown::render_markdown;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Text;
-use ratatui::widgets::{Paragraph, Widget, Wrap};
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Widget;
+use ratatui::widgets::Wrap;
+
+use crate::widget::InlineWidget;
 
 /// Inline markdown widget — renders markdown source into styled ratatui lines.
 ///

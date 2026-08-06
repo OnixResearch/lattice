@@ -7,28 +7,17 @@
 
 #![cfg_attr(animus_octet, allow(tigerstyle::path_segment_repetition))]
 
-const AGENT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_agent_id");
-const ACCOUNT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_account_id");
-const CHANNEL_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_channel_id");
-const PEER_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_peer_id");
-const GROUP_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_group_id");
-const THREAD_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_thread_id");
-const ORIGIN_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_origin_id");
-const SESSION_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_id");
-const TOOL_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_tool_id");
-const LINEAGE_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_lineage_id");
-const SUMMARY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("session_summary");
+const AGENT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_agent_id");
+const ACCOUNT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_account_id");
+const CHANNEL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_channel_id");
+const PEER_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_peer_id");
+const GROUP_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_group_id");
+const THREAD_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_thread_id");
+const ORIGIN_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_origin_id");
+const SESSION_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_id");
+const TOOL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_tool_id");
+const LINEAGE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_lineage_id");
+const SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("session_summary");
 const KEY_PREFIX: &str = "session";
 
 /// Minimum positive maintenance, preview, reply, or announce bound.
@@ -80,7 +69,8 @@ pub enum Error {
     UnboundedHistory,
     /// Inter-session influence metadata is incomplete.
     MissingProvenance,
-    /// Text contained raw prompt, transcript, provider payload, credential, path, or unbounded output markers.
+    /// Text contained raw prompt, transcript, provider payload, credential, path, or unbounded
+    /// output markers.
     UnsafePayload {
         /// Field that contained unsafe text.
         field: &'static str,
@@ -306,9 +296,7 @@ pub fn plan_session_key(draft: &SessionKeyDraft<'_>) -> Result<SessionKeyPlan, E
     let mut diagnostics = alloc::vec::Vec::new();
     let key = match draft.source_kind {
         SessionSourceKind::Main => key_from_segments(&[KEY_PREFIX, agent.as_str(), "main"]),
-        SessionSourceKind::DirectMessage => {
-            plan_direct_message_key(draft, agent.as_str(), &mut diagnostics)?
-        }
+        SessionSourceKind::DirectMessage => plan_direct_message_key(draft, agent.as_str(), &mut diagnostics)?,
         SessionSourceKind::ChannelPeer => {
             let channel = required_optional(CHANNEL_ID_FIELD, draft.channel_id)?;
             let peer = normalized_peer(draft, &mut diagnostics)?;
@@ -542,10 +530,7 @@ impl MaintenancePlan {
 
 /// Plans deterministic maintenance over host-loaded metadata.
 #[must_use]
-pub fn plan_session_maintenance(
-    policy: MaintenancePolicy,
-    sessions: &[SessionMetadata],
-) -> MaintenancePlan {
+pub fn plan_session_maintenance(policy: MaintenancePolicy, sessions: &[SessionMetadata]) -> MaintenancePlan {
     let mut actions = alloc::vec::Vec::new();
     for session in sessions {
         push_maintenance_actions(policy, session, &mut actions);
@@ -659,9 +644,7 @@ impl SessionVisibilityPlan {
 ///
 /// Panics if bounded-history or effective-ceiling post-conditions are violated
 /// after validation.
-pub fn plan_session_tool_visibility(
-    draft: &SessionVisibilityRequestDraft<'_>,
-) -> Result<SessionVisibilityPlan, Error> {
+pub fn plan_session_tool_visibility(draft: &SessionVisibilityRequestDraft<'_>) -> Result<SessionVisibilityPlan, Error> {
     let current_session_id = safe_text(SESSION_ID_FIELD, draft.current_session_id)?;
     let current_agent_id = safe_text(AGENT_ID_FIELD, draft.current_agent_id)?;
     let target_agent_id = safe_text(AGENT_ID_FIELD, draft.target_agent_id)?;
@@ -851,17 +834,13 @@ fn plan_direct_message_key(
         DirectMessageScope::PerChannelPeer => {
             let channel = required_optional(CHANNEL_ID_FIELD, draft.channel_id)?;
             let peer = normalized_peer(draft, diagnostics)?;
-            Ok(key_from_segments(&[
-                KEY_PREFIX, agent, "dm", "channel", &channel, &peer,
-            ]))
+            Ok(key_from_segments(&[KEY_PREFIX, agent, "dm", "channel", &channel, &peer]))
         }
         DirectMessageScope::PerAccountChannelPeer => {
             let account = required_optional(ACCOUNT_ID_FIELD, draft.account_id)?;
             let channel = required_optional(CHANNEL_ID_FIELD, draft.channel_id)?;
             let peer = normalized_peer(draft, diagnostics)?;
-            Ok(key_from_segments(&[
-                KEY_PREFIX, agent, "dm", "account", &account, &channel, &peer,
-            ]))
+            Ok(key_from_segments(&[KEY_PREFIX, agent, "dm", "account", &account, &channel, &peer]))
         }
     }
 }
@@ -873,12 +852,7 @@ fn origin_key(
     origin_id: Option<&str>,
 ) -> Result<alloc::string::String, Error> {
     let origin = required_optional(ORIGIN_ID_FIELD, origin_id)?;
-    Ok(key_from_segments(&[
-        KEY_PREFIX,
-        agent,
-        source_label,
-        &origin,
-    ]))
+    Ok(key_from_segments(&[KEY_PREFIX, agent, source_label, &origin]))
 }
 
 #[cfg_attr(animus_octet, allow(tigerstyle::borrowed_argument_types))]
@@ -894,9 +868,7 @@ fn normalized_peer(
                 return Err(Error::AmbiguousMetadata);
             }
             diagnostics.push(PrivacyDiagnostic::IdentityLinkNormalized);
-            Ok(alloc::string::String::from(
-                identity_link.canonical_peer_id(),
-            ))
+            Ok(alloc::string::String::from(identity_link.canonical_peer_id()))
         }
         None => Ok(peer),
     }
@@ -911,34 +883,19 @@ fn push_maintenance_actions(
     assert!(policy.max_entries >= MIN_SESSION_BOUND);
     assert!(policy.rotation_threshold_bytes >= MIN_SESSION_BOUND_U64);
     if session.age_class == AgeClass::Stale {
-        actions.push(maintenance_action(
-            session,
-            MaintenanceActionKind::PruneStale,
-        ));
+        actions.push(maintenance_action(session, MaintenanceActionKind::PruneStale));
     }
     if session.entry_count > policy.max_entries {
-        actions.push(maintenance_action(
-            session,
-            MaintenanceActionKind::CapEntries,
-        ));
+        actions.push(maintenance_action(session, MaintenanceActionKind::CapEntries));
     }
     if session.byte_count > policy.rotation_threshold_bytes {
-        actions.push(maintenance_action(
-            session,
-            MaintenanceActionKind::RotateTranscript,
-        ));
+        actions.push(maintenance_action(session, MaintenanceActionKind::RotateTranscript));
     }
     if session.archive_count > policy.archive_retention_count {
-        actions.push(maintenance_action(
-            session,
-            MaintenanceActionKind::TrimArchives,
-        ));
+        actions.push(maintenance_action(session, MaintenanceActionKind::TrimArchives));
     }
     if session.byte_count > policy.disk_budget_bytes {
-        actions.push(maintenance_action(
-            session,
-            MaintenanceActionKind::DiskBudgetPressure,
-        ));
+        actions.push(maintenance_action(session, MaintenanceActionKind::DiskBudgetPressure));
     }
 }
 
@@ -950,15 +907,10 @@ fn maintenance_action(session: &SessionMetadata, kind: MaintenanceActionKind) ->
     }
 }
 
-fn boundary_ceiling(
-    boundary: SessionBoundaryPosture,
-    host_ceiling: SessionVisibilityMode,
-) -> SessionVisibilityMode {
+fn boundary_ceiling(boundary: SessionBoundaryPosture, host_ceiling: SessionVisibilityMode) -> SessionVisibilityMode {
     let posture_ceiling = match boundary {
         SessionBoundaryPosture::Normal => SessionVisibilityMode::All,
-        SessionBoundaryPosture::Sandboxed | SessionBoundaryPosture::Delegated => {
-            SessionVisibilityMode::Tree
-        }
+        SessionBoundaryPosture::Sandboxed | SessionBoundaryPosture::Delegated => SessionVisibilityMode::Tree,
     };
     core::cmp::min(host_ceiling, posture_ceiling)
 }
@@ -979,10 +931,7 @@ fn key_from_segments(segments: &[&str]) -> alloc::string::String {
     segments.join(":")
 }
 
-fn safe_text(
-    field_name: crate::validation::FieldName,
-    value: &str,
-) -> Result<alloc::string::String, Error> {
+fn safe_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
     let normalized = crate::validation::normalized_adapter_field(field_name, value)?;
     reject_unsafe_text(field_name, normalized.as_str())?;
     Ok(normalized)
@@ -1069,16 +1018,9 @@ mod tests {
             .expect("provenance should validate");
 
         assert_ne!(first.key(), second.key());
-        assert!(
-            normalized
-                .diagnostics()
-                .contains(&PrivacyDiagnostic::IdentityLinkNormalized)
-        );
+        assert!(normalized.diagnostics().contains(&PrivacyDiagnostic::IdentityLinkNormalized));
         assert_eq!(maintenance.actions().len(), 5);
-        assert_eq!(
-            visibility.effective_visibility(),
-            SessionVisibilityMode::Tree
-        );
+        assert_eq!(visibility.effective_visibility(), SessionVisibilityMode::Tree);
         assert_eq!(provenance.handoff_mode(), HandoffMode::Send);
     }
 
@@ -1131,11 +1073,7 @@ mod tests {
         })
         .expect_err("cross-agent access should fail");
 
-        assert!(
-            shared
-                .diagnostics()
-                .contains(&PrivacyDiagnostic::SharedDirectMessageScope)
-        );
+        assert!(shared.diagnostics().contains(&PrivacyDiagnostic::SharedDirectMessageScope));
         assert_eq!(ambient, Error::AmbientStoreDiscovery);
         assert_eq!(ambiguous, Error::AmbiguousMetadata);
         assert_eq!(widening, Error::VisibilityDenied);
@@ -1163,11 +1101,10 @@ mod tests {
             history_preview_entries: None,
         })
         .expect_err("unbounded history should fail");
-        let missing_provenance = InterSessionProvenance::new(&provenance(None, SAFE_SUMMARY))
-            .expect_err("missing lineage should fail");
-        let unsafe_provenance =
-            InterSessionProvenance::new(&provenance(Some(LINEAGE_ID), UNSAFE_TRANSCRIPT))
-                .expect_err("raw transcript should fail");
+        let missing_provenance =
+            InterSessionProvenance::new(&provenance(None, SAFE_SUMMARY)).expect_err("missing lineage should fail");
+        let unsafe_provenance = InterSessionProvenance::new(&provenance(Some(LINEAGE_ID), UNSAFE_TRANSCRIPT))
+            .expect_err("raw transcript should fail");
 
         assert!(matches!(missing_peer, Error::MissingMetadata { .. }));
         assert_eq!(unbounded_history, Error::UnboundedHistory);

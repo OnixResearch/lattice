@@ -57,10 +57,7 @@ fn generated_policy_and_branched_projection_are_deterministic() {
     assert_eq!(first.branch_point_count(), EXPECTED_BRANCH_POINT_COUNT);
     assert!(first.entries()[0].is_active_path());
     assert!(!first.entries()[SIBLING_INDEX].is_active_path());
-    assert_eq!(
-        first.entries()[1].child_count(),
-        EXPECTED_BRANCH_CHILD_COUNT
-    );
+    assert_eq!(first.entries()[1].child_count(), EXPECTED_BRANCH_CHILD_COUNT);
 }
 
 #[test]
@@ -69,13 +66,11 @@ fn html_and_lines_escape_injection_and_repeat_byte_for_byte() {
     // r[verify agent_harness_runtime.session_tree_export.determinism]
     let policy = policy();
     let projection = project_session_tree_export(&policy, &source()).expect("projection");
-    let html = render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html)
-        .expect("html");
-    let repeated = render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html)
-        .expect("repeated html");
+    let html = render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html).expect("html");
+    let repeated =
+        render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html).expect("repeated html");
     let lines =
-        render_session_tree_export(&policy, &projection, SessionTreeExportFormat::SafeLines)
-            .expect("safe lines");
+        render_session_tree_export(&policy, &projection, SessionTreeExportFormat::SafeLines).expect("safe lines");
     let html_text = std::str::from_utf8(html.bytes()).expect("html utf8");
     let lines_text = std::str::from_utf8(lines.bytes()).expect("lines utf8");
 
@@ -96,24 +91,18 @@ fn html_and_lines_escape_injection_and_repeat_byte_for_byte() {
 fn linear_empty_branch_and_safe_tool_status_project() {
     let policy = policy();
     let empty_source = singleton_source(SessionTreeExportEntryKind::SystemStatus);
-    let empty_projection =
-        project_session_tree_export(&policy, &empty_source).expect("empty selected branch");
+    let empty_projection = project_session_tree_export(&policy, &empty_source).expect("empty selected branch");
     let source = singleton_source(SessionTreeExportEntryKind::ToolStatus);
     let projection = project_session_tree_export(&policy, &source).expect("linear projection");
     let artifact =
-        render_session_tree_export(&policy, &projection, SessionTreeExportFormat::SafeLines)
-            .expect("linear artifact");
+        render_session_tree_export(&policy, &projection, SessionTreeExportFormat::SafeLines).expect("linear artifact");
 
     assert_eq!(empty_projection.entries().len(), SINGLETON_ENTRY_COUNT);
     assert_eq!(empty_projection.branch_point_count(), 0);
     assert_eq!(projection.entries().len(), SINGLETON_ENTRY_COUNT);
     assert_eq!(projection.active_path_count(), FIRST_SEQUENCE);
     assert_eq!(projection.branch_point_count(), 0);
-    assert!(
-        std::str::from_utf8(artifact.bytes())
-            .expect("safe lines")
-            .contains("tool_status")
-    );
+    assert!(std::str::from_utf8(artifact.bytes()).expect("safe lines").contains("tool_status"));
 }
 
 #[test]
@@ -132,26 +121,11 @@ fn malformed_topology_and_stale_leaf_fail_closed() {
 
     assert_eq!(duplicate.entries.len(), EXPECTED_ENTRY_COUNT);
     assert_ne!(stale_leaf.active_leaf_id, REPAIR_ID);
-    assert_issue(
-        project_session_tree_export(&policy, &duplicate),
-        SessionTreeExportIssue::DuplicateEntry,
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &missing_parent),
-        SessionTreeExportIssue::MissingParent,
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &cycle),
-        SessionTreeExportIssue::InvalidSource,
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &stale_leaf),
-        SessionTreeExportIssue::StaleActiveLeaf,
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &stale_repair),
-        SessionTreeExportIssue::StaleRepairTarget,
-    );
+    assert_issue(project_session_tree_export(&policy, &duplicate), SessionTreeExportIssue::DuplicateEntry);
+    assert_issue(project_session_tree_export(&policy, &missing_parent), SessionTreeExportIssue::MissingParent);
+    assert_issue(project_session_tree_export(&policy, &cycle), SessionTreeExportIssue::InvalidSource);
+    assert_issue(project_session_tree_export(&policy, &stale_leaf), SessionTreeExportIssue::StaleActiveLeaf);
+    assert_issue(project_session_tree_export(&policy, &stale_repair), SessionTreeExportIssue::StaleRepairTarget);
 }
 
 #[test]
@@ -167,55 +141,29 @@ fn unsafe_metadata_bounds_and_unsupported_kind_fail_closed() {
     let restrictive = validate_session_tree_export_policy(&restrictive_input).expect("restrictive");
 
     assert!(private.entries[0].safe_summary.contains(PRIVATE_PROMPT));
-    assert_ne!(
-        invalid_hash.entries[0].entry_hash.len(),
-        super::data::BLAKE3_HEX_CHARS
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &private),
-        SessionTreeExportIssue::InvalidSource,
-    );
-    assert_issue(
-        project_session_tree_export(&policy, &invalid_hash),
-        SessionTreeExportIssue::InvalidSource,
-    );
-    assert_issue(
-        project_session_tree_export(&restrictive, &source()),
-        SessionTreeExportIssue::InvalidSource,
-    );
+    assert_ne!(invalid_hash.entries[0].entry_hash.len(), super::data::BLAKE3_HEX_CHARS);
+    assert_issue(project_session_tree_export(&policy, &private), SessionTreeExportIssue::InvalidSource);
+    assert_issue(project_session_tree_export(&policy, &invalid_hash), SessionTreeExportIssue::InvalidSource);
+    assert_issue(project_session_tree_export(&restrictive, &source()), SessionTreeExportIssue::InvalidSource);
     let mut bounded_input = policy_input();
     bounded_input.max_entries = BOUNDED_ENTRY_COUNT;
     bounded_input.policy_hash = session_tree_export_policy_content_hash(&bounded_input);
     let bounded = validate_session_tree_export_policy(&bounded_input).expect("bounded policy");
-    assert_issue(
-        project_session_tree_export(&bounded, &source()),
-        SessionTreeExportIssue::BoundExceeded,
-    );
+    assert_issue(project_session_tree_export(&bounded, &source()), SessionTreeExportIssue::BoundExceeded);
     let mut shallow_input = policy_input();
     shallow_input.max_depth = FIRST_SEQUENCE;
     shallow_input.policy_hash = session_tree_export_policy_content_hash(&shallow_input);
     let shallow = validate_session_tree_export_policy(&shallow_input).expect("shallow policy");
-    assert_issue(
-        project_session_tree_export(&shallow, &source()),
-        SessionTreeExportIssue::BoundExceeded,
-    );
+    assert_issue(project_session_tree_export(&shallow, &source()), SessionTreeExportIssue::BoundExceeded);
     let mut summary_policy_input = policy_input();
     summary_policy_input.max_summary_chars = FIRST_SEQUENCE;
-    summary_policy_input.policy_hash =
-        session_tree_export_policy_content_hash(&summary_policy_input);
-    let summary_policy =
-        validate_session_tree_export_policy(&summary_policy_input).expect("summary policy");
-    assert_issue(
-        project_session_tree_export(&summary_policy, &source()),
-        SessionTreeExportIssue::InvalidSource,
-    );
+    summary_policy_input.policy_hash = session_tree_export_policy_content_hash(&summary_policy_input);
+    let summary_policy = validate_session_tree_export_policy(&summary_policy_input).expect("summary policy");
+    assert_issue(project_session_tree_export(&summary_policy, &source()), SessionTreeExportIssue::InvalidSource);
     let mut custom_kind_input = policy_input();
     custom_kind_input.allowed_entry_kinds = vec![String::from("custom_private")];
     custom_kind_input.policy_hash = session_tree_export_policy_content_hash(&custom_kind_input);
-    assert_issue(
-        validate_session_tree_export_policy(&custom_kind_input),
-        SessionTreeExportIssue::InvalidPolicy,
-    );
+    assert_issue(validate_session_tree_export_policy(&custom_kind_input), SessionTreeExportIssue::InvalidPolicy);
 }
 
 #[test]
@@ -237,10 +185,7 @@ fn every_sensitive_summary_class_is_rejected() {
     for private_value in private_values {
         let mut unsafe_source = singleton_source(SessionTreeExportEntryKind::SystemStatus);
         unsafe_source.entries[0].safe_summary = String::from(private_value);
-        assert_issue(
-            project_session_tree_export(&policy, &unsafe_source),
-            SessionTreeExportIssue::InvalidSource,
-        );
+        assert_issue(project_session_tree_export(&policy, &unsafe_source), SessionTreeExportIssue::InvalidSource);
     }
 }
 
@@ -249,24 +194,12 @@ fn artifact_budget_and_format_policy_fail_closed() {
     let mut tiny_html_input = policy_input();
     tiny_html_input.max_html_bytes = 1;
     tiny_html_input.policy_hash = session_tree_export_policy_content_hash(&tiny_html_input);
-    let tiny_html_policy =
-        validate_session_tree_export_policy(&tiny_html_input).expect("tiny html policy");
+    let tiny_html_policy = validate_session_tree_export_policy(&tiny_html_input).expect("tiny html policy");
     let projection = project_session_tree_export(&tiny_html_policy, &source()).expect("projection");
-    assert_eq!(
-        tiny_html_policy.artifact_byte_limit(SessionTreeExportFormat::Html),
-        1
-    );
-    assert!(
-        tiny_html_policy
-            .formats
-            .contains(&SessionTreeExportFormat::Html)
-    );
+    assert_eq!(tiny_html_policy.artifact_byte_limit(SessionTreeExportFormat::Html), 1);
+    assert!(tiny_html_policy.formats.contains(&SessionTreeExportFormat::Html));
     assert_issue(
-        render_session_tree_export(
-            &tiny_html_policy,
-            &projection,
-            SessionTreeExportFormat::Html,
-        ),
+        render_session_tree_export(&tiny_html_policy, &projection, SessionTreeExportFormat::Html),
         SessionTreeExportIssue::BoundExceeded,
     );
 
@@ -286,8 +219,7 @@ fn receipt_is_metadata_only_and_rejects_every_private_class() {
     // r[verify agent_harness_runtime.session_tree_export.receipts]
     let policy = policy();
     let projection = project_session_tree_export(&policy, &source()).expect("projection");
-    let artifact = render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html)
-        .expect("artifact");
+    let artifact = render_session_tree_export(&policy, &projection, SessionTreeExportFormat::Html).expect("artifact");
     let receipt = project_session_tree_export_receipt(&SessionTreeExportReceiptInput {
         policy: &policy,
         projection: &projection,
@@ -300,10 +232,7 @@ fn receipt_is_metadata_only_and_rejects_every_private_class() {
 
     assert_eq!(receipt.artifact_hash, artifact.artifact_hash());
     assert_eq!(receipt.artifact_bytes, artifact.byte_count());
-    assert_eq!(
-        receipt.entry_count,
-        u32::try_from(EXPECTED_ENTRY_COUNT).expect("bounded expected entry count")
-    );
+    assert_eq!(receipt.entry_count, u32::try_from(EXPECTED_ENTRY_COUNT).expect("bounded expected entry count"));
     assert_eq!(receipt.active_path_count, EXPECTED_ACTIVE_PATH_COUNT);
     assert!(!rendered.contains(PRIVATE_PROMPT));
     for sensitive in sensitive_drafts() {
@@ -403,42 +332,12 @@ fn singleton_source(kind: SessionTreeExportEntryKind) -> SessionTreeExportSource
 
 fn source() -> SessionTreeExportSourceInput {
     let mut entries = vec![
-        entry(
-            ROOT_ID,
-            None,
-            FIRST_SEQUENCE,
-            SessionTreeExportEntryKind::SystemStatus,
-        ),
-        entry(
-            USER_ID,
-            Some(ROOT_ID),
-            SECOND_SEQUENCE,
-            SessionTreeExportEntryKind::UserOmitted,
-        ),
-        entry(
-            ASSISTANT_ID,
-            Some(USER_ID),
-            THIRD_SEQUENCE,
-            SessionTreeExportEntryKind::AssistantOmitted,
-        ),
-        entry(
-            SIBLING_ID,
-            Some(USER_ID),
-            FOURTH_SEQUENCE,
-            SessionTreeExportEntryKind::BranchSummary,
-        ),
-        entry(
-            COMPACTION_ID,
-            Some(ASSISTANT_ID),
-            FIFTH_SEQUENCE,
-            SessionTreeExportEntryKind::Compaction,
-        ),
-        entry(
-            REPAIR_ID,
-            Some(COMPACTION_ID),
-            SIXTH_SEQUENCE,
-            SessionTreeExportEntryKind::Repair,
-        ),
+        entry(ROOT_ID, None, FIRST_SEQUENCE, SessionTreeExportEntryKind::SystemStatus),
+        entry(USER_ID, Some(ROOT_ID), SECOND_SEQUENCE, SessionTreeExportEntryKind::UserOmitted),
+        entry(ASSISTANT_ID, Some(USER_ID), THIRD_SEQUENCE, SessionTreeExportEntryKind::AssistantOmitted),
+        entry(SIBLING_ID, Some(USER_ID), FOURTH_SEQUENCE, SessionTreeExportEntryKind::BranchSummary),
+        entry(COMPACTION_ID, Some(ASSISTANT_ID), FIFTH_SEQUENCE, SessionTreeExportEntryKind::Compaction),
+        entry(REPAIR_ID, Some(COMPACTION_ID), SIXTH_SEQUENCE, SessionTreeExportEntryKind::Repair),
     ];
     entries[SIBLING_INDEX].safe_summary = String::from(INJECTION_SUMMARY);
     let source = SessionTreeExportSourceInput {
@@ -549,12 +448,6 @@ fn sensitive_drafts() -> [SessionTreeExportSensitiveDraft<'static>; SENSITIVE_DR
     ]
 }
 
-fn assert_issue<T: std::fmt::Debug>(
-    result: Result<T, SessionTreeExportError>,
-    issue: SessionTreeExportIssue,
-) {
-    assert_eq!(
-        result.expect_err("expected export rejection").issue(),
-        issue
-    );
+fn assert_issue<T: std::fmt::Debug>(result: Result<T, SessionTreeExportError>, issue: SessionTreeExportIssue) {
+    assert_eq!(result.expect_err("expected export rejection").issue(), issue);
 }

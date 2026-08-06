@@ -1,12 +1,22 @@
-use super::base::{
-    MIN_LINE_COUNT_USIZE, MIN_LINE_NUMBER, ZERO_COUNT, ZERO_COUNT_USIZE, hash_text, usize_to_u32,
-};
-use super::data::{
-    ContextOversizedPolicy, ContextReference, ContextReferenceBudget, ContextReferenceError,
-    ContextReferenceFragment, ContextReferenceKind, ContextReferencePolicy,
-    ContextReferencePolicyDecision, ContextReferenceStatus, ContextResolutionPlan,
-    ContextResolverKind, ContextTruncationState, ResolvedContextCandidate,
-};
+use super::base::MIN_LINE_COUNT_USIZE;
+use super::base::MIN_LINE_NUMBER;
+use super::base::ZERO_COUNT;
+use super::base::ZERO_COUNT_USIZE;
+use super::base::hash_text;
+use super::base::usize_to_u32;
+use super::data::ContextOversizedPolicy;
+use super::data::ContextReference;
+use super::data::ContextReferenceBudget;
+use super::data::ContextReferenceError;
+use super::data::ContextReferenceFragment;
+use super::data::ContextReferenceKind;
+use super::data::ContextReferencePolicy;
+use super::data::ContextReferencePolicyDecision;
+use super::data::ContextReferenceStatus;
+use super::data::ContextResolutionPlan;
+use super::data::ContextResolverKind;
+use super::data::ContextTruncationState;
+use super::data::ResolvedContextCandidate;
 use super::host::ContextResolverSet;
 /// Plans resolver dispatch without invoking host authority.
 ///
@@ -47,36 +57,23 @@ pub fn expand_context_reference(
     policy: ContextReferencePolicy,
     resolvers: &ContextResolverSet<'_>,
 ) -> Result<ResolvedContextCandidate, ContextReferenceError> {
-    assert!(
-        !reference.safe_target_label().is_empty(),
-        "context reference labels must be validated"
-    );
-    assert!(
-        !reference.normalized_target().is_empty(),
-        "context reference targets must be validated"
-    );
+    assert!(!reference.safe_target_label().is_empty(), "context reference labels must be validated");
+    assert!(!reference.normalized_target().is_empty(), "context reference targets must be validated");
     let plan = plan_context_resolution(reference, policy, resolvers)?;
     match plan.resolver_kind {
-        ContextResolverKind::File => resolvers
-            .file
-            .ok_or(ContextReferenceError::ResolverMissing)?
-            .resolve_file(reference),
-        ContextResolverKind::Directory => resolvers
-            .directory
-            .ok_or(ContextReferenceError::ResolverMissing)?
-            .resolve_directory(reference),
-        ContextResolverKind::Diff => resolvers
-            .diff
-            .ok_or(ContextReferenceError::ResolverMissing)?
-            .resolve_diff(reference),
-        ContextResolverKind::Image => resolvers
-            .image
-            .ok_or(ContextReferenceError::ResolverMissing)?
-            .resolve_image(reference),
-        ContextResolverKind::Url => resolvers
-            .url
-            .ok_or(ContextReferenceError::ResolverMissing)?
-            .resolve_url(reference),
+        ContextResolverKind::File => {
+            resolvers.file.ok_or(ContextReferenceError::ResolverMissing)?.resolve_file(reference)
+        }
+        ContextResolverKind::Directory => {
+            resolvers.directory.ok_or(ContextReferenceError::ResolverMissing)?.resolve_directory(reference)
+        }
+        ContextResolverKind::Diff => {
+            resolvers.diff.ok_or(ContextReferenceError::ResolverMissing)?.resolve_diff(reference)
+        }
+        ContextResolverKind::Image => {
+            resolvers.image.ok_or(ContextReferenceError::ResolverMissing)?.resolve_image(reference)
+        }
+        ContextResolverKind::Url => resolvers.url.ok_or(ContextReferenceError::ResolverMissing)?.resolve_url(reference),
     }
 }
 
@@ -94,19 +91,12 @@ pub fn apply_context_budget(
     candidate: ResolvedContextCandidate,
     budget: ContextReferenceBudget,
 ) -> Result<ContextReferenceFragment, ContextReferenceError> {
-    assert!(
-        budget.max_visible_bytes > ZERO_COUNT,
-        "visible byte budget must be validated"
-    );
-    assert!(
-        budget.max_visible_lines > ZERO_COUNT,
-        "visible line budget must be validated"
-    );
+    assert!(budget.max_visible_bytes > ZERO_COUNT, "visible byte budget must be validated");
+    assert!(budget.max_visible_lines > ZERO_COUNT, "visible line budget must be validated");
     let byte_count = usize_to_u32(candidate.content.len())?;
     let original_line_count = usize_to_u32(count_lines(candidate.content.as_str()))?;
     let content_hash = hash_text(candidate.content.as_str());
-    let is_over_budget =
-        byte_count > budget.max_visible_bytes || original_line_count > budget.max_visible_lines;
+    let is_over_budget = byte_count > budget.max_visible_bytes || original_line_count > budget.max_visible_lines;
     if !is_over_budget {
         return Ok(ContextReferenceFragment {
             reference: candidate.reference,
@@ -184,21 +174,14 @@ struct TruncationLimit {
 
 impl TruncationLimit {
     const fn new(max_bytes: u32, max_lines: u32) -> Self {
-        Self {
-            max_bytes,
-            max_lines,
-        }
+        Self { max_bytes, max_lines }
     }
 }
 
-fn truncate_content(
-    text: &str,
-    limit: TruncationLimit,
-) -> Result<alloc::string::String, ContextReferenceError> {
+fn truncate_content(text: &str, limit: TruncationLimit) -> Result<alloc::string::String, ContextReferenceError> {
     assert!(limit.max_bytes > ZERO_COUNT, "byte limit must be positive");
     assert!(limit.max_lines > ZERO_COUNT, "line limit must be positive");
-    let max_bytes =
-        usize::try_from(limit.max_bytes).map_err(|_error| ContextReferenceError::CountOverflow)?;
+    let max_bytes = usize::try_from(limit.max_bytes).map_err(|_error| ContextReferenceError::CountOverflow)?;
     let mut visible = alloc::string::String::new();
     let mut current_line = MIN_LINE_NUMBER;
     for character in text.chars() {

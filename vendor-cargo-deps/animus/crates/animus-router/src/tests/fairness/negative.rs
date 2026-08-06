@@ -68,15 +68,10 @@ fn round_robin_cursor_and_receipt_validation_fail_closed() {
         redactions: &["trace_bounded"],
     });
 
-    assert!(matches!(
-        malformed_cursor,
-        Err(crate::AdapterContractError::UnsupportedRouterValue { .. })
-    ));
+    assert!(matches!(malformed_cursor, Err(crate::AdapterContractError::UnsupportedRouterValue { .. })));
     assert!(matches!(
         receipt_leak,
-        Err(crate::RouterRotationError::ReceiptLeak(
-            crate::ReceiptLeak::ProviderPayload
-        ))
+        Err(crate::RouterRotationError::ReceiptLeak(crate::ReceiptLeak::ProviderPayload))
     ));
 }
 
@@ -115,10 +110,7 @@ fn round_robin_rotation_cannot_bypass_privacy_filtering() {
 
     assert_eq!(catalog.len(), super::data::PRIMARY_ROTATION_CATALOG_COUNT);
     assert_eq!(selected.selected_models()[0], MODEL_PRIMARY);
-    assert_eq!(
-        selected.rotation_decisions()[0].candidate_count(),
-        MAX_CANDIDATES_ONE
-    );
+    assert_eq!(selected.rotation_decisions()[0].candidate_count(), MAX_CANDIDATES_ONE);
 }
 
 #[test]
@@ -137,10 +129,8 @@ fn router_receipt_rejects_uppercase_policy_hash() {
     });
 
     assert!(error.is_err());
-    let Err(crate::ValidationError::Contract(crate::AdapterContractError::InvalidEvidenceHash {
-        field,
-        reason,
-    })) = error
+    let Err(crate::ValidationError::Contract(crate::AdapterContractError::InvalidEvidenceHash { field, reason })) =
+        error
     else {
         panic!("uppercase policy hash must fail with an invalid evidence hash");
     };

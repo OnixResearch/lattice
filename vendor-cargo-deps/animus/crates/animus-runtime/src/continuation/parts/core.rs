@@ -38,6 +38,11 @@ pub fn select_next_continuation(
             });
         }
     }
+    if policy.requires_authoritative_completion() {
+        return ContinuationDecision::AwaitingCompletionEvidence {
+            reason: ContinuationReason::CompletionEvidenceRequired,
+        };
+    }
     ContinuationDecision::Complete {
         reason: ContinuationReason::NoPendingWork,
     }

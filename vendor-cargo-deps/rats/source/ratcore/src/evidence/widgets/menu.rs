@@ -1,10 +1,11 @@
 use super::super::*;
 
 mod fixtures;
-pub use fixtures::{
-    LeaderReplayRow, LeaderReplaySummary, leader_key_negative_replay_script,
-    leader_key_positive_replay_script, leader_key_replay_summary,
-};
+pub use fixtures::LeaderReplayRow;
+pub use fixtures::LeaderReplaySummary;
+pub use fixtures::leader_key_negative_replay_script;
+pub use fixtures::leader_key_positive_replay_script;
+pub use fixtures::leader_key_replay_summary;
 
 const TARGET_LEADER_KEY: &str = "leader-key";
 const TARGET_STALE_LEADER_KEY: &str = "leader-key.stale";
@@ -45,12 +46,7 @@ impl LeaderReplayTarget {
         menu.open();
         Self {
             menu,
-            known_actions: [
-                ACTION_WORKSPACE_SAVE.to_string(),
-                ACTION_DISABLED_DOCS.to_string(),
-            ]
-            .into_iter()
-            .collect(),
+            known_actions: [ACTION_WORKSPACE_SAVE.to_string(), ACTION_DISABLED_DOCS.to_string()].into_iter().collect(),
             disabled_actions: [ACTION_DISABLED_DOCS.to_string()].into_iter().collect(),
             selected_action: None,
             width: DEFAULT_REPLAY_WIDTH,
@@ -119,10 +115,7 @@ impl ReplayTarget for LeaderReplayTarget {
             ("current_items".to_string(), self.current_items()),
             ("current_menu".to_string(), self.current_menu()),
             ("depth".to_string(), self.menu.depth().to_string()),
-            (
-                "selected_action".to_string(),
-                option_id(self.selected_action.clone()),
-            ),
+            ("selected_action".to_string(), option_id(self.selected_action.clone())),
             ("surface".to_string(), TARGET_LEADER_KEY.to_string()),
             ("visible".to_string(), self.menu.visible.to_string()),
         ])
@@ -167,27 +160,17 @@ impl LeaderReplayTarget {
     }
 
     fn current_item(&self, ch: char) -> Option<&crate::leaderkey::LeaderMenuItem<String>> {
-        self.menu
-            .current()
-            .and_then(|menu| menu.items.iter().find(|item| item.key == ch))
+        self.menu.current().and_then(|menu| menu.items.iter().find(|item| item.key == ch))
     }
 
     fn current_menu(&self) -> String {
-        self.menu
-            .current()
-            .map_or_else(|| EMPTY_MARKER.to_string(), |menu| menu.label.clone())
+        self.menu.current().map_or_else(|| EMPTY_MARKER.to_string(), |menu| menu.label.clone())
     }
 
     fn current_items(&self) -> String {
         self.menu.current().map_or_else(
             || EMPTY_MARKER.to_string(),
-            |menu| {
-                join_ids(
-                    menu.items
-                        .iter()
-                        .map(|item| format!("{}:{}", item.key, item.label)),
-                )
-            },
+            |menu| join_ids(menu.items.iter().map(|item| format!("{}:{}", item.key, item.label))),
         )
     }
 }
@@ -232,10 +215,7 @@ fn option_id(value: Option<String>) -> String {
 }
 
 fn join_ids(ids: impl IntoIterator<Item = impl AsRef<str>>) -> String {
-    let values = ids
-        .into_iter()
-        .map(|id| id.as_ref().to_string())
-        .collect::<Vec<_>>();
+    let values = ids.into_iter().map(|id| id.as_ref().to_string()).collect::<Vec<_>>();
     if values.is_empty() {
         EMPTY_MARKER.to_string()
     } else {

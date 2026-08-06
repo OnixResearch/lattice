@@ -101,11 +101,7 @@ pub struct EmbeddedRatzillaDiagnostic {
 }
 
 impl EmbeddedRatzillaDiagnostic {
-    fn new(
-        code: EmbeddedRatzillaDiagnosticCode,
-        subject: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    fn new(code: EmbeddedRatzillaDiagnosticCode, subject: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             subject: subject.into(),
@@ -134,11 +130,9 @@ pub struct EmbeddedRatzillaFixtureFacts {
 impl EmbeddedRatzillaFixtureFacts {
     /// Converts a shared browser fixture row into embedded-surface facts.
     #[must_use]
-    pub fn from_browser_fixture_row(
-        row: &crate::catalog_core::BrowserFixtureNavigationRow,
-    ) -> Self {
+    pub fn from_browser_fixture_row(row: &crate::catalog_core::BrowserFixtureNavigationRow) -> Self {
         Self {
-            fixture_id: row.fixture_id.clone(),
+            fixture_id: row.fixture_id.to_string(),
             label: row.label.clone(),
             renderer_label: row.renderer_label.clone(),
             support_status: row.support_status.clone(),
@@ -264,20 +258,14 @@ pub fn evaluate_embedded_ratzilla_mount(
         diagnostics.push(EmbeddedRatzillaDiagnostic::new(
             EmbeddedRatzillaDiagnosticCode::UnsupportedBackend,
             "backend",
-            format!(
-                "unsupported embedded Ratzilla backend `{}`",
-                descriptor.backend
-            ),
+            format!("unsupported embedded Ratzilla backend `{}`", descriptor.backend),
         ));
     }
     if !KNOWN_EMBED_LIFECYCLES.contains(&descriptor.lifecycle.as_str()) {
         diagnostics.push(EmbeddedRatzillaDiagnostic::new(
             EmbeddedRatzillaDiagnosticCode::UnsupportedLifecycle,
             "lifecycle",
-            format!(
-                "unsupported embedded Ratzilla lifecycle `{}`",
-                descriptor.lifecycle
-            ),
+            format!("unsupported embedded Ratzilla lifecycle `{}`", descriptor.lifecycle),
         ));
     }
     if descriptor.initial_width == 0 || descriptor.initial_height == 0 {
@@ -294,18 +282,12 @@ pub fn evaluate_embedded_ratzilla_mount(
             "embedded Ratzilla host is already mounted",
         ));
     }
-    let fixture_facts = fixture_facts
-        .iter()
-        .find(|facts| facts.fixture_id == descriptor.fixture_id)
-        .cloned();
+    let fixture_facts = fixture_facts.iter().find(|facts| facts.fixture_id == descriptor.fixture_id).cloned();
     if fixture_facts.is_none() {
         diagnostics.push(EmbeddedRatzillaDiagnostic::new(
             EmbeddedRatzillaDiagnosticCode::UnsupportedFixture,
             "fixture_id",
-            format!(
-                "embedded Ratzilla fixture `{}` is not supported",
-                descriptor.fixture_id
-            ),
+            format!("embedded Ratzilla fixture `{}` is not supported", descriptor.fixture_id),
         ));
     }
     EmbeddedRatzillaMountPlan {
@@ -328,9 +310,7 @@ pub fn embedded_mount_key(host_id: &str) -> String {
 
 /// Classifies whether a reusable widget crate stays backend-neutral.
 #[must_use]
-pub fn classify_backend_neutral_widget(
-    profile: &BackendNeutralWidgetProfile,
-) -> Vec<BackendNeutralDiagnostic> {
+pub fn classify_backend_neutral_widget(profile: &BackendNeutralWidgetProfile) -> Vec<BackendNeutralDiagnostic> {
     let mut diagnostics = Vec::new();
     if profile.ratatui_default_features_enabled {
         diagnostics.push(BackendNeutralDiagnostic {
@@ -368,8 +348,7 @@ mod tests {
 
     #[test]
     fn ratzilla_shell_descriptor_is_browser_shell_only() {
-        let shell =
-            build_ratzilla_web_showcase_shell(vec!["spinner.basic".to_string()], "index.html");
+        let shell = build_ratzilla_web_showcase_shell(vec!["spinner.basic".to_string()], "index.html");
 
         assert_eq!(shell.backend, WebBackend::Ratzilla);
         assert!(!shell.requires_crossterm);
@@ -385,29 +364,21 @@ mod tests {
             evidence_text: EVIDENCE_WEB_RENDERER.to_string(),
             launch_context: LAUNCH_TRUNK_SERVE.to_string(),
         }];
-        let descriptor = EmbeddedRatzillaMountDescriptor::new(
-            EMBED_HOST_ID,
-            FIXTURE_CHROME_SHELL,
-            EMBED_WIDTH,
-            EMBED_HEIGHT,
-        );
+        let descriptor =
+            EmbeddedRatzillaMountDescriptor::new(EMBED_HOST_ID, FIXTURE_CHROME_SHELL, EMBED_WIDTH, EMBED_HEIGHT);
 
         let plan = evaluate_embedded_ratzilla_mount(&descriptor, &facts, &[]);
 
         assert!(plan.is_accepted(), "diagnostics: {:?}", plan.diagnostics);
         assert_eq!(plan.backend, EMBED_BACKEND_DOM);
-        assert_eq!(
-            plan.fixture_facts.expect("fixture facts").label,
-            FIXTURE_CHROME_LABEL
-        );
+        assert_eq!(plan.fixture_facts.expect("fixture facts").label, FIXTURE_CHROME_LABEL);
     }
 
     #[test]
     fn embedded_mount_rejects_missing_duplicate_and_unsupported_state() {
-        let descriptor =
-            EmbeddedRatzillaMountDescriptor::new("", MISSING_FIXTURE, ZERO_SIZE, EMBED_HEIGHT)
-                .with_backend(UNSUPPORTED_BACKEND)
-                .with_lifecycle(UNSUPPORTED_LIFECYCLE);
+        let descriptor = EmbeddedRatzillaMountDescriptor::new("", MISSING_FIXTURE, ZERO_SIZE, EMBED_HEIGHT)
+            .with_backend(UNSUPPORTED_BACKEND)
+            .with_lifecycle(UNSUPPORTED_LIFECYCLE);
         let active = vec![embedded_mount_key("")];
 
         let plan = evaluate_embedded_ratzilla_mount(&descriptor, &[], &active);
@@ -418,9 +389,11 @@ mod tests {
                 .iter()
                 .any(|diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::MissingHostId)
         );
-        assert!(plan.diagnostics.iter().any(
-            |diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::UnsupportedBackend
-        ));
+        assert!(
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::UnsupportedBackend)
+        );
         assert!(
             plan.diagnostics
                 .iter()
@@ -429,15 +402,17 @@ mod tests {
         assert!(
             plan.diagnostics
                 .iter()
-                .any(|diagnostic| diagnostic.code
-                    == EmbeddedRatzillaDiagnosticCode::DuplicateMountKey)
+                .any(|diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::DuplicateMountKey)
         );
-        assert!(plan.diagnostics.iter().any(
-            |diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::UnsupportedFixture
-        ));
         assert!(
-            plan.diagnostics.iter().any(|diagnostic| diagnostic.code
-                == EmbeddedRatzillaDiagnosticCode::UnsupportedLifecycle)
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::UnsupportedFixture)
+        );
+        assert!(
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == EmbeddedRatzillaDiagnosticCode::UnsupportedLifecycle)
         );
     }
 

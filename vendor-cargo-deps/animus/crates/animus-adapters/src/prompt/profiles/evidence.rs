@@ -35,9 +35,7 @@ impl Receipt {
             redaction: ReceiptRedaction::BodyHashed,
             directive_mode: parsed_directives.mode(),
             directive_chain_target: parsed_directives.chain_target(),
-            directive_issue_count: super::support::count_to_u64(
-                parsed_directives.diagnostics().len(),
-            ),
+            directive_issue_count: super::support::count_to_u64(parsed_directives.diagnostics().len()),
             chain_decision: chain_plan.map(super::continuity::ChainPlan::decision),
             omitted_reason,
         }

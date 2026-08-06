@@ -20,27 +20,15 @@ fn run_request_accepts_valid_noninteractive_inputs() {
     assert_eq!(request.identity().workspace_id(), Some(WORKSPACE_ID));
     assert_eq!(request.input_references(), &[Text::from(INPUT_REFERENCE)]);
     assert_eq!(request.prompt(), PROMPT);
-    assert_eq!(
-        request.external_context_handles(),
-        &[Text::from(CONTEXT_HANDLE)]
-    );
+    assert_eq!(request.external_context_handles(), &[Text::from(CONTEXT_HANDLE)]);
     assert_eq!(request.policy_profile(), POLICY_PROFILE);
-    assert_eq!(
-        request.allowed_capabilities(),
-        &[Text::from(CAPABILITY_READ)]
-    );
+    assert_eq!(request.allowed_capabilities(), &[Text::from(CAPABILITY_READ)]);
     assert_eq!(request.sandbox_profile(), SandboxProfile::ReadOnlyWorkspace);
     assert_eq!(request.output_preference().mode_label(), OUTPUT_STRUCTURED);
     assert_eq!(request.output_preference().schema_id(), Some(SCHEMA_ID));
     assert_eq!(request.validation_plan(), VALIDATION_PLAN);
-    assert_eq!(
-        request.noninteractive_behavior(),
-        NoninteractiveBehavior::FailClosed
-    );
-    assert_eq!(
-        request.resume().map(ThreadResume::thread_id),
-        Some(THREAD_ID)
-    );
+    assert_eq!(request.noninteractive_behavior(), NoninteractiveBehavior::FailClosed);
+    assert_eq!(request.resume().map(ThreadResume::thread_id), Some(THREAD_ID));
 }
 
 #[test]
@@ -62,24 +50,13 @@ fn missing_contract_fields_fail_before_execution() {
     })
     .expect_err("missing policy profile should fail");
 
-    assert_eq!(
-        objective_error,
-        AutomationError::EmptyField {
-            field: OBJECTIVE_FIELD
-        }
-    );
-    assert_eq!(
-        identity_error,
-        AutomationError::EmptyField {
-            field: RUN_IDENTITY_FIELD
-        }
-    );
-    assert_eq!(
-        policy_error,
-        AutomationError::EmptyField {
-            field: POLICY_PROFILE_FIELD
-        }
-    );
+    assert_eq!(objective_error, AutomationError::EmptyField { field: OBJECTIVE_FIELD });
+    assert_eq!(identity_error, AutomationError::EmptyField {
+        field: RUN_IDENTITY_FIELD
+    });
+    assert_eq!(policy_error, AutomationError::EmptyField {
+        field: POLICY_PROFILE_FIELD
+    });
 }
 
 #[test]
@@ -101,26 +78,15 @@ fn malformed_contract_values_fail_before_execution() {
     })
     .expect_err("duplicate input reference should fail");
 
-    assert_eq!(
-        output_contract_error,
-        AutomationError::EmptyField {
-            field: SCHEMA_ID_FIELD
-        }
-    );
-    assert_eq!(
-        behavior_error,
-        AutomationError::UnsupportedValue {
-            field: NONINTERACTIVE_BEHAVIOR_FIELD,
-            value: Text::from("ask_user"),
-        }
-    );
-    assert_eq!(
-        input_reference_error,
-        AutomationError::DuplicateValue {
-            field: INPUT_REFERENCE_FIELD,
-            value: Text::from(DUPLICATE_INPUT_REFERENCE),
-        }
-    );
+    assert_eq!(output_contract_error, AutomationError::EmptyField { field: SCHEMA_ID_FIELD });
+    assert_eq!(behavior_error, AutomationError::UnsupportedValue {
+        field: NONINTERACTIVE_BEHAVIOR_FIELD,
+        value: Text::from("ask_user"),
+    });
+    assert_eq!(input_reference_error, AutomationError::DuplicateValue {
+        field: INPUT_REFERENCE_FIELD,
+        value: Text::from(DUPLICATE_INPUT_REFERENCE),
+    });
 }
 
 #[test]
@@ -155,39 +121,22 @@ fn run_request_rejects_missing_prompt_invalid_sandbox_and_resume_mismatch() {
     })
     .expect_err("duplicate capability should fail");
 
-    assert_eq!(
-        missing_prompt,
-        AutomationError::EmptyField {
-            field: PROMPT_FIELD
-        }
-    );
-    assert_eq!(
-        invalid_sandbox,
-        AutomationError::UnsupportedValue {
-            field: SANDBOX_FIELD,
-            value: Text::from("ambient-host"),
-        }
-    );
-    assert_eq!(
-        resume_mismatch,
-        AutomationError::ResumeMismatch {
-            thread_id: Text::from(THREAD_ID),
-            expected_ledger_hash: Text::from(OTHER_LEDGER_HASH),
-            actual_ledger_hash: Text::from(LEDGER_HASH),
-        }
-    );
-    assert_eq!(
-        duplicate_context,
-        AutomationError::DuplicateValue {
-            field: CONTEXT_FIELD,
-            value: Text::from(DUPLICATE_CONTEXT),
-        }
-    );
-    assert_eq!(
-        duplicate_capability,
-        AutomationError::DuplicateValue {
-            field: CAPABILITY_FIELD,
-            value: Text::from(DUPLICATE_CAPABILITY),
-        }
-    );
+    assert_eq!(missing_prompt, AutomationError::EmptyField { field: PROMPT_FIELD });
+    assert_eq!(invalid_sandbox, AutomationError::UnsupportedValue {
+        field: SANDBOX_FIELD,
+        value: Text::from("ambient-host"),
+    });
+    assert_eq!(resume_mismatch, AutomationError::ResumeMismatch {
+        thread_id: Text::from(THREAD_ID),
+        expected_ledger_hash: Text::from(OTHER_LEDGER_HASH),
+        actual_ledger_hash: Text::from(LEDGER_HASH),
+    });
+    assert_eq!(duplicate_context, AutomationError::DuplicateValue {
+        field: CONTEXT_FIELD,
+        value: Text::from(DUPLICATE_CONTEXT),
+    });
+    assert_eq!(duplicate_capability, AutomationError::DuplicateValue {
+        field: CAPABILITY_FIELD,
+        value: Text::from(DUPLICATE_CAPABILITY),
+    });
 }

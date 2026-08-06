@@ -34,18 +34,9 @@ fn round_robin_selection_rotates_per_role_and_wraps_cursor() {
 
     assert_eq!(catalog.len(), super::data::PRIMARY_ROTATION_CATALOG_COUNT);
     assert_eq!(selected.selected_models()[0], MODEL_PRIMARY_ALT);
-    assert_eq!(
-        selected.rotation_decisions().len(),
-        super::data::EXPECTED_ROTATION_DECISIONS
-    );
-    assert_eq!(
-        selected.rotation_decisions()[0].cursor_class(),
-        crate::RouterRotationCursorClass::Wrapped
-    );
-    assert_eq!(
-        selected.rotation_decisions()[0].next_cursor().position(),
-        ZERO_COUNT
-    );
+    assert_eq!(selected.rotation_decisions().len(), super::data::EXPECTED_ROTATION_DECISIONS);
+    assert_eq!(selected.rotation_decisions()[0].cursor_class(), crate::RouterRotationCursorClass::Wrapped);
+    assert_eq!(selected.rotation_decisions()[0].next_cursor().position(), ZERO_COUNT);
 }
 
 #[test]
@@ -53,9 +44,8 @@ fn round_robin_materializes_rotated_fallback_chain_and_receipt() {
     let catalog = super::data::fallback_rotation_catalog();
     let plan = super::data::fallback_rotation_plan();
     let snapshot = super::data::fallback_rotation_snapshot();
-    let execution =
-        crate::materialize_execution_plan_with_rotation(&plan, &catalog, &budget(), &snapshot)
-            .expect("rotated execution plan should materialize");
+    let execution = crate::materialize_execution_plan_with_rotation(&plan, &catalog, &budget(), &snapshot)
+        .expect("rotated execution plan should materialize");
     let receipt = crate::RouterRotationReceipt::from_decision(
         execution.recipe_id(),
         execution.family(),
@@ -65,14 +55,8 @@ fn round_robin_materializes_rotated_fallback_chain_and_receipt() {
     .expect("rotation receipt should validate");
 
     assert_eq!(catalog.len(), super::data::FALLBACK_ROTATION_CATALOG_COUNT);
-    assert_eq!(
-        execution.fallback_chain().steps()[0].model_label(),
-        MODEL_FALLBACK_REMOTE
-    );
-    assert_eq!(
-        execution.rotation_decisions()[0].selected_model(),
-        MODEL_FALLBACK_REMOTE
-    );
+    assert_eq!(execution.fallback_chain().steps()[0].model_label(), MODEL_FALLBACK_REMOTE);
+    assert_eq!(execution.rotation_decisions()[0].selected_model(), MODEL_FALLBACK_REMOTE);
     assert_eq!(receipt.selected_model(), MODEL_FALLBACK_REMOTE);
     assert_eq!(receipt.identity_hash().len(), crate::SafeHash::HEX_CHARS);
 }

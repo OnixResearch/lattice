@@ -17,10 +17,15 @@ mod error;
 mod fabric;
 mod policy;
 mod quoting;
+#[cfg(feature = "rlm-kernel")]
+mod rlm;
 mod turn;
 
 /// Next action selected by the Steel loop fabric.
 pub type LoopDecision = action::Decision;
+
+/// Validated advisory completion request returned by Steel.
+pub type SteelCompletionCandidate = action::CompletionCandidate;
 
 /// Error returned by Steel loop fabric operations.
 pub type LoopError = error::Failure;
@@ -62,6 +67,14 @@ pub type SteelHostAction = policy::HostAction;
 pub type SteelPolicyReceiptRedaction = policy::ReceiptRedaction;
 
 pub use policy::DEFAULT_RUNTIME_HOST_ACTIONS;
+#[cfg(feature = "rlm-kernel")]
+pub use rlm::SteelRlmError;
+#[cfg(feature = "rlm-kernel")]
+pub use rlm::SteelRlmEvaluation;
+#[cfg(feature = "rlm-kernel")]
+pub use rlm::SteelRlmKernel;
+#[cfg(feature = "rlm-kernel")]
+pub use rlm::SteelRlmToolAdapter;
 
 /// Returns the canonical BLAKE3 hash for a Steel script body.
 #[must_use]

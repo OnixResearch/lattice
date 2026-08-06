@@ -1,0 +1,12 @@
+schema=component-inspection-evaluation-v1
+decision=defer
+current_owner=family-and-renderer-local-composition
+public_inspector_api=none
+idle_observer=none
+maintained_gate=not-satisfied
+revisit_trigger=two-families-two-maintained-adapters-named-consumer-and-30-duplicate-lines-each
+inventory_sha256=d31a86ef8136645bef6fa28ac859d81357caf6d18769dcab6b4fd3de421daae4
+alternatives_sha256=aae31730aa0726dc424178cd3439010fcc1800e8f11e3c9c39c14ec0079a58ea
+family_matrix_sha256=5ac41711a498c4ac8d3933d300ad7eb8553a07d1e5177c95b0495a073ff30fca
+private_fixture_sha256=c3a708bd52f32eea06c913c911d5eaa80ffc093c2c76c1a19ade8f013c7a7460
+claim=evaluation-only

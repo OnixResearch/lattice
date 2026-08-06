@@ -2,8 +2,8 @@ use super::support::*;
 
 #[test]
 fn duplicate_entry_id_fails_closed() {
-    let snapshot = super::super::Snapshot::new(duplicate_nodes(), DUPLICATE_ID, alloc::vec![])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(duplicate_nodes(), DUPLICATE_ID, alloc::vec![]).expect("snapshot should build");
 
     assert_eq!(
         super::super::replay_snapshot(&snapshot).expect_err("duplicate should fail"),
@@ -29,8 +29,8 @@ fn missing_parent_fails_closed() {
 
 #[test]
 fn parent_cycle_fails_closed() {
-    let snapshot = super::super::Snapshot::new(cycle_nodes(), CYCLE_A_ID, alloc::vec![])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(cycle_nodes(), CYCLE_A_ID, alloc::vec![]).expect("snapshot should build");
 
     assert!(matches!(
         super::super::replay_snapshot(&snapshot).expect_err("cycle should fail"),
@@ -40,8 +40,8 @@ fn parent_cycle_fails_closed() {
 
 #[test]
 fn invalid_active_leaf_fails_closed() {
-    let snapshot = super::super::Snapshot::new(branch_nodes(), INVALID_ACTIVE_ID, alloc::vec![])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(branch_nodes(), INVALID_ACTIVE_ID, alloc::vec![]).expect("snapshot should build");
 
     assert_eq!(
         super::super::replay_snapshot(&snapshot).expect_err("invalid active should fail"),
@@ -54,8 +54,8 @@ fn invalid_active_leaf_fails_closed() {
 #[test]
 fn bad_label_target_fails_closed() {
     let label = super::super::Label::new(INVALID_ACTIVE_ID, NAV_LABEL).expect("label");
-    let snapshot = super::super::Snapshot::new(branch_nodes(), SIBLING_ID, alloc::vec![label])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(branch_nodes(), SIBLING_ID, alloc::vec![label]).expect("snapshot should build");
 
     assert_eq!(
         super::super::replay_snapshot(&snapshot).expect_err("bad label should fail"),
@@ -67,8 +67,8 @@ fn bad_label_target_fails_closed() {
 
 #[test]
 fn orphan_tool_result_fails_closed() {
-    let snapshot = super::super::Snapshot::new(orphan_tool_nodes(), TOOL_ID, alloc::vec![])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(orphan_tool_nodes(), TOOL_ID, alloc::vec![]).expect("snapshot should build");
 
     assert_eq!(
         super::super::replay_snapshot(&snapshot).expect_err("orphan tool should fail"),
@@ -80,8 +80,8 @@ fn orphan_tool_result_fails_closed() {
 
 #[test]
 fn malformed_summary_boundary_fails_closed() {
-    let snapshot = super::super::Snapshot::new(summary_root_nodes(), SUMMARY_ID, alloc::vec![])
-        .expect("snapshot should build");
+    let snapshot =
+        super::super::Snapshot::new(summary_root_nodes(), SUMMARY_ID, alloc::vec![]).expect("snapshot should build");
 
     assert_eq!(
         super::super::replay_snapshot(&snapshot).expect_err("summary should fail"),
@@ -93,12 +93,8 @@ fn malformed_summary_boundary_fails_closed() {
 
 fn duplicate_nodes() -> alloc::vec::Vec<super::super::Node> {
     alloc::vec![
-        super::super::Node::root(
-            super::super::Entry::user(DUPLICATE_ID, USER_TEXT).expect("entry")
-        ),
-        super::super::Node::root(
-            super::super::Entry::assistant(DUPLICATE_ID, ASSISTANT_TEXT).expect("entry"),
-        ),
+        super::super::Node::root(super::super::Entry::user(DUPLICATE_ID, USER_TEXT).expect("entry")),
+        super::super::Node::root(super::super::Entry::assistant(DUPLICATE_ID, ASSISTANT_TEXT).expect("entry"),),
     ]
 }
 
@@ -115,11 +111,8 @@ fn missing_parent_nodes() -> alloc::vec::Vec<super::super::Node> {
 
 fn cycle_nodes() -> alloc::vec::Vec<super::super::Node> {
     alloc::vec![
-        super::super::Node::child(
-            super::super::Entry::user(CYCLE_A_ID, USER_TEXT).expect("entry"),
-            CYCLE_B_ID,
-        )
-        .expect("node should build"),
+        super::super::Node::child(super::super::Entry::user(CYCLE_A_ID, USER_TEXT).expect("entry"), CYCLE_B_ID,)
+            .expect("node should build"),
         super::super::Node::child(
             super::super::Entry::assistant(CYCLE_B_ID, ASSISTANT_TEXT).expect("entry"),
             CYCLE_A_ID,

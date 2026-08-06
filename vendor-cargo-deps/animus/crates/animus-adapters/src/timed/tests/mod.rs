@@ -79,8 +79,7 @@ const fn admitted_run() -> ScheduledRunAdmissionDraft {
 #[test]
 fn schedule_descriptor_accepts_read_only_recurring_and_run_now() {
     let receipt = admitted_recipe();
-    let schedule =
-        ScheduledWorkflow::validate(&schedule_draft(&receipt)).expect("schedule should validate");
+    let schedule = ScheduledWorkflow::validate(&schedule_draft(&receipt)).expect("schedule should validate");
     let run_now = ScheduledWorkflow::validate(&ScheduledWorkflowDraft {
         cadence: CADENCE_RUN_NOW,
         execution_mode: EXECUTION_FOREGROUND,
@@ -110,21 +109,15 @@ fn schedule_descriptor_rejects_invalid_cadence_missing_recipe_and_untrusted_reci
             recipe_id: "",
             ..schedule_draft(&admitted)
         }),
-        Err(ScheduleError::Contract(
-            crate::AdapterContractError::EmptyField { .. }
-        ))
+        Err(ScheduleError::Contract(crate::AdapterContractError::EmptyField { .. }))
     ));
-    assert_eq!(
-        ScheduledWorkflow::validate(&schedule_draft(&pending)),
-        Err(ScheduleError::UntrustedRecipe)
-    );
+    assert_eq!(ScheduledWorkflow::validate(&schedule_draft(&pending)), Err(ScheduleError::UntrustedRecipe));
 }
 
 #[test]
 fn next_run_planning_uses_explicit_ticks_only() {
     let receipt = admitted_recipe();
-    let schedule =
-        ScheduledWorkflow::validate(&schedule_draft(&receipt)).expect("schedule should validate");
+    let schedule = ScheduledWorkflow::validate(&schedule_draft(&receipt)).expect("schedule should validate");
     let plan = plan_next_run(NextRunInput {
         schedule: &schedule,
         current_tick: CURRENT_TICK,
@@ -146,10 +139,7 @@ fn next_run_planning_uses_explicit_ticks_only() {
 
 #[test]
 fn run_admission_denies_missing_queue_untrusted_policy_and_cancellation() {
-    assert_eq!(
-        admit_scheduled_run(admitted_run()),
-        ScheduledRunAdmissionStatus::Admitted
-    );
+    assert_eq!(admit_scheduled_run(admitted_run()), ScheduledRunAdmissionStatus::Admitted);
     assert_eq!(
         admit_scheduled_run(ScheduledRunAdmissionDraft {
             runtime: ScheduledRunRuntimeAdmission {
@@ -197,10 +187,7 @@ fn concurrency_conflicts_are_serialized_isolated_or_denied() {
         new_run_writes: true,
     };
 
-    assert_eq!(
-        evaluate_scheduled_concurrency(overlap),
-        ScheduledConcurrencyDecision::Serialize
-    );
+    assert_eq!(evaluate_scheduled_concurrency(overlap), ScheduledConcurrencyDecision::Serialize);
     assert_eq!(
         evaluate_scheduled_concurrency(ScheduledConcurrencyInput {
             policy: ScheduleConcurrencyPolicy::Isolate,
@@ -234,10 +221,7 @@ fn run_records_are_redacted_hash_and_count_records() {
 
     assert_eq!(record.parameter_count(), FIRST_COUNT);
     assert_eq!(record.evidence_count(), FIRST_COUNT);
-    assert_eq!(
-        validate_scheduled_record_text("hash counts redactions"),
-        Ok(())
-    );
+    assert_eq!(validate_scheduled_record_text("hash counts redactions"), Ok(()));
     assert_eq!(
         validate_scheduled_record_text("prompt: hi secret /home/user tool output"),
         Err(ScheduleError::RecordLeak)

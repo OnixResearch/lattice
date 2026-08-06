@@ -3,20 +3,14 @@ use super::*;
 /// Result of building a leader menu: the menu and any conflicts.
 pub type BuildResult<A> = (LeaderMenu<A>, Vec<Conflict>);
 
-type GroupedMenuItems<A> = (
-    Vec<MenuContribution<A>>,
-    std::collections::HashMap<String, Vec<MenuContribution<A>>>,
-);
+type GroupedMenuItems<A> = (Vec<MenuContribution<A>>, std::collections::HashMap<String, Vec<MenuContribution<A>>>);
 
 /// Build a leader menu from contributors.
 ///
 /// Collects all [`MenuContribution`] items, deduplicates by `(key, placement)`
 /// with highest priority winning, removes hidden entries, and assembles the
 /// menu tree.
-pub fn build<A: Clone>(
-    contributors: &[&dyn MenuContributor<A>],
-    hidden: &HiddenSet,
-) -> BuildResult<A> {
+pub fn build<A: Clone>(contributors: &[&dyn MenuContributor<A>], hidden: &HiddenSet) -> BuildResult<A> {
     let items = contributors.iter().flat_map(|c| c.menu_items()).collect();
     build_from_items(items, hidden)
 }
@@ -70,20 +64,13 @@ fn build_submenus<A>(
 
 /// Builds a leader menu from a pre-collected list of contributions.
 #[must_use]
-pub fn build_from_items<A: Clone>(
-    mut all_items: Vec<MenuContribution<A>>,
-    hidden: &HiddenSet,
-) -> BuildResult<A> {
+pub fn build_from_items<A: Clone>(mut all_items: Vec<MenuContribution<A>>, hidden: &HiddenSet) -> BuildResult<A> {
     let contribution_count = all_items.len();
     let mut conflicts = Vec::with_capacity(contribution_count);
 
     // Sort by priority (lowest first so highest overwrites).
     all_items.sort_by_key(|i| i.priority);
-    debug_assert!(
-        all_items
-            .windows(2)
-            .all(|pair| pair[0].priority <= pair[1].priority)
-    );
+    debug_assert!(all_items.windows(2).all(|pair| pair[0].priority <= pair[1].priority));
     debug_assert!(all_items.len() <= contribution_count);
 
     // Deduplicate by (key, placement) — last writer wins.

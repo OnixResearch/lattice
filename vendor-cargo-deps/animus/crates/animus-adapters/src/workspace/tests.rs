@@ -40,41 +40,20 @@ fn descriptor_accepts_valid_portable_intent() {
     assert_eq!(descriptor.source_id(), SOURCE_ID);
     assert_eq!(descriptor.workspace_id(), WORKSPACE_ID);
     assert_eq!(descriptor.parent_workspace_id(), Some(PARENT_ID));
-    assert_eq!(
-        descriptor.writable_roots(),
-        &[
-            alloc::string::String::from(ROOT_SRC),
-            alloc::string::String::from(ROOT_DOCS)
-        ]
-    );
-    assert_eq!(
-        descriptor.file_inclusion(),
-        crate::WorkspaceFileInclusionPolicy::TrackedOnly
-    );
+    assert_eq!(descriptor.writable_roots(), &[
+        alloc::string::String::from(ROOT_SRC),
+        alloc::string::String::from(ROOT_DOCS)
+    ]);
+    assert_eq!(descriptor.file_inclusion(), crate::WorkspaceFileInclusionPolicy::TrackedOnly);
     assert_eq!(descriptor.operation(), crate::WorkspaceOperation::Create);
-    assert_eq!(
-        descriptor.commit_target(),
-        crate::WorkspaceCommitTarget::Parent
-    );
-    assert_eq!(
-        descriptor.abort_policy(),
-        crate::WorkspaceAbortPolicy::Discard
-    );
-    assert_eq!(
-        descriptor.conflict_policy(),
-        crate::WorkspaceConflictPolicy::Fail
-    );
-    assert_eq!(
-        descriptor.cleanup_policy(),
-        crate::WorkspaceCleanupPolicy::Required
-    );
-    assert_eq!(
-        descriptor.required_capabilities(),
-        &[
-            crate::WorkspaceCapability::NestedWorkspaces,
-            crate::WorkspaceCapability::CommitToParent
-        ]
-    );
+    assert_eq!(descriptor.commit_target(), crate::WorkspaceCommitTarget::Parent);
+    assert_eq!(descriptor.abort_policy(), crate::WorkspaceAbortPolicy::Discard);
+    assert_eq!(descriptor.conflict_policy(), crate::WorkspaceConflictPolicy::Fail);
+    assert_eq!(descriptor.cleanup_policy(), crate::WorkspaceCleanupPolicy::Required);
+    assert_eq!(descriptor.required_capabilities(), &[
+        crate::WorkspaceCapability::NestedWorkspaces,
+        crate::WorkspaceCapability::CommitToParent
+    ]);
 }
 
 #[test]
@@ -82,15 +61,11 @@ fn descriptor_rejects_empty_writable_roots() {
     let mut draft = descriptor_draft();
     draft.writable_roots = &[];
 
-    let error = crate::SpeculativeWorkspaceDescriptor::new(draft)
-        .expect_err("empty writable roots should fail");
+    let error = crate::SpeculativeWorkspaceDescriptor::new(draft).expect_err("empty writable roots should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::EmptyCollection {
-            field: "workspace_writable_roots",
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::EmptyCollection {
+        field: "workspace_writable_roots",
+    });
 }
 
 #[test]
@@ -98,16 +73,12 @@ fn descriptor_rejects_unknown_capability() {
     let mut draft = descriptor_draft();
     draft.required_capabilities = &[BAD_VALUE];
 
-    let error = crate::SpeculativeWorkspaceDescriptor::new(draft)
-        .expect_err("unknown capability should fail");
+    let error = crate::SpeculativeWorkspaceDescriptor::new(draft).expect_err("unknown capability should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::UnsupportedWorkspaceValue {
-            field: "workspace_required_capability",
-            value: alloc::string::String::from(BAD_VALUE),
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::UnsupportedWorkspaceValue {
+        field: "workspace_required_capability",
+        value: alloc::string::String::from(BAD_VALUE),
+    });
 }
 
 #[test]
@@ -115,66 +86,51 @@ fn descriptor_rejects_malformed_id() {
     let mut draft = descriptor_draft();
     draft.workspace_id = NUL_WORKSPACE;
 
-    let error = crate::SpeculativeWorkspaceDescriptor::new(draft)
-        .expect_err("NUL workspace id should fail");
+    let error = crate::SpeculativeWorkspaceDescriptor::new(draft).expect_err("NUL workspace id should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::NulCharacter {
-            field: "workspace_id",
-            byte_index: NUL_BYTE_INDEX,
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::NulCharacter {
+        field: "workspace_id",
+        byte_index: NUL_BYTE_INDEX,
+    });
 }
 
 #[test]
 fn adapter_capabilities_accept_branchfs_like_backend() {
-    let capabilities =
-        crate::WorkspaceAdapterCapabilities::new(crate::WorkspaceAdapterCapabilitiesDraft {
-            adapter_label: ADAPTER_LABEL,
-            kind: "branchfs_like",
-            state: "available",
-            supported_capabilities: &[
-                "branchfs_like",
-                "nested_workspaces",
-                "commit_to_parent",
-                "abort",
-                "conflict_detection",
-                "cleanup_guarantee",
-            ],
-        })
-        .expect("valid adapter capabilities should parse");
+    let capabilities = crate::WorkspaceAdapterCapabilities::new(crate::WorkspaceAdapterCapabilitiesDraft {
+        adapter_label: ADAPTER_LABEL,
+        kind: "branchfs_like",
+        state: "available",
+        supported_capabilities: &[
+            "branchfs_like",
+            "nested_workspaces",
+            "commit_to_parent",
+            "abort",
+            "conflict_detection",
+            "cleanup_guarantee",
+        ],
+    })
+    .expect("valid adapter capabilities should parse");
 
     assert_eq!(capabilities.adapter_label(), ADAPTER_LABEL);
-    assert_eq!(
-        capabilities.kind(),
-        crate::WorkspaceAdapterKind::BranchFsLike
-    );
-    assert_eq!(
-        capabilities.state(),
-        crate::WorkspaceAdapterState::Available
-    );
+    assert_eq!(capabilities.kind(), crate::WorkspaceAdapterKind::BranchFsLike);
+    assert_eq!(capabilities.state(), crate::WorkspaceAdapterState::Available);
     assert!(capabilities.supports(crate::WorkspaceCapability::CommitToParent));
     assert!(!capabilities.supports(crate::WorkspaceCapability::VcsWorktree));
 }
 
 #[test]
 fn adapter_capabilities_reject_empty_supported_capabilities() {
-    let error =
-        crate::WorkspaceAdapterCapabilities::new(crate::WorkspaceAdapterCapabilitiesDraft {
-            adapter_label: ADAPTER_LABEL,
-            kind: "unsupported",
-            state: "unavailable",
-            supported_capabilities: &[],
-        })
-        .expect_err("empty capability set should fail");
+    let error = crate::WorkspaceAdapterCapabilities::new(crate::WorkspaceAdapterCapabilitiesDraft {
+        adapter_label: ADAPTER_LABEL,
+        kind: "unsupported",
+        state: "unavailable",
+        supported_capabilities: &[],
+    })
+    .expect_err("empty capability set should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::EmptyCollection {
-            field: "workspace_supported_capability",
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::EmptyCollection {
+        field: "workspace_supported_capability",
+    });
 }
 
 #[test]
@@ -186,10 +142,7 @@ fn adapter_outcome_accepts_explicit_failure_state() {
     })
     .expect("failed cleanup outcome should parse");
 
-    assert_eq!(
-        outcome.kind(),
-        crate::WorkspaceAdapterOutcomeKind::FailedCleanup
-    );
+    assert_eq!(outcome.kind(), crate::WorkspaceAdapterOutcomeKind::FailedCleanup);
     assert_eq!(outcome.workspace_id(), WORKSPACE_ID);
     assert_eq!(outcome.issue_code(), Some("WORKSPACE_CLEANUP_FAILED"));
 }
@@ -203,11 +156,8 @@ fn adapter_outcome_rejects_unknown_state() {
     })
     .expect_err("unknown outcome should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::UnsupportedWorkspaceValue {
-            field: "workspace_outcome_kind",
-            value: alloc::string::String::from(BAD_VALUE),
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::UnsupportedWorkspaceValue {
+        field: "workspace_outcome_kind",
+        value: alloc::string::String::from(BAD_VALUE),
+    });
 }

@@ -187,9 +187,7 @@ impl MemoryPolicyIssue {
 
 pub type MemoryPolicyResult<T> = Result<T, Vec<MemoryPolicyIssue>>;
 
-pub fn validate_memory_production_policy(
-    policy: &MemoryProductionPolicy,
-) -> MemoryPolicyResult<()> {
+pub fn validate_memory_production_policy(policy: &MemoryProductionPolicy) -> MemoryPolicyResult<()> {
     let mut issues = Vec::new();
     validate_label(policy.policy_label.as_str(), &mut issues);
     if policy.surfaces.is_empty() {
@@ -218,11 +216,7 @@ pub fn validate_memory_operation_scope(
     if let Some(user) = &scope.user_scope {
         validate_label(user.as_str(), &mut issues);
     }
-    let Some(surface) = policy
-        .surfaces
-        .iter()
-        .find(|surface| surface.surface_label == scope.surface_label)
-    else {
+    let Some(surface) = policy.surfaces.iter().find(|surface| surface.surface_label == scope.surface_label) else {
         issues.push(MemoryPolicyIssue::MissingSurface);
         return result_from_issues(issues, ());
     };
@@ -242,11 +236,7 @@ pub fn validate_memory_erasure_receipt(
         issues.push(MemoryPolicyIssue::MissingSurface);
     }
     for surface in &policy.surfaces {
-        if !receipt
-            .surfaces
-            .iter()
-            .any(|entry| entry.surface_label == surface.surface_label)
-        {
+        if !receipt.surfaces.iter().any(|entry| entry.surface_label == surface.surface_label) {
             issues.push(MemoryPolicyIssue::MissingSurface);
         }
     }
@@ -263,20 +253,13 @@ pub fn validate_memory_erasure_receipt(
             ErasureOutcome::Unsupported => issues.push(MemoryPolicyIssue::UnsupportedSurface),
         }
     }
-    if receipt.claims_complete
-        && receipt
-            .surfaces
-            .iter()
-            .any(|entry| entry.outcome != ErasureOutcome::Complete)
-    {
+    if receipt.claims_complete && receipt.surfaces.iter().any(|entry| entry.outcome != ErasureOutcome::Complete) {
         issues.push(MemoryPolicyIssue::PartialErasureClaim);
     }
     result_from_issues(issues, ())
 }
 
-pub fn validate_memory_budget_descriptor(
-    descriptor: &MemoryBudgetDescriptor,
-) -> MemoryPolicyResult<()> {
+pub fn validate_memory_budget_descriptor(descriptor: &MemoryBudgetDescriptor) -> MemoryPolicyResult<()> {
     let mut issues = Vec::new();
     validate_label(descriptor.budget_label.as_str(), &mut issues);
     validate_label(descriptor.cost_label.as_str(), &mut issues);
@@ -330,11 +313,7 @@ fn validate_hash(value: &str, issues: &mut Vec<MemoryPolicyIssue>) {
 fn result_from_issues<T>(mut issues: Vec<MemoryPolicyIssue>, value: T) -> MemoryPolicyResult<T> {
     issues.sort_by_key(|issue| issue.code());
     issues.dedup();
-    if issues.is_empty() {
-        Ok(value)
-    } else {
-        Err(issues)
-    }
+    if issues.is_empty() { Ok(value) } else { Err(issues) }
 }
 
 #[cfg(test)]

@@ -194,8 +194,7 @@ const CREDENTIAL_MARKERS: &[&str] = &[
 ];
 const FULL_PATH_MARKERS: &[&str] = &["/home/", "C:\\Users\\", "\\Users\\"];
 const PROVIDER_PAYLOAD_MARKERS: &[&str] = &["provider_json", "provider payload"];
-const RAW_TOOL_PAYLOAD_MARKERS: &[&str] =
-    &["RAW_TOOL_PAYLOAD", "raw_tool_payload=", "raw tool payload"];
+const RAW_TOOL_PAYLOAD_MARKERS: &[&str] = &["RAW_TOOL_PAYLOAD", "raw_tool_payload=", "raw tool payload"];
 const SECRET_SUMMARY_MARKERS: &[&str] = &["secret_summary=", "secret summary"];
 
 /// Confirmation receipt leak class.
@@ -241,9 +240,7 @@ pub fn validate_confirmation_receipt_text(text: &str) -> Result<(), Confirmation
 }
 
 fn first_leak(text: &str) -> Option<ConfirmationReceiptLeak> {
-    LEAK_MARKERS
-        .iter()
-        .find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
+    LEAK_MARKERS.iter().find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
 }
 
 fn contains_marker(text: &str, markers: &[&str]) -> bool {
@@ -254,18 +251,9 @@ const LEAK_MARKERS: &[(ConfirmationReceiptLeak, &[&str])] = &[
     (ConfirmationReceiptLeak::RawPrompt, RAW_PROMPT_MARKERS),
     (ConfirmationReceiptLeak::Credential, CREDENTIAL_MARKERS),
     (ConfirmationReceiptLeak::FullPath, FULL_PATH_MARKERS),
-    (
-        ConfirmationReceiptLeak::ProviderPayload,
-        PROVIDER_PAYLOAD_MARKERS,
-    ),
-    (
-        ConfirmationReceiptLeak::RawToolPayload,
-        RAW_TOOL_PAYLOAD_MARKERS,
-    ),
-    (
-        ConfirmationReceiptLeak::SecretSummary,
-        SECRET_SUMMARY_MARKERS,
-    ),
+    (ConfirmationReceiptLeak::ProviderPayload, PROVIDER_PAYLOAD_MARKERS),
+    (ConfirmationReceiptLeak::RawToolPayload, RAW_TOOL_PAYLOAD_MARKERS),
+    (ConfirmationReceiptLeak::SecretSummary, SECRET_SUMMARY_MARKERS),
 ];
 
 pub(super) fn safe_hash_parts(parts: &[&str]) -> super::super::SafeHash {

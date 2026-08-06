@@ -20,12 +20,9 @@ fn request_rejects_missing_current_shape_fields() {
         approval_posture: APPROVAL_PRE_APPROVED,
     })
     .expect_err("missing tool name should fail");
-    assert_eq!(
-        missing_name,
-        ContractError::MissingField {
-            field: super::super::NAME_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_name, ContractError::MissingField {
+        field: super::super::NAME_FIELD.as_str(),
+    });
 
     let missing_arguments = Request::from_draft(&RequestDraft {
         name: Some(NAME),
@@ -39,12 +36,9 @@ fn request_rejects_missing_current_shape_fields() {
         approval_posture: APPROVAL_PRE_APPROVED,
     })
     .expect_err("missing arguments should fail");
-    assert_eq!(
-        missing_arguments,
-        ContractError::MissingField {
-            field: super::super::ARGUMENT_NAME_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_arguments, ContractError::MissingField {
+        field: super::super::ARGUMENT_NAME_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -95,12 +89,9 @@ fn request_rejects_missing_schema_identity_capabilities_and_bad_approval() {
         approval_posture: "ambient-approval",
     })
     .expect_err("unsupported approval should fail");
-    assert_eq!(
-        bad_approval,
-        ContractError::UnsupportedApprovalPosture {
-            posture: super::super::Text::from("ambient-approval"),
-        }
-    );
+    assert_eq!(bad_approval, ContractError::UnsupportedApprovalPosture {
+        posture: super::super::Text::from("ambient-approval"),
+    });
 }
 
 #[test]
@@ -110,12 +101,9 @@ fn definition_metadata_rejects_missing_schema_and_empty_guidelines() {
         ..definition_draft(DefinitionStatus::Active, NAME)
     })
     .expect_err("missing schema identity should fail");
-    assert_eq!(
-        missing_schema,
-        ContractError::MissingField {
-            field: super::super::SCHEMA_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_schema, ContractError::MissingField {
+        field: super::super::SCHEMA_FIELD.as_str(),
+    });
 
     let empty_guidelines = Definition::validate(&DefinitionDraft {
         prompt_guidelines: &[],
@@ -144,12 +132,9 @@ fn malformed_unknown_arguments_fail() {
         fields: &unknown_fields,
     })
     .expect_err("unknown current field should fail");
-    assert_eq!(
-        unknown,
-        ContractError::UnknownArgument {
-            name: super::super::Text::from(EXTRA_ARGUMENT),
-        }
-    );
+    assert_eq!(unknown, ContractError::UnknownArgument {
+        name: super::super::Text::from(EXTRA_ARGUMENT),
+    });
 }
 
 #[test]
@@ -164,11 +149,7 @@ fn duplicate_current_arguments_fail() {
             value: Some(ARGUMENT_VALUE),
         },
     ];
-    assert!(
-        duplicate_fields
-            .iter()
-            .all(|field| field.name == Some(CURRENT_ARGUMENT))
-    );
+    assert!(duplicate_fields.iter().all(|field| field.name == Some(CURRENT_ARGUMENT)));
     let duplicate = PreparedArguments::prepare(&ArgumentPreparationRequest {
         current_schema_identity: SCHEMA_ID,
         allowed_field_names: &[CURRENT_ARGUMENT],
@@ -176,12 +157,9 @@ fn duplicate_current_arguments_fail() {
         fields: &duplicate_fields,
     })
     .expect_err("duplicate current fields should fail");
-    assert_eq!(
-        duplicate,
-        ContractError::DuplicateArgument {
-            name: super::super::Text::from(CURRENT_ARGUMENT),
-        }
-    );
+    assert_eq!(duplicate, ContractError::DuplicateArgument {
+        name: super::super::Text::from(CURRENT_ARGUMENT),
+    });
 }
 
 #[test]
@@ -197,12 +175,9 @@ fn missing_argument_values_fail() {
         fields: &missing_value_fields,
     })
     .expect_err("missing argument value should fail");
-    assert_eq!(
-        missing_value,
-        ContractError::MissingField {
-            field: super::super::ARGUMENT_VALUE_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_value, ContractError::MissingField {
+        field: super::super::ARGUMENT_VALUE_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -239,12 +214,9 @@ fn unsafe_output_reference_and_raw_body_hazards_are_rejected() {
         },
     )
     .expect_err("absolute references should fail");
-    assert_eq!(
-        unsafe_reference,
-        ContractError::UnsafeReference {
-            reference: super::super::Text::from(UNSAFE_REFERENCE),
-        }
-    );
+    assert_eq!(unsafe_reference, ContractError::UnsafeReference {
+        reference: super::super::Text::from(UNSAFE_REFERENCE),
+    });
 
     let nul_output = BoundedOutput::new(
         &OutputDraft {
@@ -270,10 +242,7 @@ fn missing_executor_denied_capability_and_unsafe_output_fail_without_fallback() 
         output_boundary_status: OutputBoundaryStatus::Bounded,
     });
     assert_eq!(missing_executor.status(), DispatchStatus::Failed);
-    assert_eq!(
-        missing_executor.failure_class(),
-        Some(FailureClass::MissingExecutor)
-    );
+    assert_eq!(missing_executor.failure_class(), Some(FailureClass::MissingExecutor));
     assert!(!missing_executor.fallback_attempted());
 
     let denied = evaluate_dispatch(DispatchRequest {
@@ -293,10 +262,7 @@ fn missing_executor_denied_capability_and_unsafe_output_fail_without_fallback() 
         output_boundary_status: OutputBoundaryStatus::UnsafeReference,
     });
     assert_eq!(unsafe_output.status(), DispatchStatus::Failed);
-    assert_eq!(
-        unsafe_output.failure_class(),
-        Some(FailureClass::UnsafeOutputReference)
-    );
+    assert_eq!(unsafe_output.failure_class(), Some(FailureClass::UnsafeOutputReference));
     assert!(!unsafe_output.fallback_attempted());
 }
 
@@ -352,10 +318,7 @@ fn plan_denies_undiscovered_tools_without_ambient_lookup() {
     assert_eq!(plan.status(), PlanStatus::Denied);
     assert_eq!(plan.issue(), PlanIssue::UndiscoveredTool);
     assert_eq!(plan.steps().len(), SINGLE_STEP_COUNT);
-    assert_eq!(
-        plan.steps()[FIRST_INDEX].issue(),
-        PlanIssue::UndiscoveredTool
-    );
+    assert_eq!(plan.steps()[FIRST_INDEX].issue(), PlanIssue::UndiscoveredTool);
 }
 
 #[test]
@@ -467,10 +430,7 @@ fn plan_rejects_binary_intermediate_as_text() {
 
     assert_eq!(plan.status(), PlanStatus::Denied);
     assert_eq!(plan.issue(), PlanIssue::UnsafeIntermediate);
-    assert_eq!(
-        plan.steps()[SECOND_INDEX].issue(),
-        PlanIssue::UnsafeIntermediate
-    );
+    assert_eq!(plan.steps()[SECOND_INDEX].issue(), PlanIssue::UnsafeIntermediate);
 }
 
 #[test]
@@ -509,8 +469,5 @@ fn plan_receipt_rejects_raw_prompt_diagnostics() {
     })
     .expect_err("raw prompt diagnostics must be rejected");
 
-    assert!(matches!(
-        leak,
-        crate::safe::receipt::Error::UnsafeMetadata { .. }
-    ));
+    assert!(matches!(leak, crate::safe::receipt::Error::UnsafeMetadata { .. }));
 }

@@ -1,0 +1,47 @@
+{
+  "components": [
+    {
+      "class": "tool_catalog",
+      "identity": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "class": "policy_authorization",
+      "identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "class": "adapter_cohort",
+      "identity": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "class": "permission",
+      "identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "class": "context_retrieval",
+      "identity": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "class": "sandbox_intent",
+      "identity": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "class": "model_runtime",
+      "identity": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "class": "capability_ceiling",
+      "identity": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "class": "hook_plugin_set",
+      "identity": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "class": "agent_definition_set",
+      "identity": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "expected_profile_identity": "53a1955677292245ccd4ccc6c0c3a7f3bcd9431f4ac0d6f1a7f9fb7ca1ac5070",
+  "redaction_marker": "raw-policy-prompt-tool-extension-credential-path-and-provider-material-omitted",
+  "schema": "animus.session-authority-profile.v1"
+}

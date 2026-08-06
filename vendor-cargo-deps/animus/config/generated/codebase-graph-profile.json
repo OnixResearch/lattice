@@ -1,0 +1,34 @@
+{
+  "binary_policy": "reject",
+  "budgets": {
+    "max_file_bytes": 1048576,
+    "max_files": 4096,
+    "max_results": 128
+  },
+  "cache_posture": "disabled",
+  "capability_root_label": "worktree",
+  "exclude_components": [
+    ".git",
+    ".jj",
+    "target"
+  ],
+  "include_extensions": [
+    "rs"
+  ],
+  "language": "rust",
+  "non_claims": [
+    "not-semantic-analysis",
+    "not-type-correctness",
+    "not-complete-reference-resolution",
+    "not-mutation-authority",
+    "not-production-readiness",
+    "not-release-eligibility"
+  ],
+  "parser_cohort": "tree-sitter-rust-0.24",
+  "profile_id": "rust-first",
+  "query_cohort": "rust-query-v1",
+  "redaction": "metadata_only",
+  "schema": "animus.codebase-graph-profile.v1",
+  "special_file_policy": "reject",
+  "stale_event_policy": "block_until_rescan"
+}

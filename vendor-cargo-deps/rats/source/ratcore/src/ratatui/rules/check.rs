@@ -10,9 +10,7 @@ const NEXT_ACTION_SUBJECT: &str = "next_action";
 
 /// Validates checked-in `Ratatui` feature policy rows.
 #[must_use]
-pub fn validate_ratatui_feature_policy(
-    rows: &[super::types::FeaturePolicyRow],
-) -> super::types::FeaturePolicyReport {
+pub fn validate_ratatui_feature_policy(rows: &[super::types::FeaturePolicyRow]) -> super::types::FeaturePolicyReport {
     let mut issues = Vec::with_capacity(rows.len());
     let mut seen_keys = std::collections::BTreeSet::new();
     debug_assert!(issues.capacity() >= rows.len());
@@ -70,10 +68,7 @@ pub fn validate_ratatui_feature_uses(
     }
 }
 
-fn row_issues(
-    row: &super::types::FeaturePolicyRow,
-    key: &str,
-) -> Vec<super::types::FeaturePolicyIssue> {
+fn row_issues(row: &super::types::FeaturePolicyRow, key: &str) -> Vec<super::types::FeaturePolicyIssue> {
     let mut issues = Vec::with_capacity(super::types::KNOWN_POLICY_STATUSES.len());
     debug_assert!(issues.capacity() == super::types::KNOWN_POLICY_STATUSES.len());
     if has_missing_row_field(row) {
@@ -110,9 +105,7 @@ fn row_issues(
         ));
         return issues;
     }
-    if status == super::types::POLICY_APPROVED
-        && row.evidence.iter().all(|entry| entry.trim().is_empty())
-    {
+    if status == super::types::POLICY_APPROVED && row.evidence.iter().all(|entry| entry.trim().is_empty()) {
         issues.push(super::types::FeaturePolicyIssue::new(
             super::types::FeaturePolicyIssueCode::MissingEvidence,
             key,
@@ -157,10 +150,7 @@ fn feature_use_issues(
             "web-consumed crate uses a web-incompatible Ratatui feature",
         ));
     }
-    let Some(status) = rules.get(&(
-        feature_use.crate_family.clone(),
-        feature_use.feature_name.clone(),
-    )) else {
+    let Some(status) = rules.get(&(feature_use.crate_family.clone(), feature_use.feature_name.clone())) else {
         issues.push(super::types::FeaturePolicyIssue::new(
             super::types::FeaturePolicyIssueCode::UnapprovedFeatureUse,
             key,
@@ -197,22 +187,14 @@ fn has_missing_use_field(feature_use: &super::types::FeatureUse) -> bool {
 
 fn is_web_incompatible(feature_use: &super::types::FeatureUse) -> bool {
     let is_web_target = feature_use.target == super::types::FeatureUseTarget::WebConsumed;
-    let is_blocked_feature =
-        super::types::WEB_INCOMPATIBLE_FEATURES.contains(&feature_use.feature_name.as_str());
+    let is_blocked_feature = super::types::WEB_INCOMPATIBLE_FEATURES.contains(&feature_use.feature_name.as_str());
     is_web_target && is_blocked_feature
 }
 
-fn accepted_rule_map(
-    rows: &[super::types::FeaturePolicyRow],
-) -> std::collections::BTreeMap<(String, String), String> {
+fn accepted_rule_map(rows: &[super::types::FeaturePolicyRow]) -> std::collections::BTreeMap<(String, String), String> {
     rows.iter()
         .filter(|row| super::types::KNOWN_POLICY_STATUSES.contains(&row.status.as_str()))
-        .map(|row| {
-            (
-                (row.crate_family.clone(), row.feature_name.clone()),
-                row.status.clone(),
-            )
-        })
+        .map(|row| ((row.crate_family.clone(), row.feature_name.clone()), row.status.clone()))
         .collect()
 }
 

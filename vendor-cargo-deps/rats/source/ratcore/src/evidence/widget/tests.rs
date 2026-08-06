@@ -4,18 +4,14 @@ use super::*;
 mod leader;
 
 const EXPECTED_WORKSPACE_SHELL_RENDERER_ARTIFACTS: usize = 4;
-const WORKSPACE_SHELL_POSITIVE_TUI: &str = include_str!(
-    "../../../../docs/generated/replay-snapshots/workspace-shell-positive.subwayrat.txt"
-);
-const WORKSPACE_SHELL_POSITIVE_DOM: &str = include_str!(
-    "../../../../docs/generated/replay-snapshots/workspace-shell-positive.meteorite.html"
-);
-const WORKSPACE_SHELL_NEGATIVE_TUI: &str = include_str!(
-    "../../../../docs/generated/replay-snapshots/workspace-shell-negative.subwayrat.txt"
-);
-const WORKSPACE_SHELL_NEGATIVE_DOM: &str = include_str!(
-    "../../../../docs/generated/replay-snapshots/workspace-shell-negative.meteorite.html"
-);
+const WORKSPACE_SHELL_POSITIVE_TUI: &str =
+    include_str!("../../../../docs/generated/replay-snapshots/workspace-shell-positive.subwayrat.txt");
+const WORKSPACE_SHELL_POSITIVE_DOM: &str =
+    include_str!("../../../../docs/generated/replay-snapshots/workspace-shell-positive.meteorite.html");
+const WORKSPACE_SHELL_NEGATIVE_TUI: &str =
+    include_str!("../../../../docs/generated/replay-snapshots/workspace-shell-negative.subwayrat.txt");
+const WORKSPACE_SHELL_NEGATIVE_DOM: &str =
+    include_str!("../../../../docs/generated/replay-snapshots/workspace-shell-negative.meteorite.html");
 
 #[test]
 fn tree_navigation_baseline_replays_and_hashes_state() {
@@ -25,10 +21,7 @@ fn tree_navigation_baseline_replays_and_hashes_state() {
     let outcome = run_replay(&script, &mut target);
 
     assert!(outcome.is_success());
-    assert_eq!(
-        outcome.state.get("selected_node"),
-        Some(&"src/lib.rs".to_string())
-    );
+    assert_eq!(outcome.state.get("selected_node"), Some(&"src/lib.rs".to_string()));
     assert_eq!(outcome.state_hash, script.snapshots[0].blake3);
 }
 
@@ -40,11 +33,67 @@ fn command_palette_baseline_replays_filter_and_selection() {
     let outcome = run_replay(&script, &mut target);
 
     assert!(outcome.is_success());
-    assert_eq!(
-        outcome.state.get("selected_action"),
-        Some(&"action.open".to_string())
-    );
+    assert_eq!(outcome.state.get("selected_action"), Some(&"action.open".to_string()));
     assert_eq!(outcome.state_hash, script.snapshots[0].blake3);
+}
+
+#[test]
+fn replay_adapter_matches_direct_command_palette_reduction() {
+    use crate::command_palette::CommandPaletteCandidate;
+    use crate::command_palette::CommandPaletteMessage;
+    use crate::command_palette::CommandPaletteModel;
+    use crate::command_palette::CommandPaletteNavigationPolicy;
+    use crate::command_palette::reduce_command_palette;
+
+    let candidates = vec![
+        CommandPaletteCandidate::enabled("action.open", "Open file"),
+        CommandPaletteCandidate::disabled(ACTION_DISABLED, "Build project", "disabled"),
+    ];
+    let direct = CommandPaletteModel::build(candidates, CommandPaletteNavigationPolicy::Wrap, true).model;
+    let direct = reduce_command_palette(&direct, CommandPaletteMessage::ReplaceQuery("open".to_string())).model;
+    let direct = reduce_command_palette(&direct, CommandPaletteMessage::Activate).model;
+
+    let mut replay = command_palette_target();
+    replay.apply_event(&ReplayEvent::Text {
+        target: TARGET_COMMAND_PALETTE.to_string(),
+        value: "open".to_string(),
+    });
+    replay.apply_event(&ReplayEvent::Key {
+        target: TARGET_COMMAND_PALETTE.to_string(),
+        key: "Enter".to_string(),
+    });
+    let replay_state = replay.snapshot_state();
+
+    assert_eq!(replay_state["query"], direct.query());
+    assert_eq!(replay_state["active_action"], direct.active_action_id().expect("direct active action").as_str());
+    assert_eq!(
+        replay_state["selected_action"],
+        direct.selected_action_id().expect("direct selected action").as_str()
+    );
+}
+
+#[test]
+fn replay_disabled_keyboard_activation_uses_shared_diagnostic_and_preserves_state() {
+    let mut palette = command_palette_target();
+    let script = ReplayScript::new(ReplayMetadata::new(
+        "palette.disabled-key",
+        "disabled palette keyboard action",
+        "command-palette",
+    ))
+    .with_event(ReplayEvent::Text {
+        target: TARGET_COMMAND_PALETTE.to_string(),
+        value: "build".to_string(),
+    })
+    .with_event(ReplayEvent::Key {
+        target: TARGET_COMMAND_PALETTE.to_string(),
+        key: "Enter".to_string(),
+    });
+
+    let outcome = run_replay(&script, &mut palette);
+
+    assert_issue(&outcome, ReplayIssueCode::DisabledAction);
+    assert_eq!(outcome.state["query"], "build");
+    assert_eq!(outcome.state["selected_action"], "-");
 }
 
 #[test]
@@ -65,23 +114,16 @@ fn replay_reports_boundaries_unknown_commands_and_malformed_text() {
     assert_issue(&tree_outcome, ReplayIssueCode::UnknownCommand);
 
     let mut palette = command_palette_target();
-    let palette_script = ReplayScript::new(ReplayMetadata::new(
-        "palette.bad",
-        "bad palette",
-        "command-palette",
-    ))
-    .with_event(ReplayEvent::Text {
-        target: TARGET_COMMAND_PALETTE.to_string(),
-        value: "bad\ntext".to_string(),
-    });
+    let palette_script = ReplayScript::new(ReplayMetadata::new("palette.bad", "bad palette", "command-palette"))
+        .with_event(ReplayEvent::Text {
+            target: TARGET_COMMAND_PALETTE.to_string(),
+            value: "bad\ntext".to_string(),
+        });
 
     let palette_outcome = run_replay(&palette_script, &mut palette);
 
     assert_eq!(
-        tree_outcome
-            .issues
-            .len()
-            .saturating_add(palette_outcome.issues.len()),
+        tree_outcome.issues.len().saturating_add(palette_outcome.issues.len()),
         EXPECTED_WIDGET_REPLAY_ISSUES
     );
     assert!(!palette_outcome.is_success());
@@ -96,14 +138,8 @@ fn workspace_shell_fixture_replays_waits_and_snapshot_evidence() {
     let outcome = run_replay(&script, &mut target);
 
     assert!(outcome.is_success());
-    assert_eq!(
-        outcome.state.get("focus_pane"),
-        Some(&"pane:task".to_string())
-    );
-    assert_eq!(
-        outcome.state.get("workspace_status"),
-        Some(&"working".to_string())
-    );
+    assert_eq!(outcome.state.get("focus_pane"), Some(&"pane:task".to_string()));
+    assert_eq!(outcome.state.get("workspace_status"), Some(&"working".to_string()));
 }
 
 #[test]
@@ -116,10 +152,7 @@ fn workspace_shell_negative_fixture_reports_stable_diagnostics() {
     assert_issue(&outcome, ReplayIssueCode::DisabledAction);
     assert_issue(&outcome, ReplayIssueCode::UnsupportedWaitPredicate);
     assert_issue(&outcome, ReplayIssueCode::ImpossibleGeometry);
-    assert_eq!(
-        outcome.state.get("focus_pane"),
-        Some(&"pane:editor".to_string())
-    );
+    assert_eq!(outcome.state.get("focus_pane"), Some(&"pane:editor".to_string()));
 }
 
 #[test]
@@ -137,8 +170,7 @@ fn workspace_shell_evidence_includes_positive_and_negative_rows() {
         evidence
             .rows
             .iter()
-            .any(|row| row.fixture_id == "workspace-shell.negative"
-                && row.diagnostics.contains("DisabledAction"))
+            .any(|row| row.fixture_id == "workspace-shell.negative" && row.diagnostics.contains("DisabledAction"))
     );
 }
 
@@ -179,10 +211,7 @@ fn workspace_shell_renderer_snapshots_validate_and_match_checked_in_artifacts() 
 #[test]
 fn workspace_shell_renderer_snapshot_validation_rejects_bad_evidence() {
     let evidence = workspace_shell_replay_evidence();
-    let mut stale = workspace_shell_renderer_snapshots()
-        .first()
-        .cloned()
-        .expect("workspace renderer artifact exists");
+    let mut stale = workspace_shell_renderer_snapshots().first().cloned().expect("workspace renderer artifact exists");
     stale.blake3 = "stale".to_string();
     let duplicate = stale.clone();
     let unsupported = WorkspaceShellRendererSnapshot::new(
@@ -193,50 +222,26 @@ fn workspace_shell_renderer_snapshot_validation_rejects_bad_evidence() {
         Vec::<u8>::new(),
     );
 
-    let report = validate_workspace_shell_renderer_snapshots(
-        &evidence.rows,
-        &[stale, duplicate, unsupported],
-    );
+    let report = validate_workspace_shell_renderer_snapshots(&evidence.rows, &[stale, duplicate, unsupported]);
 
     assert!(!report.is_valid());
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::DuplicateArtifact,
-    );
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::MissingFixture,
-    );
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::UnsupportedRenderer,
-    );
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::UnsupportedGenerator,
-    );
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::EmptyArtifact,
-    );
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::DuplicateArtifact);
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::MissingFixture);
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::UnsupportedRenderer);
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::UnsupportedGenerator);
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::EmptyArtifact);
     assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::StaleHash);
-    assert_snapshot_issue(
-        &report,
-        WorkspaceShellRendererSnapshotIssueCode::MissingRenderer,
-    );
+    assert_snapshot_issue(&report, WorkspaceShellRendererSnapshotIssueCode::MissingRenderer);
 }
 
 #[test]
 fn disabled_action_diagnostic_names_step_surface_and_action() {
     let mut target = command_palette_target();
-    let script = ReplayScript::new(ReplayMetadata::new(
-        "palette.disabled",
-        "disabled palette action",
-        "command-palette",
-    ))
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_DISABLED.to_string(),
-    });
+    let script =
+        ReplayScript::new(ReplayMetadata::new("palette.disabled", "disabled palette action", "command-palette"))
+            .with_event(ReplayEvent::Command {
+                action_id: ACTION_DISABLED.to_string(),
+            });
 
     let outcome = run_replay(&script, &mut target);
 
@@ -283,9 +288,6 @@ fn assert_artifact_bytes(
     assert_eq!(artifact.bytes, expected);
 }
 
-fn assert_snapshot_issue(
-    report: &WorkspaceShellRendererSnapshotReport,
-    code: WorkspaceShellRendererSnapshotIssueCode,
-) {
+fn assert_snapshot_issue(report: &WorkspaceShellRendererSnapshotReport, code: WorkspaceShellRendererSnapshotIssueCode) {
     assert!(report.issues.iter().any(|issue| issue.code == code));
 }

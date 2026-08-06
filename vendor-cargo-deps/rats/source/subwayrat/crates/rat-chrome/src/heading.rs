@@ -5,7 +5,8 @@
 //! layout/truncation helpers in this module.
 
 use ratatui::layout::Rect;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 const TITLE_BAR_ROW_HEIGHT: u16 = 1;
 const INDICATOR_GAP: u16 = 1;
@@ -168,12 +169,7 @@ pub fn compute_title_bar_layout(area: Rect, model: &TitleBarModel) -> TitleBarLa
     let label_region_width = label_region_right.saturating_sub(area.x);
     let rendered_label = truncate_to_width(&model.label, label_region_width);
     let rendered_label_width = text_width_u16(&rendered_label).min(label_region_width);
-    let label_x = align_label_x(
-        area.x,
-        label_region_width,
-        rendered_label_width,
-        model.alignment,
-    );
+    let label_x = align_label_x(area.x, label_region_width, rendered_label_width, model.alignment);
 
     TitleBarLayout {
         label: Rect::new(label_x, area.y, rendered_label_width, TITLE_BAR_ROW_HEIGHT),
@@ -213,17 +209,10 @@ fn compute_indicator_layouts(area: Rect, indicators: &[String]) -> Vec<TitleBarI
     layouts
 }
 
-fn align_label_x(
-    label_region_x: u16,
-    label_region_width: u16,
-    label_width: u16,
-    alignment: TitleAlignment,
-) -> u16 {
+fn align_label_x(label_region_x: u16, label_region_width: u16, label_width: u16, alignment: TitleAlignment) -> u16 {
     match alignment {
         TitleAlignment::Left => label_region_x,
-        TitleAlignment::Center => {
-            label_region_x + label_region_width.saturating_sub(label_width) / 2
-        }
+        TitleAlignment::Center => label_region_x + label_region_width.saturating_sub(label_width) / 2,
         TitleAlignment::Right => label_region_x + label_region_width.saturating_sub(label_width),
     }
 }

@@ -1,5 +1,4 @@
-const FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_assertion_redaction");
+const FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_assertion_redaction");
 
 const PROMPT_OMITTED: &str = "prompt_omitted";
 const PROVIDER_PAYLOAD_OMITTED: &str = "provider_payload_omitted";

@@ -70,11 +70,9 @@ impl Receipt {
     /// Returns [`super::Error`] when the after hash is invalid, diagnostics
     /// exceed bounds, or the resource identity conflicts with redaction policy.
     pub fn new(draft: &ReceiptDraft<'_>) -> Result<Self, super::Error> {
-        let after_snapshot_hash =
-            super::validate_hash(super::AFTER_SNAPSHOT_HASH_FIELD, draft.after_snapshot_hash)?;
+        let after_snapshot_hash = super::validate_hash(super::AFTER_SNAPSHOT_HASH_FIELD, draft.after_snapshot_hash)?;
         let resource_redaction = super::ResourceRedaction::parse(draft.resource_redaction)?;
-        let resource_identity =
-            validate_resource_identity(resource_redaction, draft.resource_identity)?;
+        let resource_identity = validate_resource_identity(resource_redaction, draft.resource_identity)?;
         let diagnostics = collect_diagnostics(draft.diagnostics)?;
         let spans = receipt_spans(draft.plan.spans());
         let receipt_hash = super::hash::receipt(super::hash::ReceiptIdentity {
@@ -194,10 +192,7 @@ fn validate_hash_identity(identity: Option<&str>) -> Result<Option<super::Text>,
             redaction: super::ResourceRedaction::ResourceHash,
         });
     };
-    Ok(Some(super::validate_hash(
-        super::RESOURCE_IDENTITY_FIELD,
-        value,
-    )?))
+    Ok(Some(super::validate_hash(super::RESOURCE_IDENTITY_FIELD, value)?))
 }
 
 fn looks_private_locator(value: &str) -> bool {
@@ -213,10 +208,7 @@ fn collect_diagnostics(values: &[&str]) -> Result<super::Collection<super::Text>
         actual_items: values.len(),
         max_items: super::MAX_RECEIPT_DIAGNOSTICS,
     })?;
-    values
-        .iter()
-        .map(|value| super::required_label(super::RECEIPT_DIAGNOSTIC_FIELD, value))
-        .collect()
+    values.iter().map(|value| super::required_label(super::RECEIPT_DIAGNOSTIC_FIELD, value)).collect()
 }
 
 fn receipt_spans(spans: &[super::Validated]) -> super::Collection<SpanMetadata> {

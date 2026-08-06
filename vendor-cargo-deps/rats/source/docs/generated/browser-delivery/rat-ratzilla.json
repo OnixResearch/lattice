@@ -1,0 +1,73 @@
+{
+  "schema": "rats.browser-delivery-manifest.v1",
+  "entrypoint": "rat-ratzilla",
+  "profile": "browser-delivery",
+  "target": "wasm32-unknown-unknown",
+  "source_sha256": "11ca5828a033d442131af8b72c5c7ddef69cd8748b791be2fcade2345fae7aaa",
+  "command_sha256": "f056ae84440976e8e988fc2524bf1c5352605ec31387849bd1c7a574debbe9c7",
+  "build_command": "trunk build --release --config Trunk.toml --public-url <root-or-subpath>",
+  "tools": {
+    "rustc": "rustc 1.98.0-nightly (485ec3fbc 2026-06-10)",
+    "trunk": "trunk 0.21.14",
+    "dioxus_cli": "dioxus 0.7.9 (bfcc111)",
+    "wasm_bindgen": "wasm-bindgen 0.2.121",
+    "gzip": "gzip 1.14",
+    "optimizer": "Trunk-managed Binaryen wasm-opt version 123 (version_123)",
+    "optimizer_adapter_sha256": "1483d98dbcda3412d328f3fb247b2afd05e5d54461317f19604df5558906dab3"
+  },
+  "budget_sha256": "03f804061076ecdea7a8a85ce9d2a077d2678ad85f62e613f131e1e504f545e7",
+  "base_paths": {
+    "root": "/",
+    "configured_subpath": "/rats/rat-ratzilla/"
+  },
+  "artifacts": [
+    {
+      "path": "index.html",
+      "role": "html",
+      "media_type": "text/html; charset=utf-8",
+      "raw_bytes": 1257,
+      "gzip_n9_bytes": 724,
+      "sha256": "101e916cb849afb7fa81386a24b58e519f6167ed0443091189305dfdfbc5b1d7"
+    },
+    {
+      "path": "rat-ratzilla.js",
+      "role": "javascript",
+      "media_type": "text/javascript; charset=utf-8",
+      "raw_bytes": 32658,
+      "gzip_n9_bytes": 6477,
+      "sha256": "7dfb0d78a2e1662cdbd29aebe8525b741ba5641505034d08995ec825889f69c6"
+    },
+    {
+      "path": "rat-ratzilla_bg.wasm",
+      "role": "wasm",
+      "media_type": "application/wasm",
+      "raw_bytes": 549676,
+      "gzip_n9_bytes": 210854,
+      "sha256": "0e48ba6875ae33ee977e7f038db9f11f6b356484343a70a11b9269a23d111018"
+    }
+  ],
+  "external_urls": [],
+  "development_only_dependencies": [],
+  "compression": {
+    "tool": "gzip 1.14",
+    "settings": "gzip -n -9",
+    "claim": "size only; not runtime performance"
+  },
+  "required_runtime_globals": [
+    "DOM",
+    "WebAssembly",
+    "requestAnimationFrame"
+  ],
+  "selected_headers": [
+    "Content-Security-Policy",
+    "X-Content-Type-Options",
+    "Referrer-Policy"
+  ],
+  "non_claims": [
+    "not PWA cache or permanent offline semantics",
+    "not startup, memory, responsiveness, or network performance",
+    "not universal CSP, penetration testing, or security certification",
+    "not all browsers, versions, operating systems, or devices",
+    "not accessibility, hosting, downstream support, or release eligibility"
+  ]
+}

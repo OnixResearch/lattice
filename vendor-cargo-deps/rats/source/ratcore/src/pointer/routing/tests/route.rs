@@ -21,20 +21,11 @@ fn click_event() -> PointerEvent {
 }
 
 fn event_with_phase(phase: PointerPhase) -> PointerEvent {
-    PointerEvent::new(
-        PointerPoint::new(POINT_X, POINT_Y),
-        PointerButton::None,
-        phase,
-        PointerSource::Mouse,
-    )
+    PointerEvent::new(PointerPoint::new(POINT_X, POINT_Y), PointerButton::None, phase, PointerSource::Mouse)
 }
 
 fn region(id: &str, z_order: i32) -> HitRegion {
-    HitRegion::new(
-        id,
-        PointerRect::new(ORIGIN, ORIGIN, REGION_SIZE, REGION_SIZE),
-        z_order,
-    )
+    HitRegion::new(id, PointerRect::new(ORIGIN, ORIGIN, REGION_SIZE, REGION_SIZE), z_order)
 }
 
 fn assert_routed_interaction(
@@ -55,9 +46,7 @@ fn route_selection_and_capture_lifecycle_are_deterministic() {
         region("background", LOW_Z).with_action("open.background"),
         region("toolbar", HIGH_Z).with_action("toolbar.open"),
     ]);
-    let capture_map = HitMap::new(vec![
-        region("splitter", HIGH_Z).with_action("splitter.drag"),
-    ]);
+    let capture_map = HitMap::new(vec![region("splitter", HIGH_Z).with_action("splitter.drag")]);
     let update = PointerEvent::new(
         PointerPoint::new(OUTSIDE_X, OUTSIDE_Y),
         PointerButton::Primary,
@@ -80,8 +69,8 @@ fn route_selection_and_capture_lifecycle_are_deterministic() {
     assert_eq!(
         routed,
         PointerRouteOutcome::Routed(PointerRoute {
-            target_id: "toolbar".to_string(),
-            action_id: Some("toolbar.open".to_string()),
+            target_id: PointerTargetId::new("toolbar"),
+            action_id: Some(PointerActionId::new("toolbar.open")),
             modal_capture: false,
             interaction: PointerInteractionClass::Activation,
             capture: PointerCaptureTransition::Start,
@@ -90,8 +79,8 @@ fn route_selection_and_capture_lifecycle_are_deterministic() {
     assert_eq!(
         updated,
         PointerRouteOutcome::Routed(PointerRoute {
-            target_id: "splitter".to_string(),
-            action_id: Some("splitter.drag".to_string()),
+            target_id: PointerTargetId::new("splitter"),
+            action_id: Some(PointerActionId::new("splitter.drag")),
             modal_capture: false,
             interaction: PointerInteractionClass::DragUpdate,
             capture: PointerCaptureTransition::Update,
@@ -100,8 +89,8 @@ fn route_selection_and_capture_lifecycle_are_deterministic() {
     assert_eq!(
         released,
         PointerRouteOutcome::Routed(PointerRoute {
-            target_id: "splitter".to_string(),
-            action_id: Some("splitter.drag".to_string()),
+            target_id: PointerTargetId::new("splitter"),
+            action_id: Some(PointerActionId::new("splitter.drag")),
             modal_capture: false,
             interaction: PointerInteractionClass::DragCommit,
             capture: PointerCaptureTransition::Release,
@@ -115,22 +104,10 @@ fn invalid_targets_and_empty_maps_fail_closed() {
     let disabled_map = HitMap::new(vec![region("disabled", HIGH_Z).with_enabled(false)]);
     let stale_event = click_event().with_captured_target("stale");
     let cases = [
-        (
-            route_pointer_event(&click_event(), &hidden_map),
-            PointerDiagnosticCode::HiddenTarget,
-        ),
-        (
-            route_pointer_event(&click_event(), &disabled_map),
-            PointerDiagnosticCode::DisabledTarget,
-        ),
-        (
-            route_pointer_event(&stale_event, &HitMap::default()),
-            PointerDiagnosticCode::StaleTarget,
-        ),
-        (
-            route_pointer_event(&click_event(), &HitMap::default()),
-            PointerDiagnosticCode::NoTarget,
-        ),
+        (route_pointer_event(&click_event(), &hidden_map), PointerDiagnosticCode::HiddenTarget),
+        (route_pointer_event(&click_event(), &disabled_map), PointerDiagnosticCode::DisabledTarget),
+        (route_pointer_event(&stale_event, &HitMap::default()), PointerDiagnosticCode::StaleTarget),
+        (route_pointer_event(&click_event(), &HitMap::default()), PointerDiagnosticCode::NoTarget),
     ];
 
     for (outcome, expected_code) in cases {
@@ -146,10 +123,7 @@ fn route_action_classification_covers_mouse_intents() {
     let hit_map = HitMap::new(vec![region("target", HIGH_Z).with_action("target.action")]);
     let cases = [
         (click_event(), PointerInteractionClass::Activation),
-        (
-            click_event().with_click_count(PointerClickCount::Double),
-            PointerInteractionClass::Activation,
-        ),
+        (click_event().with_click_count(PointerClickCount::Double), PointerInteractionClass::Activation),
         (
             PointerEvent::new(
                 PointerPoint::new(POINT_X, POINT_Y),
@@ -159,18 +133,9 @@ fn route_action_classification_covers_mouse_intents() {
             ),
             PointerInteractionClass::ContextMenu,
         ),
-        (
-            event_with_phase(PointerPhase::Move),
-            PointerInteractionClass::Hover,
-        ),
-        (
-            event_with_phase(PointerPhase::Enter),
-            PointerInteractionClass::Hover,
-        ),
-        (
-            event_with_phase(PointerPhase::Leave),
-            PointerInteractionClass::Hover,
-        ),
+        (event_with_phase(PointerPhase::Move), PointerInteractionClass::Hover),
+        (event_with_phase(PointerPhase::Enter), PointerInteractionClass::Hover),
+        (event_with_phase(PointerPhase::Leave), PointerInteractionClass::Hover),
         (
             event_with_phase(PointerPhase::Wheel).with_wheel_delta(PointerWheelDelta::new(
                 ORIGIN,
@@ -179,35 +144,18 @@ fn route_action_classification_covers_mouse_intents() {
             )),
             PointerInteractionClass::WheelScroll,
         ),
+        (event_with_phase(PointerPhase::DragStart), PointerInteractionClass::DragStart),
+        (event_with_phase(PointerPhase::DragUpdate), PointerInteractionClass::DragUpdate),
+        (event_with_phase(PointerPhase::DragCommit), PointerInteractionClass::DragCommit),
+        (event_with_phase(PointerPhase::DragCancel), PointerInteractionClass::DragCancel),
         (
-            event_with_phase(PointerPhase::DragStart),
-            PointerInteractionClass::DragStart,
-        ),
-        (
-            event_with_phase(PointerPhase::DragUpdate),
-            PointerInteractionClass::DragUpdate,
-        ),
-        (
-            event_with_phase(PointerPhase::DragCommit),
-            PointerInteractionClass::DragCommit,
-        ),
-        (
-            event_with_phase(PointerPhase::DragCancel),
-            PointerInteractionClass::DragCancel,
-        ),
-        (
-            event_with_phase(PointerPhase::Down)
-                .with_click_count(PointerClickCount::Multiple(TRIPLE_CLICK_COUNT)),
+            event_with_phase(PointerPhase::Down).with_click_count(PointerClickCount::Multiple(TRIPLE_CLICK_COUNT)),
             PointerInteractionClass::Activation,
         ),
     ];
 
     for (event, expected_interaction) in cases {
-        assert_routed_interaction(
-            route_pointer_event(&event, &hit_map),
-            "target",
-            expected_interaction,
-        );
+        assert_routed_interaction(route_pointer_event(&event, &hit_map), "target", expected_interaction);
     }
 }
 
@@ -220,9 +168,7 @@ fn modal_pass_through_and_renderer_projection_are_stable() {
             .with_capture(HitCapturePolicy::ModalCapture)
             .with_action("modal.dismiss"),
     ]);
-    let pass_through_map = HitMap::new(vec![
-        region("glass", HIGH_Z).with_capture(HitCapturePolicy::PassThrough),
-    ]);
+    let pass_through_map = HitMap::new(vec![region("glass", HIGH_Z).with_capture(HitCapturePolicy::PassThrough)]);
     let event = click_event();
 
     let modal = route_pointer_event(&event, &modal_map);

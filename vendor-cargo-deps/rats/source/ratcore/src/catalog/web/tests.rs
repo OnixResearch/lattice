@@ -1,4 +1,3 @@
-use super::super::built_in_fixtures;
 use super::*;
 
 #[test]
@@ -12,20 +11,20 @@ fn built_in_browser_index_lists_meteorite_and_ratzilla() {
             && entry.renderer_label == RENDERER_METEORITE_DOM
             && entry
                 .supported_fixture_ids
-                .contains(&FIXTURE_KNOWLEDGE_WORKFLOW.to_string())
-            && entry
-                .evidence_links
-                .contains(&DOC_METEORITE_README.to_string())
+                .contains(&crate::showcase_fixtures::FixtureId::new(FIXTURE_KNOWLEDGE_WORKFLOW))
+            && entry.evidence_status == BrowserShowcaseEvidenceStatus::Complete
+            && entry.evidence_links.contains(&DOC_METEORITE_RUNTIME.to_string())
     }));
     assert!(index.entries.iter().any(|entry| {
         entry.package_name == PACKAGE_RAT_RATZILLA
             && entry.renderer_label == RENDERER_RATZILLA_WEB
             && entry
                 .supported_fixture_ids
-                .contains(&FIXTURE_CHROME_SHELL.to_string())
-            && entry
-                .evidence_links
-                .contains(&DOC_SUBWAYRAT_WEB.to_string())
+                .contains(&crate::showcase_fixtures::FixtureId::new(FIXTURE_CHROME_SHELL))
+            && entry.evidence_links.contains(&DOC_SUBWAYRAT_WEB.to_string())
+            && entry.evidence_links.contains(&DOC_RATZILLA_INPUT.to_string())
+            && entry.unsupported_reasons.contains(&RATZILLA_GAP_KNOWLEDGE.to_string())
+            && entry.unsupported_reasons.contains(&RATZILLA_GAP_SCOPE.to_string())
     }));
 }
 
@@ -53,7 +52,7 @@ fn invalid_browser_index_reports_deterministic_diagnostics() {
     .with_validation_profile(PROFILE_MET_SHOWCASE)
     .with_supported_fixture_ids(&["unknown.fixture"])
     .with_evidence_status(BrowserShowcaseEvidenceStatus::Complete);
-    let unsupported_without_reason = BrowserShowcaseEntry::new(
+    let missing_reason_entry = BrowserShowcaseEntry::new(
         "unsupported.browser",
         "Unsupported browser",
         RENDERER_METEORITE_DOM,
@@ -66,37 +65,57 @@ fn invalid_browser_index_reports_deterministic_diagnostics() {
     .with_evidence_status(BrowserShowcaseEvidenceStatus::Unsupported);
 
     let issues = validate_browser_showcase_index(
-        &[duplicate, missing_fields, unsupported_without_reason],
-        &built_in_fixtures(),
+        &[duplicate, missing_fields, missing_reason_entry],
+        &super::super::built_in_fixtures(),
     );
 
-    assert!(
-        issues
-            .iter()
-            .any(|issue| issue.code == BrowserShowcaseIssueCode::DuplicateEntryId)
-    );
+    assert!(issues.iter().any(|issue| issue.code == BrowserShowcaseIssueCode::DuplicateEntryId));
     assert!(issues.iter().any(|issue| {
-        issue.code == BrowserShowcaseIssueCode::MissingRequiredField
-            && issue.field == FIELD_RENDERER_LABEL
+        issue.code == BrowserShowcaseIssueCode::MissingRequiredField && issue.field == FIELD_RENDERER_LABEL
     }));
-    assert!(
-        issues
-            .iter()
-            .any(|issue| issue.code == BrowserShowcaseIssueCode::MissingCommand)
-    );
+    assert!(issues.iter().any(|issue| issue.code == BrowserShowcaseIssueCode::MissingCommand));
     assert!(issues.iter().any(|issue| {
-        issue.code == BrowserShowcaseIssueCode::CompleteEvidenceWithoutLinks
-            && issue.field == FIELD_EVIDENCE_LINKS
+        issue.code == BrowserShowcaseIssueCode::CompleteEvidenceWithoutLinks && issue.field == FIELD_EVIDENCE_LINKS
     }));
     assert!(issues.iter().any(|issue| {
-        issue.code == BrowserShowcaseIssueCode::InvalidFixtureReference
-            && issue.message.contains("unknown.fixture")
+        issue.code == BrowserShowcaseIssueCode::InvalidFixtureReference && issue.message.contains("unknown.fixture")
     }));
-    assert!(
-        issues
-            .iter()
-            .any(|issue| issue.code == BrowserShowcaseIssueCode::UnsupportedWithoutReason)
-    );
+    assert!(issues.iter().any(|issue| issue.code == BrowserShowcaseIssueCode::UnsupportedWithoutReason));
+}
+
+#[test]
+fn experimental_browser_target_requires_an_explicit_scope() {
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let entry = BrowserShowcaseEntry::new(
+        "iced.browser.pilot",
+        "Iced browser pilot",
+        "iced-native",
+        "iced-pilot",
+        "experimental/iced-pilot",
+    )
+    .with_commands("run iced pilot", "build iced pilot")
+    .with_validation_profile("iced-pilot")
+    .with_supported_fixture_ids(&[FIXTURE_DIALOG_BASIC])
+    .with_evidence_links(&[DOC_WORKSPACE_VALIDATION]);
+    let default = validate_browser_showcase_index(&[entry.clone()], &super::super::built_in_fixtures());
+    assert!(default.iter().any(|issue| issue.code == BrowserShowcaseIssueCode::InvalidRendererTarget));
+
+    let pilot = crate::targeting_core::RendererRequirementScope::new(
+        "browser.pilot",
+        crate::targeting_core::RendererSubjectKind::Target,
+        crate::targeting_core::RendererScopeCompletion::Experimental,
+    )
+    .with_member(crate::targeting_core::RendererSubject::Target(crate::targeting_core::RendererTargetId::new(
+        "iced-native",
+    )));
+    let scoped =
+        validate_browser_showcase_index_with_policy(&[entry], &super::super::built_in_fixtures(), &registry, &pilot);
+    assert!(scoped.is_empty(), "issues: {scoped:?}");
+    let missing =
+        validate_browser_showcase_index_with_policy(&[], &super::super::built_in_fixtures(), &registry, &pilot);
+    assert!(missing.iter().any(|issue| {
+        issue.code == BrowserShowcaseIssueCode::InvalidRendererTarget && issue.message.contains("iced-native")
+    }));
 }
 
 #[test]
@@ -110,7 +129,9 @@ fn browser_portal_markdown_keeps_entry_facts_and_gaps_visible() {
     assert!(markdown.contains(FIXTURE_KNOWLEDGE_WORKFLOW));
     assert!(markdown.contains(PROFILE_SUBWAYRAT_WEB));
     assert!(markdown.contains(RATZILLA_LAUNCH_COMMAND));
-    assert!(markdown.contains(METEORITE_SMOKE_GAP));
+    assert!(markdown.contains(PROFILE_MET_SHOWCASE));
+    assert!(markdown.contains(DOC_METEORITE_RUNTIME));
+    assert!(!markdown.contains("no maintained root browser-smoke profile"));
 }
 
 #[test]
@@ -121,7 +142,7 @@ fn fixture_navigation_uses_index_labels_and_evidence() {
         .iter()
         .find(|entry| entry.package_name == PACKAGE_RAT_RATZILLA)
         .expect("ratzilla browser entry is present");
-    let navigation = browser_fixture_navigation_rows(entry, &built_in_fixtures());
+    let navigation = browser_fixture_navigation_rows(entry, &super::super::built_in_fixtures());
 
     assert!(navigation.is_valid());
     assert!(navigation.rows.iter().any(|row| {
@@ -147,7 +168,7 @@ fn fixture_navigation_reports_unknown_fixture_without_panicking() {
     .with_validation_profile(PROFILE_SUBWAYRAT_WEB)
     .with_supported_fixture_ids(&["missing.fixture"]);
 
-    let navigation = browser_fixture_navigation_rows(&entry, &built_in_fixtures());
+    let navigation = browser_fixture_navigation_rows(&entry, &super::super::built_in_fixtures());
 
     assert!(!navigation.is_valid());
     assert!(navigation.rows.is_empty());

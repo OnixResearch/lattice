@@ -1,0 +1,13 @@
+surface	owner_before	query	candidates	movement	history	acceptance	focus_or_callback	convergence	privacy	next_action
+Ratcore command palette	Ratcore command reducer	owned string	action IDs/fuzzy	wrap/clamp/reject	none	typed ActionId	outputs only	high	non-sensitive labels	production action adapter
+Meteorite command palette	Dioxus controlled binding	DOM committed text	projected actions	keyboard/pointer	none	on_select/on_close	DOM focus and callbacks	high	non-sensitive labels	use action-prompt production wrapper
+Subwayrat rat-fuzzy	FuzzyState plus FuzzySource	terminal committed text	provider trait slice	clamp	none	candidate clone	terminal rendering/events	high	caller classified	thin shared reducer adapter
+Subwayrat quick capture	application shell	free text	none	none	application-specific	text submit	focus/capture callbacks	medium	may contain private notes	remain unpromoted
+Subwayrat editor input	rat-editor	text buffer	none	cursor movement	editor undo	domain edit	cursor/selection/focus	low	application content	remain unpromoted
+Subwayrat tags	rat-tags	domain query	tag payloads	domain navigation	application storage	tag mutation	terminal events	medium	workspace metadata	focused future evaluation
+Meteorite searchable select	component local	controlled query	generic items	component movement	none	item callback	DOM focus/callback	medium	caller data	remain unpromoted
+Meteorite forms	form owner	field values	field options	field-specific	none	validation callback	DOM controls	low	may be sensitive	remain unpromoted
+Meteorite date input	date component	date text	calendar dates	calendar navigation	none	date value	DOM focus	low	non-secret	remain unpromoted
+Spreadsheet formula bar	rat-spreadsheet	cell text	cell addresses	grid navigation	none	cell edit	terminal cursor	low	document content	remain unpromoted
+Terminal IDE command shell	application runtime	action query	action projections	action routing	none	typed intent	application effect edge	high	action metadata	consume action adapter only
+Replay fixtures	Ratcore evidence	explicit safe fixture	immutable snapshots	logical messages	explicit policy	typed output	no callbacks	high	redact sensitive/omit disabled	production reducer only

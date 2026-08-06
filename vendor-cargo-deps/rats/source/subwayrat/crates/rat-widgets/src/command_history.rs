@@ -1,15 +1,55 @@
-//! Bounded, navigable command history buffer with optional JSON persistence.
+//! Bounded, navigable in-memory command history.
 //!
-//! Provides REPL-style command history navigation with:
-//! - Bounded entry count (configurable max, default 100)
-//! - Up/Down navigation through previous entries
-//! - Deduplication (skips consecutive duplicates)
-//! - Skips empty entries
-//! - Optional JSON file persistence (load/save)
-//! - Browsing state tracking (editing vs navigating)
+//! Persistence location, retention, privacy, encoding, and I/O belong to a
+//! named application adapter. This module exchanges generation-bound data and
+//! typed storage outcomes only.
 
-#[cfg(feature = "persistence")]
-use std::path::Path;
+pub const COMMAND_HISTORY_CODEC_VERSION: u16 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandHistorySnapshot {
+    pub base_generation: u64,
+    pub codec_version: u16,
+    pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandHistoryLoadOutcome {
+    Loaded(CommandHistorySnapshot),
+    Missing,
+    Denied,
+    Malformed,
+    FutureVersion,
+    ReadFailed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandHistorySaveOutcome {
+    Saved { generation: u64 },
+    Denied,
+    WriteFailed,
+    FlushFailed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandHistoryDiagnostic {
+    Missing,
+    Denied,
+    Malformed,
+    FutureVersion,
+    ReadFailed,
+    WriteFailed,
+    FlushFailed,
+    Stale,
+    CapacityExceeded,
+    InvalidEntries,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandHistoryApplyResult {
+    Applied,
+    Preserved(CommandHistoryDiagnostic),
+}
 
 /// A bounded command history buffer with navigation support.
 ///
@@ -30,11 +70,13 @@ use std::path::Path;
 /// assert_eq!(history.next_entry(), Some("cd /home"));
 /// assert_eq!(history.next_entry(), None); // Back to empty input
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandHistory {
     entries: Vec<String>,
     index: usize,
     browsing: bool,
     max_entries: usize,
+    generation: u64,
 }
 
 impl CommandHistory {
@@ -45,6 +87,7 @@ impl CommandHistory {
             index: 0,
             browsing: false,
             max_entries,
+            generation: 0,
         }
     }
 
@@ -59,6 +102,7 @@ impl CommandHistory {
             index,
             browsing: false,
             max_entries,
+            generation: 0,
         }
     }
 
@@ -79,6 +123,7 @@ impl CommandHistory {
         }
 
         self.entries.push(entry);
+        self.generation = self.generation.saturating_add(1);
 
         // Evict oldest if over max
         if self.entries.len() > self.max_entries {
@@ -169,9 +214,86 @@ impl CommandHistory {
 
     /// Clears all entries and resets state.
     pub fn clear(&mut self) {
+        if !self.entries.is_empty() {
+            self.generation = self.generation.saturating_add(1);
+        }
         self.entries.clear();
         self.index = 0;
         self.browsing = false;
+    }
+
+    /// Current immutable state generation.
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Produces plain data for an application-owned codec/storage adapter.
+    pub fn storage_snapshot(&self) -> CommandHistorySnapshot {
+        CommandHistorySnapshot {
+            base_generation: self.generation,
+            codec_version: COMMAND_HISTORY_CODEC_VERSION,
+            entries: self.entries.clone(),
+        }
+    }
+
+    /// Applies a later load message only when it is current and valid.
+    pub fn apply_load_outcome(&mut self, outcome: CommandHistoryLoadOutcome) -> CommandHistoryApplyResult {
+        let snapshot = match outcome {
+            CommandHistoryLoadOutcome::Loaded(snapshot) => snapshot,
+            CommandHistoryLoadOutcome::Missing => {
+                return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Missing);
+            }
+            CommandHistoryLoadOutcome::Denied => {
+                return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Denied);
+            }
+            CommandHistoryLoadOutcome::Malformed => {
+                return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Malformed);
+            }
+            CommandHistoryLoadOutcome::FutureVersion => {
+                return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::FutureVersion);
+            }
+            CommandHistoryLoadOutcome::ReadFailed => {
+                return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::ReadFailed);
+            }
+        };
+        if snapshot.base_generation != self.generation {
+            return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Stale);
+        }
+        if snapshot.codec_version > COMMAND_HISTORY_CODEC_VERSION {
+            return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::FutureVersion);
+        }
+        if snapshot.entries.len() > self.max_entries {
+            return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::CapacityExceeded);
+        }
+        if snapshot.entries.iter().any(|entry| entry.trim().is_empty())
+            || snapshot.entries.windows(2).any(|pair| pair[0] == pair[1])
+        {
+            return CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::InvalidEntries);
+        }
+        self.entries = snapshot.entries;
+        self.index = self.entries.len();
+        self.browsing = false;
+        self.generation = self.generation.saturating_add(1);
+        CommandHistoryApplyResult::Applied
+    }
+
+    /// Classifies a later save/flush result without changing accepted history.
+    pub fn classify_save_outcome(&self, outcome: CommandHistorySaveOutcome) -> CommandHistoryApplyResult {
+        match outcome {
+            CommandHistorySaveOutcome::Saved { generation } if generation == self.generation => {
+                CommandHistoryApplyResult::Applied
+            }
+            CommandHistorySaveOutcome::Saved { .. } => {
+                CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Stale)
+            }
+            CommandHistorySaveOutcome::Denied => CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::Denied),
+            CommandHistorySaveOutcome::WriteFailed => {
+                CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::WriteFailed)
+            }
+            CommandHistorySaveOutcome::FlushFailed => {
+                CommandHistoryApplyResult::Preserved(CommandHistoryDiagnostic::FlushFailed)
+            }
+        }
     }
 
     /// Returns the current position for display purposes.
@@ -183,36 +305,6 @@ impl CommandHistory {
             (self.index + 1, self.entries.len())
         } else {
             (self.entries.len(), self.entries.len())
-        }
-    }
-}
-
-#[cfg(feature = "persistence")]
-impl CommandHistory {
-    /// Loads command history from a JSON file.
-    ///
-    /// Returns an empty history if the file doesn't exist or is invalid.
-    /// Creates the history with the specified max_entries limit.
-    pub fn load_json(path: &Path, max_entries: usize) -> Self {
-        match std::fs::read_to_string(path) {
-            Ok(content) => match serde_json::from_str::<Vec<String>>(&content) {
-                Ok(entries) => Self::with_entries(entries, max_entries),
-                Err(_) => Self::new(max_entries),
-            },
-            Err(_) => Self::new(max_entries),
-        }
-    }
-
-    /// Saves command history to a JSON file.
-    ///
-    /// Creates parent directories if needed. Silently ignores errors.
-    pub fn save_json(&self, path: &Path) {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        if let Ok(json) = serde_json::to_string_pretty(&self.entries) {
-            let _ = std::fs::write(path, json);
         }
     }
 }
@@ -440,5 +532,94 @@ mod tests {
         assert_eq!(history.entries(), &entries);
         assert_eq!(history.len(), 2);
         assert!(!history.is_browsing());
+    }
+
+    #[test]
+    fn storage_rejections_preserve_accepted_history() {
+        let mut history = CommandHistory::new(3);
+        history.add("accepted".to_string());
+        let accepted = history.clone();
+
+        for outcome in [
+            CommandHistoryLoadOutcome::Missing,
+            CommandHistoryLoadOutcome::Denied,
+            CommandHistoryLoadOutcome::Malformed,
+            CommandHistoryLoadOutcome::FutureVersion,
+            CommandHistoryLoadOutcome::ReadFailed,
+        ] {
+            assert!(matches!(history.apply_load_outcome(outcome), CommandHistoryApplyResult::Preserved(_)));
+            assert_eq!(history, accepted);
+        }
+        for outcome in [
+            CommandHistorySaveOutcome::Denied,
+            CommandHistorySaveOutcome::WriteFailed,
+            CommandHistorySaveOutcome::FlushFailed,
+        ] {
+            assert!(matches!(history.classify_save_outcome(outcome), CommandHistoryApplyResult::Preserved(_)));
+            assert_eq!(history, accepted);
+        }
+    }
+
+    #[test]
+    fn stale_future_duplicate_and_excessive_snapshots_fail_closed() {
+        let mut history = CommandHistory::new(2);
+        history.add("accepted".to_string());
+        let accepted = history.clone();
+        let snapshots = [
+            CommandHistorySnapshot {
+                base_generation: history.generation().saturating_sub(1),
+                codec_version: COMMAND_HISTORY_CODEC_VERSION,
+                entries: vec!["new".to_string()],
+            },
+            CommandHistorySnapshot {
+                base_generation: history.generation(),
+                codec_version: COMMAND_HISTORY_CODEC_VERSION + 1,
+                entries: vec!["new".to_string()],
+            },
+            CommandHistorySnapshot {
+                base_generation: history.generation(),
+                codec_version: COMMAND_HISTORY_CODEC_VERSION,
+                entries: vec!["same".to_string(), "same".to_string()],
+            },
+            CommandHistorySnapshot {
+                base_generation: history.generation(),
+                codec_version: COMMAND_HISTORY_CODEC_VERSION,
+                entries: vec!["one".to_string(), "two".to_string(), "three".to_string()],
+            },
+        ];
+
+        for snapshot in snapshots {
+            assert!(matches!(
+                history.apply_load_outcome(CommandHistoryLoadOutcome::Loaded(snapshot)),
+                CommandHistoryApplyResult::Preserved(_)
+            ));
+            assert_eq!(history, accepted);
+        }
+    }
+
+    #[test]
+    fn current_loaded_snapshot_and_explicit_reset_apply_as_data() {
+        let mut history = CommandHistory::new(3);
+        history.add("old".to_string());
+        let loaded = CommandHistorySnapshot {
+            base_generation: history.generation(),
+            codec_version: COMMAND_HISTORY_CODEC_VERSION,
+            entries: vec!["new".to_string()],
+        };
+        assert_eq!(
+            history.apply_load_outcome(CommandHistoryLoadOutcome::Loaded(loaded)),
+            CommandHistoryApplyResult::Applied
+        );
+        assert_eq!(history.entries(), &["new"]);
+        let reset = CommandHistorySnapshot {
+            base_generation: history.generation(),
+            codec_version: COMMAND_HISTORY_CODEC_VERSION,
+            entries: Vec::new(),
+        };
+        assert_eq!(
+            history.apply_load_outcome(CommandHistoryLoadOutcome::Loaded(reset)),
+            CommandHistoryApplyResult::Applied
+        );
+        assert!(history.is_empty());
     }
 }

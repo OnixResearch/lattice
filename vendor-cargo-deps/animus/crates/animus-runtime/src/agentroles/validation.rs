@@ -6,16 +6,36 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::types::{
-    AGENT_ROLE_CATALOG_SCHEMA, AGENT_ROLE_PROFILE_HASH_DOMAIN, AgentRoleBudgetPolicy,
-    AgentRoleBudgetPolicyDraft, AgentRoleCatalog, AgentRoleCatalogDraft, AgentRoleClass,
-    AgentRoleContextPosture, AgentRoleError, AgentRoleEvidencePosture, AgentRoleIssue,
-    AgentRoleMutationPosture, AgentRoleOutputKind, AgentRoleProfile, AgentRoleProfileDraft,
-    AgentRoleSeparationDimension, AgentRoleSeparationPolicy, AgentRoleSeparationPolicyDraft,
-    AgentRoleToolset, AgentRoleToolsetDraft, BLAKE3_HEX_CHARS, HASH_SEPARATOR,
-    MAX_ROLE_ACTION_BUDGET, MAX_ROLE_CONTEXT_BUDGET, MAX_ROLE_LABEL_CHARS, MAX_ROLE_OUTPUT_BUDGET,
-    MAX_ROLE_POLICIES, MAX_ROLE_PROFILES, MAX_ROLE_PURPOSE_CHARS, MAX_ROLE_REFERENCES,
-};
+use super::types::AGENT_ROLE_CATALOG_SCHEMA;
+use super::types::AGENT_ROLE_PROFILE_HASH_DOMAIN;
+use super::types::AgentRoleBudgetPolicy;
+use super::types::AgentRoleBudgetPolicyDraft;
+use super::types::AgentRoleCatalog;
+use super::types::AgentRoleCatalogDraft;
+use super::types::AgentRoleClass;
+use super::types::AgentRoleContextPosture;
+use super::types::AgentRoleError;
+use super::types::AgentRoleEvidencePosture;
+use super::types::AgentRoleIssue;
+use super::types::AgentRoleMutationPosture;
+use super::types::AgentRoleOutputKind;
+use super::types::AgentRoleProfile;
+use super::types::AgentRoleProfileDraft;
+use super::types::AgentRoleSeparationDimension;
+use super::types::AgentRoleSeparationPolicy;
+use super::types::AgentRoleSeparationPolicyDraft;
+use super::types::AgentRoleToolset;
+use super::types::AgentRoleToolsetDraft;
+use super::types::BLAKE3_HEX_CHARS;
+use super::types::HASH_SEPARATOR;
+use super::types::MAX_ROLE_ACTION_BUDGET;
+use super::types::MAX_ROLE_CONTEXT_BUDGET;
+use super::types::MAX_ROLE_LABEL_CHARS;
+use super::types::MAX_ROLE_OUTPUT_BUDGET;
+use super::types::MAX_ROLE_POLICIES;
+use super::types::MAX_ROLE_PROFILES;
+use super::types::MAX_ROLE_PURPOSE_CHARS;
+use super::types::MAX_ROLE_REFERENCES;
 
 const FIELD_SCHEMA: &str = "agent_role_schema";
 const FIELD_PROFILE: &str = "agent_role_profile";
@@ -57,18 +77,15 @@ impl AgentRoleCatalog {
         let budget_policies = validate_budgets(draft.budget_policies)?;
         let toolsets = validate_toolsets(draft.toolsets)?;
         let separation_policies = validate_separation_policies(draft.separation_policies)?;
-        let profiles = validate_profiles(
-            draft.profiles,
-            ProfileReferenceContext {
-                known_capabilities: &known_capabilities,
-                input_contracts: &input_contracts,
-                output_contracts: &output_contracts,
-                evidence_contracts: &evidence_contracts,
-                budgets: &budget_policies,
-                toolsets: &toolsets,
-                separation_policies: &separation_policies,
-            },
-        )?;
+        let profiles = validate_profiles(draft.profiles, ProfileReferenceContext {
+            known_capabilities: &known_capabilities,
+            input_contracts: &input_contracts,
+            output_contracts: &output_contracts,
+            evidence_contracts: &evidence_contracts,
+            budgets: &budget_policies,
+            toolsets: &toolsets,
+            separation_policies: &separation_policies,
+        })?;
         validate_baseline_profiles(&profiles)?;
         debug_assert_eq!(profiles.len(), draft.profiles.len());
         debug_assert!(!known_capabilities.is_empty());
@@ -90,20 +107,14 @@ impl AgentRoleCatalog {
 /// # Errors
 ///
 /// Returns [`AgentRoleError`] when profile fields are malformed.
-pub fn blake3_agent_role_profile_identity(
-    draft: &AgentRoleProfileDraft<'_>,
-) -> Result<String, AgentRoleError> {
+pub fn blake3_agent_role_profile_identity(draft: &AgentRoleProfileDraft<'_>) -> Result<String, AgentRoleError> {
     validate_profile_shape(draft)?;
     Ok(profile_draft_hash(draft))
 }
 
 fn validate_catalog_shape(draft: &AgentRoleCatalogDraft<'_>) -> Result<(), AgentRoleError> {
     if draft.schema != AGENT_ROLE_CATALOG_SCHEMA {
-        return Err(error(
-            AgentRoleIssue::InvalidSchema,
-            FIELD_SCHEMA,
-            "unsupported agent-role catalog schema",
-        ));
+        return Err(error(AgentRoleIssue::InvalidSchema, FIELD_SCHEMA, "unsupported agent-role catalog schema"));
     }
     validate_nonempty_bound(CollectionBound {
         item_count: draft.profiles.len(),
@@ -148,21 +159,17 @@ fn validate_nonempty_bound(bound: CollectionBound) -> Result<(), AgentRoleError>
     Ok(())
 }
 
-fn validate_budgets(
-    drafts: &[AgentRoleBudgetPolicyDraft<'_>],
-) -> Result<Vec<AgentRoleBudgetPolicy>, AgentRoleError> {
+fn validate_budgets(drafts: &[AgentRoleBudgetPolicyDraft<'_>]) -> Result<Vec<AgentRoleBudgetPolicy>, AgentRoleError> {
     let mut policies = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let policy_id = safe_label(ValidationValue {
             field: FIELD_BUDGET,
             value: draft.policy_id,
         })?;
-        let is_action_budget_valid =
-            draft.max_actions > u32::default() && draft.max_actions <= MAX_ROLE_ACTION_BUDGET;
-        let is_output_budget_valid =
-            draft.max_outputs > u16::default() && draft.max_outputs <= MAX_ROLE_OUTPUT_BUDGET;
-        let is_context_budget_valid = draft.max_context_units > u32::default()
-            && draft.max_context_units <= MAX_ROLE_CONTEXT_BUDGET;
+        let is_action_budget_valid = draft.max_actions > u32::default() && draft.max_actions <= MAX_ROLE_ACTION_BUDGET;
+        let is_output_budget_valid = draft.max_outputs > u16::default() && draft.max_outputs <= MAX_ROLE_OUTPUT_BUDGET;
+        let is_context_budget_valid =
+            draft.max_context_units > u32::default() && draft.max_context_units <= MAX_ROLE_CONTEXT_BUDGET;
         if !is_action_budget_valid || !is_output_budget_valid || !is_context_budget_valid {
             return Err(error(
                 AgentRoleIssue::InvalidCollection,
@@ -170,10 +177,7 @@ fn validate_budgets(
                 "role budget values must be positive and finitely bounded",
             ));
         }
-        if policies
-            .iter()
-            .any(|policy: &AgentRoleBudgetPolicy| policy.policy_id == policy_id)
-        {
+        if policies.iter().any(|policy: &AgentRoleBudgetPolicy| policy.policy_id == policy_id) {
             return Err(duplicate(FIELD_BUDGET));
         }
         policies.push(AgentRoleBudgetPolicy {
@@ -188,15 +192,9 @@ fn validate_budgets(
     Ok(policies)
 }
 
-fn validate_toolsets(
-    drafts: &[AgentRoleToolsetDraft<'_>],
-) -> Result<Vec<AgentRoleToolset>, AgentRoleError> {
+fn validate_toolsets(drafts: &[AgentRoleToolsetDraft<'_>]) -> Result<Vec<AgentRoleToolset>, AgentRoleError> {
     if drafts.len() > MAX_ROLE_POLICIES {
-        return Err(error(
-            AgentRoleIssue::InvalidCollection,
-            FIELD_TOOLSET,
-            "toolset count exceeds its finite bound",
-        ));
+        return Err(error(AgentRoleIssue::InvalidCollection, FIELD_TOOLSET, "toolset count exceeds its finite bound"));
     }
     let mut toolsets = Vec::with_capacity(drafts.len());
     for draft in drafts {
@@ -210,23 +208,13 @@ fn validate_toolsets(
             field: FIELD_TOOLSET,
         })?;
         let tool_names = unique_labels(FIELD_TOOLSET, draft.tool_names)?;
-        if toolsets
-            .iter()
-            .any(|toolset: &AgentRoleToolset| toolset.toolset_id == toolset_id)
-        {
+        if toolsets.iter().any(|toolset: &AgentRoleToolset| toolset.toolset_id == toolset_id) {
             return Err(duplicate(FIELD_TOOLSET));
         }
-        toolsets.push(AgentRoleToolset {
-            toolset_id,
-            tool_names,
-        });
+        toolsets.push(AgentRoleToolset { toolset_id, tool_names });
     }
     debug_assert_eq!(toolsets.len(), drafts.len());
-    debug_assert!(
-        toolsets
-            .iter()
-            .all(|toolset| !toolset.toolset_id.is_empty())
-    );
+    debug_assert!(toolsets.iter().all(|toolset| !toolset.toolset_id.is_empty()));
     Ok(toolsets)
 }
 
@@ -248,16 +236,10 @@ fn validate_separation_policies(
         }
         let mut required_dimensions = draft.required_dimensions.to_vec();
         required_dimensions.sort_unstable();
-        if required_dimensions
-            .windows(2)
-            .any(|pair| pair[0] == pair[1])
-        {
+        if required_dimensions.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(duplicate(FIELD_SEPARATION));
         }
-        if policies
-            .iter()
-            .any(|policy: &AgentRoleSeparationPolicy| policy.policy_id == policy_id)
-        {
+        if policies.iter().any(|policy: &AgentRoleSeparationPolicy| policy.policy_id == policy_id) {
             return Err(duplicate(FIELD_SEPARATION));
         }
         policies.push(AgentRoleSeparationPolicy {
@@ -302,10 +284,7 @@ fn validate_profiles(
             ));
         }
         let profile = validated_profile(draft, references.toolsets)?;
-        if profiles
-            .iter()
-            .any(|candidate: &AgentRoleProfile| candidate.role_id == profile.role_id)
-        {
+        if profiles.iter().any(|candidate: &AgentRoleProfile| candidate.role_id == profile.role_id) {
             return Err(duplicate(FIELD_PROFILE));
         }
         profiles.push(profile);
@@ -356,9 +335,7 @@ fn validate_profile_shape(draft: &AgentRoleProfileDraft<'_>) -> Result<(), Agent
     }
     validate_required_collections(draft)?;
     validate_class_invariants(draft)?;
-    if draft.source_scope == crate::ModelProfileSourceScope::Project
-        && !draft.project_profile_admitted
-    {
+    if draft.source_scope == crate::ModelProfileSourceScope::Project && !draft.project_profile_admitted {
         return Err(error(
             AgentRoleIssue::UntrustedProfile,
             FIELD_PROFILE,
@@ -471,22 +448,14 @@ fn validate_profile_references(
     draft: &AgentRoleProfileDraft<'_>,
     references: ProfileReferenceContext<'_>,
 ) -> Result<(), AgentRoleError> {
-    if draft
-        .required_capabilities
-        .iter()
-        .any(|required| !draft.capability_ceiling.contains(required))
-    {
+    if draft.required_capabilities.iter().any(|required| !draft.capability_ceiling.contains(required)) {
         return Err(error(
             AgentRoleIssue::ClassInvariant,
             FIELD_CAPABILITY,
             "required role capabilities must also appear in the role ceiling",
         ));
     }
-    if draft
-        .capability_ceiling
-        .iter()
-        .any(|label| !contains_string(references.known_capabilities, label))
-    {
+    if draft.capability_ceiling.iter().any(|label| !contains_string(references.known_capabilities, label)) {
         return Err(missing(FIELD_CAPABILITY));
     }
     if !contains_string(references.input_contracts, draft.input_contract)
@@ -495,11 +464,7 @@ fn validate_profile_references(
     {
         return Err(missing(FIELD_CONTRACT));
     }
-    if !references
-        .budgets
-        .iter()
-        .any(|policy| policy.policy_id() == draft.budget_policy_ref)
-    {
+    if !references.budgets.iter().any(|policy| policy.policy_id() == draft.budget_policy_ref) {
         return Err(missing(FIELD_BUDGET));
     }
     if !references
@@ -509,20 +474,14 @@ fn validate_profile_references(
     {
         return Err(missing(FIELD_SEPARATION));
     }
-    if draft.toolsets.iter().any(|reference| {
-        !references
-            .toolsets
-            .iter()
-            .any(|toolset| toolset.toolset_id() == *reference)
-    }) {
+    if draft
+        .toolsets
+        .iter()
+        .any(|reference| !references.toolsets.iter().any(|toolset| toolset.toolset_id() == *reference))
+    {
         return Err(missing(FIELD_TOOLSET));
     }
-    debug_assert!(
-        draft
-            .required_capabilities
-            .iter()
-            .all(|required| draft.capability_ceiling.contains(required))
-    );
+    debug_assert!(draft.required_capabilities.iter().all(|required| draft.capability_ceiling.contains(required)));
     debug_assert!(
         references
             .separation_policies
@@ -544,9 +503,7 @@ struct ValidatedProfileMetadata {
     profile_hash: String,
 }
 
-fn validate_profile_metadata(
-    draft: &AgentRoleProfileDraft<'_>,
-) -> Result<ValidatedProfileMetadata, AgentRoleError> {
+fn validate_profile_metadata(draft: &AgentRoleProfileDraft<'_>) -> Result<ValidatedProfileMetadata, AgentRoleError> {
     let metadata = ValidatedProfileMetadata {
         role_id: safe_label(ValidationValue {
             field: FIELD_PROFILE,
@@ -605,15 +562,9 @@ fn validated_profile(
         trust_status: draft.trust_status,
         admission_status: draft.admission_status,
         project_profile_admitted: draft.project_profile_admitted,
-        required_capabilities: unique_optional_labels(
-            FIELD_CAPABILITY,
-            draft.required_capabilities,
-        )?,
+        required_capabilities: unique_optional_labels(FIELD_CAPABILITY, draft.required_capabilities)?,
         capability_ceiling: unique_labels(FIELD_CAPABILITY, draft.capability_ceiling)?,
-        eligible_model_profiles: unique_labels(
-            "eligible_model_profiles",
-            draft.eligible_model_profiles,
-        )?,
+        eligible_model_profiles: unique_labels("eligible_model_profiles", draft.eligible_model_profiles)?,
         model_targets: unique_labels("model_targets", draft.model_targets)?,
         prompt_modes: unique_labels("prompt_modes", draft.prompt_modes)?,
         prompt_sources: unique_labels("prompt_sources", draft.prompt_sources)?,
@@ -652,15 +603,13 @@ fn expand_tools(
     toolset_refs: &[String],
     toolsets: &[AgentRoleToolset],
 ) -> Result<Vec<String>, AgentRoleError> {
-    let additional_count = toolset_refs
-        .iter()
-        .try_fold(usize::default(), |total, reference| {
-            let toolset = toolsets
-                .iter()
-                .find(|toolset| toolset.toolset_id() == reference)
-                .ok_or_else(|| missing(FIELD_TOOLSET))?;
-            Ok::<usize, AgentRoleError>(total.saturating_add(toolset.tool_names().len()))
-        })?;
+    let additional_count = toolset_refs.iter().try_fold(usize::default(), |total, reference| {
+        let toolset = toolsets
+            .iter()
+            .find(|toolset| toolset.toolset_id() == reference)
+            .ok_or_else(|| missing(FIELD_TOOLSET))?;
+        Ok::<usize, AgentRoleError>(total.saturating_add(toolset.tool_names().len()))
+    })?;
     let expanded_tool_count = direct_tools.len().saturating_add(additional_count);
     let mut expanded = Vec::with_capacity(expanded_tool_count);
     expanded.extend(direct_tools.iter().cloned());
@@ -690,13 +639,11 @@ fn validate_class_separation(
             .iter()
             .find(|policy| policy.policy_id() == profile.separation_policy_ref)
             .ok_or_else(|| missing(FIELD_SEPARATION))?;
-        if matches!(
-            profile.class,
-            AgentRoleClass::Review | AgentRoleClass::Verification | AgentRoleClass::Judgment
-        ) && (!policy.requires(AgentRoleSeparationDimension::SubjectImmutable)
-            || (!policy.requires(AgentRoleSeparationDimension::Assignment)
-                && !policy.requires(AgentRoleSeparationDimension::MutationLineage)
-                && !policy.requires(AgentRoleSeparationDimension::Actor)))
+        if matches!(profile.class, AgentRoleClass::Review | AgentRoleClass::Verification | AgentRoleClass::Judgment)
+            && (!policy.requires(AgentRoleSeparationDimension::SubjectImmutable)
+                || (!policy.requires(AgentRoleSeparationDimension::Assignment)
+                    && !policy.requires(AgentRoleSeparationDimension::MutationLineage)
+                    && !policy.requires(AgentRoleSeparationDimension::Actor)))
         {
             return Err(error(
                 AgentRoleIssue::ClassInvariant,
@@ -716,10 +663,8 @@ fn validate_baseline_profiles(profiles: &[AgentRoleProfile]) -> Result<(), Agent
         (BASELINE_VERIFIER, AgentRoleClass::Verification),
         (BASELINE_JUDGE, AgentRoleClass::Judgment),
     ] {
-        let profile = profiles
-            .iter()
-            .find(|profile| profile.role_id() == role_id)
-            .ok_or_else(|| missing(FIELD_PROFILE))?;
+        let profile =
+            profiles.iter().find(|profile| profile.role_id() == role_id).ok_or_else(|| missing(FIELD_PROFILE))?;
         if profile.class() != expected_class {
             return Err(error(
                 AgentRoleIssue::ClassInvariant,
@@ -729,11 +674,7 @@ fn validate_baseline_profiles(profiles: &[AgentRoleProfile]) -> Result<(), Agent
         }
     }
     debug_assert!(profiles.len() >= 4);
-    debug_assert!(
-        profiles
-            .iter()
-            .any(|profile| profile.role_id() == BASELINE_JUDGE)
-    );
+    debug_assert!(profiles.iter().any(|profile| profile.role_id() == BASELINE_JUDGE));
     Ok(())
 }
 
@@ -799,12 +740,9 @@ pub(super) struct ValidationValue<'a> {
 
 pub(super) fn safe_label(input: ValidationValue<'_>) -> Result<String, AgentRoleError> {
     let normalized = input.value.trim();
-    let is_within_label_bound =
-        !normalized.is_empty() && normalized.chars().count() <= MAX_ROLE_LABEL_CHARS;
+    let is_within_label_bound = !normalized.is_empty() && normalized.chars().count() <= MAX_ROLE_LABEL_CHARS;
     let is_character_set_valid = normalized.chars().all(|character| {
-        character.is_ascii_lowercase()
-            || character.is_ascii_digit()
-            || matches!(character, '-' | '_' | '.' | ':')
+        character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '-' | '_' | '.' | ':')
     });
     let is_endpoint_valid = normalized
         .chars()
@@ -828,11 +766,8 @@ pub(super) fn safe_label(input: ValidationValue<'_>) -> Result<String, AgentRole
 
 fn safe_purpose(value: &str) -> Result<String, AgentRoleError> {
     let normalized = value.trim();
-    let is_within_purpose_bound =
-        !normalized.is_empty() && normalized.chars().count() <= MAX_ROLE_PURPOSE_CHARS;
-    let has_forbidden_marker = FORBIDDEN_PURPOSE_MARKERS
-        .iter()
-        .any(|marker| normalized.contains(marker));
+    let is_within_purpose_bound = !normalized.is_empty() && normalized.chars().count() <= MAX_ROLE_PURPOSE_CHARS;
+    let has_forbidden_marker = FORBIDDEN_PURPOSE_MARKERS.iter().any(|marker| normalized.contains(marker));
     if !is_within_purpose_bound || has_forbidden_marker {
         return Err(error(
             AgentRoleIssue::UnsafeLabel,
@@ -845,16 +780,9 @@ fn safe_purpose(value: &str) -> Result<String, AgentRoleError> {
 
 pub(super) fn lowercase_blake3(input: ValidationValue<'_>) -> Result<String, AgentRoleError> {
     let is_valid = input.value.len() == BLAKE3_HEX_CHARS
-        && input
-            .value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        && input.value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !is_valid {
-        return Err(error(
-            AgentRoleIssue::InvalidHash,
-            input.field,
-            "identity must be lowercase BLAKE3 hexadecimal",
-        ));
+        return Err(error(AgentRoleIssue::InvalidHash, input.field, "identity must be lowercase BLAKE3 hexadecimal"));
     }
     Ok(input.value.to_string())
 }
@@ -868,10 +796,7 @@ fn unique_labels(field: &'static str, values: &[&str]) -> Result<Vec<String>, Ag
     unique_optional_labels(field, values)
 }
 
-fn unique_optional_labels(
-    field: &'static str,
-    values: &[&str],
-) -> Result<Vec<String>, AgentRoleError> {
+fn unique_optional_labels(field: &'static str, values: &[&str]) -> Result<Vec<String>, AgentRoleError> {
     let mut labels = Vec::with_capacity(values.len());
     for value in values {
         let label = safe_label(ValidationValue { field, value })?;
@@ -887,26 +812,14 @@ fn contains_string(values: &[String], expected: &str) -> bool {
     values.iter().any(|value| value == expected)
 }
 
-pub(super) fn error(
-    issue: AgentRoleIssue,
-    field: &'static str,
-    detail: impl Into<String>,
-) -> AgentRoleError {
+pub(super) fn error(issue: AgentRoleIssue, field: &'static str, detail: impl Into<String>) -> AgentRoleError {
     AgentRoleError::new(issue, field, detail)
 }
 
 fn duplicate(field: &'static str) -> AgentRoleError {
-    error(
-        AgentRoleIssue::DuplicateIdentity,
-        field,
-        "normalized role identity is duplicated",
-    )
+    error(AgentRoleIssue::DuplicateIdentity, field, "normalized role identity is duplicated")
 }
 
 fn missing(field: &'static str) -> AgentRoleError {
-    error(
-        AgentRoleIssue::MissingReference,
-        field,
-        "role profile references an unknown catalog identity",
-    )
+    error(AgentRoleIssue::MissingReference, field, "role profile references an unknown catalog identity")
 }

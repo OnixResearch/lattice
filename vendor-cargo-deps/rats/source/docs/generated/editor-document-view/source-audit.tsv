@@ -1,0 +1,7 @@
+source	identity	license	concept_reviewed	adaptation	rejection_or_obligation
+GNU Emacs	emacs-30.2 tag;29f3f150af5c5b065c3a9f39969429e5bb3285da	GPL-3.0-or-later	buffer identity independent of windows	conceptual document/view lifetime separation	no source/test copying;independent fixture;cite manual behavior
+GNU Emacs manual	Emacs 30.2 Buffer and Window chapters	GNU Free Documentation License	one buffer shown by multiple windows	independent presentation state candidate	do not copy manual text beyond factual attribution
+GNU Emacs manual	Emacs 30.2 Point and Mark chapters	GNU Free Documentation License	point mark region and narrowing	explicit per-view positions/ranges for evaluation	Emacs character positions are not UTF-8/UTF-16/grapheme/cell units
+GNU Emacs manual	Emacs 30.2 Overlays/Text Properties chapters	GNU Free Documentation License	derived presentation metadata	revision-bound closed decorations	no Lisp property bags callbacks or mutable interval runtime
+GNU Emacs manual	Emacs 30.2 Undo chapter	GNU Free Documentation License	command/edit boundaries	separate transaction ownership questions	no implicit command-loop undo or universal history
+Tile	62df72ca1ebbb33d96ca3c2714efed15054afe99	project license	daemon-owned ResourceId BufferId ViewId and revisioned view model	downstream compatibility inventory only	no copying dependency identity allocation persistence focus or command authority

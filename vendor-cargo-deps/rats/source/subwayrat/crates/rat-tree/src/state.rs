@@ -3,7 +3,10 @@
 use std::collections::BTreeSet;
 
 use crate::keymap::TreeAction;
-use crate::model::{NodeId, TreeData, VisibleRow, compute_visible_rows};
+use crate::model::NodeId;
+use crate::model::TreeData;
+use crate::model::VisibleRow;
+use crate::model::compute_visible_rows;
 
 /// Mutable state for a tree widget.
 ///
@@ -36,7 +39,21 @@ impl TreeState {
 
     /// Recompute the cached visible rows from the data and expand state.
     pub fn recompute(&mut self, data: &dyn TreeData) {
-        self.visible_rows = compute_visible_rows(data, &self.expanded);
+        let previous_rows = std::mem::take(&mut self.visible_rows);
+        let active = previous_rows.get(self.cursor).map(|row| row.node_id);
+        let candidate_rows = compute_visible_rows(data, &self.expanded);
+        let repaired =
+            crate::virtualization::repair_tree_active(&previous_rows, &candidate_rows, active, &BTreeSet::new())
+                .ok()
+                .flatten();
+        self.visible_rows = candidate_rows;
+        if let Some(active) = repaired
+            && let Some(index) = self.visible_rows.iter().position(|row| row.node_id == active)
+        {
+            self.cursor = index;
+        } else {
+            self.clamp_cursor();
+        }
     }
 
     /// Expand the node under the cursor. No-op if it's a leaf or already expanded.
@@ -125,10 +142,7 @@ impl TreeState {
     pub fn navigate_parent(&mut self, data: &dyn TreeData) {
         if let Some(row) = self.visible_rows.get(self.cursor)
             && let Some(parent_id) = data.parent(row.node_id)
-            && let Some(pos) = self
-                .visible_rows
-                .iter()
-                .position(|r| r.node_id == parent_id)
+            && let Some(pos) = self.visible_rows.iter().position(|r| r.node_id == parent_id)
         {
             self.cursor = pos;
         }
@@ -148,11 +162,7 @@ impl TreeState {
             }
             // First child is the next row after the current cursor
             let first_child_id = data.child(row.node_id, 0);
-            if let Some(pos) = self
-                .visible_rows
-                .iter()
-                .position(|r| r.node_id == first_child_id)
-            {
+            if let Some(pos) = self.visible_rows.iter().position(|r| r.node_id == first_child_id) {
                 self.cursor = pos;
             }
         }
@@ -241,12 +251,7 @@ impl TreeState {
 
     /// Apply a `TreeAction` to this state. Returns `Some(node_id)` for
     /// `TreeAction::Select`, `None` otherwise.
-    pub fn apply(
-        &mut self,
-        action: TreeAction,
-        data: &dyn TreeData,
-        viewport_height: usize,
-    ) -> Option<NodeId> {
+    pub fn apply(&mut self, action: TreeAction, data: &dyn TreeData, viewport_height: usize) -> Option<NodeId> {
         let mut selected = None;
         match action {
             TreeAction::Up => self.move_up(),
@@ -293,6 +298,15 @@ mod tests {
     use super::*;
     use crate::model::SimpleTree;
 
+    const fn node(value: u32) -> NodeId {
+        NodeId::new(value)
+    }
+
+    fn expand_root_and_a(state: &mut TreeState) {
+        state.expanded.insert(node(0));
+        state.expanded.insert(node(1));
+    }
+
     fn sample_tree() -> SimpleTree {
         // root(0)
         //   ├─ a(1)
@@ -301,12 +315,12 @@ mod tests {
         //   └─ b(2)
         //      └─ b1(5)
         SimpleTree::new(vec![
-            (0, None, "root".into()),
-            (1, Some(0), "a".into()),
-            (2, Some(0), "b".into()),
-            (3, Some(1), "a1".into()),
-            (4, Some(1), "a2".into()),
-            (5, Some(2), "b1".into()),
+            (node(0), None, "root".into()),
+            (node(1), Some(node(0)), "a".into()),
+            (node(2), Some(node(0)), "b".into()),
+            (node(3), Some(node(1)), "a1".into()),
+            (node(4), Some(node(1)), "a2".into()),
+            (node(5), Some(node(2)), "b1".into()),
         ])
     }
 
@@ -401,8 +415,7 @@ mod tests {
     fn navigate_parent() {
         let tree = sample_tree();
         let mut state = TreeState::new(&tree);
-        state.expanded.insert(0);
-        state.expanded.insert(1);
+        expand_root_and_a(&mut state);
         state.recompute(&tree); // root,a,a1,a2,b
 
         state.cursor = 2; // a1
@@ -425,15 +438,14 @@ mod tests {
         // Root is collapsed — should auto-expand
         state.navigate_first_child(&tree);
         assert!(state.expanded.contains(&0));
-        assert_eq!(state.cursor_node_id(), Some(1)); // moved to "a"
+        assert_eq!(state.cursor_node_id(), Some(node(1))); // moved to "a"
     }
 
     #[test]
     fn navigate_first_child_leaf_noop() {
         let tree = sample_tree();
         let mut state = TreeState::new(&tree);
-        state.expanded.insert(0);
-        state.expanded.insert(1);
+        expand_root_and_a(&mut state);
         state.recompute(&tree);
 
         state.cursor = 2; // a1 (leaf)
@@ -445,49 +457,47 @@ mod tests {
     fn next_prev_sibling() {
         let tree = sample_tree();
         let mut state = TreeState::new(&tree);
-        state.expanded.insert(0);
-        state.expanded.insert(1);
+        expand_root_and_a(&mut state);
         state.recompute(&tree); // root,a,a1,a2,b
 
         // a1 → a2
         state.cursor = 2; // a1
         state.next_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(4)); // a2
+        assert_eq!(state.cursor_node_id(), Some(node(4))); // a2
 
         // a2 → no next sibling
         state.next_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(4)); // unchanged
+        assert_eq!(state.cursor_node_id(), Some(node(4))); // unchanged
 
         // a2 → a1
         state.prev_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(3)); // a1
+        assert_eq!(state.cursor_node_id(), Some(node(3))); // a1
 
         // a1 → no prev sibling
         state.prev_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(3)); // unchanged
+        assert_eq!(state.cursor_node_id(), Some(node(3))); // unchanged
     }
 
     #[test]
     fn sibling_skips_descendants() {
         let tree = sample_tree();
         let mut state = TreeState::new(&tree);
-        state.expanded.insert(0);
-        state.expanded.insert(1);
+        expand_root_and_a(&mut state);
         state.recompute(&tree); // root,a,a1,a2,b
 
         // a → b (skips a's children)
         state.cursor = 1; // a
         state.next_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(2)); // b
+        assert_eq!(state.cursor_node_id(), Some(node(2))); // b
 
         // b → a
         state.prev_sibling(&tree);
-        assert_eq!(state.cursor_node_id(), Some(1)); // a
+        assert_eq!(state.cursor_node_id(), Some(node(1))); // a
     }
 
     #[test]
     fn page_up_down() {
-        let tree = SimpleTree::new((0..20).map(|i| (i, None, format!("n{i}"))).collect());
+        let tree = SimpleTree::new((0..20).map(|value| (node(value), None, format!("n{value}"))).collect());
         let mut state = TreeState::new(&tree);
         assert_eq!(state.visible_rows.len(), 20);
 
@@ -509,7 +519,7 @@ mod tests {
 
     #[test]
     fn scroll_follows_cursor() {
-        let tree = SimpleTree::new((0..20).map(|i| (i, None, format!("n{i}"))).collect());
+        let tree = SimpleTree::new((0..20).map(|value| (node(value), None, format!("n{value}"))).collect());
         let mut state = TreeState::new(&tree);
 
         state.cursor = 15;
@@ -529,12 +539,12 @@ mod tests {
         let mut state = TreeState::new(&tree);
 
         let result = state.apply(TreeAction::Select, &tree, 20);
-        assert_eq!(result, Some(0)); // root
+        assert_eq!(result, Some(node(0))); // root
 
         state.apply(TreeAction::Expand, &tree, 20);
         state.apply(TreeAction::Down, &tree, 20);
         let result = state.apply(TreeAction::Select, &tree, 20);
-        assert_eq!(result, Some(1)); // a
+        assert_eq!(result, Some(node(1))); // a
     }
 
     #[test]
@@ -551,8 +561,7 @@ mod tests {
     fn cursor_adjust_on_collapse() {
         let tree = sample_tree();
         let mut state = TreeState::new(&tree);
-        state.expanded.insert(0);
-        state.expanded.insert(1);
+        expand_root_and_a(&mut state);
         state.recompute(&tree); // root,a,a1,a2,b
 
         // Put cursor on a1 (index 2), then collapse via toggle on root

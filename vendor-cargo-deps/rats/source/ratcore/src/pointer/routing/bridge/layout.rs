@@ -62,10 +62,7 @@ impl RenderedPointerRegion {
 
     /// Sets action identifier.
     #[must_use]
-    pub fn with_action(
-        mut self,
-        action_id: impl Into<super::super::shape::PointerActionId>,
-    ) -> Self {
+    pub fn with_action(mut self, action_id: impl Into<super::super::shape::PointerActionId>) -> Self {
         self.action_id = Some(action_id.into());
         self
     }
@@ -81,20 +78,14 @@ impl RenderedPointerRegion {
 /// Derives a shared hit map from renderer geometry projections.
 #[must_use]
 pub fn derive_pointer_hit_map(regions: Vec<RenderedPointerRegion>) -> super::super::area::HitMap {
-    super::super::area::HitMap::new(
-        regions
-            .into_iter()
-            .map(rendered_region_to_hit_region)
-            .collect(),
-    )
+    super::super::area::HitMap::new(regions.into_iter().map(rendered_region_to_hit_region).collect())
 }
 
 fn rendered_region_to_hit_region(region: RenderedPointerRegion) -> super::super::area::HitRegion {
-    let mut hit_region =
-        super::super::area::HitRegion::new(region.target_id, region.bounds, region.z_order)
-            .with_visible(region.visible)
-            .with_enabled(region.enabled)
-            .with_capture(region.capture);
+    let mut hit_region = super::super::area::HitRegion::new(region.target_id, region.bounds, region.z_order)
+        .with_visible(region.visible)
+        .with_enabled(region.enabled)
+        .with_capture(region.capture);
     if let Some(action_id) = region.action_id {
         hit_region = hit_region.with_action(action_id);
     }

@@ -1,53 +1,61 @@
-use super::{
-    Collection, HashInput, InteropError, McpDescriptor, SCHEMA_FIELD, STATUS_FIELD, Text,
-    hash_parts, parse_value, required_text, text_collection, validate_hash,
-};
+use super::Collection;
+use super::HashInput;
+use super::InteropError;
+use super::McpDescriptor;
+use super::SCHEMA_FIELD;
+use super::STATUS_FIELD;
+use super::Text;
+use super::hash_parts;
+use super::parse_value;
+use super::required_text;
+use super::text_collection;
+use super::validate_hash;
 
 mod admit;
 mod audit;
 mod flow;
 mod shape;
 
-pub use admit::{
-    McpAdvertisementDecision, McpAdvertisementInput, McpServerTrust, plan_mcp_advertisement,
-};
-pub use audit::{
-    McpReceipt, McpReceiptDraft, McpReceiptTruncationState, validate_mcp_receipt_text,
-};
-pub use flow::{
-    McpArgumentStatus, McpDispatchDecision, McpDispatchRequest, McpMutationStatus,
-    McpTransportDecision, McpTransportFailureClass, McpTransportState, evaluate_mcp_dispatch,
-    evaluate_mcp_transport,
-};
-pub use shape::{McpToolMapping, McpToolMappingDraft};
+pub use admit::McpAdvertisementDecision;
+pub use admit::McpAdvertisementInput;
+pub use admit::McpServerTrust;
+pub use admit::plan_mcp_advertisement;
+pub use audit::McpReceipt;
+pub use audit::McpReceiptDraft;
+pub use audit::McpReceiptTruncationState;
+pub use audit::validate_mcp_receipt_text;
+pub use flow::McpArgumentStatus;
+pub use flow::McpDispatchDecision;
+pub use flow::McpDispatchRequest;
+pub use flow::McpMutationStatus;
+pub use flow::McpTransportDecision;
+pub use flow::McpTransportFailureClass;
+pub use flow::McpTransportState;
+pub use flow::evaluate_mcp_dispatch;
+pub use flow::evaluate_mcp_transport;
+pub use shape::McpToolMapping;
+pub use shape::McpToolMappingDraft;
 
-const MCP_SERVER_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_server_label");
-const MCP_TOOL_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_tool_name");
-const MCP_CAPABILITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_capability_label");
-const MCP_SOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_source_metadata");
-const MCP_RESULT_BOUNDS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_result_bounds");
+const MCP_SERVER_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_server_label");
+const MCP_TOOL_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_tool_name");
+const MCP_CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_capability_label");
+const MCP_SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_source_metadata");
+const MCP_RESULT_BOUNDS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_result_bounds");
 const MCP_RESOURCE_POLICY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("mcp_resource_policy_ref");
 const MCP_ABILITY_POLICY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("mcp_ability_policy_ref");
 const MCP_RECEIPT_RESOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("mcp_redacted_resource_id");
-const MCP_TRUNCATION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_truncation_state");
-const MCP_RESPONSE_HASH_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_response_hash");
+const MCP_TRUNCATION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_truncation_state");
+const MCP_RESPONSE_HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_response_hash");
 
 const MCP_TRUNCATION_NONE: &str = "none";
 const MCP_TRUNCATION_BOUNDED: &str = "bounded";
 const MCP_TRUNCATION_REJECTED: &str = "oversized_rejected";
-const MCP_MAPPING_DESCRIPTION: &str =
-    "MCP-backed tool mapped into Animus-owned tool contracts before dispatch.";
-const MCP_MAPPING_PROMPT_SNIPPET: &str = "Use this MCP-backed tool only after Animus argument, capability, mutation, and result checks pass.";
+const MCP_MAPPING_DESCRIPTION: &str = "MCP-backed tool mapped into Animus-owned tool contracts before dispatch.";
+const MCP_MAPPING_PROMPT_SNIPPET: &str =
+    "Use this MCP-backed tool only after Animus argument, capability, mutation, and result checks pass.";
 const MCP_MAPPING_GUIDELINE: &str =
     "MCP transport, process management, discovery, network, and credentials remain host-owned.";
 const MCP_MAPPING_GUIDELINES: &[&str] = &[MCP_MAPPING_GUIDELINE];
@@ -78,17 +86,12 @@ const RECEIPT_LEAK_MARKERS: &[&str] = &[
     RECEIPT_ARGS_MARKER,
 ];
 
-fn required_optional_text(
-    field_name: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<Text, InteropError> {
+fn required_optional_text(field_name: crate::validation::FieldName, value: Option<&str>) -> Result<Text, InteropError> {
     match value {
         Some(text) => required_text(field_name, text),
-        None => Err(InteropError::Contract(
-            crate::AdapterContractError::EmptyField {
-                field: field_name.as_str(),
-            },
-        )),
+        None => Err(InteropError::Contract(crate::AdapterContractError::EmptyField {
+            field: field_name.as_str(),
+        })),
     }
 }
 

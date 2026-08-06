@@ -13,24 +13,24 @@ fn valid_workspace_builds_panel_models() {
     assert_eq!(KnowledgePanels::panel_ids().len(), 8);
     assert_eq!(build.panels.outline[0].1, "Heading");
     assert_eq!(build.panels.capture_targets, vec!["Inbox".to_string()]);
-    assert_eq!(build.panels.graph.get(DOC), Some(&vec![OTHER.to_string()]));
+    assert_eq!(build.panels.graph.get(DOC), Some(&vec![DocumentId::new(OTHER)]));
 }
 
 #[test]
 fn malformed_workspace_reports_deterministic_issues() {
     let mut input = valid_workspace();
-    input
-        .documents
-        .push(KnowledgeDocument::new(DOC, "Duplicate", ""));
+    input.documents.push(KnowledgeDocument::new(DOC, "Duplicate", ""));
     input.headings.push(KnowledgeHeading::new("missing", "", 0));
     input.tags.push(KnowledgeTag::new(DOC, "bad"));
     input.backlinks.push(KnowledgeBacklink::new(DOC, "missing"));
-    input
-        .agenda
-        .push(KnowledgeAgendaItem::new(DOC, "Bad", "2026-99").with_end("2025-01-01"));
-    input
-        .captures
-        .push(KnowledgeCaptureTarget::new("readonly", "Read-only", false));
+    let malformed = RawKnowledgeAgendaItem::new(DOC, "Bad", "2026-99").with_end("2025-01-01");
+    assert!(matches!(malformed.validate(), Err(KnowledgeAgendaDateError::InvalidDate { field: "start", .. })));
+    input.agenda.push(KnowledgeAgendaItem::new(
+        "missing",
+        "Bad",
+        crate::caldate::CalDate::parse("2026-06-11").unwrap(),
+    ));
+    input.captures.push(KnowledgeCaptureTarget::new("readonly", "Read-only", false));
     input.search.clear();
 
     let build = build_knowledge_workflow(&input);
@@ -64,7 +64,11 @@ fn valid_workspace() -> KnowledgeWorkspaceInput {
         headings: vec![KnowledgeHeading::new(DOC, "Heading", 1)],
         tags: vec![KnowledgeTag::new(DOC, "#tag")],
         backlinks: vec![KnowledgeBacklink::new(OTHER, DOC)],
-        agenda: vec![KnowledgeAgendaItem::new(DOC, "Review", "2026-06-11")],
+        agenda: vec![KnowledgeAgendaItem::new(
+            DOC,
+            "Review",
+            crate::caldate::CalDate::parse("2026-06-11").unwrap(),
+        )],
         captures: vec![KnowledgeCaptureTarget::new("inbox", "Inbox", true)],
         search: vec![KnowledgeSearchRecord::new(DOC, "Doc Heading Body")],
         graph: vec![KnowledgeGraphEdge::new(DOC, OTHER)],

@@ -8,16 +8,15 @@ const STATE_OVERSIZED: &str = "oversized-content";
 const DIAGNOSTIC_EMPTY: &str = "empty message renders placeholder text";
 const DIAGNOSTIC_INVALID: &str = "input is rejected before rendering";
 const DIAGNOSTIC_OVERSIZED: &str = "oversized content names clipping or responsive behavior";
-const METEORITE_OVERSIZED_REASON: &str =
-    "web shell uses responsive layout instead of terminal clipping";
+const METEORITE_OVERSIZED_REASON: &str = "web shell uses responsive layout instead of terminal clipping";
 
 /// Display-ready edge-case row shared by showcase renderers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EdgeDisplayRow {
     /// Fixture ID from the shared catalog.
-    pub fixture_id: String,
+    pub fixture_id: super::super::FixtureId,
     /// Stable edge state ID.
-    pub state_id: String,
+    pub state_id: super::super::FixtureStateId,
     /// Display label.
     pub label: String,
     /// Edge state kind.
@@ -76,9 +75,7 @@ pub fn built_in_edge_fixtures() -> Vec<super::Fixture> {
         super::Fixture::new(FIXTURE_CHROME, COVERAGE_DOC).with_state(
             super::State::new(STATE_OVERSIZED, "Oversized content", super::Kind::Oversized)
                 .with_diagnostic(DIAGNOSTIC_OVERSIZED)
-                .with_renderer(super::Renderer::visible(
-                    super::super::ShowcaseRenderer::Subwayrat,
-                ))
+                .with_renderer(super::Renderer::visible(super::super::ShowcaseRenderer::Subwayrat))
                 .with_renderer(super::Renderer::unsupported(
                     super::super::ShowcaseRenderer::Meteorite,
                     METEORITE_OVERSIZED_REASON,
@@ -91,19 +88,11 @@ pub fn built_in_edge_fixtures() -> Vec<super::Fixture> {
 #[must_use]
 pub fn build_edge_display(
     fixtures: &[super::Fixture],
-    accepted_fixture_ids: &[&str],
+    accepted_fixture_ids: &[super::super::FixtureId],
 ) -> EdgeDisplay {
     let validation = super::validate(fixtures, accepted_fixture_ids);
-    let mut rows = validation
-        .fixtures
-        .iter()
-        .flat_map(fixture_rows)
-        .collect::<Vec<_>>();
-    rows.sort_by(|left, right| {
-        left.fixture_id
-            .cmp(&right.fixture_id)
-            .then(left.state_id.cmp(&right.state_id))
-    });
+    let mut rows = validation.fixtures.iter().flat_map(fixture_rows).collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.fixture_id.cmp(&right.fixture_id).then(left.state_id.cmp(&right.state_id)));
     EdgeDisplay {
         rows,
         issues: validation.issues,
@@ -113,12 +102,8 @@ pub fn build_edge_display(
 /// Builds the built-in edge display used by showcase renderers.
 #[must_use]
 pub fn built_in_edge_display() -> EdgeDisplay {
-    let fixture_ids = super::super::built_in_fixtures()
-        .iter()
-        .map(|fixture| fixture.id.clone())
-        .collect::<Vec<_>>();
-    let accepted = fixture_ids.iter().map(String::as_str).collect::<Vec<_>>();
-    build_edge_display(&built_in_edge_fixtures(), &accepted)
+    let fixture_ids = super::super::built_in_fixtures().iter().map(|fixture| fixture.id.clone()).collect::<Vec<_>>();
+    build_edge_display(&built_in_edge_fixtures(), &fixture_ids)
 }
 
 struct StateSpec {
@@ -129,12 +114,8 @@ struct StateSpec {
 
 fn shared_state(spec: StateSpec) -> super::State {
     super::State::new(spec.id, spec.label, spec.kind)
-        .with_renderer(super::Renderer::visible(
-            super::super::ShowcaseRenderer::Subwayrat,
-        ))
-        .with_renderer(super::Renderer::visible(
-            super::super::ShowcaseRenderer::Meteorite,
-        ))
+        .with_renderer(super::Renderer::visible(super::super::ShowcaseRenderer::Subwayrat))
+        .with_renderer(super::Renderer::visible(super::super::ShowcaseRenderer::Meteorite))
 }
 
 fn fixture_rows(fixture: &super::Fixture) -> impl Iterator<Item = EdgeDisplayRow> + '_ {
@@ -150,23 +131,16 @@ fn fixture_rows(fixture: &super::Fixture) -> impl Iterator<Item = EdgeDisplayRow
 }
 
 fn renderer_text(state: &super::State, renderer: super::super::ShowcaseRenderer) -> String {
-    state
-        .renderers
-        .iter()
-        .find(|entry| entry.renderer == renderer)
-        .map_or_else(
-            || "missing renderer metadata".to_string(),
-            |entry| {
-                if entry.visible {
-                    "visible".to_string()
-                } else {
-                    format!(
-                        "unsupported: {}",
-                        entry.reason.as_deref().unwrap_or("reason missing")
-                    )
-                }
-            },
-        )
+    state.renderers.iter().find(|entry| entry.renderer == renderer).map_or_else(
+        || "missing renderer metadata".to_string(),
+        |entry| {
+            if entry.visible {
+                "visible".to_string()
+            } else {
+                format!("unsupported: {}", entry.reason.as_deref().unwrap_or("reason missing"))
+            }
+        },
+    )
 }
 
 fn diagnostic_text(state: &super::State) -> String {
@@ -200,23 +174,20 @@ mod tests {
 
         assert!(display.is_valid(), "issues: {:?}", display.issues);
         assert_eq!(display.rows.len(), EXPECTED_BUILT_IN_ROWS);
-        assert!(display.rows.iter().any(
-            |row| row.state_id == super::STATE_INVALID && row.diagnostics.contains("rejected")
-        ));
         assert!(
             display
                 .rows
                 .iter()
-                .any(|row| row.meteorite.contains("responsive layout"))
+                .any(|row| row.state_id == super::STATE_INVALID && row.diagnostics.contains("rejected"))
         );
+        assert!(display.rows.iter().any(|row| row.meteorite.contains("responsive layout")));
     }
 
     #[test]
     fn malformed_rows_keep_diagnostics_visible() {
-        let display = super::build_edge_display(
-            &[super::super::Fixture::new("missing.fixture", "")],
-            &[super::FIXTURE_DIALOG],
-        );
+        let display = super::build_edge_display(&[super::super::Fixture::new("missing.fixture", "")], &[
+            crate::showcase_fixtures::FixtureId::new(super::FIXTURE_DIALOG),
+        ]);
 
         assert!(!display.is_valid());
         assert!(display.rows.is_empty());

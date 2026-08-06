@@ -5,8 +5,7 @@ pub(crate) mod failure;
 #[cfg(test)]
 mod tests;
 
-pub(crate) const PURPOSE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("retrieval_purpose");
+pub(crate) const PURPOSE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("retrieval_purpose");
 pub(crate) const FIRST_ACTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("retrieval_first_action");
 pub(crate) const REPEAT_CONDITION_FIELD: crate::validation::FieldName =
@@ -31,5 +30,4 @@ pub(crate) const REFERENCE_FIELD: crate::validation::FieldName =
 pub(crate) const MAX_CONDITIONS: usize = 8;
 pub(crate) const MAX_GUIDANCE_CHARS: usize = 512;
 pub(crate) const DEFAULT_MAX_RETRIEVALS: u32 = 1;
-pub(crate) const UNSAFE_REFERENCE_MARKERS: &[&str] =
-    &["/home/", "/tmp/", "../", "C:\\", "\\Users\\"];
+pub(crate) const UNSAFE_REFERENCE_MARKERS: &[&str] = &["/home/", "/tmp/", "../", "C:\\", "\\Users\\"];

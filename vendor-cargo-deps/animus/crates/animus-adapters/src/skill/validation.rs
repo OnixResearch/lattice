@@ -4,11 +4,8 @@ pub(super) fn validate(draft: &super::Draft<'_>) -> Result<super::Descriptor, su
     let version = required_version(draft.version)?;
     let category = required_name(super::CATEGORY_FIELD, draft.category)?;
     let tags = collect_unique_names(super::TAG_FIELD, draft.tags, DuplicatePolicy::RejectTags)?;
-    let related_skills = collect_unique_names(
-        super::RELATED_SKILL_FIELD,
-        draft.related_skills,
-        DuplicatePolicy::Dedup,
-    )?;
+    let related_skills =
+        collect_unique_names(super::RELATED_SKILL_FIELD, draft.related_skills, DuplicatePolicy::Dedup)?;
     let provenance = required_text(super::PROVENANCE_FIELD, draft.provenance)?;
     let trust_status = super::TrustStatus::parse(draft.trust_status)?;
     let content_identity = required_content_identity(draft.content_identity)?;
@@ -18,14 +15,8 @@ pub(super) fn validate(draft: &super::Draft<'_>) -> Result<super::Descriptor, su
         description.chars().count() <= super::MAX_DESCRIPTION_CHARS,
         "validated descriptor summary stays bounded"
     );
-    assert!(
-        tags.len() <= super::MAX_ITEMS,
-        "validated tags stay bounded"
-    );
-    assert!(
-        related_skills.len() <= super::MAX_ITEMS,
-        "validated related skills stay bounded"
-    );
+    assert!(tags.len() <= super::MAX_ITEMS, "validated tags stay bounded");
+    assert!(related_skills.len() <= super::MAX_ITEMS, "validated related skills stay bounded");
     assert_eq!(
         content_identity.as_str().len(),
         super::CONTENT_HASH_HEX_CHARS,
@@ -65,10 +56,7 @@ fn required_version(value: Option<&str>) -> Result<super::Text, super::Error> {
     Ok(version)
 }
 
-fn required_name(
-    field: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<super::Text, super::Error> {
+fn required_name(field: crate::validation::FieldName, value: Option<&str>) -> Result<super::Text, super::Error> {
     let name = required_text(field, value)?;
     validate_name(field, name.as_str())?;
     Ok(name)
@@ -80,9 +68,7 @@ pub(super) fn required_text(
 ) -> Result<super::Text, super::Error> {
     match value {
         Some(raw) => crate::validation::normalized_adapter_field(field, raw).map_err(Into::into),
-        None => Err(super::Error::MissingField {
-            field: field.as_str(),
-        }),
+        None => Err(super::Error::MissingField { field: field.as_str() }),
     }
 }
 
@@ -93,14 +79,11 @@ fn required_content_identity(value: Option<&str>) -> Result<crate::artifact::Has
 
 fn content_identity_error(error: &crate::artifact::Error) -> super::Error {
     match error {
-        crate::artifact::Error::InvalidHash { reason, .. } => {
-            super::Error::InvalidContentIdentity {
-                field: super::CONTENT_IDENTITY_FIELD.as_str(),
-                reason,
-            }
-        }
-        crate::artifact::Error::PayloadTooLong { .. }
-        | crate::artifact::Error::PayloadContainsNul { .. } => {
+        crate::artifact::Error::InvalidHash { reason, .. } => super::Error::InvalidContentIdentity {
+            field: super::CONTENT_IDENTITY_FIELD.as_str(),
+            reason,
+        },
+        crate::artifact::Error::PayloadTooLong { .. } | crate::artifact::Error::PayloadContainsNul { .. } => {
             super::Error::InvalidContentIdentity {
                 field: super::CONTENT_IDENTITY_FIELD.as_str(),
                 reason: "skill content identity must be lowercase BLAKE3 hex",
@@ -137,10 +120,7 @@ fn collect_unique_names(
     Ok(names)
 }
 
-fn validate_item_count(
-    field: crate::validation::FieldName,
-    item_count: usize,
-) -> Result<(), super::Error> {
+fn validate_item_count(field: crate::validation::FieldName, item_count: usize) -> Result<(), super::Error> {
     if item_count > super::MAX_ITEMS {
         return Err(super::Error::TooManyItems {
             field: field.as_str(),
@@ -171,8 +151,8 @@ fn valid_name(value: &str) -> bool {
     let mut is_previous_separator = false;
     let mut has_visible_character = false;
     for character in value.chars() {
-        let is_name_separator = character == super::NAME_SEPARATOR_DASH
-            || character == super::NAME_SEPARATOR_UNDERSCORE;
+        let is_name_separator =
+            character == super::NAME_SEPARATOR_DASH || character == super::NAME_SEPARATOR_UNDERSCORE;
         if is_name_separator {
             if !has_visible_character || is_previous_separator {
                 return false;

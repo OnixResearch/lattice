@@ -7,6 +7,8 @@
 mod commands;
 #[path = "parts/reducer.rs"]
 mod reducer;
+#[path = "parts/routing/mod.rs"]
+mod routing;
 #[path = "parts/state.rs"]
 mod state;
 #[path = "parts/support.rs"]
@@ -26,6 +28,28 @@ pub type WorkspaceShellActionProjection = commands::ActionProjection;
 pub type WorkspaceShellActionSurfaces = commands::ActionSurfaces;
 /// Pure workspace shell command.
 pub type WorkspaceShellCommand = commands::Command;
+/// Representative contextual action used by the workspace pilot.
+pub type WorkspaceContextualAction = routing::ContextualAction;
+/// Focused editor/tree kind used by contextual routing.
+pub type WorkspaceContextualContentKind = routing::ContextualContentKind;
+/// Active modal state used by contextual routing.
+pub type WorkspaceContextualModalState = routing::ContextualModalState;
+/// Closed availability state for a workspace contextual capability.
+pub type WorkspaceContextualAvailability = routing::ContextualAvailability;
+/// Application-owned inputs for one contextual routing generation.
+pub type WorkspaceContextualRoutingOptions = routing::Options;
+/// Atomic contextual routing build plus shared command surfaces.
+pub type WorkspaceContextualActionPilot = routing::ContextualActionPilot;
+/// Typed contextual owner delivered after pure resolution.
+pub type WorkspaceContextualActionTarget = routing::ContextualActionTarget;
+/// Typed runtime message emitted after accepted contextual routing.
+pub type WorkspaceContextualActionMessage = routing::ContextualActionMessage;
+/// Generation-bound workspace contextual dispatch result.
+pub type WorkspaceContextualActionDispatch = routing::ContextualActionDispatch;
+/// Layered key binding plus workspace contextual dispatch result.
+pub type WorkspaceContextualKeyDispatch = routing::ContextualKeyDispatch;
+/// Inputs for dispatching a resolved key binding into a workspace message.
+pub type WorkspaceContextualKeyDispatchRequest<'a> = routing::ContextualKeyDispatchRequest<'a>;
 /// Result of reducing one workspace command.
 pub type WorkspaceShellCommandOutput = commands::CommandOutput;
 /// Deterministic workspace shell diagnostic.
@@ -58,10 +82,24 @@ pub type WorkspaceShellWorkspace = state::Space;
 pub type WorkspaceShellWorkspaceView = views::SpaceView;
 /// Focus behavior for commands that create panes or tabs.
 pub type WorkspaceFocusPolicy = commands::FocusPolicy;
-/// Compact session-visible workspace, tab, or pane identifier.
-pub type WorkspaceLiveId = types::LiveId;
-/// Durable persisted workspace, tab, pane, or layout identifier.
-pub type WorkspacePersistedId = types::PersistedId;
+/// Compact session-visible workspace identifier.
+pub type WorkspaceId = types::WorkspaceId;
+/// Durable persisted workspace identifier.
+pub type PersistedWorkspaceId = types::PersistedWorkspaceId;
+/// Compact session-visible tab identifier.
+pub type WorkspaceTabId = types::TabId;
+/// Durable persisted tab identifier.
+pub type PersistedWorkspaceTabId = types::PersistedTabId;
+/// Compact session-visible pane identifier.
+pub type WorkspacePaneId = types::PaneId;
+/// Durable persisted pane identifier.
+pub type PersistedWorkspacePaneId = types::PersistedPaneId;
+/// Typed identity retained after an entity is removed.
+pub type RetiredWorkspaceLiveId = types::RetiredLiveId;
+/// Compatibility name for the session-visible workspace identity.
+pub type WorkspaceLiveId = WorkspaceId;
+/// Compatibility name for the durable workspace identity.
+pub type WorkspacePersistedId = PersistedWorkspaceId;
 /// Split axis requested by a workspace shell command.
 pub type WorkspaceSplitAxis = commands::SplitAxis;
 /// Aggregated task status counts and overall state.
@@ -71,10 +109,47 @@ pub type WorkspaceTaskStatus = types::TaskStatus;
 
 /// Projects workspace action descriptors through the shared action registry.
 #[must_use]
-pub fn project_workspace_shell_actions(
-    actions: Vec<WorkspaceShellActionDescriptor>,
-) -> WorkspaceShellActionSurfaces {
+pub fn project_workspace_shell_actions(actions: Vec<WorkspaceShellActionDescriptor>) -> WorkspaceShellActionSurfaces {
     views::project_actions(actions)
+}
+
+/// Builds shared contextual routing and command surfaces for the workspace pilot.
+#[must_use]
+pub fn build_workspace_contextual_action_pilot(
+    model: &WorkspaceShellModel,
+    options: &WorkspaceContextualRoutingOptions,
+    previous: Option<&crate::action_registry::ActionRoutingSnapshot>,
+) -> WorkspaceContextualActionPilot {
+    routing::build_contextual_action_pilot(model, options, previous)
+}
+
+/// Converts an accepted contextual route into a typed workspace runtime message.
+#[must_use]
+pub fn dispatch_workspace_contextual_action(
+    model: &WorkspaceShellModel,
+    snapshot: &crate::action_registry::ActionRoutingSnapshot,
+    invocation: &crate::action_registry::ActionInvocation,
+) -> WorkspaceContextualActionDispatch {
+    routing::dispatch_contextual_action(model, snapshot, invocation)
+}
+
+/// Routes a resolved key binding into a typed workspace runtime message.
+#[must_use]
+pub fn dispatch_workspace_contextual_key_sequence(
+    model: &WorkspaceShellModel,
+    request: &WorkspaceContextualKeyDispatchRequest<'_>,
+) -> WorkspaceContextualKeyDispatch {
+    routing::dispatch_contextual_key_sequence(model, request)
+}
+
+/// Replays workspace activations through production routing and message adaptation.
+#[must_use]
+pub fn replay_workspace_contextual_actions(
+    model: &WorkspaceShellModel,
+    snapshot: &crate::action_registry::ActionRoutingSnapshot,
+    steps: &[crate::action_registry::ActionRouteReplayStep],
+) -> Vec<WorkspaceContextualActionDispatch> {
+    routing::replay_contextual_actions(model, snapshot, steps)
 }
 
 /// Builds a renderer-neutral workspace shell view model.
@@ -97,9 +172,7 @@ pub fn reduce_workspace_shell_command(
 
 /// Rolls pane statuses into stable counts and an overall status.
 #[must_use]
-pub fn rollup_workspace_statuses(
-    statuses: impl IntoIterator<Item = WorkspaceTaskStatus>,
-) -> WorkspaceStatusRollup {
+pub fn rollup_workspace_statuses(statuses: impl IntoIterator<Item = WorkspaceTaskStatus>) -> WorkspaceStatusRollup {
     types::rollup(statuses)
 }
 

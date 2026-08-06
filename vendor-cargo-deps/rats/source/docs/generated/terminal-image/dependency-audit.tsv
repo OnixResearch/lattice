@@ -1,0 +1,6 @@
+dependency	version	features	license	msrv	role	bounded_behavior	non_claim
+image	0.25.10	png,jpeg,gif,webp;default-features=false	MIT OR Apache-2.0	1.88.0	static content inspection, animation rejection, and Sixel decode	strict width/height limits; non-strict max_alloc; crate source says unsupported strict limits must fail	memory safety and finite limits are not codec correctness or process isolation
+base64	0.22.1	default=std	MIT OR Apache-2.0	1.48.0	Kitty and iTerm2 transfer encoding	checked 4*ceil(n/3) expansion before allocation	encoding correctness is not terminal-emulator safety
+Kitty graphics protocol	n/a	APC transmit chunks	documentation reference	n/a	protocol framing	4096-byte encoded chunks with checked framing/count/output limits	fixture bytes are not live-terminal or visual evidence
+iTerm2 inline images	n/a	OSC 1337 inline file	documentation reference	n/a	protocol framing	checked base64 and one complete staged sequence	fixture bytes are not live-terminal or visual evidence
+Sixel	n/a	DCS raster payload	documentation reference	n/a	protocol framing	bounded pixels,palette,index work,worst-case payload and exact staged bytes	payload tests are not emulator safety or visual correctness

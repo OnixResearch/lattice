@@ -1,0 +1,15 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [],
+  "destination": "config/generated/codebase-graph-profile.json",
+  "family_id": "animus.codebase-graph-profile",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "codebase_graph_profile",
+  "source": "config/codebase-graph-profile.ncl"
+}

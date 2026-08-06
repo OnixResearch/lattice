@@ -11,9 +11,9 @@
 )]
 
 use super::*;
-use crate::modelprofiles::tests::support::{
-    role_composed_plan, role_composed_plan_with_admission, tool_call_draft,
-};
+use crate::modelprofiles::tests::support::role_composed_plan;
+use crate::modelprofiles::tests::support::role_composed_plan_with_admission;
+use crate::modelprofiles::tests::support::tool_call_draft;
 
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const POLICY_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -29,8 +29,7 @@ const MEMORY_HASH: &str = "99999999999999999999999999999999999999999999999999999
 const AGENT_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const GRANT_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const FRESHNESS_HASH: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-const OUTPUT_CONTRACT_HASH: &str =
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const OUTPUT_CONTRACT_HASH: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const EVIDENCE_HASH: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 const ALTERNATE_HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const VERIFIER_HASH: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
@@ -63,8 +62,7 @@ const OUTPUT_CONTRACTS: &[&str] = &["bounded-role-output"];
 const EVIDENCE_CONTRACTS: &[&str] = &["metadata-only-evidence"];
 const TOOL_NAMES: &[&str] = &["inspect_context"];
 const EMPTY_LABELS: &[&str] = &[];
-const SUBJECT_BOUND_DIMENSIONS: &[AgentRoleSeparationDimension] =
-    &[AgentRoleSeparationDimension::SubjectImmutable];
+const SUBJECT_BOUND_DIMENSIONS: &[AgentRoleSeparationDimension] = &[AgentRoleSeparationDimension::SubjectImmutable];
 const INDEPENDENT_DIMENSIONS: &[AgentRoleSeparationDimension] = &[
     AgentRoleSeparationDimension::Assignment,
     AgentRoleSeparationDimension::Actor,
@@ -138,25 +136,15 @@ fn catalog_validates_baseline_and_specialized_roles() {
     assert_eq!(reviewer.class(), AgentRoleClass::Review);
     assert_eq!(verifier.class(), AgentRoleClass::Verification);
     assert_eq!(judge.class(), AgentRoleClass::Judgment);
-    assert_eq!(
-        implementer.mutation_posture(),
-        AgentRoleMutationPosture::ScopedIntent
-    );
-    assert_eq!(
-        reviewer.mutation_posture(),
-        AgentRoleMutationPosture::SubjectReadOnly
-    );
+    assert_eq!(implementer.mutation_posture(), AgentRoleMutationPosture::ScopedIntent);
+    assert_eq!(reviewer.mutation_posture(), AgentRoleMutationPosture::SubjectReadOnly);
     assert_ne!(implementer.profile_hash(), reviewer.profile_hash());
-    assert_eq!(
-        reviewer.expanded_tools(),
-        &[String::from("inspect_context")]
-    );
+    assert_eq!(reviewer.expanded_tools(), &[String::from("inspect_context")]);
 }
 
 #[test]
 fn catalog_rejects_stale_profile_identity() {
-    let error = catalog_with_hash_override(Some(ZERO_HASH))
-        .expect_err("stale role identity must fail closed");
+    let error = catalog_with_hash_override(Some(ZERO_HASH)).expect_err("stale role identity must fail closed");
 
     assert_eq!(error.issue(), AgentRoleIssue::StaleIdentity);
     assert_eq!(error.field(), "agent_role_profile_hash");
@@ -179,20 +167,15 @@ fn role_model_composition_adds_an_independent_resource_ceiling() {
 fn separation_checks_explicit_dimensions_and_detects_same_actor() {
     let catalog = catalog();
     let reviewer = catalog.profile("reviewer").expect("reviewer");
-    let policy = catalog
-        .separation_policy(reviewer.separation_policy_ref())
-        .expect("review separation policy");
+    let policy = catalog.separation_policy(reviewer.separation_policy_ref()).expect("review separation policy");
     let passed = evaluate_agent_role_separation(policy, &separation_observation(reviewer, false))
         .expect("valid separation observation");
     let failed = evaluate_agent_role_separation(policy, &separation_observation(reviewer, true))
         .expect("well-formed failed separation");
-    let alternate_origin = evaluate_agent_role_separation(
-        policy,
-        &AgentRoleSeparationObservation {
-            subject_actor_hash: ALTERNATE_HASH,
-            ..separation_observation(reviewer, false)
-        },
-    )
+    let alternate_origin = evaluate_agent_role_separation(policy, &AgentRoleSeparationObservation {
+        subject_actor_hash: ALTERNATE_HASH,
+        ..separation_observation(reviewer, false)
+    })
     .expect("alternate separated origin");
 
     assert!(passed.passed());
@@ -200,11 +183,7 @@ fn separation_checks_explicit_dimensions_and_detects_same_actor() {
     assert!(!failed.passed());
     assert!(alternate_origin.passed());
     assert_ne!(passed.decision_hash(), alternate_origin.decision_hash());
-    assert!(
-        failed
-            .failed_dimensions()
-            .contains(&AgentRoleSeparationDimension::Actor)
-    );
+    assert!(failed.failed_dimensions().contains(&AgentRoleSeparationDimension::Actor));
 }
 
 #[test]
@@ -213,19 +192,10 @@ fn exact_activation_authority_admits_assignment() {
     let reviewer = fixture.catalog.profile("reviewer").expect("reviewer");
 
     assert_eq!(fixture.assignment.role_id(), reviewer.role_id());
-    assert_eq!(
-        fixture.assignment.role_profile_hash(),
-        reviewer.profile_hash()
-    );
+    assert_eq!(fixture.assignment.role_profile_hash(), reviewer.profile_hash());
     assert_eq!(fixture.assignment.subject_hash(), SUBJECT_HASH);
-    assert_eq!(
-        fixture.assignment.separation_hash(),
-        fixture.separation.decision_hash()
-    );
-    assert_eq!(
-        fixture.assignment.model_plan_hash(),
-        fixture.model_plan.binding_hash()
-    );
+    assert_eq!(fixture.assignment.separation_hash(), fixture.separation.decision_hash());
+    assert_eq!(fixture.assignment.model_plan_hash(), fixture.model_plan.binding_hash());
 }
 
 #[test]
@@ -234,18 +204,10 @@ fn cross_subject_activation_authority_is_rejected() {
     let reviewer = catalog.profile("reviewer").expect("reviewer");
     let model_plan = role_composed_plan(reviewer).expect("role-bound model plan");
     let separation = separation_for(&catalog, reviewer);
-    let correct_resource = agent_role_activation_resource(activation_resource_input(
-        reviewer,
-        &model_plan,
-        &separation,
-    ))
-    .expect("correct activation resource");
-    let wrong_resource = format!(
-        "role:{}:{}:{}",
-        reviewer.role_id(),
-        ALTERNATE_HASH,
-        FRESHNESS_HASH
-    );
+    let correct_resource =
+        agent_role_activation_resource(activation_resource_input(reviewer, &model_plan, &separation))
+            .expect("correct activation resource");
+    let wrong_resource = format!("role:{}:{}:{}", reviewer.role_id(), ALTERNATE_HASH, FRESHNESS_HASH);
     let (role_assignment_request, role_assignment_receipt) =
         authorized_role_request(correct_resource.as_str(), AGENT_ROLE_ASSIGN_ABILITY);
     let (activation_request, activation_receipt) =
@@ -315,48 +277,30 @@ fn approval_sandbox_cancellation_timeout_budget_and_parent_are_independent_ceili
     let mutation = mutation_capability();
     let base = uniform_ceilings(role_ceiling.as_slice());
     let cases = [
-        (
-            AgentRoleCapabilitySource::ParentDelegation,
-            AgentRoleCapabilityCeilings {
-                parent_delegation: context_only.as_slice(),
-                ..base
-            },
-        ),
-        (
-            AgentRoleCapabilitySource::Approval,
-            AgentRoleCapabilityCeilings {
-                approval: context_only.as_slice(),
-                ..base
-            },
-        ),
-        (
-            AgentRoleCapabilitySource::Sandbox,
-            AgentRoleCapabilityCeilings {
-                sandbox: context_only.as_slice(),
-                ..base
-            },
-        ),
-        (
-            AgentRoleCapabilitySource::Cancellation,
-            AgentRoleCapabilityCeilings {
-                cancellation: context_only.as_slice(),
-                ..base
-            },
-        ),
-        (
-            AgentRoleCapabilitySource::Timeout,
-            AgentRoleCapabilityCeilings {
-                timeout: context_only.as_slice(),
-                ..base
-            },
-        ),
-        (
-            AgentRoleCapabilitySource::Budget,
-            AgentRoleCapabilityCeilings {
-                budget: context_only.as_slice(),
-                ..base
-            },
-        ),
+        (AgentRoleCapabilitySource::ParentDelegation, AgentRoleCapabilityCeilings {
+            parent_delegation: context_only.as_slice(),
+            ..base
+        }),
+        (AgentRoleCapabilitySource::Approval, AgentRoleCapabilityCeilings {
+            approval: context_only.as_slice(),
+            ..base
+        }),
+        (AgentRoleCapabilitySource::Sandbox, AgentRoleCapabilityCeilings {
+            sandbox: context_only.as_slice(),
+            ..base
+        }),
+        (AgentRoleCapabilitySource::Cancellation, AgentRoleCapabilityCeilings {
+            cancellation: context_only.as_slice(),
+            ..base
+        }),
+        (AgentRoleCapabilitySource::Timeout, AgentRoleCapabilityCeilings {
+            timeout: context_only.as_slice(),
+            ..base
+        }),
+        (AgentRoleCapabilitySource::Budget, AgentRoleCapabilityCeilings {
+            budget: context_only.as_slice(),
+            ..base
+        }),
     ];
     for (source, ceilings) in cases {
         let resolution = resolve_agent_role_capabilities(AgentRoleCapabilityResolutionInput {
@@ -402,21 +346,14 @@ fn role_plan_resume_requires_every_exact_identity() {
     })
     .expect_err("stale replay must replan");
 
-    assert!(matches!(
-        reused,
-        AgentRoleTransitionDecision::ReuseExact { .. }
-    ));
+    assert!(matches!(reused, AgentRoleTransitionDecision::ReuseExact { .. }));
     assert_eq!(stale_error.issue(), AgentRoleIssue::TransitionDenied);
 }
 
 #[test]
 fn role_and_model_changes_require_recomposition() {
     let fixture = admitted_fixture("reviewer");
-    let judge_hash = fixture
-        .catalog
-        .profile("judge")
-        .expect("judge")
-        .profile_hash();
+    let judge_hash = fixture.catalog.profile("judge").expect("judge").profile_hash();
     let snapshot = AgentRolePlanSnapshot::from(&fixture.role_plan);
     let role_change = evaluate_agent_role_transition(&AgentRoleTransitionRequest {
         kind: AgentRoleTransitionKind::RoleChange,
@@ -443,28 +380,15 @@ fn role_and_model_changes_require_recomposition() {
     })
     .expect("cancellation decision");
 
-    assert!(matches!(
-        role_change,
-        AgentRoleTransitionDecision::RecomposeRole { .. }
-    ));
-    assert!(matches!(
-        fallback,
-        AgentRoleTransitionDecision::RecomposeModel { .. }
-    ));
-    assert!(matches!(
-        cancelled,
-        AgentRoleTransitionDecision::Cancelled { .. }
-    ));
+    assert!(matches!(role_change, AgentRoleTransitionDecision::RecomposeRole { .. }));
+    assert!(matches!(fallback, AgentRoleTransitionDecision::RecomposeModel { .. }));
+    assert!(matches!(cancelled, AgentRoleTransitionDecision::Cancelled { .. }));
 }
 
 #[test]
 fn handoff_preserves_only_bounded_metadata() {
     let fixture = admitted_fixture("implementer");
-    let reviewer_hash = fixture
-        .catalog
-        .profile("reviewer")
-        .expect("reviewer")
-        .profile_hash();
+    let reviewer_hash = fixture.catalog.profile("reviewer").expect("reviewer").profile_hash();
     let evidence_refs = ["candidate-identity", "check-request"];
     let unresolved_intents = ["verify-output"];
     let requested_actions = ["review-candidate"];
@@ -497,8 +421,7 @@ fn handoff_preserves_only_bounded_metadata() {
         requested_actions: EMPTY_LABELS,
     })
     .expect("empty handoff resource");
-    let (empty_request, empty_receipt) =
-        authorized_role_request(empty_resource.as_str(), AGENT_ROLE_HANDOFF_ABILITY);
+    let (empty_request, empty_receipt) = authorized_role_request(empty_resource.as_str(), AGENT_ROLE_HANDOFF_ABILITY);
     let leak = validate_agent_role_handoff(AgentRoleHandoffDraft {
         current_plan: &fixture.role_plan,
         target_role_profile_hash: reviewer_hash,
@@ -513,8 +436,7 @@ fn handoff_preserves_only_bounded_metadata() {
         },
     })
     .expect_err("handoff cannot inherit grants");
-    let (denied_request, denied_receipt) =
-        denied_role_request(handoff_resource.as_str(), AGENT_ROLE_HANDOFF_ABILITY);
+    let (denied_request, denied_receipt) = denied_role_request(handoff_resource.as_str(), AGENT_ROLE_HANDOFF_ABILITY);
     let denied = validate_agent_role_handoff(AgentRoleHandoffDraft {
         current_plan: &fixture.role_plan,
         target_role_profile_hash: reviewer_hash,
@@ -538,30 +460,18 @@ fn handoff_preserves_only_bounded_metadata() {
 fn review_output_is_advisory_and_separately_authorized() {
     let fixture = admitted_fixture("reviewer");
     let reviewer = fixture.catalog.profile("reviewer").expect("reviewer");
-    let finding_resource_input =
-        output_resource_input(&fixture, reviewer, AgentRoleOutputEffect::Finding);
-    let finding_resource =
-        agent_role_output_resource(finding_resource_input).expect("finding resource");
+    let finding_resource_input = output_resource_input(&fixture, reviewer, AgentRoleOutputEffect::Finding);
+    let finding_resource = agent_role_output_resource(finding_resource_input).expect("finding resource");
     let (output_request, output_receipt) =
         authorized_role_request(finding_resource.as_str(), AGENT_ROLE_EMIT_REVIEW_ABILITY);
-    let output = admit_agent_role_output(output_draft(
-        finding_resource_input,
-        &output_request,
-        &output_receipt,
-    ))
-    .expect("advisory finding");
-    let select_resource_input =
-        output_resource_input(&fixture, reviewer, AgentRoleOutputEffect::Select);
-    let select_resource =
-        agent_role_output_resource(select_resource_input).expect("invalid class resource");
+    let output = admit_agent_role_output(output_draft(finding_resource_input, &output_request, &output_receipt))
+        .expect("advisory finding");
+    let select_resource_input = output_resource_input(&fixture, reviewer, AgentRoleOutputEffect::Select);
+    let select_resource = agent_role_output_resource(select_resource_input).expect("invalid class resource");
     let (select_request, select_receipt) =
         authorized_role_request(select_resource.as_str(), AGENT_ROLE_EMIT_REVIEW_ABILITY);
-    let class_error = admit_agent_role_output(output_draft(
-        select_resource_input,
-        &select_request,
-        &select_receipt,
-    ))
-    .expect_err("reviewer cannot select");
+    let class_error = admit_agent_role_output(output_draft(select_resource_input, &select_request, &select_receipt))
+        .expect_err("reviewer cannot select");
 
     assert_eq!(output.output_kind(), AgentRoleOutputKind::ReviewReport);
     assert_eq!(output.effect(), AgentRoleOutputEffect::Finding);
@@ -583,14 +493,9 @@ fn judgment_cannot_override_deterministic_denial() {
         ..output_resource_input(&fixture, judge, AgentRoleOutputEffect::Select)
     };
     let resource = agent_role_output_resource(resource_input).expect("judgment resource");
-    let (output_request, output_receipt) =
-        authorized_role_request(resource.as_str(), AGENT_ROLE_SELECT_ABILITY);
-    let error = admit_agent_role_output(output_draft(
-        resource_input,
-        &output_request,
-        &output_receipt,
-    ))
-    .expect_err("judge must not suppress deterministic denial");
+    let (output_request, output_receipt) = authorized_role_request(resource.as_str(), AGENT_ROLE_SELECT_ABILITY);
+    let error = admit_agent_role_output(output_draft(resource_input, &output_request, &output_receipt))
+        .expect_err("judge must not suppress deterministic denial");
 
     assert_eq!(error.issue(), AgentRoleIssue::OutputDenied);
     assert!(error.detail().contains("deterministic denial"));
@@ -602,12 +507,8 @@ fn assignment_requires_distinct_assign_and_activate_authority() {
     let reviewer = catalog.profile("reviewer").expect("reviewer");
     let model_plan = role_composed_plan(reviewer).expect("role-bound model plan");
     let separation = separation_for(&catalog, reviewer);
-    let resource = agent_role_activation_resource(activation_resource_input(
-        reviewer,
-        &model_plan,
-        &separation,
-    ))
-    .expect("activation resource");
+    let resource = agent_role_activation_resource(activation_resource_input(reviewer, &model_plan, &separation))
+        .expect("activation resource");
     let (wrong_assignment_request, wrong_assignment_receipt) =
         authorized_role_request(resource.as_str(), AGENT_ROLE_ACTIVATE_ABILITY);
     let (activation_request, activation_receipt) =
@@ -636,9 +537,8 @@ fn equal_router_and_semantic_judge_labels_do_not_grant_semantic_authority() {
     let judge = catalog.profile("judge").expect("judge");
     let model_plan = role_composed_plan(judge).expect("role-bound model plan");
     let separation = separation_for(&catalog, judge);
-    let resource =
-        agent_role_activation_resource(activation_resource_input(judge, &model_plan, &separation))
-            .expect("activation resource");
+    let resource = agent_role_activation_resource(activation_resource_input(judge, &model_plan, &separation))
+        .expect("activation resource");
     let (role_assignment_request, assignment_receipt) =
         authorized_role_request(resource.as_str(), AGENT_ROLE_ASSIGN_ABILITY);
     let (wrong_activation_request, wrong_activation_receipt) = authorized_request_for_action(
@@ -669,12 +569,8 @@ fn assignment_rejects_missing_grant_lineage_drift_and_malformed_contract() {
     let reviewer = catalog.profile("reviewer").expect("reviewer");
     let model_plan = role_composed_plan(reviewer).expect("role-bound model plan");
     let separation = separation_for(&catalog, reviewer);
-    let resource = agent_role_activation_resource(activation_resource_input(
-        reviewer,
-        &model_plan,
-        &separation,
-    ))
-    .expect("activation resource");
+    let resource = agent_role_activation_resource(activation_resource_input(reviewer, &model_plan, &separation))
+        .expect("activation resource");
     let (role_assignment_request, role_assignment_receipt) =
         authorized_role_request(resource.as_str(), AGENT_ROLE_ASSIGN_ABILITY);
     let (activation_request, activation_receipt) =
@@ -705,8 +601,8 @@ fn assignment_rejects_missing_grant_lineage_drift_and_malformed_contract() {
         ),
     );
     stale_lineage.parent_lineage_hash = ALTERNATE_HASH;
-    let stale_error = admit_agent_role_assignment(stale_lineage)
-        .expect_err("lineage drift must invalidate authorization");
+    let stale_error =
+        admit_agent_role_assignment(stale_lineage).expect_err("lineage drift must invalidate authorization");
     let mut malformed_contract = assignment_request(
         reviewer,
         &model_plan,
@@ -719,8 +615,8 @@ fn assignment_rejects_missing_grant_lineage_drift_and_malformed_contract() {
         ),
     );
     malformed_contract.output_contract_hash = "not-a-hash";
-    let malformed_error = admit_agent_role_assignment(malformed_contract)
-        .expect_err("malformed output contract must fail");
+    let malformed_error =
+        admit_agent_role_assignment(malformed_contract).expect_err("malformed output contract must fail");
 
     assert_eq!(missing_grant.issue(), AgentRoleIssue::AuthorityDenied);
     assert_eq!(stale_error.issue(), AgentRoleIssue::AuthorityDenied);
@@ -768,10 +664,7 @@ fn required_capabilities_and_wildcards_fail_closed() {
     })
     .expect_err("wildcard capability must fail closed");
 
-    assert_eq!(
-        missing_required.issue(),
-        AgentRoleIssue::MissingRequiredCapability
-    );
+    assert_eq!(missing_required.issue(), AgentRoleIssue::MissingRequiredCapability);
     assert_eq!(wildcard_error.issue(), AgentRoleIssue::DuplicateIdentity);
 }
 
@@ -793,13 +686,10 @@ fn hidden_capability_aliases_and_duplicate_stable_labels_fail_closed() {
         ceilings: uniform_ceilings(role_ceiling.as_slice()),
     })
     .expect("exact context capability remains admitted");
-    let duplicate_labels = vec![
-        context_capability(),
-        crate::TypedSubagentCapability::ToolUse {
-            stable_label: "context_read".to_string(),
-            tool_label: "inspect_context".to_string(),
-        },
-    ];
+    let duplicate_labels = vec![context_capability(), crate::TypedSubagentCapability::ToolUse {
+        stable_label: "context_read".to_string(),
+        tool_label: "inspect_context".to_string(),
+    }];
     let duplicate_error = resolve_agent_role_capabilities(AgentRoleCapabilityResolutionInput {
         assignment: &fixture.assignment,
         profile: reviewer,
@@ -810,8 +700,7 @@ fn hidden_capability_aliases_and_duplicate_stable_labels_fail_closed() {
     .expect_err("duplicate normalized labels must fail");
 
     assert!(alias_resolution.denied().iter().any(|denial| {
-        denial.capability() == &hidden_alias
-            && denial.source() == AgentRoleCapabilitySource::SemanticRole
+        denial.capability() == &hidden_alias && denial.source() == AgentRoleCapabilitySource::SemanticRole
     }));
     assert_eq!(duplicate_error.issue(), AgentRoleIssue::DuplicateIdentity);
 }
@@ -820,27 +709,21 @@ fn hidden_capability_aliases_and_duplicate_stable_labels_fail_closed() {
 fn role_model_composition_rejects_unadmitted_output_budget_and_workspace() {
     let catalog = catalog();
     let reviewer = catalog.profile("reviewer").expect("reviewer");
-    let wrong_output = role_composed_plan_with_admission(
-        reviewer,
-        &["other-output"],
-        &[reviewer.budget_policy_ref()],
-        &["workspace:project"],
-    )
-    .expect_err("output contract mismatch must block composition");
-    let wrong_budget = role_composed_plan_with_admission(
-        reviewer,
-        &[reviewer.output_contract()],
-        &["other-budget"],
-        &["workspace:project"],
-    )
-    .expect_err("budget mismatch must block composition");
-    let wrong_workspace = role_composed_plan_with_admission(
-        reviewer,
-        &[reviewer.output_contract()],
-        &[reviewer.budget_policy_ref()],
-        &["workspace:other"],
-    )
-    .expect_err("workspace mismatch must block composition");
+    let wrong_output =
+        role_composed_plan_with_admission(reviewer, &["other-output"], &[reviewer.budget_policy_ref()], &[
+            "workspace:project",
+        ])
+        .expect_err("output contract mismatch must block composition");
+    let wrong_budget =
+        role_composed_plan_with_admission(reviewer, &[reviewer.output_contract()], &["other-budget"], &[
+            "workspace:project",
+        ])
+        .expect_err("budget mismatch must block composition");
+    let wrong_workspace =
+        role_composed_plan_with_admission(reviewer, &[reviewer.output_contract()], &[reviewer.budget_policy_ref()], &[
+            "workspace:other",
+        ])
+        .expect_err("workspace mismatch must block composition");
 
     assert_eq!(wrong_output.issue(), AgentRoleIssue::ResourceDenied);
     assert_eq!(wrong_budget.issue(), AgentRoleIssue::ResourceDenied);
@@ -852,86 +735,45 @@ fn implementer_and_reviewer_plans_remain_distinct() {
     let implementer = admitted_fixture("implementer");
     let reviewer = admitted_fixture("reviewer");
 
-    assert_ne!(
-        implementer.model_plan.binding_hash(),
-        reviewer.model_plan.binding_hash()
-    );
-    assert_ne!(
-        implementer.role_plan.plan_hash(),
-        reviewer.role_plan.plan_hash()
-    );
-    assert_ne!(
-        implementer.capabilities.effective(),
-        reviewer.capabilities.effective()
-    );
-    assert!(
-        reviewer
-            .capabilities
-            .effective()
-            .iter()
-            .all(|capability| capability != &mutation_capability())
-    );
+    assert_ne!(implementer.model_plan.binding_hash(), reviewer.model_plan.binding_hash());
+    assert_ne!(implementer.role_plan.plan_hash(), reviewer.role_plan.plan_hash());
+    assert_ne!(implementer.capabilities.effective(), reviewer.capabilities.effective());
+    assert!(reviewer.capabilities.effective().iter().all(|capability| capability != &mutation_capability()));
 }
 
 #[test]
 fn separation_detects_lineage_context_verifier_and_rubric_drift() {
     let catalog = catalog();
     let reviewer = catalog.profile("reviewer").expect("reviewer");
-    let review_policy = catalog
-        .separation_policy(reviewer.separation_policy_ref())
-        .expect("review policy");
-    let lineage_failure = evaluate_agent_role_separation(
-        review_policy,
-        &AgentRoleSeparationObservation {
-            candidate_mutation_lineage_hash: PARENT_HASH,
-            subject_mutation_lineage_hash: PARENT_HASH,
-            ..separation_observation(reviewer, false)
-        },
-    )
+    let review_policy = catalog.separation_policy(reviewer.separation_policy_ref()).expect("review policy");
+    let lineage_failure = evaluate_agent_role_separation(review_policy, &AgentRoleSeparationObservation {
+        candidate_mutation_lineage_hash: PARENT_HASH,
+        subject_mutation_lineage_hash: PARENT_HASH,
+        ..separation_observation(reviewer, false)
+    })
     .expect("well-formed lineage failure");
-    let context_failure = evaluate_agent_role_separation(
-        review_policy,
-        &AgentRoleSeparationObservation {
-            satisfied_state_dimensions: STATE_DIMENSIONS_WITHOUT_CLEAN_CONTEXT,
-            ..separation_observation(reviewer, false)
-        },
-    )
+    let context_failure = evaluate_agent_role_separation(review_policy, &AgentRoleSeparationObservation {
+        satisfied_state_dimensions: STATE_DIMENSIONS_WITHOUT_CLEAN_CONTEXT,
+        ..separation_observation(reviewer, false)
+    })
     .expect("well-formed context failure");
     let verifier = catalog.profile("verifier").expect("verifier");
-    let verifier_policy = catalog
-        .separation_policy(verifier.separation_policy_ref())
-        .expect("verifier policy");
-    let verifier_error = evaluate_agent_role_separation(
-        verifier_policy,
-        &AgentRoleSeparationObservation {
-            observed_verifier_hash: Some(ALTERNATE_HASH),
-            ..separation_observation(verifier, false)
-        },
-    )
+    let verifier_policy = catalog.separation_policy(verifier.separation_policy_ref()).expect("verifier policy");
+    let verifier_error = evaluate_agent_role_separation(verifier_policy, &AgentRoleSeparationObservation {
+        observed_verifier_hash: Some(ALTERNATE_HASH),
+        ..separation_observation(verifier, false)
+    })
     .expect_err("verifier identity drift must fail");
     let judge = catalog.profile("judge").expect("judge");
-    let judge_policy = catalog
-        .separation_policy(judge.separation_policy_ref())
-        .expect("judge policy");
-    let rubric_error = evaluate_agent_role_separation(
-        judge_policy,
-        &AgentRoleSeparationObservation {
-            observed_rubric_hash: Some(ALTERNATE_HASH),
-            ..separation_observation(judge, false)
-        },
-    )
+    let judge_policy = catalog.separation_policy(judge.separation_policy_ref()).expect("judge policy");
+    let rubric_error = evaluate_agent_role_separation(judge_policy, &AgentRoleSeparationObservation {
+        observed_rubric_hash: Some(ALTERNATE_HASH),
+        ..separation_observation(judge, false)
+    })
     .expect_err("rubric identity drift must fail");
 
-    assert!(
-        lineage_failure
-            .failed_dimensions()
-            .contains(&AgentRoleSeparationDimension::MutationLineage)
-    );
-    assert!(
-        context_failure
-            .failed_dimensions()
-            .contains(&AgentRoleSeparationDimension::CleanContext)
-    );
+    assert!(lineage_failure.failed_dimensions().contains(&AgentRoleSeparationDimension::MutationLineage));
+    assert!(context_failure.failed_dimensions().contains(&AgentRoleSeparationDimension::CleanContext));
     assert_eq!(verifier_error.issue(), AgentRoleIssue::BindingMismatch);
     assert_eq!(rubric_error.issue(), AgentRoleIssue::BindingMismatch);
 }
@@ -939,49 +781,33 @@ fn separation_detects_lineage_context_verifier_and_rubric_drift() {
 #[test]
 fn implementer_and_reviewer_outputs_reject_overreach_and_raw_diffs() {
     let implementer = admitted_fixture("implementer");
-    let implementer_profile = implementer
-        .catalog
-        .profile("implementer")
-        .expect("implementer");
-    let candidate_input = output_resource_input(
-        &implementer,
-        implementer_profile,
-        AgentRoleOutputEffect::Candidate,
-    );
-    let candidate_resource =
-        agent_role_output_resource(candidate_input).expect("candidate resource");
-    let (candidate_request, candidate_receipt) = authorized_role_request(
-        candidate_resource.as_str(),
-        AGENT_ROLE_EMIT_CANDIDATE_ABILITY,
-    );
+    let implementer_profile = implementer.catalog.profile("implementer").expect("implementer");
+    let candidate_input = output_resource_input(&implementer, implementer_profile, AgentRoleOutputEffect::Candidate);
+    let candidate_resource = agent_role_output_resource(candidate_input).expect("candidate resource");
+    let (candidate_request, candidate_receipt) =
+        authorized_role_request(candidate_resource.as_str(), AGENT_ROLE_EMIT_CANDIDATE_ABILITY);
     let completion_claims = [AgentRoleOutputClaim::AuthoritativeCompletion];
-    let mut completion_claim =
-        output_draft(candidate_input, &candidate_request, &candidate_receipt);
+    let mut completion_claim = output_draft(candidate_input, &candidate_request, &candidate_receipt);
     completion_claim.claims = &completion_claims;
-    let completion_error = admit_agent_role_output(completion_claim)
-        .expect_err("implementer cannot attest completion");
+    let completion_error = admit_agent_role_output(completion_claim).expect_err("implementer cannot attest completion");
     let reviewer = admitted_fixture("reviewer");
     let reviewer_profile = reviewer.catalog.profile("reviewer").expect("reviewer");
-    let finding_input =
-        output_resource_input(&reviewer, reviewer_profile, AgentRoleOutputEffect::Finding);
+    let finding_input = output_resource_input(&reviewer, reviewer_profile, AgentRoleOutputEffect::Finding);
     let finding_resource = agent_role_output_resource(finding_input).expect("finding resource");
     let (finding_request, finding_receipt) =
         authorized_role_request(finding_resource.as_str(), AGENT_ROLE_EMIT_REVIEW_ABILITY);
     let mutation_claims = [AgentRoleOutputClaim::SubjectMutation];
     let mut mutation = output_draft(finding_input, &finding_request, &finding_receipt);
     mutation.claims = &mutation_claims;
-    let mutation_error =
-        admit_agent_role_output(mutation).expect_err("reviewer cannot mutate subject");
+    let mutation_error = admit_agent_role_output(mutation).expect_err("reviewer cannot mutate subject");
     let authority_claims = [AgentRoleOutputClaim::AuthorityGrant];
     let mut authority = output_draft(finding_input, &finding_request, &finding_receipt);
     authority.claims = &authority_claims;
-    let authority_error =
-        admit_agent_role_output(authority).expect_err("reviewer cannot grant authority");
+    let authority_error = admit_agent_role_output(authority).expect_err("reviewer cannot grant authority");
     let raw_diff_leak = [AgentRoleOutputLeak::RawDiffOrFile("raw patch body")];
     let mut raw_diff = output_draft(finding_input, &finding_request, &finding_receipt);
     raw_diff.sensitive = &raw_diff_leak;
-    let raw_diff_error =
-        admit_agent_role_output(raw_diff).expect_err("raw diff cannot enter review output");
+    let raw_diff_error = admit_agent_role_output(raw_diff).expect_err("raw diff cannot enter review output");
 
     assert_eq!(completion_error.issue(), AgentRoleIssue::OutputDenied);
     assert_eq!(mutation_error.issue(), AgentRoleIssue::OutputDenied);
@@ -1001,18 +827,12 @@ fn verification_requires_admitted_named_host_evidence_and_no_soundness_overclaim
         },
         ..output_resource_input(&fixture, verifier, AgentRoleOutputEffect::CheckEvidence)
     };
-    let missing_resource =
-        agent_role_output_resource(missing_evidence_input).expect("verification resource");
-    let (missing_request, missing_receipt) = authorized_role_request(
-        missing_resource.as_str(),
-        AGENT_ROLE_EMIT_VERIFICATION_ABILITY,
-    );
-    let missing_error = admit_agent_role_output(output_draft(
-        missing_evidence_input,
-        &missing_request,
-        &missing_receipt,
-    ))
-    .expect_err("fabricated verification evidence must fail");
+    let missing_resource = agent_role_output_resource(missing_evidence_input).expect("verification resource");
+    let (missing_request, missing_receipt) =
+        authorized_role_request(missing_resource.as_str(), AGENT_ROLE_EMIT_VERIFICATION_ABILITY);
+    let missing_error =
+        admit_agent_role_output(output_draft(missing_evidence_input, &missing_request, &missing_receipt))
+            .expect_err("fabricated verification evidence must fail");
     let admitted_input = AgentRoleOutputResourceInput {
         admission: AgentRoleOutputAdmission {
             host_evidence: AgentRoleAdmissionState::Admitted,
@@ -1020,23 +840,15 @@ fn verification_requires_admitted_named_host_evidence_and_no_soundness_overclaim
         },
         ..missing_evidence_input
     };
-    let admitted_resource =
-        agent_role_output_resource(admitted_input).expect("admitted verification resource");
-    let (admitted_request, admitted_receipt) = authorized_role_request(
-        admitted_resource.as_str(),
-        AGENT_ROLE_EMIT_VERIFICATION_ABILITY,
-    );
-    let output = admit_agent_role_output(output_draft(
-        admitted_input,
-        &admitted_request,
-        &admitted_receipt,
-    ))
-    .expect("named host evidence may be reported");
+    let admitted_resource = agent_role_output_resource(admitted_input).expect("admitted verification resource");
+    let (admitted_request, admitted_receipt) =
+        authorized_role_request(admitted_resource.as_str(), AGENT_ROLE_EMIT_VERIFICATION_ABILITY);
+    let output = admit_agent_role_output(output_draft(admitted_input, &admitted_request, &admitted_receipt))
+        .expect("named host evidence may be reported");
     let soundness_claims = [AgentRoleOutputClaim::VerifierSoundness];
     let mut soundness_claim = output_draft(admitted_input, &admitted_request, &admitted_receipt);
     soundness_claim.claims = &soundness_claims;
-    let soundness_error = admit_agent_role_output(soundness_claim)
-        .expect_err("verifier soundness overclaim must fail");
+    let soundness_error = admit_agent_role_output(soundness_claim).expect_err("verifier soundness overclaim must fail");
 
     assert_eq!(missing_error.issue(), AgentRoleIssue::MissingReference);
     assert_eq!(output.effect(), AgentRoleOutputEffect::CheckEvidence);
@@ -1048,16 +860,11 @@ fn judgment_requires_admitted_rubric_and_rejects_hidden_rationale() {
     let fixture = admitted_fixture("judge");
     let judge = fixture.catalog.profile("judge").expect("judge");
     let missing_rubric_input = output_resource_input(&fixture, judge, AgentRoleOutputEffect::Rank);
-    let missing_resource =
-        agent_role_output_resource(missing_rubric_input).expect("missing-rubric resource");
+    let missing_resource = agent_role_output_resource(missing_rubric_input).expect("missing-rubric resource");
     let (missing_request, missing_receipt) =
         authorized_role_request(missing_resource.as_str(), AGENT_ROLE_EMIT_JUDGMENT_ABILITY);
-    let missing_error = admit_agent_role_output(output_draft(
-        missing_rubric_input,
-        &missing_request,
-        &missing_receipt,
-    ))
-    .expect_err("judgment without rubric must fail");
+    let missing_error = admit_agent_role_output(output_draft(missing_rubric_input, &missing_request, &missing_receipt))
+        .expect_err("judgment without rubric must fail");
     let admitted_input = AgentRoleOutputResourceInput {
         rubric_hash: Some(RUBRIC_HASH),
         admission: AgentRoleOutputAdmission {
@@ -1069,13 +876,10 @@ fn judgment_requires_admitted_rubric_and_rejects_hidden_rationale() {
     let admitted_resource = agent_role_output_resource(admitted_input).expect("judgment resource");
     let (admitted_request, admitted_receipt) =
         authorized_role_request(admitted_resource.as_str(), AGENT_ROLE_EMIT_JUDGMENT_ABILITY);
-    let rationale_leak = [AgentRoleOutputLeak::JudgeRationale(
-        "private weighted rationale",
-    )];
+    let rationale_leak = [AgentRoleOutputLeak::JudgeRationale("private weighted rationale")];
     let mut hidden_rationale = output_draft(admitted_input, &admitted_request, &admitted_receipt);
     hidden_rationale.sensitive = &rationale_leak;
-    let rationale_error = admit_agent_role_output(hidden_rationale)
-        .expect_err("hidden rationale cannot be persisted");
+    let rationale_error = admit_agent_role_output(hidden_rationale).expect_err("hidden rationale cannot be persisted");
 
     assert_eq!(missing_error.issue(), AgentRoleIssue::MissingReference);
     assert_eq!(rationale_error.issue(), AgentRoleIssue::ReceiptLeak);
@@ -1089,31 +893,17 @@ fn judgment_abstention_is_explicit_and_never_forced() {
         status: AgentRoleOutputStatus::Abstained,
         ..output_resource_input(&fixture, judge, AgentRoleOutputEffect::Abstain)
     };
-    let abstained_resource =
-        agent_role_output_resource(abstained_input).expect("abstention resource");
-    let (abstained_request, abstained_receipt) = authorized_role_request(
-        abstained_resource.as_str(),
-        AGENT_ROLE_EMIT_JUDGMENT_ABILITY,
-    );
-    let output = admit_agent_role_output(output_draft(
-        abstained_input,
-        &abstained_request,
-        &abstained_receipt,
-    ))
-    .expect("explicit abstention");
+    let abstained_resource = agent_role_output_resource(abstained_input).expect("abstention resource");
+    let (abstained_request, abstained_receipt) =
+        authorized_role_request(abstained_resource.as_str(), AGENT_ROLE_EMIT_JUDGMENT_ABILITY);
+    let output = admit_agent_role_output(output_draft(abstained_input, &abstained_request, &abstained_receipt))
+        .expect("explicit abstention");
     let inconsistent_input = output_resource_input(&fixture, judge, AgentRoleOutputEffect::Abstain);
-    let inconsistent_resource =
-        agent_role_output_resource(inconsistent_input).expect("inconsistent resource");
-    let (inconsistent_request, inconsistent_receipt) = authorized_role_request(
-        inconsistent_resource.as_str(),
-        AGENT_ROLE_EMIT_JUDGMENT_ABILITY,
-    );
-    let error = admit_agent_role_output(output_draft(
-        inconsistent_input,
-        &inconsistent_request,
-        &inconsistent_receipt,
-    ))
-    .expect_err("abstention status and effect must agree");
+    let inconsistent_resource = agent_role_output_resource(inconsistent_input).expect("inconsistent resource");
+    let (inconsistent_request, inconsistent_receipt) =
+        authorized_role_request(inconsistent_resource.as_str(), AGENT_ROLE_EMIT_JUDGMENT_ABILITY);
+    let error = admit_agent_role_output(output_draft(inconsistent_input, &inconsistent_request, &inconsistent_receipt))
+        .expect_err("abstention status and effect must agree");
 
     assert_eq!(output.status(), AgentRoleOutputStatus::Abstained);
     assert_eq!(output.effect(), AgentRoleOutputEffect::Abstain);
@@ -1123,16 +913,8 @@ fn judgment_abstention_is_explicit_and_never_forced() {
 #[test]
 fn coordination_and_observation_outputs_remain_bounded() {
     for (role_id, effect, ability) in [
-        (
-            "coordinator",
-            AgentRoleOutputEffect::Coordinate,
-            AGENT_ROLE_EMIT_COORDINATION_ABILITY,
-        ),
-        (
-            "observer",
-            AgentRoleOutputEffect::Observe,
-            AGENT_ROLE_EMIT_OBSERVATION_ABILITY,
-        ),
+        ("coordinator", AgentRoleOutputEffect::Coordinate, AGENT_ROLE_EMIT_COORDINATION_ABILITY),
+        ("observer", AgentRoleOutputEffect::Observe, AGENT_ROLE_EMIT_OBSERVATION_ABILITY),
     ] {
         let fixture = admitted_fixture(role_id);
         let profile = fixture.catalog.profile(role_id).expect("extension role");
@@ -1176,8 +958,7 @@ fn role_outputs_preserve_typed_non_success_statuses() {
             ..output_resource_input(&fixture, reviewer, AgentRoleOutputEffect::Finding)
         };
         let resource = agent_role_output_resource(resource_input).expect("status resource");
-        let (request, receipt) =
-            authorized_role_request(resource.as_str(), AGENT_ROLE_EMIT_REVIEW_ABILITY);
+        let (request, receipt) = authorized_role_request(resource.as_str(), AGENT_ROLE_EMIT_REVIEW_ABILITY);
         let output = admit_agent_role_output(output_draft(resource_input, &request, &receipt))
             .expect("typed non-success output");
         assert_eq!(output.status(), status);
@@ -1189,11 +970,7 @@ fn role_outputs_preserve_typed_non_success_statuses() {
 fn handoff_rejects_overbound_metadata() {
     const OVERBOUND_HANDOFF_REFERENCES: usize = 65;
     let fixture = admitted_fixture("implementer");
-    let reviewer_hash = fixture
-        .catalog
-        .profile("reviewer")
-        .expect("reviewer")
-        .profile_hash();
+    let reviewer_hash = fixture.catalog.profile("reviewer").expect("reviewer").profile_hash();
     let evidence_refs = vec!["bounded-label"; OVERBOUND_HANDOFF_REFERENCES];
     let error = agent_role_handoff_resource(AgentRoleHandoffResourceInput {
         current_plan: &fixture.role_plan,
@@ -1210,11 +987,9 @@ fn handoff_rejects_overbound_metadata() {
 #[test]
 fn native_tool_actions_bind_model_and_role_plans() {
     let fixture = admitted_fixture("reviewer");
-    let model_call = crate::validate_model_tool_call_binding(
-        fixture.model_plan.plan(),
-        tool_call_draft(fixture.model_plan.plan()),
-    )
-    .expect("validated native model tool call");
+    let model_call =
+        crate::validate_model_tool_call_binding(fixture.model_plan.plan(), tool_call_draft(fixture.model_plan.plan()))
+            .expect("validated native model tool call");
     let capability = tool_capability();
     let binding = bind_agent_role_tool_action(AgentRoleToolActionInput {
         assignment: &fixture.assignment,
@@ -1255,30 +1030,21 @@ fn role_receipt_is_metadata_only_and_rejects_raw_material() {
         handoff: None,
         output: None,
     };
-    let receipt = project_agent_role_receipt(input, AgentRoleReceiptSensitiveDraft::default())
-        .expect("metadata receipt");
-    let error = project_agent_role_receipt(
-        input,
-        AgentRoleReceiptSensitiveDraft {
-            hidden_reasoning: Some("private chain"),
-            ..AgentRoleReceiptSensitiveDraft::default()
-        },
-    )
+    let receipt =
+        project_agent_role_receipt(input, AgentRoleReceiptSensitiveDraft::default()).expect("metadata receipt");
+    let error = project_agent_role_receipt(input, AgentRoleReceiptSensitiveDraft {
+        hidden_reasoning: Some("private chain"),
+        ..AgentRoleReceiptSensitiveDraft::default()
+    })
     .expect_err("reasoning cannot enter durable receipt");
 
     assert_eq!(receipt.kind(), AgentRoleReceiptKind::RolePlan);
-    assert_eq!(
-        receipt.assignment_hash(),
-        fixture.assignment.assignment_hash()
-    );
+    assert_eq!(receipt.assignment_hash(), fixture.assignment.assignment_hash());
     assert_eq!(
         receipt.effective_capability_count(),
         u32::try_from(REVIEW_CAPABILITIES.len()).expect("bounded review capability count")
     );
-    assert_eq!(
-        receipt.redaction_marker(),
-        "raw-role-context-and-output-omitted"
-    );
+    assert_eq!(receipt.redaction_marker(), "raw-role-context-and-output-omitted");
     assert_eq!(error.issue(), AgentRoleIssue::ReceiptLeak);
     assert!(!format!("{receipt:?}").contains("private chain"));
 }
@@ -1345,8 +1111,8 @@ fn role_receipt_rejects_every_sensitive_material_class() {
     ];
 
     for sensitive in sensitive_cases {
-        let error = project_agent_role_receipt(input, sensitive)
-            .expect_err("sensitive role receipt material must fail");
+        let error =
+            project_agent_role_receipt(input, sensitive).expect_err("sensitive role receipt material must fail");
         assert_eq!(error.issue(), AgentRoleIssue::ReceiptLeak);
     }
 }
@@ -1355,9 +1121,7 @@ fn catalog() -> AgentRoleCatalog {
     catalog_with_hash_override(None).expect("valid role catalog")
 }
 
-fn catalog_with_hash_override(
-    first_profile_hash: Option<&str>,
-) -> Result<AgentRoleCatalog, AgentRoleError> {
+fn catalog_with_hash_override(first_profile_hash: Option<&str>) -> Result<AgentRoleCatalog, AgentRoleError> {
     let provisional = ROLE_SPECS
         .iter()
         .map(|(role_id, class)| role_profile_draft(role_id, *class, ZERO_HASH))
@@ -1402,11 +1166,7 @@ fn catalog_with_hash_override(
     })
 }
 
-fn role_profile_draft<'a>(
-    role_id: &'a str,
-    class: AgentRoleClass,
-    profile_hash: &'a str,
-) -> AgentRoleProfileDraft<'a> {
+fn role_profile_draft<'a>(role_id: &'a str, class: AgentRoleClass, profile_hash: &'a str) -> AgentRoleProfileDraft<'a> {
     let (purpose, mutation_posture, context_posture, evidence_posture, output_kind) = match class {
         AgentRoleClass::Implementation => (
             "Produce bounded implementation candidates without completion authority.",
@@ -1495,17 +1255,14 @@ fn role_profile_draft<'a>(
 
 const fn separation_policy_id(class: AgentRoleClass) -> &'static str {
     match class {
-        AgentRoleClass::Implementation
-        | AgentRoleClass::Coordination
-        | AgentRoleClass::Observation => "subject-bound",
+        AgentRoleClass::Implementation | AgentRoleClass::Coordination | AgentRoleClass::Observation => "subject-bound",
         AgentRoleClass::Review => "independent-review",
         AgentRoleClass::Verification => "independent-verifier",
         AgentRoleClass::Judgment => "independent-judge",
     }
 }
 
-fn separation_policy_drafts() -> [AgentRoleSeparationPolicyDraft<'static>; SEPARATION_POLICY_COUNT]
-{
+fn separation_policy_drafts() -> [AgentRoleSeparationPolicyDraft<'static>; SEPARATION_POLICY_COUNT] {
     [
         separation_policy("subject-bound", SUBJECT_BOUND_DIMENSIONS),
         separation_policy("independent-review", INDEPENDENT_DIMENSIONS),
@@ -1524,21 +1281,13 @@ const fn separation_policy(
     }
 }
 
-fn separation_observation(
-    profile: &AgentRoleProfile,
-    use_same_actor: bool,
-) -> AgentRoleSeparationObservation<'static> {
-    let expected_verifier_hash =
-        (profile.class() == AgentRoleClass::Verification).then_some(VERIFIER_HASH);
+fn separation_observation(profile: &AgentRoleProfile, use_same_actor: bool) -> AgentRoleSeparationObservation<'static> {
+    let expected_verifier_hash = (profile.class() == AgentRoleClass::Verification).then_some(VERIFIER_HASH);
     let expected_rubric_hash = (profile.class() == AgentRoleClass::Judgment).then_some(RUBRIC_HASH);
     AgentRoleSeparationObservation {
         candidate_assignment_hash: FRESHNESS_HASH,
         subject_assignment_hash: PARENT_HASH,
-        candidate_actor_hash: if use_same_actor {
-            PARENT_HASH
-        } else {
-            ACTOR_HASH
-        },
+        candidate_actor_hash: if use_same_actor { PARENT_HASH } else { ACTOR_HASH },
         subject_actor_hash: PARENT_HASH,
         candidate_run_thread_hash: RUN_HASH,
         subject_run_thread_hash: PARENT_HASH,
@@ -1562,15 +1311,9 @@ fn separation_observation(
     }
 }
 
-fn separation_for(
-    catalog: &AgentRoleCatalog,
-    profile: &AgentRoleProfile,
-) -> AgentRoleSeparationDecision {
-    let policy = catalog
-        .separation_policy(profile.separation_policy_ref())
-        .expect("separation policy");
-    evaluate_agent_role_separation(policy, &separation_observation(profile, false))
-        .expect("separation decision")
+fn separation_for(catalog: &AgentRoleCatalog, profile: &AgentRoleProfile) -> AgentRoleSeparationDecision {
+    let policy = catalog.separation_policy(profile.separation_policy_ref()).expect("separation policy");
+    evaluate_agent_role_separation(policy, &separation_observation(profile, false)).expect("separation decision")
 }
 
 fn admitted_fixture(role_id: &str) -> AdmittedFixture {
@@ -1578,12 +1321,8 @@ fn admitted_fixture(role_id: &str) -> AdmittedFixture {
     let profile = catalog.profile(role_id).expect("role profile");
     let model_plan = role_composed_plan(profile).expect("role-bound model plan");
     let separation = separation_for(&catalog, profile);
-    let resource = agent_role_activation_resource(activation_resource_input(
-        profile,
-        &model_plan,
-        &separation,
-    ))
-    .expect("activation resource");
+    let resource = agent_role_activation_resource(activation_resource_input(profile, &model_plan, &separation))
+        .expect("activation resource");
     let (role_assignment_request, role_assignment_receipt) =
         authorized_role_request(resource.as_str(), AGENT_ROLE_ASSIGN_ABILITY);
     let (activation_request, activation_receipt) =
@@ -1601,8 +1340,8 @@ fn admitted_fixture(role_id: &str) -> AdmittedFixture {
     ))
     .expect("admitted role assignment");
     let role_ceiling = typed_role_ceiling(profile);
-    let capabilities = resolve_with_uniform_ceilings(&assignment, profile, role_ceiling.as_slice())
-        .expect("role capabilities");
+    let capabilities =
+        resolve_with_uniform_ceilings(&assignment, profile, role_ceiling.as_slice()).expect("role capabilities");
     let role_plan = build_agent_role_plan(AgentRolePlanInput {
         assignment: &assignment,
         profile,
@@ -1699,10 +1438,7 @@ fn assignment_request<'a>(
 fn authorized_role_request(
     resource: &str,
     ability: impl AsRef<str>,
-) -> (
-    animus_adapters::CapabilityRequest,
-    animus_adapters::AuthorizationReceipt,
-) {
+) -> (animus_adapters::CapabilityRequest, animus_adapters::AuthorizationReceipt) {
     authorized_request_for_action(animus_adapters::GuardedAction::AgentRole, resource, ability)
 }
 
@@ -1710,28 +1446,16 @@ fn authorized_request_for_action(
     action: animus_adapters::GuardedAction,
     resource: &str,
     ability: impl AsRef<str>,
-) -> (
-    animus_adapters::CapabilityRequest,
-    animus_adapters::AuthorizationReceipt,
-) {
+) -> (animus_adapters::CapabilityRequest, animus_adapters::AuthorizationReceipt) {
     let prefix = "role:";
     let ability = ability.as_ref();
-    let request = animus_adapters::CapabilityRequest::new(
-        action,
-        AGENT_ROLE_CAPABILITY_CONTRACT,
-        resource,
-        ability,
-    )
-    .expect("bounded capability request");
-    let contract = animus_adapters::CapabilityPolicyContract::new(
-        action,
-        AGENT_ROLE_CAPABILITY_CONTRACT,
-        prefix,
-        ability,
-    )
-    .expect("bounded capability contract");
-    let grant = animus_adapters::UcanGrant::new(AGENT_ROLE_CAPABILITY_CONTRACT, prefix, ability)
-        .expect("bounded UCAN grant");
+    let request = animus_adapters::CapabilityRequest::new(action, AGENT_ROLE_CAPABILITY_CONTRACT, resource, ability)
+        .expect("bounded capability request");
+    let contract =
+        animus_adapters::CapabilityPolicyContract::new(action, AGENT_ROLE_CAPABILITY_CONTRACT, prefix, ability)
+            .expect("bounded capability contract");
+    let grant =
+        animus_adapters::UcanGrant::new(AGENT_ROLE_CAPABILITY_CONTRACT, prefix, ability).expect("bounded UCAN grant");
     let receipt = animus_adapters::authorize_capability(&animus_adapters::AuthorizationContext {
         request: &request,
         contract: &contract,
@@ -1745,10 +1469,7 @@ fn authorized_request_for_action(
 fn denied_role_request(
     resource: &str,
     ability: impl AsRef<str>,
-) -> (
-    animus_adapters::CapabilityRequest,
-    animus_adapters::AuthorizationReceipt,
-) {
+) -> (animus_adapters::CapabilityRequest, animus_adapters::AuthorizationReceipt) {
     let prefix = "role:";
     let ability = ability.as_ref();
     let request = animus_adapters::CapabilityRequest::new(
@@ -1809,9 +1530,7 @@ fn tool_capability() -> crate::TypedSubagentCapability {
     }
 }
 
-fn uniform_ceilings(
-    capabilities: &[crate::TypedSubagentCapability],
-) -> AgentRoleCapabilityCeilings<'_> {
+fn uniform_ceilings(capabilities: &[crate::TypedSubagentCapability]) -> AgentRoleCapabilityCeilings<'_> {
     AgentRoleCapabilityCeilings {
         verified_grants: capabilities,
         host_policy: capabilities,

@@ -44,12 +44,14 @@ policy = []
 provenance = []
 quality = []
 research = []
+rlm-kernel = ["dep:animus-adapter-rlm-kernel"]
 scaffold = []
 status = []
 worker-team = []
 steel = ["dep:animus-steel"]
 
 [dependencies]
+animus-adapter-rlm-kernel = { path = "../animus-adapter-rlm-kernel", version = "0.1.0", optional = true }
 animus-adapters = { path = "../animus-adapters", version = "0.1.0" }
 animus-core = { path = "../animus-core", version = "0.1.0" }
 animus-steel = { path = "../animus-steel", version = "0.1.0", optional = true }

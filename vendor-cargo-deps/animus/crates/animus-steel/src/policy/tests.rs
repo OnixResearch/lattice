@@ -24,19 +24,17 @@ const OTHER_SCRIPT_SOURCE: &str = r"
 (define (animus-decide)
   (animus-stop))
 ";
-const EXPORTED_POLICY_JSON: &str =
-    include_str!("../../../../policy/steel-runtime/generated/steel-runtime-policy.json");
-const EXPORTED_DEFAULT_SCRIPT: &str =
-    include_str!("../../../../policy/steel-runtime/scripts/default-loop.scm");
-const EXPORTED_RALPH_SCRIPT: &str =
-    include_str!("../../../../policy/steel-runtime/scripts/ralph-loop.scm");
+const EXPORTED_POLICY_JSON: &str = include_str!("../../../../policy/steel-runtime/generated/steel-runtime-policy.json");
+const EXPORTED_DEFAULT_SCRIPT: &str = include_str!("../../../../policy/steel-runtime/scripts/default-loop.scm");
+const EXPORTED_RALPH_SCRIPT: &str = include_str!("../../../../policy/steel-runtime/scripts/ralph-loop.scm");
 const POLICY_SCHEMA: &str = "animus.steel-runtime-policy.v1";
 const EXPECTED_PROFILE_COUNT: usize = 2;
 const EXPECTED_DEFAULT_PROFILE_COUNT: usize = 1;
 const RALPH_TASK_STATE: &str = "branch: ralph/example\nstory: S1 passes false";
 const RALPH_INCOMPLETE_MESSAGE: &str = "implemented S1; S2 remains";
 const RALPH_COMPLETION_PROMISE: &str = "COMPLETE";
-const RALPH_COMPLETE_MESSAGE: &str = "all stories pass\nCOMPLETE";
+const RALPH_COMPLETE_MESSAGE: &str = "COMPLETE";
+const RALPH_INCIDENTAL_COMPLETE_MESSAGE: &str = "not COMPLETE; checks remain";
 const RALPH_PROMPT_MARKER: &str = "complete one unfinished Ralph story";
 
 #[test]
@@ -56,23 +54,15 @@ fn generated_policy_export_allows_default_script() {
         receipt_redaction: profile.receipt_redaction.mode.as_str(),
     };
     let checked_profile = profile_from_draft(&draft).expect("exported policy should build");
-    let script = super::Script::new(
-        checked_profile.name(),
-        checked_profile.script_label(),
-        EXPORTED_DEFAULT_SCRIPT,
-    );
-    let activation =
-        super::Activation::new(script, ONE_TURN_BUDGET, super::DEFAULT_RUNTIME_HOST_ACTIONS);
+    let script = super::Script::new(checked_profile.name(), checked_profile.script_label(), EXPORTED_DEFAULT_SCRIPT);
+    let activation = super::Activation::new(script, ONE_TURN_BUDGET, super::DEFAULT_RUNTIME_HOST_ACTIONS);
     let receipt = checked_profile.activate(&activation);
 
     assert_eq!(policy.schema, POLICY_SCHEMA);
     assert_eq!(policy.profiles.len(), EXPECTED_PROFILE_COUNT);
     assert_eq!(profile.name, PROFILE_NAME);
     assert_eq!(profile.script.label, SCRIPT_LABEL);
-    assert_eq!(
-        profile.script.hash,
-        super::script_hash(EXPORTED_DEFAULT_SCRIPT)
-    );
+    assert_eq!(profile.script.hash, super::script_hash(EXPORTED_DEFAULT_SCRIPT));
     assert!(receipt.is_allowed());
     assert_eq!(receipt.denied_reason(), None);
 }
@@ -94,66 +84,50 @@ fn generated_policy_export_allows_ralph_script() {
         receipt_redaction: profile.receipt_redaction.mode.as_str(),
     };
     let checked_profile = profile_from_draft(&draft).expect("ralph policy should build");
-    let script = super::Script::new(
-        checked_profile.name(),
-        checked_profile.script_label(),
-        EXPORTED_RALPH_SCRIPT,
-    );
-    let activation = super::Activation::new(
-        script,
-        RALPH_TURN_BUDGET,
-        super::DEFAULT_RUNTIME_HOST_ACTIONS,
-    );
+    let script = super::Script::new(checked_profile.name(), checked_profile.script_label(), EXPORTED_RALPH_SCRIPT);
+    let activation = super::Activation::new(script, RALPH_TURN_BUDGET, super::DEFAULT_RUNTIME_HOST_ACTIONS);
     let receipt = checked_profile.activate(&activation);
 
     assert_eq!(profile.name, RALPH_PROFILE_NAME);
     assert_eq!(profile.script.label, RALPH_SCRIPT_LABEL);
     assert_eq!(profile.budget.max_turns, RALPH_TURN_BUDGET);
-    assert_eq!(
-        profile.script.hash,
-        super::script_hash(EXPORTED_RALPH_SCRIPT)
-    );
+    assert_eq!(profile.script.hash, super::script_hash(EXPORTED_RALPH_SCRIPT));
     assert!(receipt.is_allowed());
     assert_eq!(receipt.denied_reason(), None);
 }
 
 #[test]
 fn ralph_script_reprompts_until_completion_promise() {
-    let first_turn = crate::LoopTurn::new(RALPH_TASK_STATE, None, None)
-        .expect("ralph first turn should validate");
+    let first_turn = crate::LoopTurn::new(RALPH_TASK_STATE, None, None).expect("ralph first turn should validate");
     let first_decision = crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &first_turn)
         .expect("ralph first turn should produce model request");
-    assert_model_prompt_contains(
-        first_decision,
-        &[
-            RALPH_TASK_STATE,
-            RALPH_PROMPT_MARKER,
-            RALPH_COMPLETION_PROMISE,
-        ],
-    );
+    assert_model_prompt_contains(first_decision, &[RALPH_TASK_STATE, RALPH_PROMPT_MARKER, RALPH_COMPLETION_PROMISE]);
 
-    let incomplete_turn =
-        crate::LoopTurn::new(RALPH_TASK_STATE, Some(RALPH_INCOMPLETE_MESSAGE), None)
-            .expect("ralph incomplete turn should validate");
-    let incomplete_decision =
-        crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &incomplete_turn)
-            .expect("ralph incomplete turn should produce another model request");
-    assert_model_prompt_contains(
-        incomplete_decision,
-        &["Previous iteration summary", RALPH_INCOMPLETE_MESSAGE],
-    );
+    let incomplete_turn = crate::LoopTurn::new(RALPH_TASK_STATE, Some(RALPH_INCOMPLETE_MESSAGE), None)
+        .expect("ralph incomplete turn should validate");
+    let incomplete_decision = crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &incomplete_turn)
+        .expect("ralph incomplete turn should produce another model request");
+    assert_model_prompt_contains(incomplete_decision, &["Previous iteration summary", RALPH_INCOMPLETE_MESSAGE]);
+
+    let incidental_turn = crate::LoopTurn::new(RALPH_TASK_STATE, Some(RALPH_INCIDENTAL_COMPLETE_MESSAGE), None)
+        .expect("ralph incidental turn should validate");
+    let incidental_decision = crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &incidental_turn)
+        .expect("incidental COMPLETE must reprompt");
+    assert_model_prompt_contains(incidental_decision, &[
+        "Previous iteration summary",
+        RALPH_INCIDENTAL_COMPLETE_MESSAGE,
+    ]);
 
     let complete_turn = crate::LoopTurn::new(RALPH_TASK_STATE, Some(RALPH_COMPLETE_MESSAGE), None)
         .expect("ralph complete turn should validate");
-    let complete_decision =
-        crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &complete_turn)
-            .expect("ralph complete turn should produce final response");
+    let complete_decision = crate::SteelLoopFabric::decide_once(EXPORTED_RALPH_SCRIPT, &complete_turn)
+        .expect("ralph complete turn should produce a candidate");
 
     match complete_decision {
-        crate::LoopDecision::Respond { response } => {
-            assert_eq!(response.message(), RALPH_COMPLETE_MESSAGE);
+        crate::LoopDecision::CompletionCandidate { candidate } => {
+            assert_eq!(candidate.request(), RALPH_COMPLETE_MESSAGE);
         }
-        other => panic!("expected ralph final response, got {other:?}"),
+        other => panic!("expected ralph completion candidate, got {other:?}"),
     }
 }
 
@@ -202,8 +176,7 @@ fn non_positive_budget_is_rejected() {
 
 #[test]
 fn unknown_host_action_is_rejected() {
-    let error =
-        profile_with_actions(&["model", UNKNOWN_ACTION]).expect_err("unknown action should fail");
+    let error = profile_with_actions(&["model", UNKNOWN_ACTION]).expect_err("unknown action should fail");
 
     assert_eq!(error.reason(), super::DenyReason::UnknownHostAction);
 }
@@ -226,10 +199,7 @@ fn unsupported_fallback_is_rejected() {
 fn unsupported_redaction_is_rejected() {
     let error = profile_with_redaction(UNSUPPORTED_REDACTION).expect_err("redaction should fail");
 
-    assert_eq!(
-        error.reason(),
-        super::DenyReason::UnsupportedReceiptRedaction
-    );
+    assert_eq!(error.reason(), super::DenyReason::UnsupportedReceiptRedaction);
 }
 
 #[test]
@@ -246,10 +216,7 @@ fn missing_script_denies_activation() {
     let receipt = activate_script(&profile, script, ONE_TURN_BUDGET);
 
     assert_eq!(receipt.status(), super::ActivationStatus::Denied);
-    assert_eq!(
-        receipt.denied_reason(),
-        Some(super::DenyReason::MissingScript)
-    );
+    assert_eq!(receipt.denied_reason(), Some(super::DenyReason::MissingScript));
 }
 
 #[test]
@@ -259,10 +226,7 @@ fn hash_mismatch_denies_activation() {
     let receipt = activate_script(&profile, script, ONE_TURN_BUDGET);
 
     assert_eq!(receipt.status(), super::ActivationStatus::Denied);
-    assert_eq!(
-        receipt.denied_reason(),
-        Some(super::DenyReason::HashMismatch)
-    );
+    assert_eq!(receipt.denied_reason(), Some(super::DenyReason::HashMismatch));
 }
 
 #[test]
@@ -272,10 +236,7 @@ fn oversized_budget_denies_activation() {
     let receipt = activate_script(&profile, script, TWO_TURN_BUDGET);
 
     assert_eq!(receipt.status(), super::ActivationStatus::Denied);
-    assert_eq!(
-        receipt.denied_reason(),
-        Some(super::DenyReason::InvalidBudget)
-    );
+    assert_eq!(receipt.denied_reason(), Some(super::DenyReason::InvalidBudget));
 }
 
 #[test]
@@ -284,10 +245,7 @@ fn disallowed_action_denies_activation() {
     let receipt = profile.activate(&valid_activation(&profile));
 
     assert_eq!(receipt.status(), super::ActivationStatus::Denied);
-    assert_eq!(
-        receipt.denied_reason(),
-        Some(super::DenyReason::HostActionDenied)
-    );
+    assert_eq!(receipt.denied_reason(), Some(super::DenyReason::HostActionDenied));
 }
 
 #[test]
@@ -297,10 +255,7 @@ fn mismatched_profile_denies_activation() {
     let receipt = activate_script(&profile, script, ONE_TURN_BUDGET);
 
     assert_eq!(receipt.status(), super::ActivationStatus::Denied);
-    assert_eq!(
-        receipt.denied_reason(),
-        Some(super::DenyReason::ProfileMismatch)
-    );
+    assert_eq!(receipt.denied_reason(), Some(super::DenyReason::ProfileMismatch));
 }
 
 #[test]
@@ -353,11 +308,7 @@ fn exported_policy() -> ExportedPolicy {
 }
 
 fn default_exported_profile(policy: &ExportedPolicy) -> &ExportedProfile {
-    let default_profiles: Vec<&ExportedProfile> = policy
-        .profiles
-        .iter()
-        .filter(|profile| profile.is_default)
-        .collect();
+    let default_profiles: Vec<&ExportedProfile> = policy.profiles.iter().filter(|profile| profile.is_default).collect();
 
     assert_eq!(default_profiles.len(), EXPECTED_DEFAULT_PROFILE_COUNT);
     default_profiles[0]
@@ -375,10 +326,7 @@ fn assert_model_prompt_contains(decision: crate::LoopDecision, needles: &[&str])
     match decision {
         crate::LoopDecision::CallModel { request } => {
             for needle in needles {
-                assert!(
-                    request.prompt().contains(needle),
-                    "ralph prompt should contain {needle:?}"
-                );
+                assert!(request.prompt().contains(needle), "ralph prompt should contain {needle:?}");
             }
         }
         other => panic!("expected ralph model request, got {other:?}"),
@@ -386,11 +334,7 @@ fn assert_model_prompt_contains(decision: crate::LoopDecision, needles: &[&str])
 }
 
 fn action_refs(profile: &ExportedProfile) -> Vec<&str> {
-    profile
-        .allowed_host_actions
-        .iter()
-        .map(String::as_str)
-        .collect()
+    profile.allowed_host_actions.iter().map(String::as_str).collect()
 }
 
 fn valid_profile() -> super::Profile {
@@ -402,13 +346,8 @@ fn valid_activation(profile: &super::Profile) -> super::Activation<'_> {
     super::Activation::new(script, ONE_TURN_BUDGET, super::DEFAULT_RUNTIME_HOST_ACTIONS)
 }
 
-fn activate_script(
-    profile: &super::Profile,
-    script: super::Script<'_>,
-    turn_budget: u32,
-) -> super::ActivationReceipt {
-    let activation =
-        super::Activation::new(script, turn_budget, super::DEFAULT_RUNTIME_HOST_ACTIONS);
+fn activate_script(profile: &super::Profile, script: super::Script<'_>, turn_budget: u32) -> super::ActivationReceipt {
+    let activation = super::Activation::new(script, turn_budget, super::DEFAULT_RUNTIME_HOST_ACTIONS);
     profile.activate(&activation)
 }
 
@@ -417,12 +356,7 @@ fn profile_with_name(name: &str) -> Result<super::Profile, super::Error> {
 }
 
 fn profile_with_budget(max_turns: u32) -> Result<super::Profile, super::Error> {
-    with_valid_draft(|draft| {
-        profile_from_draft(&super::ProfileDraft {
-            max_turns,
-            ..*draft
-        })
-    })
+    with_valid_draft(|draft| profile_from_draft(&super::ProfileDraft { max_turns, ..*draft }))
 }
 
 fn profile_with_actions(allowed_host_actions: &[&str]) -> Result<super::Profile, super::Error> {
@@ -435,12 +369,7 @@ fn profile_with_actions(allowed_host_actions: &[&str]) -> Result<super::Profile,
 }
 
 fn profile_with_script_label(script_label: &str) -> Result<super::Profile, super::Error> {
-    with_valid_draft(|draft| {
-        profile_from_draft(&super::ProfileDraft {
-            script_label,
-            ..*draft
-        })
-    })
+    with_valid_draft(|draft| profile_from_draft(&super::ProfileDraft { script_label, ..*draft }))
 }
 
 fn profile_with_fallback(fallback_mode: &str) -> Result<super::Profile, super::Error> {
@@ -462,12 +391,7 @@ fn profile_with_redaction(receipt_redaction: &str) -> Result<super::Profile, sup
 }
 
 fn profile_with_hash(script_hash: &str) -> Result<super::Profile, super::Error> {
-    with_valid_draft(|draft| {
-        profile_from_draft(&super::ProfileDraft {
-            script_hash,
-            ..*draft
-        })
-    })
+    with_valid_draft(|draft| profile_from_draft(&super::ProfileDraft { script_hash, ..*draft }))
 }
 
 fn profile_from_draft(draft: &super::ProfileDraft<'_>) -> Result<super::Profile, super::Error> {
@@ -485,7 +409,7 @@ fn with_valid_draft(
         script_label: SCRIPT_LABEL,
         script_hash: computed_hash.as_str(),
         max_turns: ONE_TURN_BUDGET,
-        allowed_host_actions: &["model", "tool", "respond", "stop"],
+        allowed_host_actions: &["model", "tool", "respond", "completion-candidate", "stop"],
         fallback_mode: "block",
         receipt_redaction: "hash-only",
     })

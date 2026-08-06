@@ -86,10 +86,7 @@ impl DomPointerInput {
 
     /// Adds modifiers.
     #[must_use]
-    pub const fn with_modifiers(
-        mut self,
-        modifiers: super::super::input::PointerModifiers,
-    ) -> Self {
+    pub const fn with_modifiers(mut self, modifiers: super::super::input::PointerModifiers) -> Self {
         self.modifiers = modifiers;
         self
     }
@@ -142,9 +139,7 @@ fn dom_phase(kind: &DomPointerKind) -> super::super::input::PointerPhase {
         DomPointerKind::DragUpdate => super::super::input::PointerPhase::DragUpdate,
         DomPointerKind::DragEnd => super::super::input::PointerPhase::DragCommit,
         DomPointerKind::Cancel => super::super::input::PointerPhase::DragCancel,
-        DomPointerKind::Unsupported(kind) => {
-            super::super::input::PointerPhase::Unsupported(kind.clone())
-        }
+        DomPointerKind::Unsupported(kind) => super::super::input::PointerPhase::Unsupported(kind.clone()),
     }
 }
 

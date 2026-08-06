@@ -1,9 +1,16 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+
 use super::*;
-use std::collections::{BTreeMap, BTreeSet};
 
 const ROOT_MENU_SCOPE: &str = "root";
 const DEFAULT_MENU_ORDER: i32 = 0;
 const SEPARATOR_LABEL: &str = "separator";
+
+semantic_string_id! {
+    /// Identifier for a desktop menu item, distinct from its optional action route.
+    pub struct DesktopMenuItemId;
+}
 
 /// Desktop menu item kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,15 +43,15 @@ pub enum DesktopMenuCheckedState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesktopMenuEntry {
     /// Stable menu item identifier.
-    pub id: String,
+    pub id: DesktopMenuItemId,
     /// Display label. Action entries may leave this empty to use action label.
     pub label: String,
     /// Item kind.
     pub kind: DesktopMenuItemKind,
     /// Optional action identifier.
-    pub action_id: Option<String>,
+    pub action_id: Option<ActionId>,
     /// Optional parent menu identifier.
-    pub parent_id: Option<String>,
+    pub parent_id: Option<DesktopMenuItemId>,
     /// Stable order within parent.
     pub order: i32,
     /// Optional mnemonic.
@@ -62,7 +69,7 @@ pub struct DesktopMenuEntry {
 impl DesktopMenuEntry {
     /// Creates an action menu item.
     #[must_use]
-    pub fn action(id: impl Into<String>, action_id: impl Into<String>) -> Self {
+    pub fn action(id: impl Into<DesktopMenuItemId>, action_id: impl Into<ActionId>) -> Self {
         Self {
             id: id.into(),
             label: String::new(),
@@ -80,7 +87,7 @@ impl DesktopMenuEntry {
 
     /// Creates a submenu container.
     #[must_use]
-    pub fn submenu(id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn submenu(id: impl Into<DesktopMenuItemId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -98,7 +105,7 @@ impl DesktopMenuEntry {
 
     /// Creates a separator.
     #[must_use]
-    pub fn separator(id: impl Into<String>) -> Self {
+    pub fn separator(id: impl Into<DesktopMenuItemId>) -> Self {
         Self {
             id: id.into(),
             label: String::new(),
@@ -123,7 +130,7 @@ impl DesktopMenuEntry {
 
     /// Sets parent menu identifier.
     #[must_use]
-    pub fn with_parent(mut self, parent_id: impl Into<String>) -> Self {
+    pub fn with_parent(mut self, parent_id: impl Into<DesktopMenuItemId>) -> Self {
         self.parent_id = Some(parent_id.into());
         self
     }
@@ -192,9 +199,9 @@ pub struct DesktopMenuDiagnostic {
     /// Machine-readable diagnostic code.
     pub code: DesktopMenuDiagnosticCode,
     /// Menu item associated with the diagnostic.
-    pub item_id: Option<String>,
+    pub item_id: Option<DesktopMenuItemId>,
     /// Other conflicting item identifiers.
-    pub related_item_ids: Vec<String>,
+    pub related_item_ids: Vec<DesktopMenuItemId>,
     /// Human-readable message.
     pub message: String,
 }
@@ -204,8 +211,8 @@ impl DesktopMenuDiagnostic {
     #[must_use]
     pub fn new(
         code: DesktopMenuDiagnosticCode,
-        item_id: Option<String>,
-        related_item_ids: Vec<String>,
+        item_id: Option<DesktopMenuItemId>,
+        related_item_ids: Vec<DesktopMenuItemId>,
         message: impl Into<String>,
     ) -> Self {
         Self {
@@ -221,15 +228,15 @@ impl DesktopMenuDiagnostic {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesktopMenuItemProjection {
     /// Stable item identifier.
-    pub id: String,
+    pub id: DesktopMenuItemId,
     /// Display label.
     pub label: String,
     /// Item kind.
     pub kind: DesktopMenuItemKind,
     /// Optional action identifier.
-    pub action_id: Option<String>,
+    pub action_id: Option<ActionId>,
     /// Parent item identifier.
-    pub parent_id: Option<String>,
+    pub parent_id: Option<DesktopMenuItemId>,
     /// Stable order.
     pub order: i32,
     /// Optional accelerator label.
@@ -268,7 +275,7 @@ pub enum DesktopMenuFocusRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesktopMenuFocusNode {
     /// Item identifier.
-    pub item_id: String,
+    pub item_id: DesktopMenuItemId,
     /// Focus role.
     pub role: DesktopMenuFocusRole,
     /// Accessible label.
@@ -287,7 +294,7 @@ pub struct DesktopMenuFocusProjection {
     /// Focusable nodes; separators and hidden rows are skipped.
     pub nodes: Vec<DesktopMenuFocusNode>,
     /// First active item identifier when one exists.
-    pub active_item_id: Option<String>,
+    pub active_item_id: Option<DesktopMenuItemId>,
 }
 
 /// Renderer consuming menu projections.
@@ -322,10 +329,7 @@ pub fn build_desktop_menu_projection(
     diagnostics.extend(duplicate_mnemonic_diagnostics(&entries));
     diagnostics.extend(shortcut_conflict_diagnostics(&entries));
     diagnostics.extend(invalid_radio_group_diagnostics(&entries));
-    let mut items: Vec<_> = entries
-        .iter()
-        .map(|entry| project_entry(snapshot, entry, &mut diagnostics))
-        .collect();
+    let mut items: Vec<_> = entries.iter().map(|entry| project_entry(snapshot, entry, &mut diagnostics)).collect();
     items.sort_by(|left, right| {
         parent_scope(&left.parent_id)
             .cmp(&parent_scope(&right.parent_id))
@@ -351,14 +355,8 @@ pub fn project_desktop_menu_focus(menu: &DesktopMenuProjection) -> DesktopMenuFo
             can_activate: item.enabled && item.kind == DesktopMenuItemKind::Action,
         })
         .collect();
-    let active_item_id = nodes
-        .iter()
-        .find(|node| node.can_activate)
-        .map(|node| node.item_id.clone());
-    DesktopMenuFocusProjection {
-        nodes,
-        active_item_id,
-    }
+    let active_item_id = nodes.iter().find(|node| node.can_activate).map(|node| node.item_id.clone());
+    DesktopMenuFocusProjection { nodes, active_item_id }
 }
 
 /// Wraps shared menu and focus projections for a renderer.
@@ -370,11 +368,7 @@ pub fn project_desktop_menu_renderer(
 ) -> DesktopMenuRendererProjection {
     let menu = build_desktop_menu_projection(snapshot, entries);
     let focus = project_desktop_menu_focus(&menu);
-    DesktopMenuRendererProjection {
-        renderer,
-        menu,
-        focus,
-    }
+    DesktopMenuRendererProjection { renderer, menu, focus }
 }
 
 fn project_entry(
@@ -382,10 +376,7 @@ fn project_entry(
     entry: &DesktopMenuEntry,
     diagnostics: &mut Vec<DesktopMenuDiagnostic>,
 ) -> DesktopMenuItemProjection {
-    let action = entry
-        .action_id
-        .as_ref()
-        .and_then(|action_id| snapshot.action(action_id));
+    let action = entry.action_id.as_ref().and_then(|action_id| snapshot.action(action_id));
     if entry.kind == DesktopMenuItemKind::Action && action.is_none() {
         diagnostics.push(DesktopMenuDiagnostic::new(
             DesktopMenuDiagnosticCode::MissingAction,
@@ -397,8 +388,7 @@ fn project_entry(
     let label = resolved_label(entry, action, diagnostics);
     let registry_enabled = action.map_or(true, |action| snapshot.is_active(action));
     let registry_disabled_reason = action.and_then(|action| snapshot.inactive_reason(action));
-    let missing_checked_source =
-        entry.checked != DesktopMenuCheckedState::None && entry.action_id.is_none();
+    let missing_checked_source = entry.checked != DesktopMenuCheckedState::None && entry.action_id.is_none();
     if missing_checked_source {
         diagnostics.push(DesktopMenuDiagnostic::new(
             DesktopMenuDiagnosticCode::MissingCheckedStateSource,
@@ -422,9 +412,7 @@ fn project_entry(
             .disabled_reason
             .clone()
             .or(registry_disabled_reason)
-            .or_else(|| {
-                missing_checked_source.then(|| "missing checked action source".to_string())
-            }),
+            .or_else(|| missing_checked_source.then(|| "missing checked action source".to_string())),
     }
 }
 
@@ -469,12 +457,12 @@ fn duplicate_item_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMenuDi
 }
 
 fn missing_parent_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMenuDiagnostic> {
-    let ids: BTreeSet<_> = entries.iter().map(|entry| entry.id.as_str()).collect();
+    let ids: BTreeSet<_> = entries.iter().map(|entry| &entry.id).collect();
     entries
         .iter()
         .filter_map(|entry| {
             let parent_id = entry.parent_id.as_ref()?;
-            (!ids.contains(parent_id.as_str())).then(|| {
+            (!ids.contains(parent_id)).then(|| {
                 DesktopMenuDiagnostic::new(
                     DesktopMenuDiagnosticCode::MissingParent,
                     Some(entry.id.clone()),
@@ -487,16 +475,13 @@ fn missing_parent_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMenuDi
 }
 
 fn duplicate_mnemonic_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMenuDiagnostic> {
-    let mut grouped: BTreeMap<(String, char), Vec<String>> = BTreeMap::new();
+    let mut grouped: BTreeMap<(String, char), Vec<DesktopMenuItemId>> = BTreeMap::new();
     for entry in entries {
         let Some(mnemonic) = entry.mnemonic else {
             continue;
         };
         grouped
-            .entry((
-                parent_scope(&entry.parent_id),
-                mnemonic.to_ascii_lowercase(),
-            ))
+            .entry((parent_scope(&entry.parent_id), mnemonic.to_ascii_lowercase()))
             .or_default()
             .push(entry.id.clone());
     }
@@ -517,7 +502,7 @@ fn duplicate_mnemonic_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMe
 }
 
 fn shortcut_conflict_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopMenuDiagnostic> {
-    let mut grouped: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    let mut grouped: BTreeMap<(String, String), Vec<DesktopMenuItemId>> = BTreeMap::new();
     for entry in entries {
         let Some(accelerator) = &entry.accelerator else {
             continue;
@@ -549,25 +534,18 @@ fn invalid_radio_group_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopM
         let DesktopMenuCheckedState::Radio { group, .. } = &entry.checked else {
             continue;
         };
-        grouped
-            .entry((parent_scope(&entry.parent_id), group.clone()))
-            .or_default()
-            .push(entry);
+        grouped.entry((parent_scope(&entry.parent_id), group.clone())).or_default().push(entry);
     }
     grouped
         .into_iter()
-        .filter_map(|((_scope, group), items)| {
+        .filter_map(|((_scope, _group), items)| {
             let selected_enabled = items.iter().any(|item| {
-                item.enabled
-                    && matches!(
-                        item.checked,
-                        DesktopMenuCheckedState::Radio { selected: true, .. }
-                    )
+                item.enabled && matches!(item.checked, DesktopMenuCheckedState::Radio { selected: true, .. })
             });
             (!selected_enabled).then(|| {
                 DesktopMenuDiagnostic::new(
                     DesktopMenuDiagnosticCode::InvalidRadioGroup,
-                    Some(group),
+                    items.first().map(|item| item.id.clone()),
                     items.iter().map(|item| item.id.clone()).collect(),
                     "radio group has no selected enabled item",
                 )
@@ -576,10 +554,8 @@ fn invalid_radio_group_diagnostics(entries: &[DesktopMenuEntry]) -> Vec<DesktopM
         .collect()
 }
 
-fn parent_scope(parent_id: &Option<String>) -> String {
-    parent_id
-        .clone()
-        .unwrap_or_else(|| ROOT_MENU_SCOPE.to_string())
+fn parent_scope(parent_id: &Option<DesktopMenuItemId>) -> String {
+    parent_id.as_ref().map_or_else(|| ROOT_MENU_SCOPE.to_string(), ToString::to_string)
 }
 
 fn focus_role(item: &DesktopMenuItemProjection) -> DesktopMenuFocusRole {
@@ -628,11 +604,13 @@ mod tests {
         let focus = project_desktop_menu_focus(&menu);
 
         assert!(menu.diagnostics.is_empty());
-        assert!(menu.items.iter().any(|item| {
-            item.action_id.as_deref() == Some("file.save") && item.label == "Save"
-        }));
+        assert!(
+            menu.items
+                .iter()
+                .any(|item| { item.action_id.as_ref().is_some_and(|id| id == "file.save") && item.label == "Save" })
+        );
         assert!(focus.nodes.iter().all(|node| node.label != SEPARATOR_LABEL));
-        assert_eq!(focus.active_item_id, Some("save".to_string()));
+        assert_eq!(focus.active_item_id, Some(DesktopMenuItemId::new("save")));
     }
 
     #[test]
@@ -651,16 +629,15 @@ mod tests {
                     group: "view-mode".to_string(),
                     selected: false,
                 }),
-            DesktopMenuEntry::submenu("checked", "Checked")
-                .with_checked(DesktopMenuCheckedState::Checked(true)),
+            DesktopMenuEntry::submenu("checked", "Checked").with_checked(DesktopMenuCheckedState::Checked(true)),
         ];
 
         let menu = build_desktop_menu_projection(&registry(), entries);
 
         assert!(
-            menu.diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DesktopMenuDiagnosticCode::DuplicateItemId
-            })
+            menu.diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::DuplicateItemId })
         );
         assert!(
             menu.diagnostics
@@ -668,23 +645,25 @@ mod tests {
                 .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::MissingParent })
         );
         assert!(
-            menu.diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DesktopMenuDiagnosticCode::DuplicateMnemonic
-            })
+            menu.diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::DuplicateMnemonic })
         );
         assert!(
-            menu.diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DesktopMenuDiagnosticCode::InvalidRadioGroup
-            })
+            menu.diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::InvalidRadioGroup })
         );
         assert!(
-            menu.diagnostics.iter().any(|diagnostic| {
-                diagnostic.code == DesktopMenuDiagnosticCode::ShortcutConflict
-            })
+            menu.diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::ShortcutConflict })
         );
-        assert!(menu.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == DesktopMenuDiagnosticCode::MissingCheckedStateSource
-        }));
+        assert!(
+            menu.diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == DesktopMenuDiagnosticCode::MissingCheckedStateSource })
+        );
         assert!(
             menu.diagnostics
                 .iter()
@@ -696,13 +675,8 @@ mod tests {
     fn renderer_menu_projections_share_semantics() {
         let entries = vec![DesktopMenuEntry::action("save", "file.save")];
 
-        let web = project_desktop_menu_renderer(
-            DesktopMenuRenderer::Meteorite,
-            &registry(),
-            entries.clone(),
-        );
-        let tui =
-            project_desktop_menu_renderer(DesktopMenuRenderer::Subwayrat, &registry(), entries);
+        let web = project_desktop_menu_renderer(DesktopMenuRenderer::Meteorite, &registry(), entries.clone());
+        let tui = project_desktop_menu_renderer(DesktopMenuRenderer::Subwayrat, &registry(), entries);
 
         assert_eq!(web.menu, tui.menu);
         assert_eq!(web.focus, tui.focus);

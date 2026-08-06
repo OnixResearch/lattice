@@ -1,8 +1,15 @@
-use super::{
-    LAUNCH_ARGUMENT_FIELD, LAUNCH_COMMAND_LABEL_FIELD, LaunchPolicy, LaunchPolicyDraft,
-    PluginDescriptorError, RuntimeKind, WORKING_DIRECTORY_FIELD, WorkingDirectoryMode,
-    parse_working_directory_mode, path, required_text_value, validate_optional_texts,
-};
+use super::LAUNCH_ARGUMENT_FIELD;
+use super::LAUNCH_COMMAND_LABEL_FIELD;
+use super::LaunchPolicy;
+use super::LaunchPolicyDraft;
+use super::PluginDescriptorError;
+use super::RuntimeKind;
+use super::WORKING_DIRECTORY_FIELD;
+use super::WorkingDirectoryMode;
+use super::parse_working_directory_mode;
+use super::path;
+use super::required_text_value;
+use super::validate_optional_texts;
 
 pub(in crate::manifest) fn prepare_policy(
     runtime_kind: RuntimeKind,
@@ -29,9 +36,7 @@ pub(in crate::manifest) fn prepare_policy(
     };
     let arguments = validate_optional_texts(LAUNCH_ARGUMENT_FIELD, draft.arguments)?;
     let working_directory = match draft.working_directory {
-        Some(value) => {
-            parse_working_directory_mode(&required_text_value(WORKING_DIRECTORY_FIELD, value)?)?
-        }
+        Some(value) => parse_working_directory_mode(&required_text_value(WORKING_DIRECTORY_FIELD, value)?)?,
         None => WorkingDirectoryMode::ProjectRoot,
     };
     let environment_allowlist = path::validate_environment_allowlist(draft.environment_allowlist)?;

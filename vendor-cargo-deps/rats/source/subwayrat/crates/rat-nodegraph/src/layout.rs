@@ -4,8 +4,12 @@
 //! topological sort, orders nodes within ranks to reduce edge crossings,
 //! and assigns positions with configurable spacing.
 
-use crate::model::{Graph, NodeId};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
+
+use crate::model::Graph;
+use crate::model::NodeId;
 
 /// Layout flow direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,11 +163,8 @@ pub fn auto_layout(graph: &mut Graph, config: &LayoutConfig) {
     // Sort nodes within each rank by the average position of their predecessors.
     // This is a single-pass barycenter — good enough for most graphs.
     for rank_idx in 1..=max_rank {
-        let prev_order: HashMap<NodeId, usize> = rank_buckets[rank_idx - 1]
-            .iter()
-            .enumerate()
-            .map(|(i, &id)| (id, i))
-            .collect();
+        let prev_order: HashMap<NodeId, usize> =
+            rank_buckets[rank_idx - 1].iter().enumerate().map(|(i, &id)| (id, i)).collect();
 
         let mut bary: Vec<(NodeId, f64)> = rank_buckets[rank_idx]
             .iter()
@@ -221,27 +222,19 @@ pub fn auto_layout(graph: &mut Graph, config: &LayoutConfig) {
             }
 
             let rank = ranks[&node_id];
-            let order_in_rank = rank_buckets[rank]
-                .iter()
-                .position(|&id| id == node_id)
-                .unwrap_or(0);
+            let order_in_rank = rank_buckets[rank].iter().position(|&id| id == node_id).unwrap_or(0);
 
             let (x, y) = match config.direction {
-                LayoutDirection::LeftToRight => (
-                    rank as i32 * rank_step,
-                    order_in_rank as i32 * cross_step + component_offset,
-                ),
-                LayoutDirection::TopToBottom => (
-                    order_in_rank as i32 * cross_step + component_offset,
-                    rank as i32 * rank_step,
-                ),
+                LayoutDirection::LeftToRight => {
+                    (rank as i32 * rank_step, order_in_rank as i32 * cross_step + component_offset)
+                }
+                LayoutDirection::TopToBottom => {
+                    (order_in_rank as i32 * cross_step + component_offset, rank as i32 * rank_step)
+                }
             };
 
             let (x, y) = if config.grid_size > 0 {
-                (
-                    snap_to_grid(x, config.grid_size),
-                    snap_to_grid(y, config.grid_size),
-                )
+                (snap_to_grid(x, config.grid_size), snap_to_grid(y, config.grid_size))
             } else {
                 (x, y)
             };
@@ -276,11 +269,7 @@ pub fn auto_layout(graph: &mut Graph, config: &LayoutConfig) {
 }
 
 /// Find connected components (treating edges as undirected for grouping).
-fn find_components(
-    node_ids: &[NodeId],
-    successors: &HashMap<NodeId, Vec<NodeId>>,
-    _graph: &Graph,
-) -> Vec<Vec<NodeId>> {
+fn find_components(node_ids: &[NodeId], successors: &HashMap<NodeId, Vec<NodeId>>, _graph: &Graph) -> Vec<Vec<NodeId>> {
     // Build undirected adjacency.
     let mut adj: HashMap<NodeId, HashSet<NodeId>> = HashMap::new();
     for &id in node_ids {
@@ -431,20 +420,8 @@ mod tests {
 
         // All positions should be multiples of 4.
         for node in g.nodes() {
-            assert_eq!(
-                node.x % 4,
-                0,
-                "node {} x={} not on grid",
-                node.label,
-                node.x
-            );
-            assert_eq!(
-                node.y % 4,
-                0,
-                "node {} y={} not on grid",
-                node.label,
-                node.y
-            );
+            assert_eq!(node.x % 4, 0, "node {} x={} not on grid", node.label, node.x);
+            assert_eq!(node.y % 4, 0, "node {} y={} not on grid", node.label, node.y);
         }
     }
 
@@ -479,11 +456,7 @@ mod tests {
         let nb = g.node(b).unwrap();
 
         let gap = nb.x - na.x;
-        assert!(
-            gap >= (config.node_width + 10) as i32,
-            "gap={gap}, expected >= {}",
-            config.node_width + 10
-        );
+        assert!(gap >= (config.node_width + 10) as i32, "gap={gap}, expected >= {}", config.node_width + 10);
     }
 
     #[test]

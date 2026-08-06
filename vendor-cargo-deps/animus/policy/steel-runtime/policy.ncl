@@ -5,7 +5,7 @@ let policy_schema = "animus.steel-runtime-policy.v1" in
 let maximum_profile_count = 64 in
 let maximum_host_action_count = 16 in
 let maximum_turn_budget = 1000000 in
-let runtime_host_actions = ["model", "tool", "respond", "stop"] in
+let runtime_host_actions = ["model", "tool", "respond", "completion-candidate", "stop"] in
 let fallback_modes = ["block"] in
 let receipt_redaction_modes = ["hash-only"] in
 
@@ -80,7 +80,7 @@ let default_script_hash = "79d887ab1ffd350d191ad7aea6a10fe3de28f108d34271cc99e4a
 let default_max_turns = 2 in
 let ralph_profile_name = "ralph-loop" in
 let ralph_script_label = "scripts/ralph-loop.scm" in
-let ralph_script_hash = "0225dfc88a7cbfe9b1639a199dd961cecee66ecd311a2ff13929867f60b6ca77" in
+let ralph_script_hash = "c49363bf4ab5ecd8dd519138acb3ca3b251edb0646f3ac4e98b9393c9ac93a88" in
 let ralph_max_turns = 10 in
 let fallback_block = "block" in
 let receipt_hash_only = "hash-only" in

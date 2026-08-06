@@ -2,8 +2,11 @@ mod continuation;
 mod mode;
 mod scope;
 
-pub use continuation::{ThreadResume, ThreadResumeDraft};
-pub use mode::{NoninteractiveBehavior, OutputPreference, SandboxProfile};
+pub use continuation::ThreadResume;
+pub use continuation::ThreadResumeDraft;
+pub use mode::NoninteractiveBehavior;
+pub use mode::OutputPreference;
+pub use mode::SandboxProfile;
 pub use scope::RunIdentity;
 
 /// Borrowed non-interactive runtime request fields before validation.
@@ -71,44 +74,36 @@ impl RunRequest {
             value: draft.objective,
         })?;
         let identity = RunIdentity::validate(draft.session_id, draft.workspace_id)?;
-        let input_references =
-            super::required_unique_texts(super::INPUT_REFERENCE_FIELD, draft.input_references)?;
+        let input_references = super::required_unique_texts(super::INPUT_REFERENCE_FIELD, draft.input_references)?;
         let prompt = super::required_text(super::TextField {
             field: super::PROMPT_FIELD,
             value: draft.prompt,
         })?;
-        let external_context_handles =
-            super::unique_texts(super::CONTEXT_FIELD, draft.external_context_handles)?;
+        let external_context_handles = super::unique_texts(super::CONTEXT_FIELD, draft.external_context_handles)?;
         let policy_profile = super::required_text(super::TextField {
             field: super::POLICY_PROFILE_FIELD,
             value: draft.policy_profile,
         })?;
-        let allowed_capabilities =
-            super::required_unique_texts(super::CAPABILITY_FIELD, draft.allowed_capabilities)?;
+        let allowed_capabilities = super::required_unique_texts(super::CAPABILITY_FIELD, draft.allowed_capabilities)?;
         let sandbox_profile = SandboxProfile::parse(draft.sandbox_profile).ok_or_else(|| {
             super::unsupported(super::TextField {
                 field: super::SANDBOX_FIELD,
                 value: draft.sandbox_profile,
             })
         })?;
-        let output_preference =
-            OutputPreference::from_draft(draft.output_mode, draft.structured_schema_id)?;
+        let output_preference = OutputPreference::from_draft(draft.output_mode, draft.structured_schema_id)?;
         let validation_plan = super::required_text(super::TextField {
             field: super::VALIDATION_PLAN_FIELD,
             value: draft.validation_plan,
         })?;
-        let noninteractive_behavior = NoninteractiveBehavior::parse(draft.noninteractive_behavior)
-            .ok_or_else(|| {
+        let noninteractive_behavior =
+            NoninteractiveBehavior::parse(draft.noninteractive_behavior).ok_or_else(|| {
                 super::unsupported(super::TextField {
                     field: super::NONINTERACTIVE_BEHAVIOR_FIELD,
                     value: draft.noninteractive_behavior,
                 })
             })?;
-        let resume = draft
-            .resume
-            .as_ref()
-            .map(ThreadResume::validate)
-            .transpose()?;
+        let resume = draft.resume.as_ref().map(ThreadResume::validate).transpose()?;
         Ok(Self {
             objective,
             identity,

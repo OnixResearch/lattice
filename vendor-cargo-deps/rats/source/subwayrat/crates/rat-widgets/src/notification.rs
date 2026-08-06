@@ -1,17 +1,18 @@
 //! Toast notification overlay
 
 use std::time::Duration;
-use std::time::Instant;
 
 use rat_chrome::overlay_frame;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
-use ratatui::widgets::{Paragraph, Wrap};
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Wrap;
 
-use crate::popup_chrome::{
-    POPUP_MARGIN, clamped_axis, themed_overlay_style, top_right_overlay_model,
-};
+use crate::popup_chrome::POPUP_MARGIN;
+use crate::popup_chrome::clamped_axis;
+use crate::popup_chrome::themed_overlay_style;
+use crate::popup_chrome::top_right_overlay_model;
 use crate::theme::WidgetTheme;
 
 const INFO_TTL_SECS: u64 = 3;
@@ -29,43 +30,58 @@ pub enum NotificationLevel {
     Error,
 }
 
+/// Caller-owned monotonic observation in milliseconds from an application epoch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NotificationMoment(u64);
+
+impl NotificationMoment {
+    pub const fn from_millis(milliseconds: u64) -> Self {
+        Self(milliseconds)
+    }
+
+    pub const fn as_millis(self) -> u64 {
+        self.0
+    }
+}
+
 pub struct Notification {
     pub message: String,
     pub level: NotificationLevel,
-    pub created: Instant,
+    pub created: NotificationMoment,
     pub ttl: Duration,
 }
 
 impl Notification {
-    pub fn info(message: impl Into<String>) -> Self {
+    pub fn info_at(message: impl Into<String>, created: NotificationMoment) -> Self {
         Self {
             message: message.into(),
             level: NotificationLevel::Info,
-            created: Instant::now(),
+            created,
             ttl: Duration::from_secs(INFO_TTL_SECS),
         }
     }
 
-    pub fn warning(message: impl Into<String>) -> Self {
+    pub fn warning_at(message: impl Into<String>, created: NotificationMoment) -> Self {
         Self {
             message: message.into(),
             level: NotificationLevel::Warning,
-            created: Instant::now(),
+            created,
             ttl: Duration::from_secs(WARNING_TTL_SECS),
         }
     }
 
-    pub fn error(message: impl Into<String>) -> Self {
+    pub fn error_at(message: impl Into<String>, created: NotificationMoment) -> Self {
         Self {
             message: message.into(),
             level: NotificationLevel::Error,
-            created: Instant::now(),
+            created,
             ttl: Duration::from_secs(ERROR_TTL_SECS),
         }
     }
 
-    pub fn is_expired(&self) -> bool {
-        self.created.elapsed() >= self.ttl
+    pub fn is_expired_at(&self, observed: NotificationMoment) -> bool {
+        let elapsed = observed.as_millis().saturating_sub(self.created.as_millis());
+        Duration::from_millis(elapsed) >= self.ttl
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -118,13 +134,14 @@ fn notification_overlay_model(area: Rect, title: impl Into<String>) -> rat_chrom
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::style::Color;
     use ratatui::text::Line;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 80;
     const VIEWPORT_HEIGHT: u16 = 12;
@@ -135,7 +152,7 @@ mod tests {
 
     #[test]
     fn warning_notification_uses_top_right_chrome() {
-        let notification = Notification::warning(MESSAGE);
+        let notification = Notification::warning_at(MESSAGE, moment(0));
 
         let buffer = render_notification(&notification, viewport());
         let layout = notification_layout(viewport(), &notification);
@@ -146,7 +163,7 @@ mod tests {
 
     #[test]
     fn error_notification_uses_error_border() {
-        let notification = Notification::error(MESSAGE);
+        let notification = Notification::error_at(MESSAGE, moment(0));
 
         let buffer = render_notification(&notification, viewport());
         let layout = notification_layout(viewport(), &notification);
@@ -156,12 +173,26 @@ mod tests {
 
     #[test]
     fn tiny_notification_area_does_not_panic() {
-        let notification = Notification::info(MESSAGE);
+        let notification = Notification::info_at(MESSAGE, moment(0));
 
         let buffer = render_notification(&notification, tiny_viewport());
 
         assert_eq!(buffer.area.width, TINY_VIEWPORT_WIDTH);
         assert_eq!(buffer.area.height, TINY_VIEWPORT_HEIGHT);
+    }
+
+    #[test]
+    fn explicit_time_controls_expiry_without_an_ambient_read() {
+        let created = moment(10_000);
+        let notification = Notification::info_at(MESSAGE, created);
+
+        assert!(!notification.is_expired_at(created));
+        assert!(!notification.is_expired_at(moment(9_000)));
+        assert!(notification.is_expired_at(moment(13_000)));
+    }
+
+    const fn moment(milliseconds: u64) -> NotificationMoment {
+        NotificationMoment::from_millis(milliseconds)
     }
 
     fn render_notification(notification: &Notification, viewport: Rect) -> Buffer {
@@ -183,16 +214,10 @@ mod tests {
         frame.render_widget(Paragraph::new(rows), area);
     }
 
-    fn notification_layout(
-        viewport: Rect,
-        notification: &Notification,
-    ) -> rat_chrome::OverlayLayout {
+    fn notification_layout(viewport: Rect, notification: &Notification) -> rat_chrome::OverlayLayout {
         let theme = WidgetTheme::default();
         let chrome = notification_chrome(&notification.level, &theme);
-        compute_overlay_layout(
-            viewport,
-            &notification_overlay_model(viewport, chrome.title),
-        )
+        compute_overlay_layout(viewport, &notification_overlay_model(viewport, chrome.title))
     }
 
     fn viewport() -> Rect {

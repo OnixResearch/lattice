@@ -22,14 +22,10 @@ type Collection<T> = alloc::vec::Vec<T>;
 
 const KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_kind");
 const NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_name");
-const DESCRIPTION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("resource_description");
-const SCOPE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("resource_scope");
-const PROVENANCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("resource_provenance");
-const TRUST_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("resource_trust_status");
+const DESCRIPTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_description");
+const SCOPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_scope");
+const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_provenance");
+const TRUST_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_trust_status");
 const CONTENT_IDENTITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("resource_content_identity");
 const BODY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("resource_body");
@@ -65,9 +61,19 @@ pub const PROHIBITED_DISCOVERY_EFFECTS: &[&str] = &[
 
 const UNSAFE_PROVENANCE_MARKERS: &[&str] = &["../", "/home/", "/tmp/", "C:\\\\", "\\\\Users\\\\"];
 
-pub use catalog::{advertise, build_context};
+pub use catalog::advertise;
+pub use catalog::build_context;
 pub use fault::Error;
-pub use record::{Descriptor, Draft, Kind, Scope, TrustStatus};
-pub use view::{
-    Catalog, ContentDraft, Context, Diagnostic, Issue, LoadedContent, Request, Summary,
-};
+pub use record::Descriptor;
+pub use record::Draft;
+pub use record::Kind;
+pub use record::Scope;
+pub use record::TrustStatus;
+pub use view::Catalog;
+pub use view::ContentDraft;
+pub use view::Context;
+pub use view::Diagnostic;
+pub use view::Issue;
+pub use view::LoadedContent;
+pub use view::Request;
+pub use view::Summary;

@@ -1,6 +1,8 @@
 //! Shared theme for rat-widgets styling.
 
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
 
 /// Shared style configuration for rat-widgets.
 ///
@@ -53,9 +55,7 @@ impl Default for WidgetTheme {
 impl WidgetTheme {
     /// Style for highlighted/selected items: warning color + bold.
     pub fn highlight_style(&self) -> Style {
-        Style::default()
-            .fg(self.warning)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(self.warning).add_modifier(Modifier::BOLD)
     }
 
     /// Style for selected rows: text_disabled background, text foreground.

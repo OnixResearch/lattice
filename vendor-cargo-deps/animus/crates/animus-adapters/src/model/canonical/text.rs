@@ -7,10 +7,7 @@ pub(crate) fn safe_text(
 ) -> Result<alloc::string::String, super::CanonicalModelContractError> {
     let normalized = crate::validation::normalized_adapter_field(field, raw)?;
     if contains_leak_marker(normalized.as_str(), super::LEAK_MARKER_RAW_PROVIDER_PAYLOAD)
-        || contains_leak_marker(
-            normalized.as_str(),
-            super::LEAK_MARKER_PROVIDER_PAYLOAD_PREFIX,
-        )
+        || contains_leak_marker(normalized.as_str(), super::LEAK_MARKER_PROVIDER_PAYLOAD_PREFIX)
     {
         return Err(super::CanonicalModelContractError::UnsafeText {
             field: field.as_str(),
@@ -38,10 +35,7 @@ pub(crate) fn safe_text(
 
 pub(crate) fn contains_leak_marker(value: &str, marker: &str) -> bool {
     assert!(!marker.is_empty(), "leak marker must not be empty");
-    value
-        .as_bytes()
-        .windows(marker.len())
-        .any(|window| ascii_case_eq(window, marker.as_bytes()))
+    value.as_bytes().windows(marker.len()).any(|window| ascii_case_eq(window, marker.as_bytes()))
 }
 
 pub(crate) fn ascii_case_eq(left: &[u8], right: &[u8]) -> bool {

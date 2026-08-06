@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=spacewasm_embedded_compat"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.spacewasm-embedded-compat",
+      "source": {
+        "path": "config/spacewasm-embedded-compat.ncl",
+        "identity": "b3:16a0f483a9433b784904355a85323aa7167e8ec47a20663512570a581cc87258",
+        "bytes": 2486
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "spacewasm_embedded_compat",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/spacewasm-embedded-compat.json",
+        "identity": "b3:3e1c6e495cb4f8bfb4c27053829571fd21d2741fe64910ca9941f5f6405a6914",
+        "bytes": 1559
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=spacewasm_embedded_compat"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:34d47d3360b985461fd865e99241086129417b8c7f0f4179dc7454b2964003d4"
+}

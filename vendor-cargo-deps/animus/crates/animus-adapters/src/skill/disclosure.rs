@@ -77,23 +77,17 @@ impl Context {
 /// descriptor item bound.
 #[must_use]
 pub fn build_context(request: Request<'_>) -> Context {
-    assert!(
-        request.manifests.len() <= super::MAX_ITEMS,
-        "manifest inputs stay within the descriptor item bound"
-    );
+    assert!(request.manifests.len() <= super::MAX_ITEMS, "manifest inputs stay within the descriptor item bound");
     assert!(
         request.loaded_bodies.len() <= super::MAX_ITEMS,
         "loaded body inputs stay within the descriptor item bound"
     );
     let catalog = super::advertise(request.manifests);
-    let selected_body = request.selected_name.and_then(|selected_name| {
-        select_loaded_body(request.manifests, request.loaded_bodies, selected_name)
-    });
+    let selected_body = request
+        .selected_name
+        .and_then(|selected_name| select_loaded_body(request.manifests, request.loaded_bodies, selected_name));
 
-    Context {
-        catalog,
-        selected_body,
-    }
+    Context { catalog, selected_body }
 }
 
 fn select_loaded_body(
@@ -101,20 +95,10 @@ fn select_loaded_body(
     bodies: &[BodyDraft<'_>],
     selected_name: &str,
 ) -> Option<LoadedBody> {
-    assert!(
-        manifests.len() <= super::MAX_ITEMS,
-        "manifest inputs stay within the descriptor item bound"
-    );
-    assert!(
-        bodies.len() <= super::MAX_ITEMS,
-        "loaded body inputs stay within the descriptor item bound"
-    );
+    assert!(manifests.len() <= super::MAX_ITEMS, "manifest inputs stay within the descriptor item bound");
+    assert!(bodies.len() <= super::MAX_ITEMS, "loaded body inputs stay within the descriptor item bound");
     let manifest = manifests.iter().find(|item| item.name() == selected_name)?;
-    assert_eq!(
-        manifest.name(),
-        selected_name,
-        "selected descriptor matches the requested skill name"
-    );
+    assert_eq!(manifest.name(), selected_name, "selected descriptor matches the requested skill name");
     if manifest.trust_status() != super::TrustStatus::Trusted {
         return None;
     }
@@ -122,21 +106,15 @@ fn select_loaded_body(
         return None;
     }
     let body = bodies.iter().find(|candidate| {
-        candidate.name == manifest.name()
-            && candidate.content_identity == manifest.content_identity().as_str()
+        candidate.name == manifest.name() && candidate.content_identity == manifest.content_identity().as_str()
     })?;
-    assert_eq!(
-        body.name,
-        manifest.name(),
-        "loaded body matches selected skill"
-    );
+    assert_eq!(body.name, manifest.name(), "loaded body matches selected skill");
     assert_eq!(
         body.content_identity,
         manifest.content_identity().as_str(),
         "loaded body identity matches selected descriptor"
     );
-    let validated_body =
-        super::validation::required_text(super::BODY_FIELD, Some(body.body)).ok()?;
+    let validated_body = super::validation::required_text(super::BODY_FIELD, Some(body.body)).ok()?;
     assert!(!validated_body.is_empty(), "loaded body is non-empty");
     Some(LoadedBody {
         name: manifest.name.clone(),

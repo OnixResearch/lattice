@@ -85,32 +85,20 @@ pub(crate) fn validate_command_shape(
     profile: &super::ProcessJobProfile,
 ) -> Result<(), super::ProcessJobProfileError> {
     debug_assert!(!profile_name.is_empty());
-    debug_assert!(
-        profile.command.is_some() || profile.program.is_some() || profile.args.is_empty()
-    );
-    let has_command = profile
-        .command
-        .as_deref()
-        .is_some_and(|value| !value.trim().is_empty());
-    let has_program = profile
-        .program
-        .as_deref()
-        .is_some_and(|value| !value.trim().is_empty());
+    debug_assert!(profile.command.is_some() || profile.program.is_some() || profile.args.is_empty());
+    let has_command = profile.command.as_deref().is_some_and(|value| !value.trim().is_empty());
+    let has_program = profile.program.as_deref().is_some_and(|value| !value.trim().is_empty());
     if has_command == has_program {
-        return Err(helpers::command_shape_error(
-            helpers::CommandShapeErrorInput {
-                profile_name,
-                reason: "set exactly one of command or program",
-            },
-        ));
+        return Err(helpers::command_shape_error(helpers::CommandShapeErrorInput {
+            profile_name,
+            reason: "set exactly one of command or program",
+        }));
     }
     if has_command && !profile.args.is_empty() {
-        return Err(helpers::command_shape_error(
-            helpers::CommandShapeErrorInput {
-                profile_name,
-                reason: "args are valid only with program",
-            },
-        ));
+        return Err(helpers::command_shape_error(helpers::CommandShapeErrorInput {
+            profile_name,
+            reason: "args are valid only with program",
+        }));
     }
     for arg in &profile.args {
         if arg.trim().is_empty() {
@@ -150,10 +138,7 @@ pub(crate) fn validate_env(
     debug_assert!(env.iter().all(|variable| !variable.key.is_empty()));
     let mut seen = std::collections::BTreeSet::new();
     for variable in env {
-        if !helpers::is_allowed_env_key(
-            variable.key.as_str(),
-            policy.allowed_env_prefixes.as_slice(),
-        ) {
+        if !helpers::is_allowed_env_key(variable.key.as_str(), policy.allowed_env_prefixes.as_slice()) {
             return Err(helpers::env_error(helpers::EnvErrorInput {
                 profile_name,
                 key: variable.key.as_str(),
@@ -227,16 +212,8 @@ pub(crate) fn validate_resources(
             resources.timeout_seconds.map(u64::from),
             policy.max_timeout_seconds.map(u64::from),
         ),
-        (
-            "memory_bytes",
-            resources.memory_bytes,
-            policy.max_memory_bytes,
-        ),
-        (
-            "cpu_millis",
-            resources.cpu_millis.map(u64::from),
-            policy.max_cpu_millis.map(u64::from),
-        ),
+        ("memory_bytes", resources.memory_bytes, policy.max_memory_bytes),
+        ("cpu_millis", resources.cpu_millis.map(u64::from), policy.max_cpu_millis.map(u64::from)),
         ("log_bytes", resources.log_bytes, policy.max_log_bytes),
     ] {
         validate_resource_limit(field, actual, maximum, profile_name)?;
@@ -277,10 +254,7 @@ pub(crate) fn validate_metadata(
                 super::ProcessJobProfileErrorKind::UnsafeMetadata,
                 profile_name,
                 super::METADATA_FIELD,
-                format!(
-                    "metadata key `{}` is not an identity metadata key",
-                    field.key
-                ),
+                format!("metadata key `{}` is not an identity metadata key", field.key),
             ));
         }
         helpers::validate_identity_field(IdentityTextInput {

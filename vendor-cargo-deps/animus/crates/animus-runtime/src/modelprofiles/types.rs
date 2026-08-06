@@ -805,11 +805,7 @@ pub struct ModelRuntimeProfileError {
 }
 
 impl ModelRuntimeProfileError {
-    pub(super) fn new(
-        issue: ModelRuntimeProfileIssue,
-        field: &'static str,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub(super) fn new(issue: ModelRuntimeProfileIssue, field: &'static str, detail: impl Into<String>) -> Self {
         Self {
             issue,
             field,
@@ -838,10 +834,6 @@ impl ModelRuntimeProfileError {
 
 impl core::fmt::Display for ModelRuntimeProfileError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            formatter,
-            "{}: {} ({:?})",
-            self.field, self.detail, self.issue
-        )
+        write!(formatter, "{}: {} ({:?})", self.field, self.detail, self.issue)
     }
 }

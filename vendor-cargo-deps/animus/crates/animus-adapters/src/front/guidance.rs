@@ -1,9 +1,5 @@
 #![allow(unknown_lints)]
-#![allow(
-    non_trait_imports,
-    path_segment_repetition,
-    underscore_in_module_filename
-)]
+#![allow(non_trait_imports, path_segment_repetition, underscore_in_module_filename)]
 
 #[allow(
     assertion_density,
@@ -26,26 +22,34 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 pub use assembly::assemble_guidance_sources;
-pub use skill_metadata::{
-    SkillDiscoveryDraft, SkillDiscoveryMetadata, SkillInvocationMode, SkillInvocationPolicy,
-    SkillLoadDecision, SkillLoadDenial, SkillLoadRequest, decide_skill_loading,
-};
-pub use skill_package::{
-    SkillPackageDescriptor, SkillPackageDraft, SkillScriptDenial, admit_runtime_core_skill_script,
-};
-pub use source::{
-    GuidanceAssembly, GuidanceBudget, GuidanceDisposition, GuidanceLedgerEntry,
-    GuidanceLedgerReason, GuidanceOverride, GuidancePrecedence, GuidanceSource,
-    GuidanceSourceDraft,
-};
+pub use skill_metadata::SkillDiscoveryDraft;
+pub use skill_metadata::SkillDiscoveryMetadata;
+pub use skill_metadata::SkillInvocationMode;
+pub use skill_metadata::SkillInvocationPolicy;
+pub use skill_metadata::SkillLoadDecision;
+pub use skill_metadata::SkillLoadDenial;
+pub use skill_metadata::SkillLoadRequest;
+pub use skill_metadata::decide_skill_loading;
+pub use skill_package::SkillPackageDescriptor;
+pub use skill_package::SkillPackageDraft;
+pub use skill_package::SkillScriptDenial;
+pub use skill_package::admit_runtime_core_skill_script;
+pub use source::GuidanceAssembly;
+pub use source::GuidanceBudget;
+pub use source::GuidanceDisposition;
+pub use source::GuidanceLedgerEntry;
+pub use source::GuidanceLedgerReason;
+pub use source::GuidanceOverride;
+pub use source::GuidancePrecedence;
+pub use source::GuidanceSource;
+pub use source::GuidanceSourceDraft;
 
 /// Descriptor-side effects that skill manifest validation explicitly does not perform.
 pub const PROHIBITED_SKILL_MANIFEST_EFFECTS: &[&str] = crate::skill::PROHIBITED_MANIFEST_EFFECTS;
 /// Character length of a lowercase BLAKE3 skill content identity.
 pub const SKILL_CONTENT_HASH_HEX_CHARS: usize = crate::skill::CONTENT_HASH_HEX_CHARS;
 /// Descriptor-side effects that generic resource discovery explicitly does not perform.
-pub const PROHIBITED_PROMPT_RESOURCE_EFFECTS: &[&str] =
-    crate::resource::PROHIBITED_DISCOVERY_EFFECTS;
+pub const PROHIBITED_PROMPT_RESOURCE_EFFECTS: &[&str] = crate::resource::PROHIBITED_DISCOVERY_EFFECTS;
 /// Borrowed full-body content explicitly supplied by a host load decision.
 pub type SkillBodyDraft<'a> = crate::skill::BodyDraft<'a>;
 /// Progressive skill disclosure context for prompt construction.
@@ -105,17 +109,13 @@ pub fn advertise_skill_resources(manifests: &[SkillManifest]) -> SkillResourceCa
 
 /// Builds progressive skill disclosure context without loading unselected bodies.
 #[must_use]
-pub fn build_skill_disclosure_context(
-    request: SkillDisclosureRequest<'_>,
-) -> SkillDisclosureContext {
+pub fn build_skill_disclosure_context(request: SkillDisclosureRequest<'_>) -> SkillDisclosureContext {
     crate::skill::build_context(request)
 }
 
 /// Builds deterministic summaries from already validated prompt resources.
 #[must_use]
-pub fn advertise_prompt_resources(
-    descriptors: &[PromptResourceDescriptor],
-) -> PromptResourceCatalog {
+pub fn advertise_prompt_resources(descriptors: &[PromptResourceDescriptor]) -> PromptResourceCatalog {
     crate::resource::advertise(descriptors)
 }
 
@@ -125,20 +125,13 @@ pub fn build_prompt_resource_context(request: PromptResourceRequest<'_>) -> Prom
     crate::resource::build_context(request)
 }
 
-const GUIDANCE_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guidance_name");
-const GUIDANCE_ORIGIN_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guidance_origin");
-const SKILL_SOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_source");
-const SKILL_DEPENDENCY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_dependency");
-const SKILL_SCRIPT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_script");
-const SKILL_REFERENCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_reference");
-const SKILL_ASSET_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_asset");
+const GUIDANCE_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guidance_name");
+const GUIDANCE_ORIGIN_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guidance_origin");
+const SKILL_SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_source");
+const SKILL_DEPENDENCY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_dependency");
+const SKILL_SCRIPT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_script");
+const SKILL_REFERENCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_reference");
+const SKILL_ASSET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_asset");
 const MAX_GUIDANCE_SOURCES: usize = 32;
 const MAX_SKILL_DESCRIPTOR_ITEMS: usize = 32;
 
@@ -184,19 +177,13 @@ impl core::fmt::Display for GuidanceError {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} supports at most {max_items} items; got {actual_items}"
-            ),
+            } => write!(formatter, "{field} supports at most {max_items} items; got {actual_items}"),
             Self::ZeroBudgetCost { source } => {
                 write!(formatter, "{source} must use non-zero budget units")
             }
-            Self::DuplicateGuidancePrecedence { scope, precedence } => write!(
-                formatter,
-                "guidance scope {} has duplicate precedence {}",
-                scope.as_str(),
-                precedence.rank()
-            ),
+            Self::DuplicateGuidancePrecedence { scope, precedence } => {
+                write!(formatter, "guidance scope {} has duplicate precedence {}", scope.as_str(), precedence.rank())
+            }
         }
     }
 }

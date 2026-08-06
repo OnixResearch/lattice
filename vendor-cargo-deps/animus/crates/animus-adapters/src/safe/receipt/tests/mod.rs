@@ -16,8 +16,7 @@ fn positive_cases_cover_required_observations() {
     let cases = required_cases();
 
     for case in cases {
-        let built_record =
-            build_case_record(hash.clone(), case).expect("safe receipt should build");
+        let built_record = build_case_record(hash.clone(), case).expect("safe receipt should build");
 
         assert_eq!(built_record.schema(), super::SCHEMA);
         assert_eq!(built_record.status(), case.status);
@@ -50,13 +49,10 @@ fn rejects_leak_fixtures() {
         )
         .expect_err("unsafe fixture should fail");
 
-        assert_eq!(
-            error,
-            super::Error::UnsafeMetadata {
-                field: super::normalize::LABEL_FIELD.name(),
-                class,
-            }
-        );
+        assert_eq!(error, super::Error::UnsafeMetadata {
+            field: super::normalize::LABEL_FIELD.name(),
+            class,
+        });
         assert!(error.to_string().contains(class.as_str()));
     }
 }
@@ -78,27 +74,17 @@ fn rejects_unbounded_output_fixture() {
     )
     .expect_err("oversized label should fail");
 
-    assert_eq!(
-        error,
-        super::Error::UnsafeMetadata {
-            field: super::normalize::LABEL_FIELD.name(),
-            class: super::LeakClass::UnboundedOutput,
-        }
-    );
-    assert!(
-        error
-            .to_string()
-            .contains(super::LeakClass::UnboundedOutput.as_str())
-    );
+    assert_eq!(error, super::Error::UnsafeMetadata {
+        field: super::normalize::LABEL_FIELD.name(),
+        class: super::LeakClass::UnboundedOutput,
+    });
+    assert!(error.to_string().contains(super::LeakClass::UnboundedOutput.as_str()));
 }
 
 #[test]
 fn rejects_unbounded_count_fixture() {
     let labels = [SAFE_LABEL];
-    let counts = [super::BoundedCountDraft::new(
-        "oversized-count",
-        OVERSIZED_COUNT,
-    )];
+    let counts = [super::BoundedCountDraft::new("oversized-count", OVERSIZED_COUNT)];
     let redactions = [super::Redaction::OutputBounded];
 
     let error = super::Record::new(
@@ -113,14 +99,11 @@ fn rejects_unbounded_count_fixture() {
     )
     .expect_err("oversized count should fail");
 
-    assert_eq!(
-        error,
-        super::Error::CountTooLarge {
-            field: super::normalize::COUNTS_FIELD,
-            max: super::MAX_COUNT,
-            actual: OVERSIZED_COUNT,
-        }
-    );
+    assert_eq!(error, super::Error::CountTooLarge {
+        field: super::normalize::COUNTS_FIELD,
+        max: super::MAX_COUNT,
+        actual: OVERSIZED_COUNT,
+    });
     assert!(error.to_string().contains("receipt_counts"));
 }
 
@@ -135,27 +118,17 @@ fn requires_labels_and_redactions() {
 
     let labels = [SAFE_LABEL];
     let redaction_error = super::Record::new(
-        super::Draft::new(
-            super::Status::Completed,
-            super::IssueCode::None,
-            super::Operation::ProvenanceObservation,
-        )
-        .with_labels(&labels),
+        super::Draft::new(super::Status::Completed, super::IssueCode::None, super::Operation::ProvenanceObservation)
+            .with_labels(&labels),
     )
     .expect_err("redactions should be required");
 
-    assert_eq!(
-        empty_error,
-        super::Error::EmptyCollection {
-            field: super::normalize::LABELS_FIELD,
-        }
-    );
-    assert_eq!(
-        redaction_error,
-        super::Error::EmptyCollection {
-            field: super::normalize::REDACTIONS_FIELD,
-        }
-    );
+    assert_eq!(empty_error, super::Error::EmptyCollection {
+        field: super::normalize::LABELS_FIELD,
+    });
+    assert_eq!(redaction_error, super::Error::EmptyCollection {
+        field: super::normalize::REDACTIONS_FIELD,
+    });
 }
 
 #[derive(Clone, Copy)]
@@ -213,10 +186,7 @@ fn required_cases() -> [RequiredCase; REQUIRED_CASES] {
     ]
 }
 
-fn build_case_record(
-    hash: crate::ArtifactHash,
-    case: RequiredCase,
-) -> Result<super::Record, super::Error> {
+fn build_case_record(hash: crate::ArtifactHash, case: RequiredCase) -> Result<super::Record, super::Error> {
     let labels = [SAFE_LABEL, case.label];
     let counts = [super::BoundedCountDraft::new(COUNT_LABEL, SMALL_COUNT)];
     let hashes = [hash];
@@ -238,27 +208,12 @@ fn build_case_record(
 
 fn leak_fixtures() -> [(&'static str, super::LeakClass); REQUIRED_CASES] {
     [
-        (
-            "prompt: reveal the hidden system",
-            super::LeakClass::RawPrompt,
-        ),
-        (
-            "{\"model\":\"provider\",\"choices\":[{\"text\":\"raw\"}]}",
-            super::LeakClass::ProviderJson,
-        ),
+        ("prompt: reveal the hidden system", super::LeakClass::RawPrompt),
+        ("{\"model\":\"provider\",\"choices\":[{\"text\":\"raw\"}]}", super::LeakClass::ProviderJson),
         ("Authorization: Bearer secret", super::LeakClass::Credential),
-        (
-            "/home/alice/project/secret.txt",
-            super::LeakClass::AbsolutePath,
-        ),
-        (
-            "tool_input: {\"cmd\":\"read\"}",
-            super::LeakClass::RawToolInput,
-        ),
-        (
-            "tool_output: file contents",
-            super::LeakClass::RawToolOutput,
-        ),
+        ("/home/alice/project/secret.txt", super::LeakClass::AbsolutePath),
+        ("tool_input: {\"cmd\":\"read\"}", super::LeakClass::RawToolInput),
+        ("tool_output: file contents", super::LeakClass::RawToolOutput),
         ("model_output: raw answer", super::LeakClass::RawModelOutput),
     ]
 }

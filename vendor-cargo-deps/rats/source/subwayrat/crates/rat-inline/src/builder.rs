@@ -1,9 +1,13 @@
 //! Builder API for constructing inline view trees.
 
+use std::any::TypeId;
+
+use ratcore::inline::NodeKey;
+use ratcore::inline::ViewNode;
+use ratcore::inline::ViewTree;
+
 use crate::widget::InlineWidget;
 use crate::widgets::InlineText;
-use ratcore::inline::{NodeKey, ViewNode, ViewTree};
-use std::any::TypeId;
 
 /// Builder for constructing an inline view tree.
 ///
@@ -116,29 +120,19 @@ mod tests {
 
     #[test]
     fn build_keyed() {
-        let (tree, _) = InlineView::new()
-            .keyed("msg-0", InlineText::new("hi"))
-            .build();
+        let (tree, _) = InlineView::new().keyed("msg-0", InlineText::new("hi")).build();
         assert_eq!(tree.nodes[0].key.as_ref().unwrap().0, "msg-0");
     }
 
     #[test]
     fn build_when_true() {
-        let (tree, _) = InlineView::new()
-            .text("before")
-            .when(true, |v| v.text("conditional"))
-            .text("after")
-            .build();
+        let (tree, _) = InlineView::new().text("before").when(true, |v| v.text("conditional")).text("after").build();
         assert_eq!(tree.len(), 3);
     }
 
     #[test]
     fn build_when_false() {
-        let (tree, _) = InlineView::new()
-            .text("before")
-            .when(false, |v| v.text("conditional"))
-            .text("after")
-            .build();
+        let (tree, _) = InlineView::new().text("before").when(false, |v| v.text("conditional")).text("after").build();
         assert_eq!(tree.len(), 2);
     }
 
@@ -146,9 +140,7 @@ mod tests {
     fn build_each() {
         let items = vec!["a", "b", "c"];
         let (tree, _) = InlineView::new()
-            .each(items.iter().enumerate(), |v, (i, item)| {
-                v.keyed(format!("item-{i}"), InlineText::new(*item))
-            })
+            .each(items.iter().enumerate(), |v, (i, item)| v.keyed(format!("item-{i}"), InlineText::new(*item)))
             .build();
         assert_eq!(tree.len(), 3);
         assert_eq!(tree.nodes[0].key.as_ref().unwrap().0, "item-0");

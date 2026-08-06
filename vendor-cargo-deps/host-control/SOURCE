@@ -1,0 +1,7 @@
+name: host-control
+repository: ssh://git@github.com/OnixResearch/host-control.git
+revision: 7735faf3d8895b0bfa89f563184c4321b3b144a1
+paths:
+- Cargo.toml
+- crates/host-control-core
+normalized-manifest: crates/host-control-core/Cargo.toml

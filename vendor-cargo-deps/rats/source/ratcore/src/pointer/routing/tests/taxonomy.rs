@@ -15,12 +15,7 @@ fn click_event() -> PointerEvent {
 }
 
 fn event_with_phase(phase: PointerPhase) -> PointerEvent {
-    PointerEvent::new(
-        PointerPoint::new(POINT_X, POINT_Y),
-        PointerButton::None,
-        phase,
-        PointerSource::Mouse,
-    )
+    PointerEvent::new(PointerPoint::new(POINT_X, POINT_Y), PointerButton::None, phase, PointerSource::Mouse)
 }
 
 #[test]
@@ -33,11 +28,7 @@ fn full_event_taxonomy_normalizes_supported_mouse_variants() {
     };
     let wheel = event_with_phase(PointerPhase::Wheel)
         .with_coordinate_space(PointerCoordinateSpace::Document)
-        .with_wheel_delta(PointerWheelDelta::new(
-            ORIGIN,
-            WHEEL_VERTICAL_DELTA,
-            PointerWheelUnit::Pixels,
-        ))
+        .with_wheel_delta(PointerWheelDelta::new(ORIGIN, WHEEL_VERTICAL_DELTA, PointerWheelUnit::Pixels))
         .with_modifiers(modifiers);
     let double_click = click_event()
         .with_coordinate_space(PointerCoordinateSpace::WidgetLocal)
@@ -51,18 +42,11 @@ fn full_event_taxonomy_normalizes_supported_mouse_variants() {
     .with_buttons(PointerButtonSet::from_button(&PointerButton::Primary));
 
     let normalized_wheel = normalize_pointer_event(wheel).expect("wheel event is supported");
-    let normalized_double =
-        normalize_pointer_event(double_click).expect("double click is supported");
+    let normalized_double = normalize_pointer_event(double_click).expect("double click is supported");
     let normalized_drag = normalize_pointer_event(drag).expect("drag event is supported");
 
-    assert_eq!(
-        normalized_wheel.coordinate_space,
-        PointerCoordinateSpace::Document
-    );
-    assert_eq!(
-        normalized_wheel.wheel_delta.expect("wheel delta").unit,
-        PointerWheelUnit::Pixels
-    );
+    assert_eq!(normalized_wheel.coordinate_space, PointerCoordinateSpace::Document);
+    assert_eq!(normalized_wheel.wheel_delta.expect("wheel delta").unit, PointerWheelUnit::Pixels);
     assert_eq!(normalized_wheel.modifiers, modifiers);
     assert_eq!(normalized_double.click_count, PointerClickCount::Double);
     assert!(normalized_drag.buttons.primary);
@@ -92,8 +76,7 @@ fn unsupported_pointer_details_fail_closed() {
             WHEEL_VERTICAL_DELTA,
             PointerWheelUnit::Unsupported("degrees".to_string()),
         )),
-        event_with_phase(PointerPhase::Move)
-            .with_buttons(PointerButtonSet::none().with_unsupported("extra-button")),
+        event_with_phase(PointerPhase::Move).with_buttons(PointerButtonSet::none().with_unsupported("extra-button")),
     ];
 
     for event in unsupported_events {

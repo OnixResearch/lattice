@@ -1,0 +1,15 @@
+schema=iced.semantic-projection.v1
+fixture=workspace-shell.negative
+adapter=iced-semantic
+generator=iced-workspace-semantic-v1
+evidence-role=semantic-projection
+state-blake3=0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5
+workspace-snapshot-blake3=0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5
+state.diagnostics=StaleLiveId,UnsupportedRestoreShape
+state.focus_pane=pane:editor
+state.layout_shape=workspaces=1,tabs=1,panes=1
+state.pane_content=pane:editor:editor ready
+state.panes=pane:editor
+state.workspace_status=idle
+effects=-
+diagnostics=DisabledAction,UnsupportedWaitPredicate,OutOfBoundsMouse,ImpossibleGeometry

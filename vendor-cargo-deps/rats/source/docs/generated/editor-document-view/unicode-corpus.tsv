@@ -1,0 +1,13 @@
+case	text_description	bytes	scalars	UTF16_relationship	grapheme_or_cell_issue	required_policy
+ASCII	abc	3	3	equal	one cell each	all units coincide only here
+multibyte-script	Greek lambda	2	1	one unit	usually one display cell	byte and scalar differ
+combining	e plus combining acute	3	2	two units	one grapheme;zero-width combining mark	cursor engine must choose grapheme policy
+emoji	woman technologist ZWJ sequence	11	3	five units	one grapheme;terminal width varies	no inferred universal offset
+wide	CJK ideograph	3	1	one unit	typically two terminal cells	display adapter owns width
+zero-width	zero-width joiner	3	1	one unit	zero display cells alone	do not equate scalar and cell
+Tab	ASCII tab	1	1	one unit	display cells depend on tab stop	renderer/view owns tab expansion
+CRLF	a CRLF b	4	4	four units	line split and retained delimiter differ	content owner names newline policy
+invalid-boundary	byte inside multibyte scalar	n/a	n/a	n/a	must reject	range validation before slicing
+edit-before	offset after replacement	n/a	n/a	n/a	shift by checked removed/inserted bytes	mapping owned by edit engine
+edit-inside	offset in replaced range	n/a	n/a	n/a	ambiguous	invalidate unless explicit affinity policy
+stale-revision	any range under old revision	n/a	n/a	n/a	content may differ	reject or application-supplied remap

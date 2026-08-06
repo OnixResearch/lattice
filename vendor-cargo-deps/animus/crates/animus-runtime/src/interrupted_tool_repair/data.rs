@@ -37,7 +37,8 @@ pub enum InterruptedToolEntryKind {
     ToolResult,
     /// Previously committed synthetic terminal result.
     SyntheticToolResult,
-    /// Compaction or replay metadata that remains provider-visible only through a validated projection.
+    /// Compaction or replay metadata that remains provider-visible only through a validated
+    /// projection.
     ReplayMetadata,
     /// Unsupported entry used to prove fail-closed behavior.
     Unsupported,
@@ -587,8 +588,7 @@ impl InterruptedToolProviderGateDecision {
     pub const fn provider_dispatch_allowed(&self) -> bool {
         matches!(
             self.status,
-            InterruptedToolProviderGateStatus::ReadyClean
-                | InterruptedToolProviderGateStatus::ReadyRepaired
+            InterruptedToolProviderGateStatus::ReadyClean | InterruptedToolProviderGateStatus::ReadyRepaired
         )
     }
 

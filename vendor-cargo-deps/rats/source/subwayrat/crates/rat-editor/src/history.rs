@@ -1,6 +1,7 @@
 //! Command history and history navigation
 
-use crate::{Editor, MAX_HISTORY};
+use crate::Editor;
+use crate::MAX_HISTORY;
 
 impl Editor {
     pub fn history_up(&mut self) {

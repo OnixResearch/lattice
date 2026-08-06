@@ -101,9 +101,7 @@ pub(super) fn receipt(input: ReceiptIdentity<'_>) -> super::Text {
         super::RECEIPT_SCHEMA,
         input.plan_hash,
         input.resource_redaction.as_str(),
-        input
-            .resource_identity
-            .unwrap_or(super::OMITTED_RESOURCE_IDENTITY),
+        input.resource_identity.unwrap_or(super::OMITTED_RESOURCE_IDENTITY),
         input.after_snapshot_hash,
         diagnostics_hash.as_str(),
         spans_hash.as_str(),

@@ -53,9 +53,7 @@ fn core_rows() -> Vec<super::CoverageRow> {
             super::STATUS_PASS_THROUGH,
             "Publish primitive coverage rows for edge cases and fallback decisions.",
         )
-        .with_related_surface(
-            "Theme token projection stays in Ratcore; Ratatui styling stays TUI-owned.",
-        )
+        .with_related_surface("Theme token projection stays in Ratcore; Ratatui styling stays TUI-owned.")
         .with_evidence("docs/theme-token-previews.md")
         .with_evidence("subwayrat/crates/rat-showcase/src/main.rs"),
     );

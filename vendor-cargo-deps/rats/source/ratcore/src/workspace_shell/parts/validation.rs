@@ -8,8 +8,8 @@ pub(crate) struct CandidateIds<'a> {
 
 /// Tab lookup request scoped by workspace and tab IDs.
 pub(crate) struct TabRef<'a> {
-    pub space: &'a str,
-    pub tab: &'a str,
+    pub space: &'a super::types::WorkspaceId,
+    pub tab: &'a super::types::TabId,
 }
 
 /// Live-ID diagnostic request.
@@ -22,10 +22,7 @@ pub(crate) struct LiveRef<'a> {
 #[must_use]
 pub fn validate_model(model: &super::state::Model) -> Vec<super::types::Diagnostic> {
     let focus_diagnostics = focus_diagnostic(model).into_iter();
-    duplicate_id_diagnostics(model)
-        .into_iter()
-        .chain(focus_diagnostics)
-        .collect()
+    duplicate_id_diagnostics(model).into_iter().chain(focus_diagnostics).collect()
 }
 
 pub(crate) fn ensure_unique_ids(
@@ -34,20 +31,14 @@ pub(crate) fn ensure_unique_ids(
 ) -> Result<(), super::types::Diagnostic> {
     debug_assert!(!candidate.live.is_empty());
     debug_assert!(!candidate.persisted.is_empty());
-    if all_live_ids(model)
-        .iter()
-        .any(|existing| existing == candidate.live)
-    {
+    if all_live_ids(model).iter().any(|existing| existing == candidate.live) {
         return Err(super::types::Diagnostic::new(
             super::types::DiagnosticCode::DuplicateLiveId,
             candidate.live,
             format!("live ID `{}` already exists", candidate.live),
         ));
     }
-    if all_persisted_ids(model)
-        .iter()
-        .any(|existing| existing == candidate.persisted)
-    {
+    if all_persisted_ids(model).iter().any(|existing| existing == candidate.persisted) {
         return Err(super::types::Diagnostic::new(
             super::types::DiagnosticCode::DuplicatePersistedId,
             candidate.persisted,
@@ -64,47 +55,35 @@ pub(crate) fn require_tab(
     debug_assert!(!target.space.is_empty());
     debug_assert!(!target.tab.is_empty());
     let space = space_index(model, target.space).ok_or_else(|| {
-        missing_live_diagnostic(
-            model,
-            LiveRef {
-                id: target.space,
-                subject: super::types::SUBJECT_SPACE,
-            },
-        )
+        missing_live_diagnostic(model, LiveRef {
+            id: target.space.as_str(),
+            subject: super::types::SUBJECT_SPACE,
+        })
     })?;
     let tab = tab_index(&model.workspaces[space], target.tab).ok_or_else(|| {
-        missing_live_diagnostic(
-            model,
-            LiveRef {
-                id: target.tab,
-                subject: super::types::SUBJECT_TAB,
-            },
-        )
+        missing_live_diagnostic(model, LiveRef {
+            id: target.tab.as_str(),
+            subject: super::types::SUBJECT_TAB,
+        })
     })?;
-    Ok(super::state::TabPosition {
-        workspace: space,
-        tab,
-    })
+    Ok(super::state::TabPosition { workspace: space, tab })
 }
 
-pub(crate) fn space_index(model: &super::state::Model, live_id: &str) -> Option<usize> {
-    model
-        .workspaces
-        .iter()
-        .position(|workspace| workspace.live_id == live_id)
+pub(crate) fn space_index(model: &super::state::Model, live_id: &super::types::WorkspaceId) -> Option<usize> {
+    model.workspaces.iter().position(|workspace| &workspace.live_id == live_id)
 }
 
-pub(crate) fn tab_index(workspace: &super::state::Space, live_id: &str) -> Option<usize> {
-    workspace.tabs.iter().position(|tab| tab.live_id == live_id)
+pub(crate) fn tab_index(workspace: &super::state::Space, live_id: &super::types::TabId) -> Option<usize> {
+    workspace.tabs.iter().position(|tab| &tab.live_id == live_id)
 }
 
-pub(crate) fn pane_index(tab: &super::state::Tab, live_id: &str) -> Option<usize> {
-    tab.panes.iter().position(|pane| pane.live_id == live_id)
+pub(crate) fn pane_index(tab: &super::state::Tab, live_id: &super::types::PaneId) -> Option<usize> {
+    tab.panes.iter().position(|pane| &pane.live_id == live_id)
 }
 
 pub(crate) fn pane_position_in_model(
     model: &super::state::Model,
-    live_id: &str,
+    live_id: &super::types::PaneId,
 ) -> Option<(usize, usize, usize)> {
     for (space_position, workspace) in model.workspaces.iter().enumerate() {
         for (tab_position, tab) in workspace.tabs.iter().enumerate() {
@@ -116,11 +95,8 @@ pub(crate) fn pane_position_in_model(
     None
 }
 
-pub(crate) fn missing_live_diagnostic(
-    model: &super::state::Model,
-    live: LiveRef<'_>,
-) -> super::types::Diagnostic {
-    if model.retired_live_ids.contains(live.id) {
+pub(crate) fn missing_live_diagnostic(model: &super::state::Model, live: LiveRef<'_>) -> super::types::Diagnostic {
+    if model.retired_live_ids.iter().any(|retired| retired.as_str() == live.id) {
         return super::types::Diagnostic::new(
             super::types::DiagnosticCode::StaleLiveId,
             live.id,
@@ -174,10 +150,10 @@ fn duplicate_persisted_id_diagnostics(ids: Vec<String>) -> Vec<super::types::Dia
 fn all_live_ids(model: &super::state::Model) -> Vec<String> {
     let mut ids = Vec::with_capacity(id_capacity(model));
     for workspace in &model.workspaces {
-        ids.push(workspace.live_id.clone());
+        ids.push(workspace.live_id.to_string());
         for tab in &workspace.tabs {
-            ids.push(tab.live_id.clone());
-            ids.extend(tab.panes.iter().map(|pane| pane.live_id.clone()));
+            ids.push(tab.live_id.to_string());
+            ids.extend(tab.panes.iter().map(|pane| pane.live_id.to_string()));
         }
     }
     ids
@@ -186,10 +162,10 @@ fn all_live_ids(model: &super::state::Model) -> Vec<String> {
 fn all_persisted_ids(model: &super::state::Model) -> Vec<String> {
     let mut ids = Vec::with_capacity(id_capacity(model));
     for workspace in &model.workspaces {
-        ids.push(workspace.persisted_id.clone());
+        ids.push(workspace.persisted_id.to_string());
         for tab in &workspace.tabs {
-            ids.push(tab.persisted_id.clone());
-            ids.extend(tab.panes.iter().map(|pane| pane.persisted_id.clone()));
+            ids.push(tab.persisted_id.to_string());
+            ids.extend(tab.panes.iter().map(|pane| pane.persisted_id.to_string()));
         }
     }
     ids
@@ -200,26 +176,17 @@ fn id_capacity(model: &super::state::Model) -> usize {
         total
             .saturating_add(1)
             .saturating_add(workspace.tabs.len())
-            .saturating_add(
-                workspace
-                    .tabs
-                    .iter()
-                    .map(|tab| tab.panes.len())
-                    .sum::<usize>(),
-            )
+            .saturating_add(workspace.tabs.iter().map(|tab| tab.panes.len()).sum::<usize>())
     })
 }
 
 fn focus_diagnostic(model: &super::state::Model) -> Option<super::types::Diagnostic> {
     let focus = model.focus.as_ref()?;
     let Some(space_position) = space_index(model, &focus.workspace) else {
-        return Some(missing_live_diagnostic(
-            model,
-            LiveRef {
-                id: &focus.workspace,
-                subject: super::types::SUBJECT_SPACE,
-            },
-        ));
+        return Some(missing_live_diagnostic(model, LiveRef {
+            id: focus.workspace.as_str(),
+            subject: super::types::SUBJECT_SPACE,
+        }));
     };
     tab_focus_diagnostic(model, space_position, focus)
 }
@@ -233,13 +200,10 @@ fn tab_focus_diagnostic(
     debug_assert!(!focus.tab.is_empty());
     let workspace = &model.workspaces[space_position];
     let Some(tab_position) = tab_index(workspace, &focus.tab) else {
-        return Some(missing_live_diagnostic(
-            model,
-            LiveRef {
-                id: &focus.tab,
-                subject: super::types::SUBJECT_TAB,
-            },
-        ));
+        return Some(missing_live_diagnostic(model, LiveRef {
+            id: focus.tab.as_str(),
+            subject: super::types::SUBJECT_TAB,
+        }));
     };
     pane_focus_diagnostic(
         model,
@@ -260,11 +224,8 @@ fn pane_focus_diagnostic(
     if pane_index(tab, &focus.pane).is_some() {
         return None;
     }
-    Some(missing_live_diagnostic(
-        model,
-        LiveRef {
-            id: &focus.pane,
-            subject: super::types::SUBJECT_PANE,
-        },
-    ))
+    Some(missing_live_diagnostic(model, LiveRef {
+        id: focus.pane.as_str(),
+        subject: super::types::SUBJECT_PANE,
+    }))
 }

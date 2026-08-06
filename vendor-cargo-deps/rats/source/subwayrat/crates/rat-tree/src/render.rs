@@ -1,13 +1,15 @@
 //! Tree widget rendering via ratatui `StatefulWidget`.
 
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    text::{Line, Span},
-    widgets::{Block, StatefulWidget, Widget},
-};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::StatefulWidget;
+use ratatui::widgets::Widget;
 
-use crate::model::{NodeId, TreeData};
+use crate::model::NodeId;
+use crate::model::TreeData;
 use crate::state::TreeState;
 use crate::style::TreeStyle;
 
@@ -87,11 +89,7 @@ impl StatefulWidget for Tree<'_> {
             };
 
             let is_selected = row_idx == state.cursor;
-            let row_style = if is_selected {
-                s.selected_style
-            } else {
-                s.normal_style
-            };
+            let row_style = if is_selected { s.selected_style } else { s.normal_style };
 
             // Build the line spans
             let mut spans: Vec<Span> = Vec::new();
@@ -131,10 +129,7 @@ impl StatefulWidget for Tree<'_> {
 
             // Icon (if present)
             if let Some(icon) = self.data.node_icon(vis_row.node_id) {
-                spans.push(Span::styled(
-                    format!("{icon} "),
-                    s.icon_style.patch(row_style),
-                ));
+                spans.push(Span::styled(format!("{icon} "), s.icon_style.patch(row_style)));
             }
 
             // Label

@@ -1,8 +1,16 @@
-use super::{
-    Collection, HASH_FIELD, HashInput, OUTCOME_FIELD, PARAMETER_HASH_FIELD, RECIPE_FIELD,
-    REDACTION_FIELD, ScheduleError, Text, required_text, text_collection, validate_hash,
-    validate_hashes,
-};
+use super::Collection;
+use super::HASH_FIELD;
+use super::HashInput;
+use super::OUTCOME_FIELD;
+use super::PARAMETER_HASH_FIELD;
+use super::RECIPE_FIELD;
+use super::REDACTION_FIELD;
+use super::ScheduleError;
+use super::Text;
+use super::required_text;
+use super::text_collection;
+use super::validate_hash;
+use super::validate_hashes;
 
 /// Untrusted scheduled run record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -117,10 +125,7 @@ pub fn validate_scheduled_record_text(text: &str) -> Result<(), ScheduleError> {
     Ok(())
 }
 
-fn count_to_u32(
-    field_name: crate::validation::FieldName,
-    value: usize,
-) -> Result<u32, ScheduleError> {
+fn count_to_u32(field_name: crate::validation::FieldName, value: usize) -> Result<u32, ScheduleError> {
     u32::try_from(value).map_err(|_overflow| ScheduleError::CountOverflow {
         field: field_name.as_str(),
     })

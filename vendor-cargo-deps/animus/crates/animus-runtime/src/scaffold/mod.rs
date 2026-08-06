@@ -6,7 +6,8 @@
 //! computes deterministic selection, admission, and receipt decisions without
 //! ambient authority.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
+// drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -14,12 +15,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -29,18 +25,32 @@
 mod core;
 mod data;
 
-pub use core::{
-    apply_scaffold_admission, blake3_scaffold_fingerprint, select_scaffold_profile,
-    validate_scaffold_influence_receipt, validate_scaffold_profile,
-};
-pub use data::{
-    ScaffoldAdmissionDecision, ScaffoldAdmissionEffect, ScaffoldAdmissionOutcome,
-    ScaffoldAdmissionRequest, ScaffoldDiagnostic, ScaffoldDiagnosticKind, ScaffoldFingerprint,
-    ScaffoldInfluenceReceipt, ScaffoldInfluenceValidationOutcome, ScaffoldProfile,
-    ScaffoldProfileProvenance, ScaffoldReceiptSensitiveEvidence, ScaffoldReviewStatus,
-    ScaffoldRevision, ScaffoldRevisionProposal, ScaffoldSelectionOutcome, ScaffoldSelectionPlan,
-    ScaffoldSelectionRequest, ScaffoldStrategyKnob, ScaffoldValidationResult,
-};
+pub use core::apply_scaffold_admission;
+pub use core::blake3_scaffold_fingerprint;
+pub use core::select_scaffold_profile;
+pub use core::validate_scaffold_influence_receipt;
+pub use core::validate_scaffold_profile;
+
+pub use data::ScaffoldAdmissionDecision;
+pub use data::ScaffoldAdmissionEffect;
+pub use data::ScaffoldAdmissionOutcome;
+pub use data::ScaffoldAdmissionRequest;
+pub use data::ScaffoldDiagnostic;
+pub use data::ScaffoldDiagnosticKind;
+pub use data::ScaffoldFingerprint;
+pub use data::ScaffoldInfluenceReceipt;
+pub use data::ScaffoldInfluenceValidationOutcome;
+pub use data::ScaffoldProfile;
+pub use data::ScaffoldProfileProvenance;
+pub use data::ScaffoldReceiptSensitiveEvidence;
+pub use data::ScaffoldReviewStatus;
+pub use data::ScaffoldRevision;
+pub use data::ScaffoldRevisionProposal;
+pub use data::ScaffoldSelectionOutcome;
+pub use data::ScaffoldSelectionPlan;
+pub use data::ScaffoldSelectionRequest;
+pub use data::ScaffoldStrategyKnob;
+pub use data::ScaffoldValidationResult;
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const SCAFFOLD_HASH_DOMAIN: &str = "animus.scaffold-profile.v1";

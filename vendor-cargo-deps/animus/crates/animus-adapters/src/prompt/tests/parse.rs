@@ -24,20 +24,14 @@ fn parser_accepts_supported_reference_shapes() -> Result<(), ContextReferenceErr
 
     let url = parse_context_reference(SAMPLE_URL)?;
     assert_eq!(url.kind(), ContextReferenceKind::Url);
-    assert!(
-        url.safe_target_label()
-            .starts_with(super::super::base::URL_LABEL_PREFIX)
-    );
+    assert!(url.safe_target_label().starts_with(super::super::base::URL_LABEL_PREFIX));
     assert!(!url.safe_target_label().contains("example.test"));
     Ok(())
 }
 
 #[test]
 fn parser_rejects_malformed_and_unsafe_references() {
-    assert!(matches!(
-        parse_context_reference("src/lib.rs"),
-        Err(ContextReferenceError::MissingSigil)
-    ));
+    assert!(matches!(parse_context_reference("src/lib.rs"), Err(ContextReferenceError::MissingSigil)));
     assert!(matches!(
         parse_context_reference(MALFORMED_RANGE),
         Err(ContextReferenceError::MalformedRange { .. })
@@ -46,10 +40,7 @@ fn parser_rejects_malformed_and_unsafe_references() {
         parse_context_reference(UNSUPPORTED_REFERENCE),
         Err(ContextReferenceError::UnsupportedKind { .. })
     ));
-    assert!(matches!(
-        parse_context_reference(ESCAPING_REFERENCE),
-        Err(ContextReferenceError::PathEscape { .. })
-    ));
+    assert!(matches!(parse_context_reference(ESCAPING_REFERENCE), Err(ContextReferenceError::PathEscape { .. })));
     assert!(matches!(
         parse_context_reference("@https://token@example.test/private"),
         Err(ContextReferenceError::UnsafeTarget { .. })

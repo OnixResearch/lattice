@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,43 +7,83 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
-use super::{
-    BLAKE3_ALGORITHM, FIELD_ARCHIVE_BEST_RUN, FIELD_ARCHIVE_IDEAS, FIELD_ARCHIVE_KEPT_RUNS,
-    FIELD_BASELINE_CONFIG, FIELD_BASELINE_EVIDENCE, FIELD_BASELINE_GUARDED,
-    FIELD_BASELINE_PRIMARY_METRIC, FIELD_BASELINE_STUDY, FIELD_BASELINE_WORKLOAD, FIELD_CHECKS,
-    FIELD_CLAIM, FIELD_DIFF, FIELD_EXPECTED_SIGNAL, FIELD_FALSIFICATION, FIELD_GUARDED_FILES,
-    FIELD_HYPOTHESIS_ID, FIELD_HYPOTHESIS_LINKS, FIELD_HYPOTHESIS_REFERENCE, FIELD_INSTRUMENTATION,
-    FIELD_INTERVENTION, FIELD_METRIC_DIRECTION, FIELD_OBJECTIVE, FIELD_OFF_LIMITS,
-    FIELD_PRIMARY_METRIC, FIELD_PROMOTION_DEPENDENCY, FIELD_PROMOTION_FILE, FIELD_PROMOTION_GROUP,
-    FIELD_PROMOTION_RUNS, FIELD_PROVENANCE, FIELD_RISK_NOTES, FIELD_ROLLBACK,
-    FIELD_RUN_CHANGED_FILES, FIELD_RUN_CHECKS, FIELD_RUN_ID, FIELD_RUN_MEASUREMENT_RISKS,
-    FIELD_RUN_NEXT_ACTION, FIELD_RUN_PRIMARY_METRIC, FIELD_RUN_SEQUENCE, FIELD_RUN_STUDY,
-    FIELD_SCOPE, FIELD_STUDY_ID, FIELD_WORKLOAD, HASH_PART_SEPARATOR, RESEARCHSPEC_HASH_DOMAIN,
-    data::{
-        ResearchSpecArchiveConclusion, ResearchSpecBaselineEvidence, ResearchSpecCheckResult,
-        ResearchSpecCheckStatus, ResearchSpecDiagnostic, ResearchSpecDiagnosticKind,
-        ResearchSpecFingerprint, ResearchSpecGuardedFingerprint, ResearchSpecHypothesis,
-        ResearchSpecHypothesisDecision, ResearchSpecKeepDecision, ResearchSpecKeepOutcome,
-        ResearchSpecMeasurementRisk, ResearchSpecMetricDirection, ResearchSpecMetricSample,
-        ResearchSpecPromotionDecision, ResearchSpecPromotionGroup, ResearchSpecPromotionOutcome,
-        ResearchSpecRunEvidence, ResearchSpecRunStatus, ResearchSpecStudyContract,
-        ResearchSpecValidationResult,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::FIELD_ARCHIVE_BEST_RUN;
+use super::FIELD_ARCHIVE_IDEAS;
+use super::FIELD_ARCHIVE_KEPT_RUNS;
+use super::FIELD_BASELINE_CONFIG;
+use super::FIELD_BASELINE_EVIDENCE;
+use super::FIELD_BASELINE_GUARDED;
+use super::FIELD_BASELINE_PRIMARY_METRIC;
+use super::FIELD_BASELINE_STUDY;
+use super::FIELD_BASELINE_WORKLOAD;
+use super::FIELD_CHECKS;
+use super::FIELD_CLAIM;
+use super::FIELD_DIFF;
+use super::FIELD_EXPECTED_SIGNAL;
+use super::FIELD_FALSIFICATION;
+use super::FIELD_GUARDED_FILES;
+use super::FIELD_HYPOTHESIS_ID;
+use super::FIELD_HYPOTHESIS_LINKS;
+use super::FIELD_HYPOTHESIS_REFERENCE;
+use super::FIELD_INSTRUMENTATION;
+use super::FIELD_INTERVENTION;
+use super::FIELD_METRIC_DIRECTION;
+use super::FIELD_OBJECTIVE;
+use super::FIELD_OFF_LIMITS;
+use super::FIELD_PRIMARY_METRIC;
+use super::FIELD_PROMOTION_DEPENDENCY;
+use super::FIELD_PROMOTION_FILE;
+use super::FIELD_PROMOTION_GROUP;
+use super::FIELD_PROMOTION_RUNS;
+use super::FIELD_PROVENANCE;
+use super::FIELD_RISK_NOTES;
+use super::FIELD_ROLLBACK;
+use super::FIELD_RUN_CHANGED_FILES;
+use super::FIELD_RUN_CHECKS;
+use super::FIELD_RUN_ID;
+use super::FIELD_RUN_MEASUREMENT_RISKS;
+use super::FIELD_RUN_NEXT_ACTION;
+use super::FIELD_RUN_PRIMARY_METRIC;
+use super::FIELD_RUN_SEQUENCE;
+use super::FIELD_RUN_STUDY;
+use super::FIELD_SCOPE;
+use super::FIELD_STUDY_ID;
+use super::FIELD_WORKLOAD;
+use super::HASH_PART_SEPARATOR;
+use super::RESEARCHSPEC_HASH_DOMAIN;
+use super::data::ResearchSpecArchiveConclusion;
+use super::data::ResearchSpecBaselineEvidence;
+use super::data::ResearchSpecCheckResult;
+use super::data::ResearchSpecCheckStatus;
+use super::data::ResearchSpecDiagnostic;
+use super::data::ResearchSpecDiagnosticKind;
+use super::data::ResearchSpecFingerprint;
+use super::data::ResearchSpecGuardedFingerprint;
+use super::data::ResearchSpecHypothesis;
+use super::data::ResearchSpecHypothesisDecision;
+use super::data::ResearchSpecKeepDecision;
+use super::data::ResearchSpecKeepOutcome;
+use super::data::ResearchSpecMeasurementRisk;
+use super::data::ResearchSpecMetricDirection;
+use super::data::ResearchSpecMetricSample;
+use super::data::ResearchSpecPromotionDecision;
+use super::data::ResearchSpecPromotionGroup;
+use super::data::ResearchSpecPromotionOutcome;
+use super::data::ResearchSpecRunEvidence;
+use super::data::ResearchSpecRunStatus;
+use super::data::ResearchSpecStudyContract;
+use super::data::ResearchSpecValidationResult;
 
 const FIELD_PROMOTION_GROUP_DUPLICATE: &str = "promotion_group.duplicate_group_id";
 const FIELD_RUN_UNRESOLVED: &str = "run.status";
@@ -65,39 +106,17 @@ pub fn blake3_researchspec_fingerprint(label: &str, bytes: &[u8]) -> ResearchSpe
 ///
 /// Returns all missing-field and empty-collection diagnostics for required
 /// study contract fields.
-pub fn validate_research_study_contract(
-    contract: &ResearchSpecStudyContract,
-) -> ResearchSpecValidationResult {
+pub fn validate_research_study_contract(contract: &ResearchSpecStudyContract) -> ResearchSpecValidationResult {
     let mut diagnostics = Vec::new();
     require_text(&contract.study_id, FIELD_STUDY_ID, &mut diagnostics);
     require_text(&contract.objective, FIELD_OBJECTIVE, &mut diagnostics);
-    require_text(
-        &contract.primary_metric,
-        FIELD_PRIMARY_METRIC,
-        &mut diagnostics,
-    );
-    require_text(
-        &contract.workload.command_identity,
-        FIELD_WORKLOAD,
-        &mut diagnostics,
-    );
+    require_text(&contract.primary_metric, FIELD_PRIMARY_METRIC, &mut diagnostics);
+    require_text(&contract.workload.command_identity, FIELD_WORKLOAD, &mut diagnostics);
     require_collection(&contract.correctness_checks, FIELD_CHECKS, &mut diagnostics);
     require_collection(&contract.scope_files, FIELD_SCOPE, &mut diagnostics);
-    require_collection(
-        &contract.off_limits_files,
-        FIELD_OFF_LIMITS,
-        &mut diagnostics,
-    );
-    require_collection(
-        &contract.guarded_measurement_files,
-        FIELD_GUARDED_FILES,
-        &mut diagnostics,
-    );
-    require_text(
-        &contract.provenance.source,
-        FIELD_PROVENANCE,
-        &mut diagnostics,
-    );
+    require_collection(&contract.off_limits_files, FIELD_OFF_LIMITS, &mut diagnostics);
+    require_collection(&contract.guarded_measurement_files, FIELD_GUARDED_FILES, &mut diagnostics);
+    require_text(&contract.provenance.source, FIELD_PROVENANCE, &mut diagnostics);
     to_validation_result(diagnostics)
 }
 
@@ -127,26 +146,10 @@ pub fn validate_research_baseline(
     );
     require_collection_of_checks(&baseline.checks, FIELD_CHECKS, &mut diagnostics);
     collect_failed_checks(&baseline.checks, FIELD_CHECKS, &mut diagnostics);
-    require_blake3(
-        &baseline.config_fingerprint,
-        FIELD_BASELINE_CONFIG,
-        &mut diagnostics,
-    );
-    require_blake3(
-        &baseline.workload_fingerprint,
-        FIELD_BASELINE_WORKLOAD,
-        &mut diagnostics,
-    );
-    require_blake3(
-        &baseline.evidence_fingerprint,
-        FIELD_BASELINE_EVIDENCE,
-        &mut diagnostics,
-    );
-    require_guarded_fingerprints(
-        &baseline.guarded_fingerprints,
-        FIELD_BASELINE_GUARDED,
-        &mut diagnostics,
-    );
+    require_blake3(&baseline.config_fingerprint, FIELD_BASELINE_CONFIG, &mut diagnostics);
+    require_blake3(&baseline.workload_fingerprint, FIELD_BASELINE_WORKLOAD, &mut diagnostics);
+    require_blake3(&baseline.evidence_fingerprint, FIELD_BASELINE_EVIDENCE, &mut diagnostics);
+    require_guarded_fingerprints(&baseline.guarded_fingerprints, FIELD_BASELINE_GUARDED, &mut diagnostics);
     to_validation_result(diagnostics)
 }
 
@@ -156,31 +159,13 @@ pub fn validate_research_baseline(
 ///
 /// Returns diagnostics when a hypothesis lacks an actionable claim,
 /// intervention, expected signal, falsification criteria, or risk notes.
-pub fn validate_research_hypothesis(
-    hypothesis: &ResearchSpecHypothesis,
-) -> ResearchSpecValidationResult {
+pub fn validate_research_hypothesis(hypothesis: &ResearchSpecHypothesis) -> ResearchSpecValidationResult {
     let mut diagnostics = Vec::new();
-    require_text(
-        &hypothesis.hypothesis_id,
-        FIELD_HYPOTHESIS_ID,
-        &mut diagnostics,
-    );
+    require_text(&hypothesis.hypothesis_id, FIELD_HYPOTHESIS_ID, &mut diagnostics);
     require_hypothesis_text(&hypothesis.claim, FIELD_CLAIM, &mut diagnostics);
-    require_hypothesis_text(
-        &hypothesis.intervention,
-        FIELD_INTERVENTION,
-        &mut diagnostics,
-    );
-    require_hypothesis_text(
-        &hypothesis.expected_signal,
-        FIELD_EXPECTED_SIGNAL,
-        &mut diagnostics,
-    );
-    require_hypothesis_text(
-        &hypothesis.falsification_criteria,
-        FIELD_FALSIFICATION,
-        &mut diagnostics,
-    );
+    require_hypothesis_text(&hypothesis.intervention, FIELD_INTERVENTION, &mut diagnostics);
+    require_hypothesis_text(&hypothesis.expected_signal, FIELD_EXPECTED_SIGNAL, &mut diagnostics);
+    require_hypothesis_text(&hypothesis.falsification_criteria, FIELD_FALSIFICATION, &mut diagnostics);
     require_hypothesis_text(&hypothesis.risk_notes, FIELD_RISK_NOTES, &mut diagnostics);
     to_validation_result(diagnostics)
 }
@@ -205,34 +190,13 @@ pub fn validate_research_run(
             "run study_id does not match study contract",
         ));
     }
-    require_text(
-        &run.hypothesis_id,
-        FIELD_HYPOTHESIS_REFERENCE,
-        &mut diagnostics,
-    );
-    require_text(
-        &run.timestamp_or_sequence,
-        FIELD_RUN_SEQUENCE,
-        &mut diagnostics,
-    );
+    require_text(&run.hypothesis_id, FIELD_HYPOTHESIS_REFERENCE, &mut diagnostics);
+    require_text(&run.timestamp_or_sequence, FIELD_RUN_SEQUENCE, &mut diagnostics);
     require_blake3(&run.diff_fingerprint, FIELD_DIFF, &mut diagnostics);
-    require_metric_name(
-        &run.primary_metric,
-        &study.primary_metric,
-        FIELD_RUN_PRIMARY_METRIC,
-        &mut diagnostics,
-    );
+    require_metric_name(&run.primary_metric, &study.primary_metric, FIELD_RUN_PRIMARY_METRIC, &mut diagnostics);
     require_collection_of_checks(&run.checks, FIELD_RUN_CHECKS, &mut diagnostics);
-    require_collection(
-        &run.changed_files,
-        FIELD_RUN_CHANGED_FILES,
-        &mut diagnostics,
-    );
-    require_guarded_fingerprints(
-        &run.guarded_fingerprints,
-        FIELD_INSTRUMENTATION,
-        &mut diagnostics,
-    );
+    require_collection(&run.changed_files, FIELD_RUN_CHANGED_FILES, &mut diagnostics);
+    require_guarded_fingerprints(&run.guarded_fingerprints, FIELD_INSTRUMENTATION, &mut diagnostics);
     if run_requires_learning_context(run.status) {
         require_failure_context(run, &mut diagnostics);
     }
@@ -249,10 +213,7 @@ pub fn evaluate_research_keep_gate(
 ) -> ResearchSpecKeepDecision {
     let mut diagnostics = Vec::new();
     append_result(validate_research_study_contract(study), &mut diagnostics);
-    append_result(
-        validate_research_baseline(study, baseline),
-        &mut diagnostics,
-    );
+    append_result(validate_research_baseline(study, baseline), &mut diagnostics);
     append_result(validate_research_hypothesis(hypothesis), &mut diagnostics);
     append_result(validate_research_run(study, run), &mut diagnostics);
     validate_run_hypothesis_link(hypothesis, run, &mut diagnostics);
@@ -277,9 +238,7 @@ pub fn evaluate_research_keep_gate(
 
 /// Evaluates whether kept-run promotion groups are independent or dependent.
 #[must_use]
-pub fn evaluate_research_promotion_groups(
-    groups: &[ResearchSpecPromotionGroup],
-) -> ResearchSpecPromotionDecision {
+pub fn evaluate_research_promotion_groups(groups: &[ResearchSpecPromotionGroup]) -> ResearchSpecPromotionDecision {
     let mut diagnostics = Vec::new();
     let group_ids = collect_group_ids(groups, &mut diagnostics);
     collect_group_shape_diagnostics(groups, &group_ids, &mut diagnostics);
@@ -295,10 +254,7 @@ pub fn evaluate_research_promotion_groups(
     } else {
         ResearchSpecPromotionOutcome::Independent
     };
-    ResearchSpecPromotionDecision {
-        outcome,
-        diagnostics,
-    }
+    ResearchSpecPromotionDecision { outcome, diagnostics }
 }
 
 /// Validates whether a study archive can close out all lifecycle decisions.
@@ -322,11 +278,7 @@ pub fn validate_research_archive(
         ));
     }
     require_text(&archive.objective, FIELD_OBJECTIVE, &mut diagnostics);
-    require_blake3(
-        &archive.baseline_fingerprint,
-        FIELD_BASELINE_EVIDENCE,
-        &mut diagnostics,
-    );
+    require_blake3(&archive.baseline_fingerprint, FIELD_BASELINE_EVIDENCE, &mut diagnostics);
     collect_unresolved_hypotheses(hypotheses, &mut diagnostics);
     collect_unresolved_runs(runs, &mut diagnostics);
     collect_archive_reference_diagnostics(archive, runs, &mut diagnostics);
@@ -340,10 +292,7 @@ pub fn validate_research_archive(
     to_validation_result(diagnostics)
 }
 
-fn append_result(
-    result: ResearchSpecValidationResult,
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn append_result(result: ResearchSpecValidationResult, diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     if let Err(mut new_diagnostics) = result {
         diagnostics.append(&mut new_diagnostics);
     }
@@ -358,10 +307,7 @@ fn collect_archive_reference_diagnostics(
     runs: &[ResearchSpecRunEvidence],
     diagnostics: &mut Vec<ResearchSpecDiagnostic>,
 ) {
-    let run_ids = runs
-        .iter()
-        .map(|run| run.run_id.as_str())
-        .collect::<BTreeSet<_>>();
+    let run_ids = runs.iter().map(|run| run.run_id.as_str()).collect::<BTreeSet<_>>();
     if let Some(best_run_id) = archive.best_run_id.as_deref() {
         if !run_ids.contains(best_run_id) {
             diagnostics.push(ResearchSpecDiagnostic::new(
@@ -398,16 +344,11 @@ fn collect_failed_checks(
     }
 }
 
-fn collect_group_file_overlaps(
-    groups: &[ResearchSpecPromotionGroup],
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn collect_group_file_overlaps(groups: &[ResearchSpecPromotionGroup], diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     let mut file_owner = BTreeMap::<&str, &str>::new();
     for group in groups {
         for file in &group.touched_files {
-            if let Some(existing_group_id) =
-                file_owner.insert(file.as_str(), group.group_id.as_str())
-            {
+            if let Some(existing_group_id) = file_owner.insert(file.as_str(), group.group_id.as_str()) {
                 if existing_group_id != group.group_id {
                     diagnostics.push(ResearchSpecDiagnostic::new(
                         ResearchSpecDiagnosticKind::PromotionGroupOverlap,
@@ -501,10 +442,7 @@ fn collect_guarded_drift(
     }
 }
 
-fn collect_measurement_risks(
-    risks: &[ResearchSpecMeasurementRisk],
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn collect_measurement_risks(risks: &[ResearchSpecMeasurementRisk], diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     for risk in risks {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::MeasurementIntegrityRisk,
@@ -514,11 +452,7 @@ fn collect_measurement_risks(
     }
 }
 
-fn collect_metric_gate(
-    study: &ResearchSpecStudyContract,
-    delta: i64,
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn collect_metric_gate(study: &ResearchSpecStudyContract, delta: i64, diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     if delta <= 0 {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::MetricDidNotImprove,
@@ -545,10 +479,7 @@ fn collect_metric_gate(
     }
 }
 
-fn collect_unresolved_hypotheses(
-    hypotheses: &[ResearchSpecHypothesis],
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn collect_unresolved_hypotheses(hypotheses: &[ResearchSpecHypothesis], diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     for hypothesis in hypotheses {
         if hypothesis.decision == ResearchSpecHypothesisDecision::Undecided {
             diagnostics.push(ResearchSpecDiagnostic::new(
@@ -560,10 +491,7 @@ fn collect_unresolved_hypotheses(
     }
 }
 
-fn collect_unresolved_runs(
-    runs: &[ResearchSpecRunEvidence],
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn collect_unresolved_runs(runs: &[ResearchSpecRunEvidence], diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     for run in runs {
         if run.status == ResearchSpecRunStatus::Completed {
             diagnostics.push(ResearchSpecDiagnostic::new(
@@ -584,9 +512,7 @@ fn metric_delta(
     baseline: &ResearchSpecBaselineEvidence,
     run: &ResearchSpecRunEvidence,
 ) -> Option<i64> {
-    if baseline.primary_metric.name != study.primary_metric
-        || run.primary_metric.name != study.primary_metric
-    {
+    if baseline.primary_metric.name != study.primary_metric || run.primary_metric.name != study.primary_metric {
         return None;
     }
     let baseline_value = baseline.primary_metric.value.microunits();
@@ -597,11 +523,7 @@ fn metric_delta(
     })
 }
 
-fn require_blake3(
-    fingerprint: &ResearchSpecFingerprint,
-    field: &str,
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn require_blake3(fingerprint: &ResearchSpecFingerprint, field: &str, diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::UnexpectedAlgorithm,
@@ -612,11 +534,7 @@ fn require_blake3(
     require_text(&fingerprint.value_hex, field, diagnostics);
 }
 
-fn require_collection(
-    values: &[String],
-    field: &str,
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn require_collection(values: &[String], field: &str, diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     if values.is_empty() || values.iter().any(|value| blank(value)) {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::EmptyCollection,
@@ -640,10 +558,7 @@ fn require_collection_of_checks(
     }
 }
 
-fn require_failure_context(
-    run: &ResearchSpecRunEvidence,
-    diagnostics: &mut Vec<ResearchSpecDiagnostic>,
-) {
+fn require_failure_context(run: &ResearchSpecRunEvidence, diagnostics: &mut Vec<ResearchSpecDiagnostic>) {
     if run.rollback_reason.as_deref().is_none_or(blank) {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::FailedRunMissingContext,
@@ -717,9 +632,7 @@ fn require_text(text: &str, field: &str, diagnostics: &mut Vec<ResearchSpecDiagn
 fn run_requires_learning_context(status: ResearchSpecRunStatus) -> bool {
     matches!(
         status,
-        ResearchSpecRunStatus::Discarded
-            | ResearchSpecRunStatus::Crashed
-            | ResearchSpecRunStatus::CheckFailed
+        ResearchSpecRunStatus::Discarded | ResearchSpecRunStatus::Crashed | ResearchSpecRunStatus::CheckFailed
     )
 }
 
@@ -737,10 +650,7 @@ fn validate_run_hypothesis_link(
     diagnostics: &mut Vec<ResearchSpecDiagnostic>,
 ) {
     if hypothesis.hypothesis_id != run.hypothesis_id
-        || !hypothesis
-            .linked_run_ids
-            .iter()
-            .any(|run_id| run_id == &run.run_id)
+        || !hypothesis.linked_run_ids.iter().any(|run_id| run_id == &run.run_id)
     {
         diagnostics.push(ResearchSpecDiagnostic::new(
             ResearchSpecDiagnosticKind::TraceabilityMissing,

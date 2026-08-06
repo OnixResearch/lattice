@@ -1,0 +1,15 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [],
+  "destination": "config/generated/spacewasm-embedded-compat.json",
+  "family_id": "animus.spacewasm-embedded-compat",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "spacewasm_embedded_compat",
+  "source": "config/spacewasm-embedded-compat.ncl"
+}

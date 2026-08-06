@@ -108,14 +108,8 @@ pub fn evaluate(request: Request<'_>) -> Evaluation {
     let analysis = super::analyze_wrapper(request.command);
     let intent_count = analysis.intents().len();
     let matched_rule_slots = intent_count.saturating_mul(request.rules.len());
-    assert!(
-        intent_count > 0,
-        "evaluation must inspect at least one intent"
-    );
-    assert!(
-        intent_count <= super::MAX_COMMAND_WORDS,
-        "evaluated intent count must fit command bound"
-    );
+    assert!(intent_count > 0, "evaluation must inspect at least one intent");
+    assert!(intent_count <= super::MAX_COMMAND_WORDS, "evaluated intent count must fit command bound");
     let mut final_decision = super::Decision::Allow;
     let mut matched_rules = super::Collection::with_capacity(matched_rule_slots);
     let mut command_fingerprints = super::Collection::with_capacity(intent_count);
@@ -146,9 +140,7 @@ fn evaluate_intent(
         if rule.matches_intent(intent) {
             matched_rules.push(RuleEvidence::new(rule, intent));
             decision = Some(
-                decision.map_or(rule.decision(), |current: super::Decision| {
-                    current.most_restrictive(rule.decision())
-                }),
+                decision.map_or(rule.decision(), |current: super::Decision| current.most_restrictive(rule.decision())),
             );
         }
     }

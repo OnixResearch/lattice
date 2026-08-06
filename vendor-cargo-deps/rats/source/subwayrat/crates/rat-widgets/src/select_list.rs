@@ -5,11 +5,15 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Span;
-use ratatui::widgets::{List, ListItem};
+use ratatui::widgets::List;
+use ratatui::widgets::ListItem;
 
-use crate::popup_chrome::{
-    POPUP_MARGIN, centered_overlay_model, clamped_axis, themed_overlay_style, title, usize_to_u16,
-};
+use crate::popup_chrome::POPUP_MARGIN;
+use crate::popup_chrome::centered_overlay_model;
+use crate::popup_chrome::clamped_axis;
+use crate::popup_chrome::themed_overlay_style;
+use crate::popup_chrome::title;
+use crate::popup_chrome::usize_to_u16;
 use crate::theme::WidgetTheme;
 
 const SELECT_LIST_WIDTH: u16 = 40;
@@ -90,11 +94,7 @@ impl SelectList {
     }
 }
 
-fn select_overlay_model(
-    area: Rect,
-    title_text: &str,
-    item_count: usize,
-) -> rat_chrome::OverlayModel {
+fn select_overlay_model(area: Rect, title_text: &str, item_count: usize) -> rat_chrome::OverlayModel {
     let width = clamped_axis(area.width, SELECT_LIST_WIDTH, POPUP_MARGIN);
     let preferred_height = usize_to_u16(item_count).saturating_add(BORDER_ROWS);
     let height = clamped_axis(area.height, preferred_height, POPUP_MARGIN);
@@ -122,14 +122,16 @@ fn select_list_items<'a>(model: &'a SelectListModel, theme: &WidgetTheme) -> Lis
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
-    use ratatui::style::{Color, Modifier};
+    use ratatui::style::Color;
+    use ratatui::style::Modifier;
     use ratatui::text::Line;
     use ratatui::widgets::Paragraph;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 60;
     const VIEWPORT_HEIGHT: u16 = 12;
@@ -151,11 +153,7 @@ mod tests {
 
         assert_eq!(buffer[(layout.outer.x, layout.outer.y)].fg, Color::Blue);
         assert_eq!(buffer[(layout.inner.x, selected_y)].symbol(), "B");
-        assert!(
-            buffer[(layout.inner.x, selected_y)]
-                .modifier
-                .contains(Modifier::BOLD)
-        );
+        assert!(buffer[(layout.inner.x, selected_y)].modifier.contains(Modifier::BOLD));
     }
 
     #[test]
@@ -215,10 +213,7 @@ mod tests {
     }
 
     fn select_layout(viewport: Rect, list: &SelectList) -> rat_chrome::OverlayLayout {
-        compute_overlay_layout(
-            viewport,
-            &select_overlay_model(viewport, &list.title, list.model.items.len()),
-        )
+        compute_overlay_layout(viewport, &select_overlay_model(viewport, &list.title, list.model.items.len()))
     }
 
     fn viewport() -> Rect {

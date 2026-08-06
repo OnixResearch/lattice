@@ -66,17 +66,14 @@ impl Binding {
     /// Returns true only when every requested capability survived stronger checks.
     #[must_use]
     pub fn all_allowed(&self) -> bool {
-        self.bindings
-            .iter()
-            .all(|binding| binding.status() == BindingStatus::AllowedByPolicy)
+        self.bindings.iter().all(|binding| binding.status() == BindingStatus::AllowedByPolicy)
     }
 }
 
 /// Resolves profile-requested mode metadata below host and runtime authority.
 #[must_use]
 pub fn bind_mode(request: BindingRequest<'_>) -> Binding {
-    let mut bindings =
-        super::support::Collection::with_capacity(request.requested_capabilities.len());
+    let mut bindings = super::support::Collection::with_capacity(request.requested_capabilities.len());
     for capability in request.requested_capabilities.iter().copied() {
         bindings.push(CapabilityBinding {
             capability,

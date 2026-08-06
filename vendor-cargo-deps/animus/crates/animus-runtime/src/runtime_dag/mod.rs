@@ -24,16 +24,26 @@
 mod core;
 mod data;
 
-pub use core::{
-    blake3_runtime_dag_fingerprint, explain_runtime_dag_blocked_nodes, plan_runtime_dag_topology,
-    project_runtime_dag_receipt, validate_runtime_dag_graph, validate_runtime_dag_receipt,
-};
-pub use data::{
-    RuntimeDagBlockedNode, RuntimeDagBounds, RuntimeDagEdge, RuntimeDagGraph, RuntimeDagIssueKind,
-    RuntimeDagNode, RuntimeDagReceipt, RuntimeDagReceiptLeak, RuntimeDagRedactionStatus,
-    RuntimeDagTopologicalBatch, RuntimeDagTopologicalPlan, RuntimeDagValidationIssue,
-    RuntimeDagValidationReport,
-};
+pub use core::blake3_runtime_dag_fingerprint;
+pub use core::explain_runtime_dag_blocked_nodes;
+pub use core::plan_runtime_dag_topology;
+pub use core::project_runtime_dag_receipt;
+pub use core::validate_runtime_dag_graph;
+pub use core::validate_runtime_dag_receipt;
+
+pub use data::RuntimeDagBlockedNode;
+pub use data::RuntimeDagBounds;
+pub use data::RuntimeDagEdge;
+pub use data::RuntimeDagGraph;
+pub use data::RuntimeDagIssueKind;
+pub use data::RuntimeDagNode;
+pub use data::RuntimeDagReceipt;
+pub use data::RuntimeDagReceiptLeak;
+pub use data::RuntimeDagRedactionStatus;
+pub use data::RuntimeDagTopologicalBatch;
+pub use data::RuntimeDagTopologicalPlan;
+pub use data::RuntimeDagValidationIssue;
+pub use data::RuntimeDagValidationReport;
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const EMPTY_COUNT: usize = 0;

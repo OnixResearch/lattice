@@ -5,7 +5,48 @@
 //! into a list based on expand/collapse state.
 
 /// Stable identifier for a node in the tree.
-pub type NodeId = u32;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NodeId(u32);
+
+impl NodeId {
+    /// Creates a node identifier from its renderer-neutral numeric value.
+    #[must_use]
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    /// Returns the renderer-neutral numeric value.
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for NodeId {
+    fn from(value: u32) -> Self {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<usize> for NodeId {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        u32::try_from(value).map(Self::new)
+    }
+}
+
+impl std::borrow::Borrow<u32> for NodeId {
+    fn borrow(&self) -> &u32 {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for NodeId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
 
 /// Trait for tree data accessed top-down.
 ///
@@ -43,6 +84,10 @@ pub struct VisibleRow {
     pub node_id: NodeId,
     /// Depth in the tree (0 for roots).
     pub depth: usize,
+    /// One-based position among siblings.
+    pub position: usize,
+    /// Number of siblings at this level.
+    pub set_size: usize,
     /// Whether this node has children.
     pub has_children: bool,
     /// Whether this node is currently expanded.
@@ -59,18 +104,32 @@ pub struct VisibleRow {
 ///
 /// Nodes whose parent is collapsed are excluded. The walk is depth-first.
 #[must_use]
-pub fn compute_visible_rows(
-    data: &dyn TreeData,
-    expanded: &std::collections::BTreeSet<NodeId>,
-) -> Vec<VisibleRow> {
+pub fn compute_visible_rows(data: &dyn TreeData, expanded: &std::collections::BTreeSet<NodeId>) -> Vec<VisibleRow> {
     let mut walker = VisibleRowWalker::new(data, expanded);
     let root_count = walker.data.root_count();
     for index in 0..root_count {
         let node = walker.data.root(index);
         let is_last_sibling = index.saturating_add(1) == root_count;
-        walker.walk_node(node, 0, is_last_sibling, &[]);
+        walker.walk_node(
+            node,
+            WalkPosition {
+                depth: 0,
+                position: index.saturating_add(1),
+                set_size: root_count,
+                is_last_sibling,
+            },
+            &[],
+        );
     }
     walker.into_rows()
+}
+
+#[derive(Clone, Copy)]
+struct WalkPosition {
+    depth: usize,
+    position: usize,
+    set_size: usize,
+    is_last_sibling: bool,
 }
 
 struct VisibleRowWalker<'a> {
@@ -92,36 +151,35 @@ impl<'a> VisibleRowWalker<'a> {
         self.rows
     }
 
-    fn walk_node(
-        &mut self,
-        node: NodeId,
-        depth: usize,
-        is_last_sibling: bool,
-        ancestors_last: &[bool],
-    ) {
+    fn walk_node(&mut self, node: NodeId, position: WalkPosition, ancestors_last: &[bool]) {
         let child_count = self.data.child_count(node);
         let has_children = child_count > 0;
         let is_expanded = has_children && self.expanded.contains(&node);
 
         self.rows.push(VisibleRow {
             node_id: node,
-            depth,
+            depth: position.depth,
+            position: position.position,
+            set_size: position.set_size,
             has_children,
             is_expanded,
-            is_last_sibling,
+            is_last_sibling: position.is_last_sibling,
             ancestors_last: ancestors_last.to_vec(),
         });
 
         if is_expanded {
             let mut child_ancestors = ancestors_last.to_vec();
-            child_ancestors.push(is_last_sibling);
+            child_ancestors.push(position.is_last_sibling);
             for child_index in 0..child_count {
                 let child = self.data.child(node, child_index);
-                let is_child_last = child_index.saturating_add(1) == child_count;
                 self.walk_node(
                     child,
-                    depth.saturating_add(1),
-                    is_child_last,
+                    WalkPosition {
+                        depth: position.depth.saturating_add(1),
+                        position: child_index.saturating_add(1),
+                        set_size: child_count,
+                        is_last_sibling: child_index.saturating_add(1) == child_count,
+                    },
                     &child_ancestors,
                 );
             }
@@ -150,16 +208,9 @@ impl SimpleTree {
     pub fn new(entries: Vec<(NodeId, Option<NodeId>, String)>) -> Self {
         let entry_count = entries.len();
         let mut roots = Vec::with_capacity(entry_count);
-        let mut children: std::collections::BTreeMap<NodeId, Vec<NodeId>> =
-            std::collections::BTreeMap::new();
-        let parents = entries
-            .iter()
-            .filter_map(|(id, parent_id, _label)| parent_id.map(|pid| (*id, pid)))
-            .collect();
-        let labels = entries
-            .iter()
-            .map(|(id, _parent_id, label)| (*id, label.clone()))
-            .collect();
+        let mut children: std::collections::BTreeMap<NodeId, Vec<NodeId>> = std::collections::BTreeMap::new();
+        let parents = entries.iter().filter_map(|(id, parent_id, _label)| parent_id.map(|pid| (*id, pid))).collect();
+        let labels = entries.iter().map(|(id, _parent_id, label)| (*id, label.clone())).collect();
 
         for (id, parent_id, _label) in entries {
             match parent_id {

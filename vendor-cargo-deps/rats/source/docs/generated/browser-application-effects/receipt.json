@@ -1,0 +1,30 @@
+{
+  "adapter": "met-showcase.browser-effects.v1",
+  "authority": "current-application-operation-generation-capability-privacy-authorization",
+  "browser_product": "Chrome/149.0.7827.53",
+  "bundle_hash": "b3f6338cc2c9cb9eca58705896dc076623977b69",
+  "capability_hash": "62611e7fe114230571b0a82f1d38d68e9d9c374a9bfef8efdf1514a8b867dc9d",
+  "command_hash": "bed771ac936c693c3efb7905c471f23b61931c1d",
+  "direct": {
+    "clipboard_write": "completed",
+    "file_export": "initiated-and-cleaned",
+    "file_import": "completed-4-bytes-bounded-text",
+    "invalid_import": "rejected-state-preserved"
+  },
+  "non_claims": [
+    "not clipboard read, directories, persistent handles, network transfer, native effects, or all browsers",
+    "not security certification, downstream authorization, persistence, recovery, or release evidence"
+  ],
+  "normalized_result_hash": "227724faf213ccb829505704bf9b22330090f4bb",
+  "partial": {
+    "download_completion": "untested",
+    "file_picker_cancel": "simulated"
+  },
+  "protocol_version": "1.3",
+  "result": "pass",
+  "runner": "x86_64-unknown-linux-gnu",
+  "schema": "rats.browser-application-effects.v1",
+  "source_hash": "ab767b8484d12fa74b799af41f1c1ff057453a23",
+  "source_revision": "ab4a6a6786ed0c480585676cba7dc785f103f4fc",
+  "target": "wasm32-unknown-unknown"
+}

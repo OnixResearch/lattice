@@ -210,6 +210,9 @@ fn map_report(
                 model_label: model_adapter.model_label(),
             }),
         }),
+        animus_runtime::RuntimeStatus::CompletionCandidate { .. } => Err(crate::agent_node::AgentError::Adapter(
+            "Animus runtime requested unsupported host-owned completion evaluation".to_string(),
+        )),
         animus_runtime::RuntimeStatus::Stopped => Err(crate::agent_node::AgentError::Adapter(
             "Animus runtime stopped without a final response".to_string(),
         )),

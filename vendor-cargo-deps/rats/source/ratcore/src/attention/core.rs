@@ -14,7 +14,7 @@
 //!     .with_scope(FocusScope::root("root", "Application"))
 //!     .with_node(FocusNode::new("save", "root", FocusRole::Button, "Save"))
 //!     .activate_first().unwrap();
-//! assert_eq!(graph.active_id(), Some("save"));
+//! assert_eq!(graph.active_id().map(|id| id.as_str()), Some("save"));
 //! assert_eq!(graph.tui_projection().unwrap().status_text, "Button: Save");
 //! ```
 
@@ -22,13 +22,29 @@ const ROOT_SCOPE_ID: &str = "root";
 const STYLE_FOCUSED: &str = "focused";
 const STATUS_SEPARATOR: &str = ": ";
 
+semantic_string_id! {
+    /// Identifier for a focus scope.
+    pub struct FocusScopeId;
+}
+
+semantic_string_id! {
+    /// Identifier for a focusable node.
+    ///
+    /// ```compile_fail
+    /// use ratcore::focus::{FocusNode, FocusRole, FocusScopeId};
+    /// let scope = FocusScopeId::new("root");
+    /// let _ = FocusNode::new(scope, "root", FocusRole::Button, "Save");
+    /// ```
+    pub struct FocusNodeId;
+}
+
 /// Focus scope such as an app root, panel, menu, or modal dialog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FocusScope {
     /// Stable scope ID.
-    pub id: String,
+    pub id: FocusScopeId,
     /// Optional parent scope ID.
-    pub parent: Option<String>,
+    pub parent: Option<FocusScopeId>,
     /// Scope label for announcements.
     pub label: String,
     /// Whether focus is trapped inside this scope while active.
@@ -40,7 +56,7 @@ pub struct FocusScope {
 impl FocusScope {
     /// Creates a root scope.
     #[must_use]
-    pub fn root(id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn root(id: impl Into<FocusScopeId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             parent: None,
@@ -52,11 +68,7 @@ impl FocusScope {
 
     /// Creates a child scope.
     #[must_use]
-    pub fn child(
-        id: impl Into<String>,
-        parent: impl Into<String>,
-        label: impl Into<String>,
-    ) -> Self {
+    pub fn child(id: impl Into<FocusScopeId>, parent: impl Into<FocusScopeId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             parent: Some(parent.into()),
@@ -85,9 +97,9 @@ impl FocusScope {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FocusNode {
     /// Stable node ID.
-    pub id: String,
+    pub id: FocusNodeId,
     /// Owning scope ID.
-    pub scope: String,
+    pub scope: FocusScopeId,
     /// Semantic role.
     pub role: FocusRole,
     /// Accessible label.
@@ -104,8 +116,8 @@ impl FocusNode {
     /// Creates a focus node.
     #[must_use]
     pub fn new(
-        id: impl Into<String>,
-        scope: impl Into<String>,
+        id: impl Into<FocusNodeId>,
+        scope: impl Into<FocusScopeId>,
         role: FocusRole,
         label: impl Into<String>,
     ) -> Self {
@@ -124,8 +136,8 @@ impl FocusNode {
     #[must_use]
     pub fn for_widget(
         kind: FocusWidgetKind,
-        id: impl Into<String>,
-        scope: impl Into<String>,
+        id: impl Into<FocusNodeId>,
+        scope: impl Into<FocusScopeId>,
         label: impl Into<String>,
     ) -> Self {
         Self::new(id, scope, kind.default_role(), label)
@@ -176,19 +188,39 @@ pub enum FocusErrorCode {
     ModalEscape,
 }
 
+/// Typed identity associated with a focus diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FocusErrorId {
+    /// Focus scope identity.
+    Scope(FocusScopeId),
+    /// Focus node identity.
+    Node(FocusNodeId),
+}
+
+impl FocusErrorId {
+    /// Returns the raw identity text for display adapters.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Scope(id) => id.as_str(),
+            Self::Node(id) => id.as_str(),
+        }
+    }
+}
+
 /// Deterministic focus error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FocusError {
     /// Stable error code.
     pub code: FocusErrorCode,
-    /// Related ID when available.
-    pub id: Option<String>,
+    /// Related typed ID when available.
+    pub id: Option<FocusErrorId>,
     /// Human-readable diagnostic.
     pub message: String,
 }
 
 impl FocusError {
-    fn new(code: FocusErrorCode, id: Option<String>, message: impl Into<String>) -> Self {
+    fn new(code: FocusErrorCode, id: Option<FocusErrorId>, message: impl Into<String>) -> Self {
         Self {
             code,
             id,
@@ -201,26 +233,30 @@ impl FocusError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FocusTransition {
     /// Previously active node ID.
-    pub previous: Option<String>,
+    pub previous: Option<FocusNodeId>,
     /// Newly active node ID.
-    pub active: Option<String>,
+    pub active: Option<FocusNodeId>,
     /// Announcement text for status/live-region adapters.
     pub announcement: Option<String>,
 }
 
+mod accessibility;
 mod checks;
 mod model;
 mod motion;
 mod semantics;
 mod views;
+pub use accessibility::*;
 pub use model::FocusGraph;
-pub use semantics::{FocusRole, FocusWidgetKind};
-pub use views::{AriaProjection, TuiFocusProjection};
+pub use semantics::FocusRole;
+pub use semantics::FocusWidgetKind;
+pub use views::AriaProjection;
+pub use views::TuiFocusProjection;
 
 /// Returns the default root scope ID used by examples and simple applications.
 #[must_use]
-pub fn default_root_scope_id() -> &'static str {
-    ROOT_SCOPE_ID
+pub fn default_root_scope_id() -> FocusScopeId {
+    FocusScopeId::new(ROOT_SCOPE_ID)
 }
 
 #[cfg(test)]

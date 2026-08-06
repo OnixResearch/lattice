@@ -46,55 +46,41 @@ pub fn pointer_mouse_replay_target() -> PointerMouseReplayTarget {
 /// Creates the valid full mouse replay script.
 #[must_use]
 pub fn pointer_mouse_positive_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        POSITIVE_FIXTURE_ID,
-        POSITIVE_NAME,
-        FIXTURE_COMPONENT,
-    ))
-    .with_event(command(ACTION_CLICK_CHROME))
-    .with_event(command(ACTION_DOUBLE_COMMAND))
-    .with_event(command(ACTION_CONTEXT_TABLE))
-    .with_event(ReplayEvent::Mouse {
-        target: TARGET_FULL_MOUSE.to_string(),
-        x: HOVER_X,
-        y: HOVER_Y,
-    })
-    .with_event(command(ACTION_WHEEL_TREE))
-    .with_event(command(ACTION_DRAG_START_DOCKING))
-    .with_event(command(ACTION_DRAG_UPDATE_DOCKING))
-    .with_event(command(ACTION_DRAG_RELEASE_DOCKING))
-    .with_event(command(ACTION_CANCEL_OVERLAY))
-    .with_event(command(ACTION_SHIFT_SELECT_SPREADSHEET))
-    .with_event(wait_for_released_capture())
-    .with_assertion(ReplayAssertion::new(
-        "accepted_routes",
-        POSITIVE_ACCEPTED_ROUTES.to_string(),
-    ))
-    .with_assertion(ReplayAssertion::new("captured_target", EMPTY_MARKER))
+    ReplayScript::new(ReplayMetadata::new(POSITIVE_FIXTURE_ID, POSITIVE_NAME, FIXTURE_COMPONENT))
+        .with_event(command(ACTION_CLICK_CHROME))
+        .with_event(command(ACTION_DOUBLE_COMMAND))
+        .with_event(command(ACTION_CONTEXT_TABLE))
+        .with_event(ReplayEvent::Mouse {
+            target: TARGET_FULL_MOUSE.to_string(),
+            x: HOVER_X,
+            y: HOVER_Y,
+        })
+        .with_event(command(ACTION_WHEEL_TREE))
+        .with_event(command(ACTION_DRAG_START_DOCKING))
+        .with_event(command(ACTION_DRAG_UPDATE_DOCKING))
+        .with_event(command(ACTION_DRAG_RELEASE_DOCKING))
+        .with_event(command(ACTION_CANCEL_OVERLAY))
+        .with_event(command(ACTION_SHIFT_SELECT_SPREADSHEET))
+        .with_event(wait_for_released_capture())
+        .with_assertion(ReplayAssertion::new("accepted_routes", POSITIVE_ACCEPTED_ROUTES.to_string()))
+        .with_assertion(ReplayAssertion::new("captured_target", EMPTY_MARKER))
 }
 
 /// Creates the invalid full mouse replay script.
 #[must_use]
 pub fn pointer_mouse_negative_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        NEGATIVE_FIXTURE_ID,
-        NEGATIVE_NAME,
-        FIXTURE_COMPONENT,
-    ))
-    .with_event(command(ACTION_DISABLED_REGION))
-    .with_event(command(ACTION_MISSING_DRAG_START))
-    .with_event(command(ACTION_STALE_CAPTURE))
-    .with_event(command(ACTION_UNSUPPORTED_BACKEND))
-    .with_event(ReplayEvent::Mouse {
-        target: TARGET_FULL_MOUSE.to_string(),
-        x: OUT_OF_BOUNDS_X,
-        y: OUT_OF_BOUNDS_Y,
-    })
-    .with_assertion(ReplayAssertion::new(
-        "accepted_routes",
-        NEGATIVE_ACCEPTED_ROUTES.to_string(),
-    ))
-    .with_assertion(ReplayAssertion::new("captured_target", EMPTY_MARKER))
+    ReplayScript::new(ReplayMetadata::new(NEGATIVE_FIXTURE_ID, NEGATIVE_NAME, FIXTURE_COMPONENT))
+        .with_event(command(ACTION_DISABLED_REGION))
+        .with_event(command(ACTION_MISSING_DRAG_START))
+        .with_event(command(ACTION_STALE_CAPTURE))
+        .with_event(command(ACTION_UNSUPPORTED_BACKEND))
+        .with_event(ReplayEvent::Mouse {
+            target: TARGET_FULL_MOUSE.to_string(),
+            x: OUT_OF_BOUNDS_X,
+            y: OUT_OF_BOUNDS_Y,
+        })
+        .with_assertion(ReplayAssertion::new("accepted_routes", NEGATIVE_ACCEPTED_ROUTES.to_string()))
+        .with_assertion(ReplayAssertion::new("captured_target", EMPTY_MARKER))
 }
 
 /// Runs full mouse replay fixtures and returns deterministic proof rows.
@@ -130,9 +116,8 @@ fn run_replay_row(script: ReplayScript) -> PointerMouseReplayProofRow {
     let scenario = script.metadata.name.clone();
     let mut target = pointer_mouse_replay_target();
     let report = run_replay(&script, &mut target);
-    let route_summary_hash = target
-        .snapshot_bytes(SNAPSHOT_ROUTE_SUMMARY)
-        .map_or_else(String::new, |bytes| blake3_hex(&bytes));
+    let route_summary_hash =
+        target.snapshot_bytes(SNAPSHOT_ROUTE_SUMMARY).map_or_else(String::new, |bytes| blake3_hex(&bytes));
     let diagnostics = join_issue_codes(&report);
     PointerMouseReplayProofRow {
         fixture_id,
@@ -144,11 +129,7 @@ fn run_replay_row(script: ReplayScript) -> PointerMouseReplayProofRow {
 }
 
 fn join_issue_codes(report: &ReplayReport) -> String {
-    let values = report
-        .issues
-        .iter()
-        .map(|issue| format!("{:?}", issue.code))
-        .collect::<Vec<_>>();
+    let values = report.issues.iter().map(|issue| format!("{:?}", issue.code)).collect::<Vec<_>>();
     if values.is_empty() {
         EMPTY_MARKER.to_string()
     } else {

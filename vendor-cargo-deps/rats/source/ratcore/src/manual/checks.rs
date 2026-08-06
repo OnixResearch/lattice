@@ -1,5 +1,13 @@
 use super::*;
 
+#[path = "checks/mapping.rs"]
+mod mapping;
+#[path = "checks/policy.rs"]
+mod policy;
+pub use mapping::SnapshotPolicy;
+pub use mapping::validate_parity_manifest_gate;
+pub use mapping::validate_parity_manifest_gate_with_policy;
+
 /// Stable snapshot validation issue code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SnapshotIssueCode {
@@ -11,6 +19,14 @@ pub enum SnapshotIssueCode {
     DuplicateId,
     /// Renderer label is unsupported.
     UnsupportedRenderer,
+    /// Renderer registry or evidence scope policy is invalid.
+    InvalidRendererPolicy,
+    /// Evidence adapter identity is not registered or in scope.
+    UnknownEvidenceAdapter,
+    /// Legacy renderer text and nominal adapter identity disagree.
+    MismatchedEvidenceAdapter,
+    /// Evidence adapter does not produce visual snapshot evidence.
+    WrongEvidenceRole,
     /// Artifact hash does not match the manifest.
     StaleHash,
     /// Documentation source is incomplete.
@@ -35,11 +51,7 @@ pub struct SnapshotIssue {
 }
 
 impl SnapshotIssue {
-    pub(super) fn new(
-        code: SnapshotIssueCode,
-        subject: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub(super) fn new(code: SnapshotIssueCode, subject: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             subject: subject.into(),
@@ -63,23 +75,40 @@ impl SnapshotValidationReport {
     }
 }
 
-/// Validates a snapshot manifest against known fixtures and artifacts.
+/// Validates a snapshot manifest against the built-in visual adapter scope.
 #[must_use]
 pub fn validate_snapshot_manifest(
     entries: &[SnapshotManifestEntry],
-    fixture_ids: &std::collections::BTreeSet<String>,
+    fixture_ids: &std::collections::BTreeSet<crate::showcase_fixtures::FixtureId>,
     artifacts: &[SnapshotArtifact],
+) -> SnapshotValidationReport {
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let scope = crate::targeting_core::built_in_renderer_scope(
+        crate::targeting_core::BuiltInRendererScope::SnapshotVisualAdapters,
+    );
+    validate_snapshot_manifest_with_policy(entries, fixture_ids, artifacts, &registry, &scope)
+}
+
+/// Validates a snapshot manifest against an explicit visual evidence-adapter scope.
+#[must_use]
+pub fn validate_snapshot_manifest_with_policy(
+    entries: &[SnapshotManifestEntry],
+    fixture_ids: &std::collections::BTreeSet<crate::showcase_fixtures::FixtureId>,
+    artifacts: &[SnapshotArtifact],
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
 ) -> SnapshotValidationReport {
     let artifact_map = artifacts
         .iter()
         .map(|artifact| (artifact.path.clone(), artifact.bytes.as_slice()))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let mut issues = Vec::with_capacity(entries.len());
+    let mut issues = policy::registry_scope_issues(registry, scope);
+    issues.reserve(entries.len());
     debug_assert!(artifact_map.len() <= artifacts.len());
     debug_assert!(issues.capacity() >= entries.len());
     let mut ids = std::collections::BTreeSet::new();
     for entry in entries {
-        let identity = format!("{}:{}", entry.fixture_id, entry.renderer);
+        let identity = format!("{}:{}", entry.fixture_id, entry.evidence_adapter);
         if !ids.insert(identity.clone()) {
             issues.push(SnapshotIssue::new(
                 SnapshotIssueCode::DuplicateId,
@@ -90,24 +119,19 @@ pub fn validate_snapshot_manifest(
         if !fixture_ids.contains(&entry.fixture_id) {
             issues.push(SnapshotIssue::new(
                 SnapshotIssueCode::MissingFixture,
-                entry.fixture_id.clone(),
+                entry.fixture_id.to_string(),
                 "snapshot entry references a missing fixture",
             ));
         }
-        if !super::fixtures::SUPPORTED_RENDERERS.contains(&entry.renderer.as_str()) {
-            issues.push(SnapshotIssue::new(
-                SnapshotIssueCode::UnsupportedRenderer,
-                entry.renderer.clone(),
-                "snapshot renderer is unsupported",
-            ));
-        }
+        issues.extend(policy::manifest_adapter_issues(entry, registry, scope));
         match artifact_map.get(&entry.artifact_path) {
-            Some(bytes) if crate::interaction_replay::blake3_hex(bytes) != entry.blake3 => issues
-                .push(SnapshotIssue::new(
+            Some(bytes) if crate::interaction_replay::blake3_hex(bytes) != entry.blake3 => {
+                issues.push(SnapshotIssue::new(
                     SnapshotIssueCode::StaleHash,
                     entry.artifact_path.clone(),
                     "snapshot artifact hash is stale",
-                )),
+                ))
+            }
             Some(_) => {}
             None => issues.push(SnapshotIssue::new(
                 SnapshotIssueCode::MissingArtifact,
@@ -141,68 +165,6 @@ pub fn validate_generated_document(check: GeneratedDocumentCheck<'_>) -> Snapsho
                 check.subject,
                 "checked-in generated documentation is stale",
             )],
-        }
-    }
-}
-
-/// Validates snapshot documentation evidence required by fixture parity rows.
-#[must_use]
-pub fn validate_parity_manifest_gate(
-    rows: &[crate::showcase_fixtures::FixtureParityRow],
-    entries: &[SnapshotManifestEntry],
-    pages: &[GeneratedComponentPage],
-    artifacts: &[SnapshotArtifact],
-) -> SnapshotValidationReport {
-    let fixture_ids = rows
-        .iter()
-        .map(|row| row.fixture_id.clone())
-        .collect::<std::collections::BTreeSet<_>>();
-    let mut issues = validate_snapshot_manifest(entries, &fixture_ids, artifacts).issues;
-    let page_index = pages
-        .iter()
-        .map(|page| ((page.fixture_id.as_str(), page.path.as_str()), page))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    let entry_index = entries
-        .iter()
-        .map(|entry| ((entry.fixture_id.as_str(), entry.renderer.as_str()), entry))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    debug_assert!(page_index.len() <= pages.len());
-    debug_assert!(entry_index.len() <= entries.len());
-    for row in rows {
-        for renderer in row.renderers.iter().filter(|renderer| renderer.supported) {
-            let snapshot_renderer = snapshot_renderer_label(renderer.renderer);
-            if !page_index
-                .contains_key(&(row.fixture_id.as_str(), row.documentation_target.as_str()))
-            {
-                issues.push(SnapshotIssue::new(
-                    SnapshotIssueCode::MissingDocPage,
-                    row.documentation_target.clone(),
-                    format!(
-                        "fixture `{}` lacks generated documentation for `{}`",
-                        row.fixture_id,
-                        renderer.renderer.label()
-                    ),
-                ));
-            }
-            if !entry_index.contains_key(&(row.fixture_id.as_str(), snapshot_renderer)) {
-                issues.push(SnapshotIssue::new(
-                    SnapshotIssueCode::MissingManifestEntry,
-                    format!("{}:{snapshot_renderer}", row.fixture_id),
-                    "fixture parity row lacks snapshot manifest evidence",
-                ));
-            }
-        }
-    }
-    SnapshotValidationReport { issues }
-}
-
-fn snapshot_renderer_label(renderer: crate::showcase_fixtures::ShowcaseRenderer) -> &'static str {
-    match renderer {
-        crate::showcase_fixtures::ShowcaseRenderer::Subwayrat => {
-            super::fixtures::RENDERER_SUBWAYRAT_TYPST
-        }
-        crate::showcase_fixtures::ShowcaseRenderer::Meteorite => {
-            super::fixtures::RENDERER_METEORITE_DOM
         }
     }
 }

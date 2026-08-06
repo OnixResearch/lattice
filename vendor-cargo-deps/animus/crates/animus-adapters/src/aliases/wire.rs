@@ -6,14 +6,11 @@ pub const MODEL_REQUEST_CONTRACT_IDENTITY: &str = crate::model::MODEL_REQUEST_CO
 /// Stable contract identity for public model response DTOs.
 pub const MODEL_RESPONSE_CONTRACT_IDENTITY: &str = crate::model::MODEL_RESPONSE_CONTRACT_IDENTITY;
 /// Stable contract identity for canonical provider-neutral model request DTOs.
-pub const CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY: &str =
-    crate::model::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
+pub const CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY: &str = crate::model::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
 /// Stable contract identity for canonical provider-neutral model response envelopes.
-pub const CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY: &str =
-    crate::model::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
+pub const CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY: &str = crate::model::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
 /// Stable contract identity for public model stream frame DTOs.
-pub const MODEL_STREAM_FRAME_CONTRACT_IDENTITY: &str =
-    crate::model::wire::MODEL_STREAM_FRAME_CONTRACT_IDENTITY;
+pub const MODEL_STREAM_FRAME_CONTRACT_IDENTITY: &str = crate::model::wire::MODEL_STREAM_FRAME_CONTRACT_IDENTITY;
 
 /// Stable model-call correlation identifier carried by stream frames.
 pub type ModelStreamCallId = crate::model::wire::parts::CallId;
@@ -62,8 +59,7 @@ pub type CanonicalModelOutputControlsDraft<'a> = crate::model::CanonicalOutputCo
 /// Canonical model response-format intent.
 pub type CanonicalModelResponseFormatIntent = crate::model::CanonicalResponseFormatIntent;
 /// Borrowed canonical model response-format intent before validation.
-pub type CanonicalModelResponseFormatIntentDraft<'a> =
-    crate::model::CanonicalResponseFormatIntentDraft<'a>;
+pub type CanonicalModelResponseFormatIntentDraft<'a> = crate::model::CanonicalResponseFormatIntentDraft<'a>;
 /// Canonical model reasoning effort request.
 pub type CanonicalModelReasoningEffort = crate::model::CanonicalReasoningEffort;
 /// Canonical model reasoning request.
@@ -73,8 +69,7 @@ pub type CanonicalModelReasoningRequestDraft<'a> = crate::model::CanonicalReason
 /// Canonical model response envelope.
 pub type CanonicalModelResponseEnvelope = crate::model::CanonicalModelResponseEnvelope;
 /// Borrowed canonical model response envelope before validation.
-pub type CanonicalModelResponseEnvelopeDraft<'a> =
-    crate::model::CanonicalModelResponseEnvelopeDraft<'a>;
+pub type CanonicalModelResponseEnvelopeDraft<'a> = crate::model::CanonicalModelResponseEnvelopeDraft<'a>;
 /// Canonical model response item.
 pub type CanonicalModelResponseItem = crate::model::CanonicalModelResponseItem;
 /// Borrowed canonical model response item before validation.
@@ -130,15 +125,13 @@ pub type ModelInputModality = crate::multimodal::InputModality;
 /// Validated selected model input capability metadata.
 pub type SelectedModelInputCapabilities = crate::multimodal::ModelInputCapabilities;
 /// Borrowed selected model input capability metadata before validation.
-pub type SelectedModelInputCapabilitiesDraft<'a> =
-    crate::multimodal::ModelInputCapabilitiesDraft<'a>;
+pub type SelectedModelInputCapabilitiesDraft<'a> = crate::multimodal::ModelInputCapabilitiesDraft<'a>;
 /// Multimodal dispatch plan after capability gates pass.
 pub type ModelMultimodalDispatchPlan = crate::multimodal::DispatchPlan;
 /// Validated provider-native serialization policy.
 pub type ModelProviderSerializationPolicy = crate::multimodal::ProviderSerializationPolicy;
 /// Borrowed provider-native serialization policy before validation.
-pub type ModelProviderSerializationPolicyDraft<'a> =
-    crate::multimodal::ProviderSerializationPolicyDraft<'a>;
+pub type ModelProviderSerializationPolicyDraft<'a> = crate::multimodal::ProviderSerializationPolicyDraft<'a>;
 /// Provider request serialization mode.
 pub type ModelProviderSerializationMode = crate::multimodal::ProviderSerializationMode;
 /// Provider-native request fixture.
@@ -162,8 +155,7 @@ pub type ModelImageReceiptDraft<'a> = crate::multimodal::ImageReceiptDraft<'a>;
 /// Largest accepted model image byte count before host-side transformation is required.
 pub const MAX_MODEL_IMAGE_BYTE_COUNT: u64 = crate::multimodal::MAX_IMAGE_BYTE_COUNT;
 /// Default per-image prompt assembly budget for model image inputs.
-pub const DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET: u64 =
-    crate::multimodal::DEFAULT_PROMPT_IMAGE_BYTE_BUDGET;
+pub const DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET: u64 = crate::multimodal::DEFAULT_PROMPT_IMAGE_BYTE_BUDGET;
 /// Assembles ordered multimodal model content and safe image outcomes.
 ///
 /// # Errors
@@ -192,7 +184,8 @@ pub fn prepare_model_multimodal_dispatch(
 ///
 /// # Errors
 ///
-/// Returns [`ModelMultimodalError`] when image serialization would be lossy or lacks an injected service.
+/// Returns [`ModelMultimodalError`] when image serialization would be lossy or lacks an injected
+/// service.
 pub fn serialize_model_provider_native_fixture(
     assembly: &ModelPromptAssembly,
     policy: &ModelProviderSerializationPolicy,
@@ -206,9 +199,7 @@ pub fn serialize_model_provider_native_fixture(
 /// # Errors
 ///
 /// Returns [`ModelStreamError`] when stream frames are malformed or terminally invalid.
-pub fn assemble_visible_model_stream_response(
-    frames: &[ModelStreamFrame],
-) -> Result<ModelResponse, ModelStreamError> {
+pub fn assemble_visible_model_stream_response(frames: &[ModelStreamFrame]) -> Result<ModelResponse, ModelStreamError> {
     crate::model::wire::validate::assemble(frames)
 }
 
@@ -217,9 +208,7 @@ pub fn assemble_visible_model_stream_response(
 /// # Errors
 ///
 /// Returns [`ModelStreamError`] when fixture chunks cannot be parsed safely.
-pub fn parse_model_stream_fixture(
-    chunks: &[&str],
-) -> Result<alloc::vec::Vec<ModelStreamFrame>, ModelStreamError> {
+pub fn parse_model_stream_fixture(chunks: &[&str]) -> Result<alloc::vec::Vec<ModelStreamFrame>, ModelStreamError> {
     crate::model::wire::fixture::parse(chunks)
 }
 

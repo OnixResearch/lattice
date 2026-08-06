@@ -1,0 +1,5 @@
+selected=tab.history
+focused=tab.history
+events=[FocusChanged(TabId("tab.details")), SelectionProposed(TabId("tab.details")), SelectionCommitted(TabId("tab.details")), FocusChanged(TabId("tab.history")), SelectionProposed(TabId("tab.history")), SelectionCommitted(TabId("tab.history"))]
+diagnostics=[TabsDiagnostic { code: UnknownTarget, subject: "tab.missing" }]
+semantic_identity=95f702cac56d7b879c09f90b1c878eac3b9a56baace83d1815b0eee657418ec6

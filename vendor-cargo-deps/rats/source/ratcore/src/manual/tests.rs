@@ -21,19 +21,15 @@ const CHROME_DOC: &str = "docs/generated/components/chrome-shell.md";
 const KNOWLEDGE_DOC: &str = "docs/generated/components/knowledge-workflow.md";
 const THEME_DOC: &str = "docs/generated/components/theme-tokens.md";
 const CHECKED_IN_MANIFEST: &str = include_str!("../../../docs/generated/snapshot-manifest.md");
-const CHECKED_IN_DIALOG_DOC: &str =
-    include_str!("../../../docs/generated/components/dialog-basic.md");
-const CHECKED_IN_CHROME_DOC: &str =
-    include_str!("../../../docs/generated/components/chrome-shell.md");
-const CHECKED_IN_KNOWLEDGE_DOC: &str =
-    include_str!("../../../docs/generated/components/knowledge-workflow.md");
-const CHECKED_IN_THEME_DOC: &str =
-    include_str!("../../../docs/generated/components/theme-tokens.md");
+const CHECKED_IN_DIALOG_DOC: &str = include_str!("../../../docs/generated/components/dialog-basic.md");
+const CHECKED_IN_CHROME_DOC: &str = include_str!("../../../docs/generated/components/chrome-shell.md");
+const CHECKED_IN_KNOWLEDGE_DOC: &str = include_str!("../../../docs/generated/components/knowledge-workflow.md");
+const CHECKED_IN_THEME_DOC: &str = include_str!("../../../docs/generated/components/theme-tokens.md");
 
 #[test]
 fn manifest_validates_with_matching_artifact_hash() {
     let entry = sample_entry();
-    let fixtures = std::collections::BTreeSet::from([FIXTURE.to_string()]);
+    let fixtures = std::collections::BTreeSet::from([crate::showcase_fixtures::FixtureId::new(FIXTURE)]);
     let artifacts = vec![SnapshotArtifact::new(ARTIFACT_PATH, ARTIFACT)];
 
     let outcome = validate_snapshot_manifest(&[entry], &fixtures, &artifacts);
@@ -47,19 +43,15 @@ fn manifest_rejects_missing_stale_duplicate_and_unsupported() {
     stale.blake3 = "stale".to_string();
     let duplicate = stale.clone();
     let invalid_renderer_entry = SnapshotManifestEntry {
-        fixture_id: "missing".to_string(),
+        fixture_id: crate::showcase_fixtures::FixtureId::new("missing"),
         renderer: "browser".to_string(),
         artifact_path: "missing.png".to_string(),
         ..sample_entry()
     };
-    let fixtures = std::collections::BTreeSet::from([FIXTURE.to_string()]);
+    let fixtures = std::collections::BTreeSet::from([crate::showcase_fixtures::FixtureId::new(FIXTURE)]);
     let artifacts = vec![SnapshotArtifact::new(ARTIFACT_PATH, ARTIFACT)];
 
-    let outcome = validate_snapshot_manifest(
-        &[stale, duplicate, invalid_renderer_entry],
-        &fixtures,
-        &artifacts,
-    );
+    let outcome = validate_snapshot_manifest(&[stale, duplicate, invalid_renderer_entry], &fixtures, &artifacts);
 
     assert!(!outcome.is_valid());
     assert!(!outcome.issues.is_empty());
@@ -93,11 +85,7 @@ fn generator_requires_snippets_and_publication_checklist_names_review_steps() {
     let (_page, issues) = generate_component_page(&source, &[sample_entry()]);
 
     assert_eq!(issues[0].code, SnapshotIssueCode::MissingSnippet);
-    assert!(
-        publication_checklist()
-            .iter()
-            .any(|step| step.contains("BLAKE3"))
-    );
+    assert!(publication_checklist().iter().any(|step| step.contains("BLAKE3")));
 }
 
 #[test]
@@ -140,16 +128,20 @@ fn built_in_snapshot_manifest_validates_real_artifacts() {
 
     assert!(outcome.is_valid());
     assert_eq!(entries.len(), EXPECTED_BASELINE_ENTRY_COUNT);
-    assert!(entries.iter().any(|entry| {
-        entry.fixture_id == "chrome.shell" && entry.renderer == "subwayrat-typst"
-    }));
-    assert!(entries.iter().any(|entry| {
-        entry.fixture_id == "knowledge.workflow" && entry.renderer == "meteorite-dom"
-    }));
     assert!(
-        entries.iter().any(|entry| {
-            entry.fixture_id == "theme.tokens" && entry.renderer == "meteorite-dom"
-        })
+        entries
+            .iter()
+            .any(|entry| { entry.fixture_id == "chrome.shell" && entry.renderer == "subwayrat-typst" })
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|entry| { entry.fixture_id == "knowledge.workflow" && entry.renderer == "meteorite-dom" })
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|entry| { entry.fixture_id == "theme.tokens" && entry.renderer == "meteorite-dom" })
     );
 }
 
@@ -210,10 +202,7 @@ fn generated_manifest_and_component_pages_match_checked_in_docs() {
         (THEME_DOC, CHECKED_IN_THEME_DOC),
     ];
     for (path, checked_in) in expected_docs {
-        doc::assertions::assert_generated_document(doc::assertions::ExpectedGeneratedDocument {
-            path,
-            checked_in,
-        });
+        doc::assertions::assert_generated_document(doc::assertions::ExpectedGeneratedDocument { path, checked_in });
     }
 }
 

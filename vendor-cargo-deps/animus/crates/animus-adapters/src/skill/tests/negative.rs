@@ -8,12 +8,9 @@ fn missing_description_fails_validation() {
     })
     .expect_err("missing description should fail");
 
-    assert_eq!(
-        missing_description,
-        Error::MissingField {
-            field: DESCRIPTION_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_description, Error::MissingField {
+        field: DESCRIPTION_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -26,13 +23,10 @@ fn overlong_description_fails_validation() {
     })
     .expect_err("overlong description should fail");
 
-    assert_eq!(
-        overlong_description,
-        Error::DescriptionTooLong {
-            max_chars: MAX_DESCRIPTION_CHARS,
-            actual_chars: overlong_chars,
-        }
-    );
+    assert_eq!(overlong_description, Error::DescriptionTooLong {
+        max_chars: MAX_DESCRIPTION_CHARS,
+        actual_chars: overlong_chars,
+    });
 }
 
 #[test]
@@ -43,12 +37,9 @@ fn unsupported_semver_shape_fails_validation() {
     })
     .expect_err("unsupported version shape should fail");
 
-    assert_eq!(
-        bad_shape_error,
-        Error::UnsupportedVersion {
-            value: Text::from(BAD_VERSION),
-        }
-    );
+    assert_eq!(bad_shape_error, Error::UnsupportedVersion {
+        value: Text::from(BAD_VERSION),
+    });
 }
 
 #[test]
@@ -59,13 +50,10 @@ fn malformed_name_fails_validation() {
     })
     .expect_err("invalid skill name should fail");
 
-    assert_eq!(
-        invalid_name,
-        Error::MalformedName {
-            field: NAME_FIELD.as_str(),
-            value: Text::from(INVALID_NAME),
-        }
-    );
+    assert_eq!(invalid_name, Error::MalformedName {
+        field: NAME_FIELD.as_str(),
+        value: Text::from(INVALID_NAME),
+    });
 }
 
 #[test]
@@ -76,12 +64,9 @@ fn missing_content_identity_fails_validation() {
     })
     .expect_err("missing content identity should fail");
 
-    assert_eq!(
-        missing_identity,
-        Error::MissingField {
-            field: CONTENT_IDENTITY_FIELD.as_str(),
-        }
-    );
+    assert_eq!(missing_identity, Error::MissingField {
+        field: CONTENT_IDENTITY_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -91,20 +76,14 @@ fn unsafe_content_identities_fail_validation() {
         ..valid_draft()
     })
     .expect_err("path-like content handles should fail");
-    assert!(matches!(
-        unsafe_identity,
-        Error::InvalidContentIdentity { .. }
-    ));
+    assert!(matches!(unsafe_identity, Error::InvalidContentIdentity { .. }));
 
     let uppercase_identity = Descriptor::validate(&Draft {
         content_identity: Some(UPPERCASE_HASH),
         ..valid_draft()
     })
     .expect_err("uppercase hash should fail");
-    assert!(matches!(
-        uppercase_identity,
-        Error::InvalidContentIdentity { .. }
-    ));
+    assert!(matches!(uppercase_identity, Error::InvalidContentIdentity { .. }));
 }
 
 #[test]
@@ -115,12 +94,7 @@ fn duplicate_tag_fails_validation() {
     })
     .expect_err("duplicate tags should fail");
 
-    assert_eq!(
-        duplicate_tag,
-        Error::DuplicateTag {
-            tag: Text::from(TAG),
-        }
-    );
+    assert_eq!(duplicate_tag, Error::DuplicateTag { tag: Text::from(TAG) });
 }
 
 #[test]
@@ -131,13 +105,10 @@ fn malformed_related_name_fails_validation() {
     })
     .expect_err("malformed related skill names should fail");
 
-    assert_eq!(
-        malformed_related,
-        Error::MalformedName {
-            field: RELATED_SKILL_FIELD.as_str(),
-            value: Text::from(INVALID_RELATED_NAME),
-        }
-    );
+    assert_eq!(malformed_related, Error::MalformedName {
+        field: RELATED_SKILL_FIELD.as_str(),
+        value: Text::from(INVALID_RELATED_NAME),
+    });
 }
 
 #[test]

@@ -4,12 +4,17 @@
 //! ANSI escape sequences for terminal output. Content grows into
 //! scrollback via newline emission.
 
+use std::io::Write;
+
+use ratatui::buffer::Buffer;
+use ratatui::buffer::Cell;
+use ratatui::layout::Rect;
+use ratcore::inline::NodeKey;
+use ratcore::inline::ViewTree;
+use ratcore::inline::{self};
+
 use crate::builder::InlineView;
 use crate::widget::InlineWidget;
-use ratatui::buffer::{Buffer, Cell};
-use ratatui::layout::Rect;
-use ratcore::inline::{self, NodeKey, ViewTree};
-use std::io::Write;
 
 /// Inline renderer that writes styled content into terminal scrollback.
 pub struct InlineRenderer {
@@ -58,9 +63,7 @@ impl InlineRenderer {
         let old_nodes = std::mem::take(&mut self.tree).nodes;
         let result = inline::reconcile(old_nodes, new_tree.nodes);
 
-        self.tree = ViewTree {
-            nodes: result.nodes,
-        };
+        self.tree = ViewTree { nodes: result.nodes };
         self.widgets = new_widgets;
     }
 

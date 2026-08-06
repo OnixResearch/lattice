@@ -1,30 +1,46 @@
 #![allow(non_trait_imports)]
-use super::{
-    CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY, CanonicalContentPartDraft,
-    CanonicalModelContractError, CanonicalModelMessage, CanonicalModelMessageDraft,
-    CanonicalModelRequest, CanonicalModelRequestDraft, CanonicalModelRole, CanonicalOutputControls,
-    CanonicalOutputControlsDraft, CanonicalReasoningEffort, CanonicalReasoningRequest,
-    CanonicalReasoningRequestDraft, CanonicalResponseFormatIntent,
-    CanonicalResponseFormatIntentDraft, CanonicalSafeMetadata, CanonicalToolDeclaration,
-    INVALID_CACHED_USAGE, INVALID_ZERO_USAGE, MAX_MODEL_MESSAGES, MAX_MODEL_TOOLS,
-    RESPONSE_TEXT_FIELD, ROLE_FIELD, ROLE_USER, TOOL_NAME_FIELD, lossy_legacy_request,
-    require_collection, validate_collection_len, validate_contract_identity, validate_messages,
-    validate_metadata, validate_tools,
-};
+use super::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
+use super::CanonicalContentPartDraft;
+use super::CanonicalModelContractError;
+use super::CanonicalModelMessage;
+use super::CanonicalModelMessageDraft;
+use super::CanonicalModelRequest;
+use super::CanonicalModelRequestDraft;
+use super::CanonicalModelRole;
+use super::CanonicalOutputControls;
+use super::CanonicalOutputControlsDraft;
+use super::CanonicalReasoningEffort;
+use super::CanonicalReasoningRequest;
+use super::CanonicalReasoningRequestDraft;
+use super::CanonicalResponseFormatIntent;
+use super::CanonicalResponseFormatIntentDraft;
+use super::CanonicalSafeMetadata;
+use super::CanonicalToolDeclaration;
+use super::INVALID_CACHED_USAGE;
+use super::INVALID_ZERO_USAGE;
+use super::MAX_MODEL_MESSAGES;
+use super::MAX_MODEL_TOOLS;
+use super::RESPONSE_TEXT_FIELD;
+use super::ROLE_FIELD;
+use super::ROLE_USER;
+use super::TOOL_NAME_FIELD;
+use super::lossy_legacy_request;
+use super::require_collection;
+use super::validate_collection_len;
+use super::validate_contract_identity;
+use super::validate_messages;
+use super::validate_metadata;
+use super::validate_tools;
 
 impl CanonicalModelRequest {
     /// Validates a borrowed canonical request draft.
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when any request field is malformed, unsafe, or unsupported.
-    pub fn from_draft(
-        draft: CanonicalModelRequestDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
-        validate_contract_identity(
-            CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY,
-            draft.contract_identity,
-        )?;
+    /// Returns [`CanonicalModelContractError`] when any request field is malformed, unsafe, or
+    /// unsupported.
+    pub fn from_draft(draft: CanonicalModelRequestDraft<'_>) -> Result<Self, CanonicalModelContractError> {
+        validate_contract_identity(CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY, draft.contract_identity)?;
         require_collection(ROLE_FIELD, draft.messages.len(), MAX_MODEL_MESSAGES)?;
         validate_collection_len(TOOL_NAME_FIELD, draft.tools.len(), MAX_MODEL_TOOLS)?;
         Ok(Self {
@@ -41,13 +57,10 @@ impl CanonicalModelRequest {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when the legacy prompt somehow fails canonical validation.
-    pub fn from_legacy_request(
-        request: &crate::model::Request,
-    ) -> Result<Self, CanonicalModelContractError> {
-        let content = [CanonicalContentPartDraft::Text {
-            text: request.prompt(),
-        }];
+    /// Returns [`CanonicalModelContractError`] when the legacy prompt somehow fails canonical
+    /// validation.
+    pub fn from_legacy_request(request: &crate::model::Request) -> Result<Self, CanonicalModelContractError> {
+        let content = [CanonicalContentPartDraft::Text { text: request.prompt() }];
         let messages = [CanonicalModelMessageDraft {
             role: ROLE_USER,
             content: &content,
@@ -77,7 +90,8 @@ impl CanonicalModelRequest {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when projection would lose structured, tool, stream, or reasoning semantics.
+    /// Returns [`CanonicalModelContractError`] when projection would lose structured, tool, stream,
+    /// or reasoning semantics.
     pub fn to_legacy_request(&self) -> Result<crate::model::Request, CanonicalModelContractError> {
         if !self.tools.is_empty()
             || !self.output.is_legacy_compatible()

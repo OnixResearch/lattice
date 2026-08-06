@@ -1,0 +1,17 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [
+    "config/agent-check-registry.ncl"
+  ],
+  "destination": "dylint.toml",
+  "family_id": "animus.repo.dylint",
+  "format": "toml",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "dylint_config",
+  "source": "config/repo.ncl"
+}

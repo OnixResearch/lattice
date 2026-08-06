@@ -6,9 +6,12 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use crate::{
-    DropdownLayout, DropdownStyle, MenuItem, MenuNav, compute_dropdown_width, render_dropdown,
-};
+use crate::DropdownLayout;
+use crate::DropdownStyle;
+use crate::MenuItem;
+use crate::MenuNav;
+use crate::compute_dropdown_width;
+use crate::render_dropdown;
 
 const DEFAULT_CONTEXT_MENU_MIN_WIDTH: u16 = 8;
 const CONTEXT_MENU_BORDER_HEIGHT: u16 = 2;
@@ -133,11 +136,7 @@ impl ContextMenuModel {
             return None;
         }
 
-        let label = self
-            .nav
-            .current_item(self.items.as_slice())
-            .and_then(MenuItem::label)
-            .map(str::to_string);
+        let label = self.nav.current_item(self.items.as_slice()).and_then(MenuItem::label).map(str::to_string);
 
         if label.is_some() {
             self.dismiss();
@@ -153,11 +152,7 @@ impl ContextMenuModel {
 }
 
 /// Compute a viewport-clamped context menu area for the current menu level.
-pub fn compute_context_menu_area(
-    viewport: Rect,
-    model: &ContextMenuModel,
-    minimum_width: u16,
-) -> Option<Rect> {
+pub fn compute_context_menu_area(viewport: Rect, model: &ContextMenuModel, minimum_width: u16) -> Option<Rect> {
     if !model.visible || viewport.width == 0 || viewport.height == 0 {
         return None;
     }
@@ -180,13 +175,7 @@ pub fn render_context_menu(
     model: &ContextMenuModel,
     style: &DropdownStyle,
 ) -> Option<DropdownLayout> {
-    render_context_menu_with_min_width(
-        frame,
-        viewport,
-        model,
-        style,
-        DEFAULT_CONTEXT_MENU_MIN_WIDTH,
-    )
+    render_context_menu_with_min_width(frame, viewport, model, style, DEFAULT_CONTEXT_MENU_MIN_WIDTH)
 }
 
 /// Render a context menu using a caller-supplied minimum width.
@@ -220,9 +209,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const VIEWPORT_X: u16 = 0;
     const VIEWPORT_Y: u16 = 0;
@@ -253,10 +243,7 @@ mod tests {
         model.show(ContextMenuAnchor::new(DEFAULT_ANCHOR_X, DEFAULT_ANCHOR_Y));
 
         assert!(model.visible);
-        assert_eq!(
-            model.anchor,
-            ContextMenuAnchor::new(DEFAULT_ANCHOR_X, DEFAULT_ANCHOR_Y)
-        );
+        assert_eq!(model.anchor, ContextMenuAnchor::new(DEFAULT_ANCHOR_X, DEFAULT_ANCHOR_Y));
         assert_eq!(model.nav.focused(), Some(EXPECTED_OPEN_INDEX));
     }
 
@@ -290,19 +277,13 @@ mod tests {
         assert_eq!(model.move_up(), None);
         assert_eq!(model.activate(), None);
         assert!(!model.enter_submenu());
-        assert_eq!(
-            compute_context_menu_area(viewport, &model, TEST_MINIMUM_WIDTH),
-            None
-        );
+        assert_eq!(compute_context_menu_area(viewport, &model, TEST_MINIMUM_WIDTH), None);
     }
 
     #[test]
     fn area_repositions_when_overflowing_right_edge() {
         let mut model = ContextMenuModel::new(short_items());
-        model.show(ContextMenuAnchor::new(
-            RIGHT_EDGE_ANCHOR_X,
-            TOP_EDGE_ANCHOR_Y,
-        ));
+        model.show(ContextMenuAnchor::new(RIGHT_EDGE_ANCHOR_X, TOP_EDGE_ANCHOR_Y));
 
         let area = compute_context_menu_area(test_viewport(), &model, TEST_MINIMUM_WIDTH)
             .expect("visible context menu should compute an area");
@@ -314,10 +295,7 @@ mod tests {
     #[test]
     fn area_repositions_when_overflowing_bottom_edge() {
         let mut model = ContextMenuModel::new(short_items());
-        model.show(ContextMenuAnchor::new(
-            DEFAULT_ANCHOR_X,
-            BOTTOM_EDGE_ANCHOR_Y,
-        ));
+        model.show(ContextMenuAnchor::new(DEFAULT_ANCHOR_X, BOTTOM_EDGE_ANCHOR_Y));
 
         let area = compute_context_menu_area(test_viewport(), &model, TEST_MINIMUM_WIDTH)
             .expect("visible context menu should compute an area");

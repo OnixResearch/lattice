@@ -4,31 +4,52 @@ mod conformance;
 mod tests;
 pub(crate) mod wire;
 
-pub use canonical::{
-    CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY, CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY,
-    CanonicalContentPart, CanonicalContentPartDraft, CanonicalFinishReason,
-    CanonicalModelContractError, CanonicalModelMessage, CanonicalModelMessageDraft,
-    CanonicalModelRequest, CanonicalModelRequestDraft, CanonicalModelResponseEnvelope,
-    CanonicalModelResponseEnvelopeDraft, CanonicalModelResponseItem,
-    CanonicalModelResponseItemDraft, CanonicalModelRole, CanonicalOutputControls,
-    CanonicalOutputControlsDraft, CanonicalReasoningEffort, CanonicalReasoningRequest,
-    CanonicalReasoningRequestDraft, CanonicalResponseFormatIntent,
-    CanonicalResponseFormatIntentDraft, CanonicalSafeMetadata, CanonicalSafeMetadataDraft,
-    CanonicalToolDeclaration, CanonicalToolDeclarationDraft, CanonicalUnsafeTextReason,
-    CanonicalUsage, CanonicalUsageDraft,
-};
-pub use conformance::{
-    ProviderProjectionError, ProviderProjectionFamily, ProviderProjectionFeatureSupport,
-    ProviderProjectionIndexEntry, ProviderProjectionIndexEntryDraft, ProviderProjectionIndexStatus,
-    ProviderProjectionSupport, ProviderRequestProjection, ProviderResponseFixtureDraft,
-    assert_provider_request_fixture, assert_provider_stream_fixture,
-    normalize_provider_response_fixture, project_provider_request_fixture,
-    validate_provider_projection_index,
-};
+pub use canonical::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
+pub use canonical::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
+pub use canonical::CanonicalContentPart;
+pub use canonical::CanonicalContentPartDraft;
+pub use canonical::CanonicalFinishReason;
+pub use canonical::CanonicalModelContractError;
+pub use canonical::CanonicalModelMessage;
+pub use canonical::CanonicalModelMessageDraft;
+pub use canonical::CanonicalModelRequest;
+pub use canonical::CanonicalModelRequestDraft;
+pub use canonical::CanonicalModelResponseEnvelope;
+pub use canonical::CanonicalModelResponseEnvelopeDraft;
+pub use canonical::CanonicalModelResponseItem;
+pub use canonical::CanonicalModelResponseItemDraft;
+pub use canonical::CanonicalModelRole;
+pub use canonical::CanonicalOutputControls;
+pub use canonical::CanonicalOutputControlsDraft;
+pub use canonical::CanonicalReasoningEffort;
+pub use canonical::CanonicalReasoningRequest;
+pub use canonical::CanonicalReasoningRequestDraft;
+pub use canonical::CanonicalResponseFormatIntent;
+pub use canonical::CanonicalResponseFormatIntentDraft;
+pub use canonical::CanonicalSafeMetadata;
+pub use canonical::CanonicalSafeMetadataDraft;
+pub use canonical::CanonicalToolDeclaration;
+pub use canonical::CanonicalToolDeclarationDraft;
+pub use canonical::CanonicalUnsafeTextReason;
+pub use canonical::CanonicalUsage;
+pub use canonical::CanonicalUsageDraft;
+pub use conformance::ProviderProjectionError;
+pub use conformance::ProviderProjectionFamily;
+pub use conformance::ProviderProjectionFeatureSupport;
+pub use conformance::ProviderProjectionIndexEntry;
+pub use conformance::ProviderProjectionIndexEntryDraft;
+pub use conformance::ProviderProjectionIndexStatus;
+pub use conformance::ProviderProjectionSupport;
+pub use conformance::ProviderRequestProjection;
+pub use conformance::ProviderResponseFixtureDraft;
+pub use conformance::assert_provider_request_fixture;
+pub use conformance::assert_provider_stream_fixture;
+pub use conformance::normalize_provider_response_fixture;
+pub use conformance::project_provider_request_fixture;
+pub use conformance::validate_provider_projection_index;
 
 const PROMPT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("prompt");
-const MESSAGE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_message");
+const MESSAGE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_message");
 
 // r[impl agent_harness_runtime.boundary_versions.contract_identities]
 /// Stable contract identity for public model request DTOs.

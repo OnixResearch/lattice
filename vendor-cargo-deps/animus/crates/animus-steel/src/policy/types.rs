@@ -1,6 +1,7 @@
 const ACTION_MODEL: &str = "model";
 const ACTION_TOOL: &str = "tool";
 const ACTION_RESPOND: &str = "respond";
+const ACTION_COMPLETION_CANDIDATE: &str = "completion-candidate";
 const ACTION_STOP: &str = "stop";
 const FALLBACK_BLOCK: &str = "block";
 const FALLBACK_STOP: &str = "stop";
@@ -16,6 +17,8 @@ pub enum HostAction {
     Tool,
     /// Permit Steel to return a final response.
     Respond,
+    /// Permit Steel to request host-owned completion evaluation.
+    CompletionCandidate,
     /// Permit Steel to stop without a final response.
     Stop,
 }
@@ -31,11 +34,9 @@ impl HostAction {
             ACTION_MODEL => Ok(Self::Model),
             ACTION_TOOL => Ok(Self::Tool),
             ACTION_RESPOND => Ok(Self::Respond),
+            ACTION_COMPLETION_CANDIDATE => Ok(Self::CompletionCandidate),
             ACTION_STOP => Ok(Self::Stop),
-            _unknown => Err(Error::new(
-                DenyReason::UnknownHostAction,
-                "allowed_host_actions",
-            )),
+            _unknown => Err(Error::new(DenyReason::UnknownHostAction, "allowed_host_actions")),
         }
     }
 
@@ -46,6 +47,7 @@ impl HostAction {
             Self::Model => ACTION_MODEL,
             Self::Tool => ACTION_TOOL,
             Self::Respond => ACTION_RESPOND,
+            Self::CompletionCandidate => ACTION_COMPLETION_CANDIDATE,
             Self::Stop => ACTION_STOP,
         }
     }
@@ -103,10 +105,7 @@ impl ReceiptRedaction {
         match label {
             REDACTION_HASH_ONLY => Ok(Self::HashOnly),
             REDACTION_METADATA_ONLY => Ok(Self::MetadataOnly),
-            _unknown => Err(Error::new(
-                DenyReason::UnsupportedReceiptRedaction,
-                "receipt_redaction",
-            )),
+            _unknown => Err(Error::new(DenyReason::UnsupportedReceiptRedaction, "receipt_redaction")),
         }
     }
 
@@ -194,12 +193,7 @@ impl Error {
 
 impl core::fmt::Display for Error {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            formatter,
-            "steel policy field {} failed: {}",
-            self.field,
-            self.reason.as_str()
-        )
+        write!(formatter, "steel policy field {} failed: {}", self.field, self.reason.as_str())
     }
 }
 

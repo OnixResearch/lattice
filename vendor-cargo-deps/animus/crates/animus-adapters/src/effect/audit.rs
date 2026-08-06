@@ -1,5 +1,4 @@
-const HASH_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("effect_receipt_hash");
+const HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("effect_receipt_hash");
 const HASH_LENGTH_REASON: &str = "effect hash must use the configured BLAKE3 hex length";
 const HASH_NOT_HEX_REASON: &str = "effect hash must contain lowercase hex only";
 const EMPTY_PAYLOAD_COUNT: u32 = 0;
@@ -197,20 +196,14 @@ fn validate_hash(value: &str) -> Result<(), crate::AdapterContractError> {
     crate::validation::validate_required_adapter_field(HASH_FIELD, value)?;
     let actual_chars = value.chars().count();
     assert!(actual_chars > 0, "validated hash cannot be empty");
-    assert!(
-        actual_chars <= value.len(),
-        "hash char count must fit in byte length"
-    );
+    assert!(actual_chars <= value.len(), "hash char count must fit in byte length");
     if actual_chars != SAFE_HASH_HEX_CHARS {
         return Err(crate::AdapterContractError::InvalidEvidenceHash {
             field: HASH_FIELD.as_str(),
             reason: HASH_LENGTH_REASON,
         });
     }
-    if !value
-        .chars()
-        .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
-    {
+    if !value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase()) {
         return Err(crate::AdapterContractError::InvalidEvidenceHash {
             field: HASH_FIELD.as_str(),
             reason: HASH_NOT_HEX_REASON,

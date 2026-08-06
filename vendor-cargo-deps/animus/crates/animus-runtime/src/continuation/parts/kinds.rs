@@ -76,6 +76,8 @@ pub enum ContinuationAction {
     ContinueLoop,
     /// Run a validation or auto-test follow-up.
     RunValidationFollowUp,
+    /// No dispatchable work remains but authoritative evidence is required.
+    AwaitCompletionEvidence,
     /// No continuation work remains.
     Complete,
     /// Cancel current continuation work.
@@ -90,6 +92,7 @@ impl ContinuationAction {
             Self::ReplayQueuedPrompt => REPLAY_QUEUED_PROMPT_LABEL,
             Self::ContinueLoop => CONTINUE_LOOP_LABEL,
             Self::RunValidationFollowUp => RUN_VALIDATION_FOLLOW_UP_LABEL,
+            Self::AwaitCompletionEvidence => AWAIT_COMPLETION_EVIDENCE_LABEL,
             Self::Complete => COMPLETE_LABEL,
             Self::Cancel => CANCEL_LABEL,
         }
@@ -100,6 +103,7 @@ impl ContinuationAction {
             REPLAY_QUEUED_PROMPT_LABEL => Ok(Self::ReplayQueuedPrompt),
             CONTINUE_LOOP_LABEL => Ok(Self::ContinueLoop),
             RUN_VALIDATION_FOLLOW_UP_LABEL => Ok(Self::RunValidationFollowUp),
+            AWAIT_COMPLETION_EVIDENCE_LABEL => Ok(Self::AwaitCompletionEvidence),
             COMPLETE_LABEL => Ok(Self::Complete),
             CANCEL_LABEL => Ok(Self::Cancel),
             _ => Err(ContinuationError::UnsupportedValue {
@@ -119,6 +123,8 @@ pub enum ContinuationReason {
     ActiveLoopWork,
     /// Validation or auto-test follow-up is eligible.
     ValidationFollowUp,
+    /// Authoritative completion evidence is still required.
+    CompletionEvidenceRequired,
     /// No continuation work remains.
     NoPendingWork,
     /// Cancellation was requested.
@@ -133,6 +139,7 @@ impl ContinuationReason {
             Self::QueuedUserInput => QUEUED_USER_INPUT_REASON,
             Self::ActiveLoopWork => ACTIVE_LOOP_WORK_REASON,
             Self::ValidationFollowUp => VALIDATION_FOLLOW_UP_REASON,
+            Self::CompletionEvidenceRequired => COMPLETION_EVIDENCE_REQUIRED_REASON,
             Self::NoPendingWork => NO_PENDING_WORK_REASON,
             Self::CancellationRequested => CANCELLATION_REQUESTED_REASON,
         }

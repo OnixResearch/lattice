@@ -1,0 +1,59 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=model_runtime_profile_set"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.model-runtime-profiles",
+      "source": {
+        "path": "config/model-runtime-profiles.ncl",
+        "identity": "b3:919eaeef5083b13f76442aacacd0fedd550428d46def550aaa5480be779b6df7",
+        "bytes": 11420
+      },
+      "dependencies": [
+        {
+          "path": "policy/contracts/primitives.ncl",
+          "identity": "b3:102e0de517da26582d662cfdc87acb45733099fd62b1d805d6e01eaa077744e0",
+          "bytes": 4543
+        }
+      ],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "model_runtime_profile_set",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/model-runtime-profiles.json",
+        "identity": "b3:fa013359b99531763bda8703f52812366f60e6d3b038c90257bd2e69dea73d6d",
+        "bytes": 3862
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=model_runtime_profile_set"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:2207992c25ba1ef99cd9c735ada50d81e1a5fc2f13279f4e26031f980b29dd24"
+}

@@ -49,10 +49,7 @@ impl PointerEvent {
 
     /// Adds coordinate-space metadata.
     #[must_use]
-    pub fn with_coordinate_space(
-        mut self,
-        coordinate_space: super::super::shape::PointerCoordinateSpace,
-    ) -> Self {
+    pub fn with_coordinate_space(mut self, coordinate_space: super::super::shape::PointerCoordinateSpace) -> Self {
         self.coordinate_space = coordinate_space;
         self
     }
@@ -87,10 +84,7 @@ impl PointerEvent {
 
     /// Adds an already captured target.
     #[must_use]
-    pub fn with_captured_target(
-        mut self,
-        target: impl Into<super::super::shape::PointerTargetId>,
-    ) -> Self {
+    pub fn with_captured_target(mut self, target: impl Into<super::super::shape::PointerTargetId>) -> Self {
         self.captured_target = Some(target.into());
         self
     }

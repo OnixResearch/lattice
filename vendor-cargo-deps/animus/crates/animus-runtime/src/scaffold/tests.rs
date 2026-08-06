@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,12 +7,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -67,27 +63,21 @@ fn reviewed_profile_validates_and_invalid_fixtures_fail_closed() {
     let diagnostics = validate_scaffold_profile(&invalid).expect_err("invalid scaffold");
 
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ScaffoldDiagnosticKind::MalformedId
-            && diagnostic.field == FIELD_PROFILE_ID
+        diagnostic.kind == ScaffoldDiagnosticKind::MalformedId && diagnostic.field == FIELD_PROFILE_ID
     }));
     assert!(
         diagnostics
             .iter()
             .any(|diagnostic| { diagnostic.kind == ScaffoldDiagnosticKind::DuplicateRevision })
     );
+    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == ScaffoldDiagnosticKind::UnsupportedKnob }));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == ScaffoldDiagnosticKind::MissingField && diagnostic.field == FIELD_PROFILE_PROVENANCE
+    }));
     assert!(
         diagnostics
             .iter()
-            .any(|diagnostic| { diagnostic.kind == ScaffoldDiagnosticKind::UnsupportedKnob })
-    );
-    assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ScaffoldDiagnosticKind::MissingField
-            && diagnostic.field == FIELD_PROFILE_PROVENANCE
-    }));
-    assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic.kind == ScaffoldDiagnosticKind::UnreviewedActiveRevision
-        })
+            .any(|diagnostic| { diagnostic.kind == ScaffoldDiagnosticKind::UnreviewedActiveRevision })
     );
     assert!(
         diagnostics
@@ -112,21 +102,10 @@ fn selection_prefers_exact_then_fallback_and_reports_policy_rejections() {
     assert_eq!(selected.outcome, ScaffoldSelectionOutcome::ExactMatch);
     assert_eq!(selected.profile_id.as_deref(), Some(PROFILE_ID));
 
-    let fallback_selected = select_scaffold_profile(
-        &[
-            fallback.clone(),
-            profile(PROFILE_ID, TASK_CLASS, ROUTE_FAST, false),
-        ],
-        &request,
-    );
-    assert_eq!(
-        fallback_selected.outcome,
-        ScaffoldSelectionOutcome::Fallback
-    );
-    assert_eq!(
-        fallback_selected.profile_id.as_deref(),
-        Some(FALLBACK_PROFILE_ID)
-    );
+    let fallback_selected =
+        select_scaffold_profile(&[fallback.clone(), profile(PROFILE_ID, TASK_CLASS, ROUTE_FAST, false)], &request);
+    assert_eq!(fallback_selected.outcome, ScaffoldSelectionOutcome::Fallback);
+    assert_eq!(fallback_selected.profile_id.as_deref(), Some(FALLBACK_PROFILE_ID));
     assert!(
         fallback_selected
             .diagnostics
@@ -138,10 +117,7 @@ fn selection_prefers_exact_then_fallback_and_reports_policy_rejections() {
         &[fallback, exact],
         &selection_request(TASK_CLASS, &[ROUTE_REMOTE], &[FALLBACK_PROFILE_ID]),
     );
-    assert_eq!(
-        denied.outcome,
-        ScaffoldSelectionOutcome::NoCompatibleProfile
-    );
+    assert_eq!(denied.outcome, ScaffoldSelectionOutcome::NoCompatibleProfile);
     assert!(
         denied
             .diagnostics
@@ -309,14 +285,8 @@ fn selection_request(
 ) -> ScaffoldSelectionRequest {
     ScaffoldSelectionRequest {
         task_class: task_class.to_string(),
-        route_capability_labels: route_capability_labels
-            .iter()
-            .map(|label| (*label).to_string())
-            .collect(),
-        disabled_profile_ids: disabled_profile_ids
-            .iter()
-            .map(|profile_id| (*profile_id).to_string())
-            .collect(),
+        route_capability_labels: route_capability_labels.iter().map(|label| (*label).to_string()).collect(),
+        disabled_profile_ids: disabled_profile_ids.iter().map(|profile_id| (*profile_id).to_string()).collect(),
         fallback_task_class: Some(FALLBACK_TASK_CLASS.to_string()),
     }
 }

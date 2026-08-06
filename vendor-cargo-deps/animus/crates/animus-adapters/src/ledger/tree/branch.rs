@@ -7,9 +7,7 @@ const EMPTY_ENTRY_COUNT: usize = 0;
 /// Returns [`super::super::flow::Error`] when tree shape validation fails, the active branch
 /// contains unsupported entries, a tool result is orphaned, or a summary has no
 /// prior model-visible span to replace.
-pub fn replay_snapshot(
-    snapshot: &super::Snapshot,
-) -> Result<super::super::flow::Report, super::super::flow::Error> {
+pub fn replay_snapshot(snapshot: &super::Snapshot) -> Result<super::super::flow::Report, super::super::flow::Error> {
     validate_snapshot(snapshot)?;
     let selected = active_path(snapshot)?;
     replay_selected(&selected, snapshot.labels())
@@ -56,11 +54,7 @@ fn replay_selected(
         }
     }
 
-    Ok(super::super::flow::Report::new(
-        context,
-        counts,
-        labels.to_vec(),
-    ))
+    Ok(super::super::flow::Report::new(context, counts, labels.to_vec()))
 }
 
 fn validate_snapshot(snapshot: &super::Snapshot) -> Result<(), super::super::flow::Error> {
@@ -106,8 +100,7 @@ fn validate_active_leaf(snapshot: &super::Snapshot) -> Result<(), super::super::
 
 fn validate_supported_entry(entry: &super::super::Entry) -> Result<(), super::super::flow::Error> {
     match entry {
-        super::super::Entry::Unsupported { id, kind_label }
-        | super::super::Entry::AdapterOwned { id, kind_label } => {
+        super::super::Entry::Unsupported { id, kind_label } | super::super::Entry::AdapterOwned { id, kind_label } => {
             Err(super::super::flow::unsupported_entry(id, kind_label))
         }
         super::super::Entry::UserMessage { .. }
@@ -119,10 +112,7 @@ fn validate_supported_entry(entry: &super::super::Entry) -> Result<(), super::su
     }
 }
 
-fn validate_parent(
-    snapshot: &super::Snapshot,
-    node: &super::Node,
-) -> Result<(), super::super::flow::Error> {
+fn validate_parent(snapshot: &super::Snapshot, node: &super::Node) -> Result<(), super::super::flow::Error> {
     if let Some(parent_id) = node.parent_id() {
         if find_node(snapshot, parent_id).is_none() {
             return Err(super::super::flow::Error::MissingParent {
@@ -134,10 +124,7 @@ fn validate_parent(
     Ok(())
 }
 
-fn validate_tool_parent(
-    snapshot: &super::Snapshot,
-    node: &super::Node,
-) -> Result<(), super::super::flow::Error> {
+fn validate_tool_parent(snapshot: &super::Snapshot, node: &super::Node) -> Result<(), super::super::flow::Error> {
     if node.entry().kind() != super::super::EntryKind::ToolResult {
         return Ok(());
     }
@@ -153,10 +140,7 @@ fn validate_tool_parent(
     })
 }
 
-fn validate_node_cycle(
-    snapshot: &super::Snapshot,
-    node: &super::Node,
-) -> Result<(), super::super::flow::Error> {
+fn validate_node_cycle(snapshot: &super::Snapshot, node: &super::Node) -> Result<(), super::super::flow::Error> {
     debug_assert!(!snapshot.entries().is_empty());
     debug_assert!(find_node(snapshot, node.entry().id()).is_some());
     let mut seen = alloc::vec::Vec::with_capacity(snapshot.entries().len());
@@ -171,11 +155,9 @@ fn validate_node_cycle(
             });
         }
         seen.push(current_id.as_str());
-        let current = find_node(snapshot, current_id).ok_or_else(|| {
-            super::super::flow::Error::MissingParent {
-                entry_id: super::super::flow::id_string(node.entry().id()),
-                parent_id: super::super::flow::id_string(current_id),
-            }
+        let current = find_node(snapshot, current_id).ok_or_else(|| super::super::flow::Error::MissingParent {
+            entry_id: super::super::flow::id_string(node.entry().id()),
+            parent_id: super::super::flow::id_string(current_id),
         })?;
         if let Some(parent_id) = current.parent_id() {
             current_id = parent_id;
@@ -200,9 +182,7 @@ fn validate_labels(snapshot: &super::Snapshot) -> Result<(), super::super::flow:
     Ok(())
 }
 
-fn active_path(
-    snapshot: &super::Snapshot,
-) -> Result<alloc::vec::Vec<&super::Node>, super::super::flow::Error> {
+fn active_path(snapshot: &super::Snapshot) -> Result<alloc::vec::Vec<&super::Node>, super::super::flow::Error> {
     debug_assert!(!snapshot.entries().is_empty());
     debug_assert!(find_node(snapshot, snapshot.active_leaf()).is_some());
     let mut path = alloc::vec::Vec::with_capacity(snapshot.entries().len());
@@ -210,10 +190,8 @@ fn active_path(
     let mut remaining_hops = snapshot.entries().len();
     while remaining_hops > EMPTY_ENTRY_COUNT {
         remaining_hops = remaining_hops.saturating_sub(1);
-        let current = find_node(snapshot, current_id).ok_or_else(|| {
-            super::super::flow::Error::InvalidActiveLeaf {
-                active_leaf: super::super::flow::id_string(snapshot.active_leaf()),
-            }
+        let current = find_node(snapshot, current_id).ok_or_else(|| super::super::flow::Error::InvalidActiveLeaf {
+            active_leaf: super::super::flow::id_string(snapshot.active_leaf()),
         })?;
         path.push(current);
         if let Some(parent_id) = current.parent_id() {
@@ -229,12 +207,6 @@ fn active_path(
     })
 }
 
-fn find_node<'a>(
-    snapshot: &'a super::Snapshot,
-    id: &super::super::EntryId,
-) -> Option<&'a super::Node> {
-    snapshot
-        .entries()
-        .iter()
-        .find(|node| node.entry().id() == id)
+fn find_node<'a>(snapshot: &'a super::Snapshot, id: &super::super::EntryId) -> Option<&'a super::Node> {
+    snapshot.entries().iter().find(|node| node.entry().id() == id)
 }

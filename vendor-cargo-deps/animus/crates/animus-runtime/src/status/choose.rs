@@ -10,25 +10,22 @@ pub struct Selection {
 
 impl Selection {
     fn from_observation(parts: SelectionParts<'_>) -> Self {
-        let selected_authority =
-            super::types::AuthoritySummary::from_observation(parts.observation);
+        let selected_authority = super::types::AuthoritySummary::from_observation(parts.observation);
         let evidence_hashes = parts.observation.evidence_hashes().to_vec();
         Self {
             target_id: String::from(parts.request.target_id()),
             semantic_state: parts.observation.state(),
             message: parts.observation.message().map(String::from),
             presentation: parts.observation.presentation().clone(),
-            explanation: super::explain::DecisionExplanation::new(
-                super::explain::DecisionExplanationParts {
-                    target_id: parts.request.target_id(),
-                    selected_authority: Some(selected_authority),
-                    rejected_candidates: parts.rejected_candidates,
-                    freshness: super::types::Freshness::Current,
-                    fallback_reason: parts.fallback_reason,
-                    evidence_hashes,
-                    evidence_summary: parts.evidence_summary,
-                },
-            ),
+            explanation: super::explain::DecisionExplanation::new(super::explain::DecisionExplanationParts {
+                target_id: parts.request.target_id(),
+                selected_authority: Some(selected_authority),
+                rejected_candidates: parts.rejected_candidates,
+                freshness: super::types::Freshness::Current,
+                fallback_reason: parts.fallback_reason,
+                evidence_hashes,
+                evidence_summary: parts.evidence_summary,
+            }),
         }
     }
 
@@ -43,17 +40,15 @@ impl Selection {
             semantic_state: animus_adapters::SemanticAgentState::Unknown,
             message: None,
             presentation: animus_adapters::AgentStatusPresentation::empty(),
-            explanation: super::explain::DecisionExplanation::new(
-                super::explain::DecisionExplanationParts {
-                    target_id: request.target_id(),
-                    selected_authority: None,
-                    rejected_candidates,
-                    freshness,
-                    fallback_reason: Some(fallback_reason),
-                    evidence_hashes: Vec::new(),
-                    evidence_summary: super::safe::EvidenceSummary::unknown(),
-                },
-            ),
+            explanation: super::explain::DecisionExplanation::new(super::explain::DecisionExplanationParts {
+                target_id: request.target_id(),
+                selected_authority: None,
+                rejected_candidates,
+                freshness,
+                fallback_reason: Some(fallback_reason),
+                evidence_hashes: Vec::new(),
+                evidence_summary: super::safe::EvidenceSummary::unknown(),
+            }),
         }
     }
 
@@ -149,10 +144,7 @@ fn classify<'a>(
             }
             animus_adapters::AgentStatusObservationKind::UntrustedLifecycle => {
                 signals.has_untrusted_lifecycle = true;
-                rejected.push(
-                    observation,
-                    super::types::RejectedReason::UntrustedLifecycle,
-                );
+                rejected.push(observation, super::types::RejectedReason::UntrustedLifecycle);
             }
             animus_adapters::AgentStatusObservationKind::HeuristicFallback => {
                 heuristics.push(observation);
@@ -251,10 +243,5 @@ fn select_fallback(
     }
 
     let reason = super::rank::fallback_reason(classified.signals);
-    Selection::unknown(
-        request,
-        rejected.into_vec(),
-        super::rank::freshness_for_unknown(reason),
-        reason,
-    )
+    Selection::unknown(request, rejected.into_vec(), super::rank::freshness_for_unknown(reason), reason)
 }

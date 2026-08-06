@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,28 +7,34 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use super::{
-    BLAKE3_ALGORITHM, FIELD_ACTION, FIELD_DESCRIPTOR, FIELD_RESULT, FIELD_SCHEDULER,
-    FRESH_TASK_HASH_DOMAIN, HASH_PART_SEPARATOR, REQUIRED_COUNT,
-    data::{
-        FreshTaskActionKind, FreshTaskDescriptor, FreshTaskDiagnostic, FreshTaskDiagnosticKind,
-        FreshTaskDispatchDecision, FreshTaskFingerprint, FreshTaskInheritance, FreshTaskIsolation,
-        FreshTaskMode, FreshTaskResult, FreshTaskResultStatus, FreshTaskSchedulerState,
-        FreshTaskValidationResult,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::FIELD_ACTION;
+use super::FIELD_DESCRIPTOR;
+use super::FIELD_RESULT;
+use super::FIELD_SCHEDULER;
+use super::FRESH_TASK_HASH_DOMAIN;
+use super::HASH_PART_SEPARATOR;
+use super::REQUIRED_COUNT;
+use super::data::FreshTaskActionKind;
+use super::data::FreshTaskDescriptor;
+use super::data::FreshTaskDiagnostic;
+use super::data::FreshTaskDiagnosticKind;
+use super::data::FreshTaskDispatchDecision;
+use super::data::FreshTaskFingerprint;
+use super::data::FreshTaskInheritance;
+use super::data::FreshTaskIsolation;
+use super::data::FreshTaskMode;
+use super::data::FreshTaskResult;
+use super::data::FreshTaskResultStatus;
+use super::data::FreshTaskSchedulerState;
+use super::data::FreshTaskValidationResult;
 
 const RAW_SECRET_MARKER: &str = "API_KEY";
 const RAW_PATH_MARKER: &str = "/home/";
@@ -51,27 +58,13 @@ pub fn blake3_fresh_task_fingerprint(label: &str, bytes: &[u8]) -> FreshTaskFing
 ///
 /// Returns diagnostics for missing goal/context/tool/model/schema fields or
 /// invalid budgets.
-pub fn validate_fresh_task_descriptor(
-    descriptor: &FreshTaskDescriptor,
-) -> FreshTaskValidationResult {
+pub fn validate_fresh_task_descriptor(descriptor: &FreshTaskDescriptor) -> FreshTaskValidationResult {
     let mut diagnostics = Vec::new();
-    require_text(
-        &descriptor.descriptor_id,
-        FIELD_DESCRIPTOR,
-        &mut diagnostics,
-    );
+    require_text(&descriptor.descriptor_id, FIELD_DESCRIPTOR, &mut diagnostics);
     require_text(&descriptor.goal, FIELD_DESCRIPTOR, &mut diagnostics);
     require_text(&descriptor.model_policy, FIELD_DESCRIPTOR, &mut diagnostics);
-    require_text(
-        &descriptor.result_schema,
-        FIELD_DESCRIPTOR,
-        &mut diagnostics,
-    );
-    require_collection(
-        &descriptor.context_references,
-        FIELD_DESCRIPTOR,
-        &mut diagnostics,
-    );
+    require_text(&descriptor.result_schema, FIELD_DESCRIPTOR, &mut diagnostics);
+    require_collection(&descriptor.context_references, FIELD_DESCRIPTOR, &mut diagnostics);
     if descriptor.allowed_actions.is_empty()
         || descriptor.budget.tokens < REQUIRED_COUNT
         || descriptor.budget.tool_calls < REQUIRED_COUNT
@@ -93,9 +86,7 @@ pub fn evaluate_fresh_task_dispatch(
     isolation: &FreshTaskIsolation,
     scheduler: FreshTaskSchedulerState,
 ) -> FreshTaskDispatchDecision {
-    let mut diagnostics = validate_fresh_task_descriptor(descriptor)
-        .err()
-        .unwrap_or_default();
+    let mut diagnostics = validate_fresh_task_descriptor(descriptor).err().unwrap_or_default();
     if scheduler != FreshTaskSchedulerState::Ready {
         diagnostics.push(FreshTaskDiagnostic::new(
             FreshTaskDiagnosticKind::MissingScheduler,
@@ -127,10 +118,7 @@ pub fn evaluate_side_question_action(
     action: FreshTaskActionKind,
 ) -> FreshTaskDispatchDecision {
     let denied = descriptor.mode == FreshTaskMode::SideQuestion
-        && !matches!(
-            action,
-            FreshTaskActionKind::Read | FreshTaskActionKind::Search
-        );
+        && !matches!(action, FreshTaskActionKind::Read | FreshTaskActionKind::Search);
     if denied {
         FreshTaskDispatchDecision {
             dispatch: false,
@@ -188,9 +176,7 @@ pub fn validate_fresh_task_result(result: &FreshTaskResult) -> FreshTaskValidati
 }
 
 fn contains_unsafe(text: &str) -> bool {
-    text.contains(RAW_SECRET_MARKER)
-        || text.contains(RAW_PATH_MARKER)
-        || text.contains(RAW_OUTPUT_MARKER)
+    text.contains(RAW_SECRET_MARKER) || text.contains(RAW_PATH_MARKER) || text.contains(RAW_OUTPUT_MARKER)
 }
 
 fn require_collection(values: &[String], field: &str, diagnostics: &mut Vec<FreshTaskDiagnostic>) {

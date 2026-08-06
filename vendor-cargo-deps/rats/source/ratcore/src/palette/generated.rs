@@ -54,12 +54,7 @@ pub fn validate_theme_artifact_freshness(
     let expected = expected_theme_artifacts(source, presets);
     let artifact_map = artifacts
         .iter()
-        .map(|artifact| {
-            (
-                (artifact.path.as_str(), artifact.renderer.as_str()),
-                artifact,
-            )
-        })
+        .map(|artifact| ((artifact.path.as_str(), artifact.renderer.as_str()), artifact))
         .collect::<std::collections::BTreeMap<_, _>>();
     debug_assert!(artifact_map.len() <= artifacts.len());
     debug_assert!(expected.len() <= presets.len().saturating_mul(RENDERER_ARTIFACTS_PER_PRESET));
@@ -67,10 +62,7 @@ pub fn validate_theme_artifact_freshness(
         issues.extend(single_artifact_metadata_issues(source, artifact));
     }
     for expected_artifact in &expected {
-        match artifact_map.get(&(
-            expected_artifact.path.as_str(),
-            expected_artifact.renderer.as_str(),
-        )) {
+        match artifact_map.get(&(expected_artifact.path.as_str(), expected_artifact.renderer.as_str())) {
             Some(actual) => {
                 if actual.content != expected_artifact.content {
                     issues.push(ThemeIssue::new(
@@ -92,9 +84,7 @@ pub fn validate_theme_artifact_freshness(
 
 /// Builds fixture-backed theme preview rows for each built-in renderer.
 #[must_use]
-pub fn theme_preview_matrix(
-    presets: &[crate::generated_theme_tokens::GeneratedThemePreset],
-) -> Vec<ThemePreviewRow> {
+pub fn theme_preview_matrix(presets: &[crate::generated_theme_tokens::GeneratedThemePreset]) -> Vec<ThemePreviewRow> {
     let renderers = [RENDERER_RATATUI_RUST, RENDERER_METEORITE_CSS];
     let rows = presets
         .iter()
@@ -103,14 +93,8 @@ pub fn theme_preview_matrix(
                 ThemePreviewRow::new(
                     preset.name,
                     renderer,
-                    PREVIEW_STATES
-                        .iter()
-                        .map(|state| (*state).to_string())
-                        .collect(),
-                    REQUIRED_ROLES
-                        .iter()
-                        .map(|role| (*role).to_string())
-                        .collect(),
+                    PREVIEW_STATES.iter().map(|state| (*state).to_string()).collect(),
+                    REQUIRED_ROLES.iter().map(|role| (*role).to_string()).collect(),
                 )
             })
         })
@@ -126,10 +110,7 @@ pub fn validate_theme_preview_matrix(
     rows: &[ThemePreviewRow],
     presets: &[crate::generated_theme_tokens::GeneratedThemePreset],
 ) -> ThemeValidationReport {
-    let preset_map = presets
-        .iter()
-        .map(|preset| (preset.name, preset))
-        .collect::<std::collections::BTreeMap<_, _>>();
+    let preset_map = presets.iter().map(|preset| (preset.name, preset)).collect::<std::collections::BTreeMap<_, _>>();
     let mut issues = Vec::with_capacity(rows.len());
     debug_assert!(preset_map.len() <= presets.len());
     debug_assert!(issues.capacity() >= rows.len());
@@ -153,10 +134,7 @@ pub fn validate_theme_preview_matrix(
     ThemeValidationReport { issues }
 }
 
-fn single_artifact_metadata_issues(
-    source: &ThemeTokenSource,
-    artifact: &ThemeGeneratedArtifact,
-) -> Vec<ThemeIssue> {
+fn single_artifact_metadata_issues(source: &ThemeTokenSource, artifact: &ThemeGeneratedArtifact) -> Vec<ThemeIssue> {
     let mut issues = Vec::new();
     debug_assert!(!artifact.path.is_empty());
     debug_assert!(!artifact.renderer.is_empty());
@@ -189,11 +167,7 @@ fn preview_role_issues(
     row: &ThemePreviewRow,
     preset: &crate::generated_theme_tokens::GeneratedThemePreset,
 ) -> Vec<ThemeIssue> {
-    let roles = preset
-        .colors
-        .iter()
-        .map(|color| color.role)
-        .collect::<std::collections::BTreeSet<_>>();
+    let roles = preset.colors.iter().map(|color| color.role).collect::<std::collections::BTreeSet<_>>();
     row.roles
         .iter()
         .filter(|role| !roles.contains(role.as_str()))

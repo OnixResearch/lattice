@@ -8,17 +8,17 @@ pub struct KnowledgePanels {
     /// Capture target labels that are writable.
     pub capture_targets: Vec<String>,
     /// Tag labels mapped to document IDs.
-    pub tags: std::collections::BTreeMap<String, Vec<String>>,
+    pub tags: std::collections::BTreeMap<String, Vec<DocumentId>>,
     /// Backlink target IDs mapped to source IDs.
-    pub backlinks: std::collections::BTreeMap<String, Vec<String>>,
+    pub backlinks: std::collections::BTreeMap<DocumentId, Vec<DocumentId>>,
     /// Agenda item labels.
     pub agenda: Vec<String>,
     /// Markdown preview bodies by document ID.
-    pub markdown: std::collections::BTreeMap<String, String>,
+    pub markdown: std::collections::BTreeMap<DocumentId, String>,
     /// Search records by document ID.
-    pub search: std::collections::BTreeMap<String, String>,
+    pub search: std::collections::BTreeMap<DocumentId, String>,
     /// Graph adjacency by source ID.
-    pub graph: std::collections::BTreeMap<String, Vec<String>>,
+    pub graph: std::collections::BTreeMap<DocumentId, Vec<DocumentId>>,
 }
 
 impl KnowledgePanels {
@@ -92,11 +92,8 @@ fn validate_workspace(input: &KnowledgeWorkspaceInput) -> Vec<KnowledgeIssue> {
     issues
 }
 
-fn document_id_set(documents: &[KnowledgeDocument]) -> std::collections::BTreeSet<String> {
-    documents
-        .iter()
-        .map(|document| document.id.clone())
-        .collect()
+fn document_id_set(documents: &[KnowledgeDocument]) -> std::collections::BTreeSet<DocumentId> {
+    documents.iter().map(|document| document.id.clone()).collect()
 }
 
 fn duplicate_document_issues(documents: &[KnowledgeDocument]) -> Vec<KnowledgeIssue> {
@@ -106,7 +103,7 @@ fn duplicate_document_issues(documents: &[KnowledgeDocument]) -> Vec<KnowledgeIs
         if !seen.insert(document.id.clone()) {
             issues.push(KnowledgeIssue::new(
                 KnowledgeIssueCode::DuplicateDocument,
-                document.id.clone(),
+                document.id.to_string(),
                 "duplicate document ID",
             ));
         }
@@ -116,33 +113,26 @@ fn duplicate_document_issues(documents: &[KnowledgeDocument]) -> Vec<KnowledgeIs
 
 fn heading_issues(
     headings: &[KnowledgeHeading],
-    document_ids: &std::collections::BTreeSet<String>,
+    document_ids: &std::collections::BTreeSet<DocumentId>,
 ) -> Vec<KnowledgeIssue> {
     headings
         .iter()
         .filter(|heading| {
-            heading.title.trim().is_empty()
-                || heading.level == 0
-                || !document_ids.contains(&heading.document_id)
+            heading.title.trim().is_empty() || heading.level == 0 || !document_ids.contains(&heading.document_id)
         })
         .map(|heading| {
             KnowledgeIssue::new(
                 KnowledgeIssueCode::MalformedHeading,
-                heading.document_id.clone(),
+                heading.document_id.to_string(),
                 "heading must reference a document, have text, and use level >= 1",
             )
         })
         .collect()
 }
 
-fn tag_issues(
-    tags: &[KnowledgeTag],
-    document_ids: &std::collections::BTreeSet<String>,
-) -> Vec<KnowledgeIssue> {
+fn tag_issues(tags: &[KnowledgeTag], document_ids: &std::collections::BTreeSet<DocumentId>) -> Vec<KnowledgeIssue> {
     tags.iter()
-        .filter(|tag| {
-            !tag.label.starts_with(TAG_PREFIX) || !document_ids.contains(&tag.document_id)
-        })
+        .filter(|tag| !tag.label.starts_with(TAG_PREFIX) || !document_ids.contains(&tag.document_id))
         .map(|tag| {
             KnowledgeIssue::new(
                 KnowledgeIssueCode::InvalidTag,
@@ -155,13 +145,11 @@ fn tag_issues(
 
 fn backlink_issues(
     backlinks: &[KnowledgeBacklink],
-    document_ids: &std::collections::BTreeSet<String>,
+    document_ids: &std::collections::BTreeSet<DocumentId>,
 ) -> Vec<KnowledgeIssue> {
     backlinks
         .iter()
-        .filter(|link| {
-            !document_ids.contains(&link.source_id) || !document_ids.contains(&link.target_id)
-        })
+        .filter(|link| !document_ids.contains(&link.source_id) || !document_ids.contains(&link.target_id))
         .map(|link| {
             KnowledgeIssue::new(
                 KnowledgeIssueCode::MissingLinkTarget,
@@ -174,23 +162,16 @@ fn backlink_issues(
 
 fn agenda_issues(
     agenda: &[KnowledgeAgendaItem],
-    document_ids: &std::collections::BTreeSet<String>,
+    document_ids: &std::collections::BTreeSet<DocumentId>,
 ) -> Vec<KnowledgeIssue> {
     agenda
         .iter()
-        .filter(|item| {
-            !document_ids.contains(&item.document_id)
-                || !is_iso_date(&item.start)
-                || item
-                    .end
-                    .as_ref()
-                    .is_some_and(|end| !is_iso_date(end) || end < &item.start)
-        })
+        .filter(|item| !document_ids.contains(&item.document_id))
         .map(|item| {
             KnowledgeIssue::new(
                 KnowledgeIssueCode::BadDateRange,
                 item.title.clone(),
-                "agenda item must reference a document and use an ordered YYYY-MM-DD date range",
+                "validated agenda item must reference an existing document",
             )
         })
         .collect()
@@ -231,64 +212,26 @@ fn build_panels(input: &KnowledgeWorkspaceInput) -> KnowledgePanels {
             .filter(|target| target.writable)
             .map(|target| target.label.clone())
             .collect(),
-        tags: group_pairs(
-            input
-                .tags
-                .iter()
-                .map(|tag| (tag.label.clone(), tag.document_id.clone())),
-        ),
-        backlinks: group_pairs(
-            input
-                .backlinks
-                .iter()
-                .map(|link| (link.target_id.clone(), link.source_id.clone())),
-        ),
-        agenda: input
-            .agenda
-            .iter()
-            .map(|item| format!("{} {}", item.start, item.title))
-            .collect(),
-        markdown: input
-            .documents
-            .iter()
-            .map(|document| (document.id.clone(), document.body.clone()))
-            .collect(),
-        search: input
-            .search
-            .iter()
-            .map(|record| (record.document_id.clone(), record.text.clone()))
-            .collect(),
-        graph: group_pairs(
-            input
-                .graph
-                .iter()
-                .map(|edge| (edge.source_id.clone(), edge.target_id.clone())),
-        ),
+        tags: group_pairs(input.tags.iter().map(|tag| (tag.label.clone(), tag.document_id.clone()))),
+        backlinks: group_pairs(input.backlinks.iter().map(|link| (link.target_id.clone(), link.source_id.clone()))),
+        agenda: input.agenda.iter().map(|item| format!("{} {}", item.start, item.title)).collect(),
+        markdown: input.documents.iter().map(|document| (document.id.clone(), document.body.clone())).collect(),
+        search: input.search.iter().map(|record| (record.document_id.clone(), record.text.clone())).collect(),
+        graph: group_pairs(input.graph.iter().map(|edge| (edge.source_id.clone(), edge.target_id.clone()))),
     };
     debug_assert!(panels.markdown.len() <= input.documents.len());
     debug_assert!(panels.search.len() <= input.search.len());
     panels
 }
 
-fn group_pairs<I>(pairs: I) -> std::collections::BTreeMap<String, Vec<String>>
+fn group_pairs<K, V, I>(pairs: I) -> std::collections::BTreeMap<K, Vec<V>>
 where
-    I: IntoIterator<Item = (String, String)>,
+    K: Ord,
+    I: IntoIterator<Item = (K, V)>,
 {
-    let mut grouped: std::collections::BTreeMap<String, Vec<String>> =
-        std::collections::BTreeMap::new();
+    let mut grouped: std::collections::BTreeMap<K, Vec<V>> = std::collections::BTreeMap::new();
     for (key, value) in pairs {
         grouped.entry(key).or_default().push(value);
     }
     grouped
-}
-
-fn is_iso_date(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() == 10
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit())
 }

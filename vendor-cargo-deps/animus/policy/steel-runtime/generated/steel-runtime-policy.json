@@ -5,6 +5,7 @@
         "model",
         "tool",
         "respond",
+        "completion-candidate",
         "stop"
       ],
       "budget": {
@@ -27,6 +28,7 @@
         "model",
         "tool",
         "respond",
+        "completion-candidate",
         "stop"
       ],
       "budget": {
@@ -40,7 +42,7 @@
         "mode": "hash-only"
       },
       "script": {
-        "hash": "0225dfc88a7cbfe9b1639a199dd961cecee66ecd311a2ff13929867f60b6ca77",
+        "hash": "c49363bf4ab5ecd8dd519138acb3ca3b251edb0646f3ac4e98b9393c9ac93a88",
         "label": "scripts/ralph-loop.scm"
       }
     }

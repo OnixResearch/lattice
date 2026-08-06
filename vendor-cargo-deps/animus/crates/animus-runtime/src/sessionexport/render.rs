@@ -7,8 +7,7 @@ type SessionTreeExportIssue = super::data::SessionTreeExportIssue;
 type SessionTreeExportPolicy = super::data::SessionTreeExportPolicy;
 type SessionTreeExportProjection = super::data::SessionTreeExportProjection;
 
-const SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN: &str =
-    super::data::SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN;
+const SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN: &str = super::data::SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN;
 const FIELD_ARTIFACT: &str = "session_tree_export_artifact";
 const HTML_PREFIX: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Redacted session tree</title></head><body><main>";
 const HTML_SUFFIX: &str = "</main></body></html>\n";
@@ -94,34 +93,24 @@ pub fn render_session_tree_export(
     format: SessionTreeExportFormat,
 ) -> Result<SessionTreeExportArtifact, SessionTreeExportError> {
     if !policy.formats.contains(&format) {
-        return Err(SessionTreeExportError::new(
-            SessionTreeExportIssue::UnsupportedFormat,
-            FIELD_ARTIFACT,
-        ));
+        return Err(SessionTreeExportError::new(SessionTreeExportIssue::UnsupportedFormat, FIELD_ARTIFACT));
     }
     let rendered = match format {
         SessionTreeExportFormat::Html => render_html(projection),
         SessionTreeExportFormat::SafeLines => render_safe_lines(projection),
     };
-    let byte_count = u32::try_from(rendered.len()).map_err(|_error| {
-        SessionTreeExportError::new(SessionTreeExportIssue::BoundExceeded, FIELD_ARTIFACT)
-    })?;
+    let byte_count = u32::try_from(rendered.len())
+        .map_err(|_error| SessionTreeExportError::new(SessionTreeExportIssue::BoundExceeded, FIELD_ARTIFACT))?;
     if byte_count > policy.artifact_byte_limit(format) {
-        return Err(SessionTreeExportError::new(
-            SessionTreeExportIssue::BoundExceeded,
-            FIELD_ARTIFACT,
-        ));
+        return Err(SessionTreeExportError::new(SessionTreeExportIssue::BoundExceeded, FIELD_ARTIFACT));
     }
     debug_assert!(policy.formats.contains(&format));
     debug_assert!(!rendered.is_empty());
-    let artifact_hash = super::core::hash_parts(
-        SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN,
-        &[
-            projection.projection_hash.as_str(),
-            format.as_str(),
-            rendered.as_str(),
-        ],
-    );
+    let artifact_hash = super::core::hash_parts(SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN, &[
+        projection.projection_hash.as_str(),
+        format.as_str(),
+        rendered.as_str(),
+    ]);
     Ok(SessionTreeExportArtifact {
         format,
         bytes: rendered.into_bytes(),
@@ -169,11 +158,7 @@ fn push_topology_view(output: &mut RenderBuffer, projection: &SessionTreeExportP
         output.push_str("<li data-depth=\"");
         output.push_str(entry.depth.to_string().as_str());
         output.push_str("\" data-active=\"");
-        output.push_str(if entry.is_active_path {
-            "true"
-        } else {
-            "false"
-        });
+        output.push_str(if entry.is_active_path { "true" } else { "false" });
         output.push_str("\"><code>");
         output.push_html_escaped(entry.entry_id.as_str());
         output.push_str("</code> parent=<code>");
@@ -239,11 +224,7 @@ fn render_safe_lines(projection: &SessionTreeExportProjection) -> String {
         output.push_char('\t');
         output.push_str(entry.depth.to_string().as_str());
         output.push_char('\t');
-        output.push_str(if entry.is_active_path {
-            "active"
-        } else {
-            "sibling"
-        });
+        output.push_str(if entry.is_active_path { "active" } else { "sibling" });
         output.push_char('\t');
         output.push_line_escaped(entry.status.as_str());
         output.push_char('\t');

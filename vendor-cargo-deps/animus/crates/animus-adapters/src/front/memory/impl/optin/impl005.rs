@@ -1,10 +1,15 @@
 #![allow(unknown_lints)]
 #![cfg_attr(animus_octet, allow(tigerstyle::excessive_file_length))]
 
-use super::{
-    MemoryAdmissionDecision, MemoryAvailabilityStatus, MemoryCandidate, MemoryDescriptor,
-    MemoryPersistenceIntent, OptInMemoryRecord, PromptAssemblyError, String, Vec,
-};
+use super::MemoryAdmissionDecision;
+use super::MemoryAvailabilityStatus;
+use super::MemoryCandidate;
+use super::MemoryDescriptor;
+use super::MemoryPersistenceIntent;
+use super::OptInMemoryRecord;
+use super::PromptAssemblyError;
+use super::String;
+use super::Vec;
 
 /// Swappable memory adapter boundary kind.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -70,10 +75,7 @@ pub trait MemoryStoreAdapter {
     /// # Errors
     ///
     /// Returns [`MemoryAdapterError`] when persistence is unavailable or rejected by the host.
-    fn persist_memory_descriptor(
-        &self,
-        descriptor: &MemoryDescriptor,
-    ) -> MemoryAdapterResult<MemoryPersistenceIntent>;
+    fn persist_memory_descriptor(&self, descriptor: &MemoryDescriptor) -> MemoryAdapterResult<MemoryPersistenceIntent>;
 }
 
 /// Swappable compatibility importer for external memory formats.
@@ -96,7 +98,8 @@ pub trait MemoryExtractionAdapter {
     ///
     /// # Errors
     ///
-    /// Returns [`MemoryAdapterError`] when extraction is unavailable or candidate metadata is invalid.
+    /// Returns [`MemoryAdapterError`] when extraction is unavailable or candidate metadata is
+    /// invalid.
     fn propose_memory_candidate(&self) -> MemoryAdapterResult<MemoryCandidate>;
 }
 
@@ -106,11 +109,9 @@ pub trait MemoryAdmissionAdapter {
     ///
     /// # Errors
     ///
-    /// Returns [`MemoryAdapterError`] when admission review is unavailable or decision metadata is invalid.
-    fn decide_memory_admission(
-        &self,
-        candidate: &MemoryCandidate,
-    ) -> MemoryAdapterResult<MemoryAdmissionDecision>;
+    /// Returns [`MemoryAdapterError`] when admission review is unavailable or decision metadata is
+    /// invalid.
+    fn decide_memory_admission(&self, candidate: &MemoryCandidate) -> MemoryAdapterResult<MemoryAdmissionDecision>;
 }
 
 /// Swappable retrieval adapter for opt-in memory records.
@@ -130,10 +131,7 @@ pub trait OptInMemoryMutationAdapter {
     /// # Errors
     ///
     /// Returns [`MemoryAdapterError`] when mutation is unavailable or rejected by the host.
-    fn apply_memory_mutation(
-        &self,
-        record: &OptInMemoryRecord,
-    ) -> MemoryAdapterResult<MemoryPersistenceIntent>;
+    fn apply_memory_mutation(&self, record: &OptInMemoryRecord) -> MemoryAdapterResult<MemoryPersistenceIntent>;
 }
 
 /// Swappable availability adapter for memory services.
@@ -268,18 +266,12 @@ impl core::fmt::Display for MemoryError {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} supports at most {max_items} items; got {actual_items}"
-            ),
+            } => write!(formatter, "{field} supports at most {max_items} items; got {actual_items}"),
             Self::MissingTrustScope { descriptor_id } => {
                 write!(formatter, "{descriptor_id} is missing memory trust scope")
             }
             Self::MissingInclusionPolicy { descriptor_id } => {
-                write!(
-                    formatter,
-                    "{descriptor_id} is missing memory inclusion policy"
-                )
+                write!(formatter, "{descriptor_id} is missing memory inclusion policy")
             }
             Self::ExpiredDescriptor { descriptor_id } => {
                 write!(formatter, "{descriptor_id} has expired memory freshness")
@@ -291,10 +283,7 @@ impl core::fmt::Display for MemoryError {
                 write!(formatter, "{record_id} is missing memory record scope")
             }
             Self::MissingAdapterCapabilities { adapter_label } => {
-                write!(
-                    formatter,
-                    "{adapter_label} is missing memory adapter capabilities"
-                )
+                write!(formatter, "{adapter_label} is missing memory adapter capabilities")
             }
             Self::MissingEvidence { record_id } => {
                 write!(formatter, "{record_id} is missing memory evidence metadata")
@@ -305,15 +294,9 @@ impl core::fmt::Display for MemoryError {
             Self::UnsupportedCategory {
                 record_id,
                 category_label,
-            } => write!(
-                formatter,
-                "{record_id} uses unsupported memory category {category_label}"
-            ),
+            } => write!(formatter, "{record_id} uses unsupported memory category {category_label}"),
             Self::MissingBaseline { claim_id } => {
-                write!(
-                    formatter,
-                    "{claim_id} is missing memory evaluation baseline"
-                )
+                write!(formatter, "{claim_id} is missing memory evaluation baseline")
             }
             Self::InvalidConfidence {
                 min_percent,
@@ -323,9 +306,7 @@ impl core::fmt::Display for MemoryError {
                 formatter,
                 "memory confidence must be between {min_percent} and {max_percent}; got {actual_percent}"
             ),
-            Self::ZeroInjectionBudget => {
-                formatter.write_str("memory injection budget must be non-zero")
-            }
+            Self::ZeroInjectionBudget => formatter.write_str("memory injection budget must be non-zero"),
             Self::AdmissionCandidateMismatch {
                 candidate_id,
                 decision_candidate_id,

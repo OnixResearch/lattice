@@ -6,13 +6,19 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::composition::{ModelInvocationOmissionClass, ModelInvocationPlan};
-use super::types::{
-    MODEL_INVOCATION_RECEIPT_HASH_DOMAIN, ModelMemoryAccessMode, ModelProfileSourceScope,
-    ModelProfileSpecificity, ModelProfileTrustStatus, ModelRuntimeProfileError,
-    ModelRuntimeProfileIssue, NativeToolCallingMode, ResolvedModelRuntimeProfile,
-};
-use super::validation::{blake3_parts, error};
+use super::composition::ModelInvocationOmissionClass;
+use super::composition::ModelInvocationPlan;
+use super::types::MODEL_INVOCATION_RECEIPT_HASH_DOMAIN;
+use super::types::ModelMemoryAccessMode;
+use super::types::ModelProfileSourceScope;
+use super::types::ModelProfileSpecificity;
+use super::types::ModelProfileTrustStatus;
+use super::types::ModelRuntimeProfileError;
+use super::types::ModelRuntimeProfileIssue;
+use super::types::NativeToolCallingMode;
+use super::types::ResolvedModelRuntimeProfile;
+use super::validation::blake3_parts;
+use super::validation::error;
 
 const FIELD_RECEIPT: &str = "model_invocation_receipt";
 const REDACTION_MARKER: &str = "raw-model-context-omitted";
@@ -416,41 +422,17 @@ fn reject_sensitive_receipt_fields(
     let leaks = [
         (sensitive.raw_prompt, ModelInvocationReceiptLeak::RawPrompt),
         (sensitive.skill_body, ModelInvocationReceiptLeak::SkillBody),
-        (
-            sensitive.memory_body,
-            ModelInvocationReceiptLeak::MemoryBody,
-        ),
-        (
-            sensitive.script_or_asset,
-            ModelInvocationReceiptLeak::ScriptOrAsset,
-        ),
-        (
-            sensitive.tool_arguments,
-            ModelInvocationReceiptLeak::ToolArguments,
-        ),
-        (
-            sensitive.tool_output,
-            ModelInvocationReceiptLeak::ToolOutput,
-        ),
-        (
-            sensitive.provider_payload,
-            ModelInvocationReceiptLeak::ProviderPayload,
-        ),
+        (sensitive.memory_body, ModelInvocationReceiptLeak::MemoryBody),
+        (sensitive.script_or_asset, ModelInvocationReceiptLeak::ScriptOrAsset),
+        (sensitive.tool_arguments, ModelInvocationReceiptLeak::ToolArguments),
+        (sensitive.tool_output, ModelInvocationReceiptLeak::ToolOutput),
+        (sensitive.provider_payload, ModelInvocationReceiptLeak::ProviderPayload),
         (sensitive.credential, ModelInvocationReceiptLeak::Credential),
-        (
-            sensitive.environment_value,
-            ModelInvocationReceiptLeak::EnvironmentValue,
-        ),
+        (sensitive.environment_value, ModelInvocationReceiptLeak::EnvironmentValue),
         (sensitive.full_path, ModelInvocationReceiptLeak::FullPath),
         (sensitive.endpoint, ModelInvocationReceiptLeak::Endpoint),
-        (
-            sensitive.hidden_reasoning,
-            ModelInvocationReceiptLeak::HiddenReasoning,
-        ),
-        (
-            sensitive.unbounded_trace,
-            ModelInvocationReceiptLeak::UnboundedTrace,
-        ),
+        (sensitive.hidden_reasoning, ModelInvocationReceiptLeak::HiddenReasoning),
+        (sensitive.unbounded_trace, ModelInvocationReceiptLeak::UnboundedTrace),
     ];
     if leaks.iter().any(|(candidate, _)| candidate.is_some()) {
         return Err(error(
@@ -526,10 +508,7 @@ fn receipt_hash(input: ReceiptHashInput<'_>) -> String {
         REDACTION_MARKER.to_string(),
     ];
     for skill in input.skills {
-        parts.push(format!(
-            "skill:{}:{}:{}",
-            skill.name, skill.content_identity, skill.selected
-        ));
+        parts.push(format!("skill:{}:{}:{}", skill.name, skill.content_identity, skill.selected));
     }
     for tool in input.tools {
         parts.push(format!("tool:{}:{}", tool.name, tool.schema_identity));

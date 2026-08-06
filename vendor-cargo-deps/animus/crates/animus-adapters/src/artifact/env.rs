@@ -27,11 +27,7 @@ pub struct Draft<'a> {
 impl<'a> Draft<'a> {
     /// Builds a draft without dependency hashes.
     #[must_use]
-    pub const fn new(
-        kind: super::Kind,
-        redaction: super::RedactionClass,
-        payload: &'a str,
-    ) -> Self {
+    pub const fn new(kind: super::Kind, redaction: super::RedactionClass, payload: &'a str) -> Self {
         Self {
             kind,
             redaction,
@@ -143,10 +139,7 @@ fn normalize_payload(value: &str) -> Result<alloc::string::String, super::Error>
 
 fn validate_payload_length(value: &str) -> Result<(), super::Error> {
     let actual_chars = value.chars().count();
-    assert!(
-        actual_chars <= value.len(),
-        "payload char count must fit byte length"
-    );
+    assert!(actual_chars <= value.len(), "payload char count must fit byte length");
     if actual_chars > MAX_PAYLOAD_CHARS {
         return Err(super::Error::PayloadTooLong {
             max_chars: MAX_PAYLOAD_CHARS,
@@ -157,15 +150,9 @@ fn validate_payload_length(value: &str) -> Result<(), super::Error> {
 }
 
 fn copy_payload(value: &str) -> Result<alloc::string::String, super::Error> {
-    assert!(
-        value.len() >= value.chars().count(),
-        "payload byte length must cover character count"
-    );
+    assert!(value.len() >= value.chars().count(), "payload byte length must cover character count");
     let mut normalized = alloc::string::String::with_capacity(value.len());
-    assert!(
-        normalized.capacity() >= value.len(),
-        "payload normalization buffer must reserve enough bytes"
-    );
+    assert!(normalized.capacity() >= value.len(), "payload normalization buffer must reserve enough bytes");
     let mut is_skipping_line_feed = false;
     for (byte_index, character) in value.char_indices() {
         if character == NUL_CHARACTER {
@@ -189,10 +176,7 @@ fn normalized_dependencies(dependencies: &[super::Hash]) -> alloc::vec::Vec<supe
     let mut normalized = dependencies.to_vec();
     normalized.sort();
     normalized.dedup();
-    assert!(
-        normalized.len() <= dependencies.len(),
-        "deduplicated dependencies cannot grow"
-    );
+    assert!(normalized.len() <= dependencies.len(), "deduplicated dependencies cannot grow");
     normalized
 }
 

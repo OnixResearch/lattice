@@ -1,0 +1,40 @@
+{
+  "budgets_sha256": "03f804061076ecdea7a8a85ce9d2a077d2678ad85f62e613f131e1e504f545e7",
+  "command_sha256": "f056ae84440976e8e988fc2524bf1c5352605ec31387849bd1c7a574debbe9c7",
+  "engines_sha256": "b0336f0d47933caa380a71281c5ef96c5130c76f892ce5b93a4755c1bf21aa27",
+  "exact_engines": {
+    "chromium": "Chromium 149.0.7827.53",
+    "firefox": "Mozilla Firefox 151.0.3",
+    "geckodriver": "geckodriver 0.36.0",
+    "webkit": "unsupported: no direct runner"
+  },
+  "grades": {
+    "chromium_runtime": "pass",
+    "firefox_runtime": "pass",
+    "manifest": "pass",
+    "mime_headers_csp": "pass",
+    "negatives": "pass",
+    "privacy": "pass",
+    "release_repeated": "pass",
+    "root_subpath": "pass",
+    "self_contained": "pass",
+    "size_budgets": "pass"
+  },
+  "limitations": [
+    "not PWA or permanent offline semantics",
+    "not performance",
+    "not security certification or universal CSP",
+    "not accessibility or application-effect permission evidence",
+    "not WebKit or all browsers/devices",
+    "not hosting or release eligibility"
+  ],
+  "manifests": {
+    "met-showcase": "6b56f0d938480a0c8055e434c114be30e558ed01082128d3c9fcc9d46c3b7093",
+    "rat-ratzilla": "6a508456f535408fbe83ea7ff4920a3b45a665bcd2f0f495ea7425020768dc00"
+  },
+  "profile": "browser-delivery",
+  "runner": "x86_64-unknown-linux-gnu",
+  "schema": "rats.browser-delivery-evidence.v1",
+  "source_sha256": "11ca5828a033d442131af8b72c5c7ddef69cd8748b791be2fcade2345fae7aaa",
+  "target": "wasm32-unknown-unknown"
+}

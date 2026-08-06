@@ -1,12 +1,22 @@
 #![allow(non_trait_imports)]
-use super::{
-    CanonicalModelContractError, CanonicalModelMessage, CanonicalModelMessageDraft,
-    CanonicalOutputControlsDraft, CanonicalSafeMetadata, CanonicalSafeMetadataDraft,
-    CanonicalToolDeclaration, CanonicalToolDeclarationDraft, MAX_STOP_SEQUENCES,
-    REASONING_SUMMARY_FIELD, RESPONSE_SCHEMA_FIELD, STOP_SEQUENCE_FIELD, safe_text,
-    validate_collection_len, validate_reasoning_effort, validate_temperature, validate_text_slice,
-    validate_token_budget,
-};
+use super::CanonicalModelContractError;
+use super::CanonicalModelMessage;
+use super::CanonicalModelMessageDraft;
+use super::CanonicalOutputControlsDraft;
+use super::CanonicalSafeMetadata;
+use super::CanonicalSafeMetadataDraft;
+use super::CanonicalToolDeclaration;
+use super::CanonicalToolDeclarationDraft;
+use super::MAX_STOP_SEQUENCES;
+use super::REASONING_SUMMARY_FIELD;
+use super::RESPONSE_SCHEMA_FIELD;
+use super::STOP_SEQUENCE_FIELD;
+use super::safe_text;
+use super::validate_collection_len;
+use super::validate_reasoning_effort;
+use super::validate_temperature;
+use super::validate_text_slice;
+use super::validate_token_budget;
 
 /// Validated canonical output controls.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -23,16 +33,10 @@ impl CanonicalOutputControls {
     /// # Errors
     ///
     /// Returns [`CanonicalModelContractError`] when token, sampling, or stop-sequence bounds fail.
-    pub fn from_draft(
-        draft: CanonicalOutputControlsDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
+    pub fn from_draft(draft: CanonicalOutputControlsDraft<'_>) -> Result<Self, CanonicalModelContractError> {
         validate_token_budget(draft.max_output_tokens)?;
         validate_temperature(draft.temperature_millis)?;
-        validate_collection_len(
-            STOP_SEQUENCE_FIELD,
-            draft.stop_sequences.len(),
-            MAX_STOP_SEQUENCES,
-        )?;
+        validate_collection_len(STOP_SEQUENCE_FIELD, draft.stop_sequences.len(), MAX_STOP_SEQUENCES)?;
         Ok(Self {
             max_output_tokens: draft.max_output_tokens,
             temperature_millis: draft.temperature_millis,
@@ -120,17 +124,13 @@ impl CanonicalResponseFormatIntent {
     /// # Errors
     ///
     /// Returns [`CanonicalModelContractError`] when a schema label is empty or unsafe.
-    pub fn from_draft(
-        draft: CanonicalResponseFormatIntentDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
+    pub fn from_draft(draft: CanonicalResponseFormatIntentDraft<'_>) -> Result<Self, CanonicalModelContractError> {
         match draft {
             CanonicalResponseFormatIntentDraft::Text => Ok(Self::Text),
             CanonicalResponseFormatIntentDraft::JsonObject => Ok(Self::JsonObject),
-            CanonicalResponseFormatIntentDraft::JsonSchema { schema_label } => {
-                Ok(Self::JsonSchema {
-                    schema_label: safe_text(RESPONSE_SCHEMA_FIELD, schema_label)?,
-                })
-            }
+            CanonicalResponseFormatIntentDraft::JsonSchema { schema_label } => Ok(Self::JsonSchema {
+                schema_label: safe_text(RESPONSE_SCHEMA_FIELD, schema_label)?,
+            }),
         }
     }
 }
@@ -172,18 +172,14 @@ impl CanonicalReasoningRequest {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when enabled/effort invariants fail or summary metadata is unsafe.
-    pub fn from_draft(
-        draft: CanonicalReasoningRequestDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
+    /// Returns [`CanonicalModelContractError`] when enabled/effort invariants fail or summary
+    /// metadata is unsafe.
+    pub fn from_draft(draft: CanonicalReasoningRequestDraft<'_>) -> Result<Self, CanonicalModelContractError> {
         validate_reasoning_effort(draft.enabled, draft.effort)?;
         Ok(Self {
             enabled: draft.enabled,
             effort: draft.effort,
-            summary_label: draft
-                .summary_label
-                .map(|raw| safe_text(REASONING_SUMMARY_FIELD, raw))
-                .transpose()?,
+            summary_label: draft.summary_label.map(|raw| safe_text(REASONING_SUMMARY_FIELD, raw)).transpose()?,
         })
     }
 

@@ -6,8 +6,14 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, HighlightSpacing, List, ListItem, ListState};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::widgets::Block;
+use ratatui::widgets::HighlightSpacing;
+use ratatui::widgets::List;
+use ratatui::widgets::ListItem;
+use ratatui::widgets::ListState;
 
 use crate::theme::WidgetTheme;
 
@@ -135,9 +141,7 @@ impl ScrollableList {
             model: ScrollableListModel::new(items),
             highlight_symbol: "> ".to_string(),
             border_color: Color::Blue,
-            highlight_style: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            highlight_style: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             normal_style: Style::default().fg(Color::DarkGray),
         }
     }
@@ -247,12 +251,8 @@ impl ScrollableList {
             }
         }
 
-        let list_items: Vec<ListItem> = self
-            .model
-            .items
-            .iter()
-            .map(|item| ListItem::new(item.as_str()).style(self.normal_style))
-            .collect();
+        let list_items: Vec<ListItem> =
+            self.model.items.iter().map(|item| ListItem::new(item.as_str()).style(self.normal_style)).collect();
 
         let mut widget = List::new(list_items)
             .highlight_symbol(self.highlight_symbol.as_str())
@@ -263,9 +263,8 @@ impl ScrollableList {
             widget = widget.block(b);
         }
 
-        let mut state = ListState::default()
-            .with_selected(Some(self.model.selected))
-            .with_offset(self.model.scroll_offset);
+        let mut state =
+            ListState::default().with_selected(Some(self.model.selected)).with_offset(self.model.scroll_offset);
 
         frame.render_stateful_widget(widget, area, &mut state);
     }
@@ -284,13 +283,7 @@ impl ScrollableList {
     /// Render using colors from the given [`WidgetTheme`], ignoring the
     /// per-instance style fields. Useful when the theme may change at
     /// runtime.
-    pub fn render_themed(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        block: Option<Block>,
-        theme: &WidgetTheme,
-    ) {
+    pub fn render_themed(&mut self, frame: &mut Frame, area: Rect, block: Option<Block>, theme: &WidgetTheme) {
         self.highlight_style = theme.highlight_style();
         self.normal_style = Style::default().fg(theme.text_muted);
         self.border_color = theme.border_focused;

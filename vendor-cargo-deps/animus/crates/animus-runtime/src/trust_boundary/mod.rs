@@ -5,7 +5,8 @@
 //! validates already-loaded descriptors and evaluates planned/observed action
 //! descriptors deterministically.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
+// drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -13,12 +14,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -28,18 +24,29 @@
 mod core;
 mod data;
 
-pub use core::{
-    bind_trust_boundary_judge, blake3_trust_boundary_fingerprint, monitor_trust_boundary_action,
-    validate_trust_boundary_descriptor, validate_trust_boundary_receipt,
-};
-pub use data::{
-    TrustBoundaryAction, TrustBoundaryActionKind, TrustBoundaryDescriptor, TrustBoundaryDiagnostic,
-    TrustBoundaryDiagnosticKind, TrustBoundaryEvidencePolicy, TrustBoundaryFingerprint,
-    TrustBoundaryIssueCode, TrustBoundaryJudgeBinding, TrustBoundaryJudgeOutcome,
-    TrustBoundaryJudgeVeto, TrustBoundaryMonitorDecision, TrustBoundaryReceiptLeak,
-    TrustBoundaryRedactionStatus, TrustBoundaryValidationResult, TrustBoundaryVerifierArtifact,
-    TrustBoundaryViolationReceipt,
-};
+pub use core::bind_trust_boundary_judge;
+pub use core::blake3_trust_boundary_fingerprint;
+pub use core::monitor_trust_boundary_action;
+pub use core::validate_trust_boundary_descriptor;
+pub use core::validate_trust_boundary_receipt;
+
+pub use data::TrustBoundaryAction;
+pub use data::TrustBoundaryActionKind;
+pub use data::TrustBoundaryDescriptor;
+pub use data::TrustBoundaryDiagnostic;
+pub use data::TrustBoundaryDiagnosticKind;
+pub use data::TrustBoundaryEvidencePolicy;
+pub use data::TrustBoundaryFingerprint;
+pub use data::TrustBoundaryIssueCode;
+pub use data::TrustBoundaryJudgeBinding;
+pub use data::TrustBoundaryJudgeOutcome;
+pub use data::TrustBoundaryJudgeVeto;
+pub use data::TrustBoundaryMonitorDecision;
+pub use data::TrustBoundaryReceiptLeak;
+pub use data::TrustBoundaryRedactionStatus;
+pub use data::TrustBoundaryValidationResult;
+pub use data::TrustBoundaryVerifierArtifact;
+pub use data::TrustBoundaryViolationReceipt;
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const TRUST_BOUNDARY_HASH_DOMAIN: &str = "animus.trust-boundary.v1";

@@ -34,11 +34,7 @@ impl Editor {
         if self.cursor_col > 0 {
             // Find the previous char boundary
             let line = &self.lines[self.cursor_line];
-            let prev = line[..self.cursor_col]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            let prev = line[..self.cursor_col].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
             self.lines[self.cursor_line].remove(prev);
             self.cursor_col = prev;
         } else if self.cursor_line > 0 {
@@ -87,11 +83,7 @@ impl Editor {
     pub fn move_left(&mut self) {
         if self.cursor_col > 0 {
             let line = &self.lines[self.cursor_line];
-            self.cursor_col = line[..self.cursor_col]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            self.cursor_col = line[..self.cursor_col].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
         } else if self.cursor_line > 0 {
             self.cursor_line -= 1;
             self.cursor_col = self.lines[self.cursor_line].len();
@@ -125,13 +117,7 @@ impl Editor {
     /// to the inner area (after removing borders). `inner_width` is the
     /// available character width and `indicator_len` is the prompt prefix
     /// length on the first line.
-    pub fn click_to_cursor(
-        &mut self,
-        rel_col: u16,
-        rel_row: u16,
-        inner_width: usize,
-        indicator_len: usize,
-    ) {
+    pub fn click_to_cursor(&mut self, rel_col: u16, rel_row: u16, inner_width: usize, indicator_len: usize) {
         if inner_width == 0 {
             return;
         }

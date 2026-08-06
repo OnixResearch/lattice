@@ -18,36 +18,22 @@ pub(super) fn unsupported_diagnostic(kind: &str) -> super::result::PointerDiagno
     } else {
         format!("unsupported pointer input: {kind}")
     };
-    super::result::PointerDiagnostic::new(
-        super::result::PointerDiagnosticCode::UnsupportedKind,
-        None,
-        message,
-    )
+    super::result::PointerDiagnostic::new(super::result::PointerDiagnosticCode::UnsupportedKind, None, message)
 }
 
-pub(super) fn disabled_diagnostic(
-    region: &super::area::HitRegion,
-) -> super::result::PointerRouteOutcome {
+pub(super) fn disabled_diagnostic(region: &super::area::HitRegion) -> super::result::PointerRouteOutcome {
     super::result::PointerRouteOutcome::Diagnostic(super::result::PointerDiagnostic::new(
         super::result::PointerDiagnosticCode::DisabledTarget,
         Some(region.target_id.clone()),
-        region
-            .diagnostic
-            .clone()
-            .unwrap_or_else(|| "target is disabled".to_string()),
+        region.diagnostic.clone().unwrap_or_else(|| "target is disabled".to_string()),
     ))
 }
 
-pub(super) fn hidden_diagnostic(
-    region: &super::area::HitRegion,
-) -> super::result::PointerRouteOutcome {
+pub(super) fn hidden_diagnostic(region: &super::area::HitRegion) -> super::result::PointerRouteOutcome {
     super::result::PointerRouteOutcome::Diagnostic(super::result::PointerDiagnostic::new(
         super::result::PointerDiagnosticCode::HiddenTarget,
         Some(region.target_id.clone()),
-        region
-            .diagnostic
-            .clone()
-            .unwrap_or_else(|| "target is hidden".to_string()),
+        region.diagnostic.clone().unwrap_or_else(|| "target is hidden".to_string()),
     ))
 }
 

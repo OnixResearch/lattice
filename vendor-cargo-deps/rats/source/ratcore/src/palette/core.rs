@@ -34,13 +34,15 @@ const PREVIEW_STATES: &[&str] = &[
     "danger-warning-success",
 ];
 
+mod adaptive;
 mod generated;
 mod validation;
 
-pub use generated::{
-    expected_theme_artifacts, theme_preview_matrix, validate_theme_artifact_freshness,
-    validate_theme_preview_matrix,
-};
+pub use adaptive::*;
+pub use generated::expected_theme_artifacts;
+pub use generated::theme_preview_matrix;
+pub use generated::validate_theme_artifact_freshness;
+pub use generated::validate_theme_preview_matrix;
 /// Stable theme validation issue code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ThemeIssueCode {
@@ -110,11 +112,7 @@ pub struct ThemeTokenSource {
 impl ThemeTokenSource {
     /// Creates a theme token source snapshot.
     #[must_use]
-    pub fn new(
-        path: impl Into<String>,
-        bytes: impl Into<Vec<u8>>,
-        generator: impl Into<String>,
-    ) -> Self {
+    pub fn new(path: impl Into<String>, bytes: impl Into<Vec<u8>>, generator: impl Into<String>) -> Self {
         Self {
             path: path.into(),
             bytes: bytes.into(),
@@ -234,9 +232,7 @@ pub fn export_css(preset: &crate::generated_theme_tokens::GeneratedThemePreset) 
 
 /// Exports renderer-neutral role names preserved across ratatui and Meteorite.
 #[must_use]
-pub fn semantic_role_names(
-    preset: &crate::generated_theme_tokens::GeneratedThemePreset,
-) -> Vec<&'static str> {
+pub fn semantic_role_names(preset: &crate::generated_theme_tokens::GeneratedThemePreset) -> Vec<&'static str> {
     preset.colors.iter().map(|color| color.role).collect()
 }
 
@@ -248,9 +244,7 @@ pub fn theme_source_blake3(source_bytes: &[u8]) -> String {
 
 /// Exports a deterministic ratatui-oriented token listing.
 #[must_use]
-pub fn export_ratatui_tokens(
-    preset: &crate::generated_theme_tokens::GeneratedThemePreset,
-) -> String {
+pub fn export_ratatui_tokens(preset: &crate::generated_theme_tokens::GeneratedThemePreset) -> String {
     let mut output = format!("theme={}\n", preset.name);
     for color in preset.colors {
         output.push_str(color.role);

@@ -62,7 +62,7 @@ impl Renderer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct State {
     /// Stable state ID.
-    pub id: String,
+    pub id: super::FixtureStateId,
     /// Display label.
     pub label: String,
     /// State kind.
@@ -76,7 +76,7 @@ pub struct State {
 impl State {
     /// Creates an edge state.
     #[must_use]
-    pub fn new(id: impl Into<String>, label: impl Into<String>, kind: Kind) -> Self {
+    pub fn new(id: impl Into<super::FixtureStateId>, label: impl Into<String>, kind: Kind) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -105,7 +105,7 @@ impl State {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fixture {
     /// Stable fixture ID from the shared catalog.
-    pub fixture_id: String,
+    pub fixture_id: super::FixtureId,
     /// Coverage or parity reference proving the base fixture is current.
     pub coverage_reference: String,
     /// Edge states for the fixture.
@@ -115,7 +115,7 @@ pub struct Fixture {
 impl Fixture {
     /// Creates a catalog entry.
     #[must_use]
-    pub fn new(fixture_id: impl Into<String>, coverage_reference: impl Into<String>) -> Self {
+    pub fn new(fixture_id: impl Into<super::FixtureId>, coverage_reference: impl Into<String>) -> Self {
         Self {
             fixture_id: fixture_id.into(),
             coverage_reference: coverage_reference.into(),
@@ -156,7 +156,7 @@ pub struct Issue {
     /// Stable issue code.
     pub code: IssueCode,
     /// Fixture ID associated with the issue.
-    pub fixture_id: String,
+    pub fixture_id: super::FixtureId,
     /// State ID, renderer label, or field associated with the issue.
     pub subject: String,
     /// Human-readable diagnostic.
@@ -166,7 +166,7 @@ pub struct Issue {
 impl Issue {
     pub(super) fn new(
         code: IssueCode,
-        fixture_id: impl Into<String>,
+        fixture_id: impl Into<super::FixtureId>,
         subject: impl Into<String>,
         message: impl Into<String>,
     ) -> Self {
@@ -199,9 +199,11 @@ impl Report {
 mod checks;
 pub use checks::validate;
 mod projection;
-pub use projection::{
-    EdgeDisplay, EdgeDisplayRow, build_edge_display, built_in_edge_display, built_in_edge_fixtures,
-};
+pub use projection::EdgeDisplay;
+pub use projection::EdgeDisplayRow;
+pub use projection::build_edge_display;
+pub use projection::built_in_edge_display;
+pub use projection::built_in_edge_fixtures;
 
 #[cfg(test)]
 #[path = "cases/tests.rs"]

@@ -1,0 +1,35 @@
+{
+  "animus_surface": "compatibility-reexport-only",
+  "forbidden_sources": [
+    "workspace-relative",
+    "release-local",
+    "branch-only",
+    "tag-only",
+    "vendored-copy",
+    "direct-transitive-fork"
+  ],
+  "non_claims": [
+    "not-daemon-correctness",
+    "not-transport-security",
+    "not-pty-preservation",
+    "not-policy-authorization",
+    "not-whole-product-readiness"
+  ],
+  "package": "host-control-core",
+  "repository": "ssh://git@github.com/OnixResearch/host-control.git",
+  "retained_authority": [
+    "consumer-policy",
+    "transport",
+    "daemon",
+    "pty",
+    "process",
+    "filesystem",
+    "clock",
+    "ui",
+    "persistence"
+  ],
+  "revision": "e359ccb80a52efb860307278510fa5297ac970ed",
+  "schema": "animus.host-control-source/v1",
+  "semantic_owner": "OnixResearch/host-control",
+  "tile_adoption": "independent-exact-revision"
+}

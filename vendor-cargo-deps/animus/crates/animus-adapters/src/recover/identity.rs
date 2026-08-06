@@ -47,29 +47,16 @@ impl CheckpointRecord {
     /// hashes, optional attribution, or changed-file counts are invalid.
     pub fn new(draft: CheckpointDraft<'_>) -> Result<Self, super::CheckpointError> {
         let backend_kind = super::CheckpointBackendKind::parse(draft.backend_kind)?;
-        let checkpoint_id =
-            super::core::required_string(super::CHECKPOINT_ID_FIELD, draft.checkpoint_id)?;
-        let workspace_label = super::core::required_string(
-            super::CHECKPOINT_WORKSPACE_LABEL_FIELD,
-            draft.workspace_label,
-        )?;
-        let workspace_hash = super::CheckpointHash::new_for_field(
-            super::CHECKPOINT_WORKSPACE_HASH_FIELD,
-            draft.workspace_hash,
-        )?;
-        let before_hash = super::CheckpointHash::new_for_field(
-            super::CHECKPOINT_BEFORE_HASH_FIELD,
-            draft.before_hash,
-        )?;
-        let after_hash = super::CheckpointHash::new_for_field(
-            super::CHECKPOINT_AFTER_HASH_FIELD,
-            draft.after_hash,
-        )?;
+        let checkpoint_id = super::core::required_string(super::CHECKPOINT_ID_FIELD, draft.checkpoint_id)?;
+        let workspace_label =
+            super::core::required_string(super::CHECKPOINT_WORKSPACE_LABEL_FIELD, draft.workspace_label)?;
+        let workspace_hash =
+            super::CheckpointHash::new_for_field(super::CHECKPOINT_WORKSPACE_HASH_FIELD, draft.workspace_hash)?;
+        let before_hash = super::CheckpointHash::new_for_field(super::CHECKPOINT_BEFORE_HASH_FIELD, draft.before_hash)?;
+        let after_hash = super::CheckpointHash::new_for_field(super::CHECKPOINT_AFTER_HASH_FIELD, draft.after_hash)?;
         super::core::validate_changed_file_count(draft.changed_file_count)?;
-        let session_hash =
-            super::core::optional_hash(super::CHECKPOINT_SESSION_HASH_FIELD, draft.session_hash)?;
-        let tool_label =
-            super::core::optional_string(super::CHECKPOINT_TOOL_LABEL_FIELD, draft.tool_label)?;
+        let session_hash = super::core::optional_hash(super::CHECKPOINT_SESSION_HASH_FIELD, draft.session_hash)?;
+        let tool_label = super::core::optional_string(super::CHECKPOINT_TOOL_LABEL_FIELD, draft.tool_label)?;
         let status = super::CheckpointStatus::parse(draft.status)?;
         Ok(Self {
             backend_kind,

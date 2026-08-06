@@ -1,0 +1,12 @@
+subject	pin_or_version	feature_or_scope	finding	decision
+Amethystate source	9cabc9cb03a77e2de973351cf2bb454ea6d62dd4	tag v0.9.3	MIT;workspace MSRV 1.90;edition 2024	exact git revision in isolated private harness
+amethystate package	0.9.3	default-features=false;redb only	persistent macro,StoreBuilder,MigrationReport,save/save_lazy;no text watcher	retain private experimental
+redb	4.1.0	transitive native backend	debounced pending map,explicit save_now/close,Drop ignores close error	explicit adapter flush required
+amethystate-core	0.9.3	transitive	source-aware subscriptions and UUID instance identity available	not exposed to app model
+migration engine	0.9.3	build_with_report	component failures and drift are report values; build() discards report	adapter uses build_with_report and rejects failures/drift
+macro surface	0.9.3	amethystate persistent mode	generates generic stored type,load_with,mutate,mutate_lazy,save	confined to private harness
+amethystate-dioxus	0.7.0	native DefaultStore;wasm Tauri backend	native harness resolves Dioxus 0.7.10 versus workspace 0.7.9;wasm requires Tauri;preload macro unwraps/panics	not adopted; standalone browser remains separate
+standalone browser	web-sys 0.3	wasm32 met-hooks only	Window.localStorage read/write;status exposes missing/denied/decode/write/unsupported	retain bounded hook
+native target	Rust 1.96 host	isolated harness	11 tests and strict Clippy pass	pilot evidence only
+wasm target	wasm32-unknown-unknown	met-hooks compile	browser API typechecks;no mounted-browser runtime receipt	compile plus simulated codec statuses only
+license	MIT	repository LICENSE	no copied source;API use only	record source provenance

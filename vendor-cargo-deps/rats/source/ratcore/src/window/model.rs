@@ -69,9 +69,7 @@ impl ViewportState {
             });
         }
         if parts.cursor >= parts.item_count {
-            return Err(ViewportError::CursorOutOfBounds {
-                index: parts.cursor,
-            });
+            return Err(ViewportError::CursorOutOfBounds { index: parts.cursor });
         }
         if parts.scroll_offset >= parts.item_count {
             return Err(ViewportError::ScrollOutOfBounds {
@@ -81,16 +79,10 @@ impl ViewportState {
         if let Some(anchor_index) = parts.anchor
             && anchor_index >= parts.item_count
         {
-            return Err(ViewportError::AnchorOutOfBounds {
-                index: anchor_index,
-            });
+            return Err(ViewportError::AnchorOutOfBounds { index: anchor_index });
         }
         if let Some(selection_range) = parts.selection {
-            SelectionRange::new(
-                selection_range.anchor,
-                selection_range.focus,
-                parts.item_count,
-            )?;
+            SelectionRange::new(selection_range.anchor, selection_range.focus, parts.item_count)?;
         }
         Ok(Self {
             item_count: parts.item_count,
@@ -146,9 +138,7 @@ impl ViewportState {
             return VisibleRange::new(0, 0);
         }
         let start = self.scroll_offset.min(self.item_count);
-        let end = start
-            .saturating_add(self.viewport_extent)
-            .min(self.item_count);
+        let end = start.saturating_add(self.viewport_extent).min(self.item_count);
         VisibleRange::new(start, end)
     }
 
@@ -229,9 +219,7 @@ impl ViewportState {
         self.cursor = self.cursor.min(last);
         self.scroll_offset = self.scroll_offset.min(last);
         self.anchor = self.anchor.map(|anchor| anchor.min(last));
-        self.selection = self
-            .selection
-            .and_then(|selection| selection.clamp(item_count));
+        self.selection = self.selection.and_then(|selection| selection.clamp(item_count));
         self.with_cursor_visible()
     }
 
@@ -262,10 +250,7 @@ impl ViewportState {
         }
         let visible_end = self.scroll_offset.saturating_add(self.viewport_extent);
         if self.cursor >= visible_end {
-            self.scroll_offset = self
-                .cursor
-                .saturating_add(1)
-                .saturating_sub(self.viewport_extent);
+            self.scroll_offset = self.cursor.saturating_add(1).saturating_sub(self.viewport_extent);
         }
         let max_scroll = self.item_count.saturating_sub(1);
         self.scroll_offset = self.scroll_offset.min(max_scroll);

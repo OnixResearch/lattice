@@ -38,8 +38,7 @@ impl EvidenceSummary {
     /// Returns [`super::failure::Error`] when missing-evidence names are absent
     /// for a status that requires them or any name is invalid.
     pub fn validate(draft: &EvidenceSummaryDraft<'_>) -> Result<Self, super::failure::Error> {
-        let missing_evidence =
-            super::check::missing_evidence(draft.status, draft.missing_evidence)?;
+        let missing_evidence = super::check::missing_evidence(draft.status, draft.missing_evidence)?;
         Ok(Self {
             status: draft.status,
             missing_evidence,
@@ -127,10 +126,7 @@ impl Metadata {
         super::check::raw_body(draft.raw_body)?;
         Ok(Self {
             source_label: super::check::required_text(super::SOURCE_FIELD, draft.source_label)?,
-            safe_reference: super::check::safe_reference(
-                super::REFERENCE_FIELD,
-                draft.safe_reference,
-            )?,
+            safe_reference: super::check::safe_reference(super::REFERENCE_FIELD, draft.safe_reference)?,
             content_hash: super::check::content_hash(draft.content_hash)?,
             truncation: draft.truncation,
         })
@@ -166,9 +162,9 @@ impl Metadata {
 pub fn plan(budget: &super::contract::Budget, evidence: &EvidenceSummary) -> Decision {
     match evidence.status() {
         EvidenceStatus::Sufficient => Decision::AnswerFromEvidence,
-        EvidenceStatus::MissingRequired
-        | EvidenceStatus::Contradictory
-        | EvidenceStatus::Insufficient => plan_missing_evidence(budget, evidence),
+        EvidenceStatus::MissingRequired | EvidenceStatus::Contradictory | EvidenceStatus::Insufficient => {
+            plan_missing_evidence(budget, evidence)
+        }
     }
 }
 

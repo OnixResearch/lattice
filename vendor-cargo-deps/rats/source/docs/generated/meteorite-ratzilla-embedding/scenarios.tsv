@@ -1,0 +1,10 @@
+scenario	evidence_grade	status	claim
+cleanup	mounted-direct	complete	idempotent host cleanup and post-unmount inertness
+fixture	mounted-direct	complete	validated fixture replacement renders real dialog
+focus	mounted-direct	complete	Ratzilla grid retains terminal-cell input ownership
+host	mounted-direct	complete	Dioxus-owned namespaced host exists
+input	mounted-direct	complete	Enter reaches embedded Ratzilla reducer and redraw
+nested-grid	mounted-direct	complete	exactly one Ratzilla DOM grid is nested
+parity-label	mounted-direct	complete	native Dioxus parity remains partial
+remount	mounted-direct	complete	generation replacement leaves exactly one grid
+resize	mounted-direct	complete	embedded host accepts a new measured frame generation

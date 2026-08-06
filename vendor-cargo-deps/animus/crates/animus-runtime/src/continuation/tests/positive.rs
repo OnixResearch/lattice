@@ -118,6 +118,18 @@ fn queued_prompt_priority_wins_and_leaves_automation_pending() {
 }
 
 #[test]
+// r[verify agent_harness_runtime.authoritative_completion.feedback.dispatch]
+fn validation_follow_up_keeps_its_exact_work_identity() {
+    let state = ContinuationState::new()
+        .with_validation_follow_up(VALIDATION_WORK_ID)
+        .expect("validation work should validate");
+    let decision = select_next_continuation(&state, &default_policy());
+
+    assert_eq!(decision.action(), ContinuationAction::RunValidationFollowUp);
+    assert_eq!(decision.work_id(), Some(VALIDATION_WORK_ID));
+}
+
+#[test]
 fn custom_priority_can_make_loop_work_win_explicitly() {
     let priority = ContinuationPriority::new([
         ContinuationCandidate::LoopContinuation,

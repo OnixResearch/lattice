@@ -59,9 +59,14 @@
         isRatsCompileTimeAssetPath =
           path:
           toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
-          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/" (
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/ratcore/src/generated/" (
             toString path
-          );
+          )
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/meteorite/crates/met-core/generated/" (
+            toString path
+          )
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/themes/" (toString path);
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:

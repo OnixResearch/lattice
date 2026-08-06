@@ -15,10 +15,8 @@ pub(super) const VALIDATION_PLAN: &str = "cargo-test-headless";
 pub(super) const SCHEMA_ID: &str = "schema.final.answer";
 pub(super) const THREAD_ID: &str = "thread-1";
 pub(super) const OTHER_THREAD_ID: &str = "thread-2";
-pub(super) const LEDGER_HASH: &str =
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-pub(super) const OTHER_LEDGER_HASH: &str =
-    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+pub(super) const LEDGER_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const OTHER_LEDGER_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 pub(super) const EVENT_BODY: &str = "model dispatched";
 pub(super) const PROMPT_BODY: &str = "prompt assembled";
 pub(super) const BACKGROUND_BODY: &str = "background queue idle";
@@ -83,11 +81,7 @@ pub(super) fn event_body_over_limit() -> Text {
     "x".repeat(OVERSIZED_EVENT_BODY_BYTES)
 }
 
-pub(super) fn visible_event(
-    sequence: u64,
-    kind: AutomationEventKind,
-    body: &str,
-) -> AutomationEventDraft<'_> {
+pub(super) fn visible_event(sequence: u64, kind: AutomationEventKind, body: &str) -> AutomationEventDraft<'_> {
     AutomationEventDraft {
         sequence,
         kind: kind.as_str(),
@@ -98,57 +92,17 @@ pub(super) fn visible_event(
 
 pub(super) fn valid_stream() -> Collection<AutomationEnvelope> {
     build_automation_stream(&[
-        visible_event(
-            THREAD_SEQUENCE,
-            AutomationEventKind::ThreadStarted,
-            "thread started",
-        ),
-        visible_event(
-            TURN_SEQUENCE,
-            AutomationEventKind::ItemCreated,
-            PROGRESS_BODY,
-        ),
-        visible_event(
-            PROMPT_SEQUENCE,
-            AutomationEventKind::PromptAssembly,
-            PROMPT_BODY,
-        ),
-        visible_event(
-            MODEL_SEQUENCE,
-            AutomationEventKind::ModelDispatch,
-            EVENT_BODY,
-        ),
-        visible_event(
-            STREAM_START_SEQUENCE,
-            AutomationEventKind::ModelStreamStart,
-            STREAM_CALL_ID,
-        ),
-        visible_event(
-            STREAM_FRAME_SEQUENCE,
-            AutomationEventKind::ModelStreamFrame,
-            "token delta",
-        ),
-        visible_event(
-            STREAM_END_SEQUENCE,
-            AutomationEventKind::ModelStreamEnd,
-            "finish",
-        ),
-        visible_event(
-            BACKGROUND_SEQUENCE,
-            AutomationEventKind::BackgroundWork,
-            BACKGROUND_BODY,
-        ),
-        visible_event(
-            VALIDATION_SEQUENCE,
-            AutomationEventKind::Validation,
-            VALIDATION_BODY,
-        ),
+        visible_event(THREAD_SEQUENCE, AutomationEventKind::ThreadStarted, "thread started"),
+        visible_event(TURN_SEQUENCE, AutomationEventKind::ItemCreated, PROGRESS_BODY),
+        visible_event(PROMPT_SEQUENCE, AutomationEventKind::PromptAssembly, PROMPT_BODY),
+        visible_event(MODEL_SEQUENCE, AutomationEventKind::ModelDispatch, EVENT_BODY),
+        visible_event(STREAM_START_SEQUENCE, AutomationEventKind::ModelStreamStart, STREAM_CALL_ID),
+        visible_event(STREAM_FRAME_SEQUENCE, AutomationEventKind::ModelStreamFrame, "token delta"),
+        visible_event(STREAM_END_SEQUENCE, AutomationEventKind::ModelStreamEnd, "finish"),
+        visible_event(BACKGROUND_SEQUENCE, AutomationEventKind::BackgroundWork, BACKGROUND_BODY),
+        visible_event(VALIDATION_SEQUENCE, AutomationEventKind::Validation, VALIDATION_BODY),
         visible_event(RECEIPT_SEQUENCE, AutomationEventKind::Receipt, RECEIPT_BODY),
-        visible_event(
-            FINAL_RESPONSE_SEQUENCE,
-            AutomationEventKind::FinalResponse,
-            FINAL_BODY,
-        ),
+        visible_event(FINAL_RESPONSE_SEQUENCE, AutomationEventKind::FinalResponse, FINAL_BODY),
         visible_event(FINAL_SEQUENCE, AutomationEventKind::Completion, FINAL_BODY),
     ])
     .expect("valid stream should build")

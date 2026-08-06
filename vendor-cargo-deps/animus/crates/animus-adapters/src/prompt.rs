@@ -12,26 +12,43 @@ mod scan;
 #[cfg(test)]
 mod tests;
 
-pub use data::{
-    ContextLineRange, ContextOversizedPolicy, ContextReference, ContextReferenceBudget,
-    ContextReferenceCounts, ContextReferenceError, ContextReferenceFragment, ContextReferenceKind,
-    ContextReferencePolicy, ContextReferencePolicyDecision, ContextReferenceProvenance,
-    ContextReferenceProvenanceDraft, ContextReferenceStatus, ContextRenderMode,
-    ContextResolutionPlan, ContextResolverKind, ContextSourceTrust, ContextTruncationState,
-    ResolvedContextCandidate,
-};
-pub use family::{
-    ContextAdapterAvailability, ContextAdapterOutcomeClass, ContextAdapterPolicyDecision,
-    ContextAdapterRole, ContextAdapterRoleDraft, ContextAdapterRoleRecord,
-    validate_context_resolver_role,
-};
+pub use data::ContextLineRange;
+pub use data::ContextOversizedPolicy;
+pub use data::ContextReference;
+pub use data::ContextReferenceBudget;
+pub use data::ContextReferenceCounts;
+pub use data::ContextReferenceError;
+pub use data::ContextReferenceFragment;
+pub use data::ContextReferenceKind;
+pub use data::ContextReferencePolicy;
+pub use data::ContextReferencePolicyDecision;
+pub use data::ContextReferenceProvenance;
+pub use data::ContextReferenceProvenanceDraft;
+pub use data::ContextReferenceStatus;
+pub use data::ContextRenderMode;
+pub use data::ContextResolutionPlan;
+pub use data::ContextResolverKind;
+pub use data::ContextSourceTrust;
+pub use data::ContextTruncationState;
+pub use data::ResolvedContextCandidate;
+pub use family::ContextAdapterAvailability;
+pub use family::ContextAdapterOutcomeClass;
+pub use family::ContextAdapterPolicyDecision;
+pub use family::ContextAdapterRole;
+pub use family::ContextAdapterRoleDraft;
+pub use family::ContextAdapterRoleRecord;
+pub use family::validate_context_resolver_role;
 /// Validated context adapter family manifest for public prompt contracts.
 pub type ContextAdapterFamilyManifest = family::Manifest;
-pub use flow::{apply_context_budget, expand_context_reference, plan_context_resolution};
-pub use host::{
-    ContextResolverSet, DiffContextResolver, DirectoryContextResolver, FileContextResolver,
-    ImageContextResolver, UrlContextResolver,
-};
+pub use flow::apply_context_budget;
+pub use flow::expand_context_reference;
+pub use flow::plan_context_resolution;
+pub use host::ContextResolverSet;
+pub use host::DiffContextResolver;
+pub use host::DirectoryContextResolver;
+pub use host::FileContextResolver;
+pub use host::ImageContextResolver;
+pub use host::UrlContextResolver;
 /// Prompt profile assembly report.
 pub type ProfileAssembly = profiles::Assembly;
 /// Prompt profile assembly diagnostic.
@@ -103,10 +120,7 @@ pub fn bind_profile_mode(request: ProfileModeBindingRequest<'_>) -> ProfileModeB
 
 /// Parses first-line profile directives and strips them from body text.
 #[must_use]
-pub fn parse_profile_directives(
-    body: &str,
-    supported_chain_targets: &[ProfileMode],
-) -> ProfileDirectiveReport {
+pub fn parse_profile_directives(body: &str, supported_chain_targets: &[ProfileMode]) -> ProfileDirectiveReport {
     profiles::parse(body, supported_chain_targets)
 }
 pub use scan::parse_context_reference;

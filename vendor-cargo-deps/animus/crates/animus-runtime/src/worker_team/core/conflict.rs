@@ -7,10 +7,7 @@ pub(super) fn merge_validated_reports(
     let evidence = collect_evidence(reports);
     let conflicts = detect_conflicts(reports);
     if !conflicts.is_empty() {
-        return super::super::ReportMergeOutcome::Conflict(super::super::ConflictReport {
-            conflicts,
-            evidence,
-        });
+        return super::super::ReportMergeOutcome::Conflict(super::super::ConflictReport { conflicts, evidence });
     }
     super::super::ReportMergeOutcome::Merged(super::super::WorkerMergedReport {
         evidence,
@@ -29,11 +26,7 @@ pub(super) enum MutationSelection {
 #[allow(unbounded_collection_growth)]
 fn collect_evidence(reports: &[super::super::Report]) -> Vec<super::super::EvidenceReference> {
     debug_assert!(!reports.is_empty());
-    debug_assert!(
-        reports
-            .iter()
-            .all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS)
-    );
+    debug_assert!(reports.iter().all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS));
     let mut seen = std::collections::BTreeSet::new();
     let mut evidence = Vec::with_capacity(reports.len());
     for report in reports {
@@ -49,15 +42,8 @@ fn collect_evidence(reports: &[super::super::Report]) -> Vec<super::super::Evide
 #[allow(unbounded_collection_growth)]
 fn collect_claims(reports: &[super::super::Report]) -> Vec<super::super::Claim> {
     debug_assert!(!reports.is_empty());
-    debug_assert!(
-        reports
-            .iter()
-            .all(|report| report.claims.len() <= super::super::MAX_REPORT_FIELDS)
-    );
-    reports
-        .iter()
-        .flat_map(|report| report.claims.iter().cloned())
-        .collect()
+    debug_assert!(reports.iter().all(|report| report.claims.len() <= super::super::MAX_REPORT_FIELDS));
+    reports.iter().flat_map(|report| report.claims.iter().cloned()).collect()
 }
 
 fn detect_conflicts(reports: &[super::super::Report]) -> Vec<super::super::Conflict> {
@@ -84,13 +70,8 @@ pub(super) fn select_mutations(
 #[allow(unbounded_collection_growth)]
 pub(super) fn claims(reports: &[super::super::Report]) -> Vec<super::super::Conflict> {
     debug_assert!(!reports.is_empty());
-    debug_assert!(
-        reports
-            .iter()
-            .all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS)
-    );
-    let mut by_subject: std::collections::BTreeMap<&str, (&str, Vec<String>)> =
-        std::collections::BTreeMap::new();
+    debug_assert!(reports.iter().all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS));
+    let mut by_subject: std::collections::BTreeMap<&str, (&str, Vec<String>)> = std::collections::BTreeMap::new();
     let mut conflicts = Vec::with_capacity(reports.len());
     for claim in reports.iter().flat_map(|report| report.claims.iter()) {
         let evidence_ids = claim.evidence_ids.clone();
@@ -116,18 +97,10 @@ pub(super) fn claims(reports: &[super::super::Report]) -> Vec<super::super::Conf
 #[allow(unbounded_collection_growth)]
 pub(super) fn mutations(reports: &[super::super::Report]) -> Vec<super::super::Conflict> {
     debug_assert!(!reports.is_empty());
-    debug_assert!(
-        reports
-            .iter()
-            .all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS)
-    );
-    let mut by_target: std::collections::BTreeMap<&str, (&str, Vec<String>)> =
-        std::collections::BTreeMap::new();
+    debug_assert!(reports.iter().all(|report| report.evidence.len() <= super::super::MAX_REPORT_FIELDS));
+    let mut by_target: std::collections::BTreeMap<&str, (&str, Vec<String>)> = std::collections::BTreeMap::new();
     let mut conflicts = Vec::with_capacity(reports.len());
-    for intent in reports
-        .iter()
-        .flat_map(|report| report.mutation_intents.iter())
-    {
+    for intent in reports.iter().flat_map(|report| report.mutation_intents.iter()) {
         match by_target.get_mut(intent.target.as_str()) {
             Some((kind, existing_evidence)) if *kind != intent.mutation_kind.as_str() => {
                 let mut combined = existing_evidence.clone();
@@ -140,23 +113,15 @@ pub(super) fn mutations(reports: &[super::super::Report]) -> Vec<super::super::C
             }
             Some((_kind, existing_evidence)) => existing_evidence.push(intent.evidence_id.clone()),
             None => {
-                by_target.insert(
-                    intent.target.as_str(),
-                    (
-                        intent.mutation_kind.as_str(),
-                        vec![intent.evidence_id.clone()],
-                    ),
-                );
+                by_target
+                    .insert(intent.target.as_str(), (intent.mutation_kind.as_str(), vec![intent.evidence_id.clone()]));
             }
         }
     }
     conflicts
 }
 
-fn mutation_allowed(
-    task: &super::super::WorkerTask,
-    intent: &super::super::MutationIntent,
-) -> bool {
+fn mutation_allowed(task: &super::super::WorkerTask, intent: &super::super::MutationIntent) -> bool {
     task.allowed_capabilities().iter().any(|capability| {
         matches!(
             capability,

@@ -1,14 +1,32 @@
 #![allow(non_trait_imports)]
-use super::{
-    CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY, CONTRACT_IDENTITY_FIELD, CanonicalContentPart,
-    CanonicalContentPartDraft, CanonicalFinishReason, CanonicalModelContractError,
-    CanonicalModelMessage, CanonicalModelMessageDraft, CanonicalModelResponseItem,
-    CanonicalModelResponseItemDraft, CanonicalSafeMetadata, CanonicalSafeMetadataDraft,
-    CanonicalToolDeclaration, CanonicalToolDeclarationDraft, CanonicalUsage, CanonicalUsageDraft,
-    FINISH_REASON_FIELD, FINISH_STOP, MALFORMED_DIAGNOSTIC_FIELD, MAX_RESPONSE_DIAGNOSTICS,
-    MAX_RESPONSE_ITEMS, RESPONSE_TEXT_FIELD, lossy_legacy_response, require_collection, safe_text,
-    validate_collection_len, validate_metadata, validate_response_combination,
-};
+use super::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
+use super::CONTRACT_IDENTITY_FIELD;
+use super::CanonicalContentPart;
+use super::CanonicalContentPartDraft;
+use super::CanonicalFinishReason;
+use super::CanonicalModelContractError;
+use super::CanonicalModelMessage;
+use super::CanonicalModelMessageDraft;
+use super::CanonicalModelResponseItem;
+use super::CanonicalModelResponseItemDraft;
+use super::CanonicalSafeMetadata;
+use super::CanonicalSafeMetadataDraft;
+use super::CanonicalToolDeclaration;
+use super::CanonicalToolDeclarationDraft;
+use super::CanonicalUsage;
+use super::CanonicalUsageDraft;
+use super::FINISH_REASON_FIELD;
+use super::FINISH_STOP;
+use super::MALFORMED_DIAGNOSTIC_FIELD;
+use super::MAX_RESPONSE_DIAGNOSTICS;
+use super::MAX_RESPONSE_ITEMS;
+use super::RESPONSE_TEXT_FIELD;
+use super::lossy_legacy_response;
+use super::require_collection;
+use super::safe_text;
+use super::validate_collection_len;
+use super::validate_metadata;
+use super::validate_response_combination;
 
 /// Borrowed canonical response envelope before validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,20 +60,12 @@ impl CanonicalModelResponseEnvelope {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when any response field is malformed, unsafe, or semantically impossible.
-    pub fn from_draft(
-        draft: CanonicalModelResponseEnvelopeDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
-        validate_contract_identity(
-            CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY,
-            draft.contract_identity,
-        )?;
+    /// Returns [`CanonicalModelContractError`] when any response field is malformed, unsafe, or
+    /// semantically impossible.
+    pub fn from_draft(draft: CanonicalModelResponseEnvelopeDraft<'_>) -> Result<Self, CanonicalModelContractError> {
+        validate_contract_identity(CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY, draft.contract_identity)?;
         require_collection(RESPONSE_TEXT_FIELD, draft.items.len(), MAX_RESPONSE_ITEMS)?;
-        validate_collection_len(
-            MALFORMED_DIAGNOSTIC_FIELD,
-            draft.diagnostics.len(),
-            MAX_RESPONSE_DIAGNOSTICS,
-        )?;
+        validate_collection_len(MALFORMED_DIAGNOSTIC_FIELD, draft.diagnostics.len(), MAX_RESPONSE_DIAGNOSTICS)?;
         let Some(raw_finish_reason) = draft.finish_reason else {
             return Err(CanonicalModelContractError::MissingFinishReason {
                 field: FINISH_REASON_FIELD.as_str(),
@@ -76,10 +86,9 @@ impl CanonicalModelResponseEnvelope {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when the legacy message somehow fails canonical validation.
-    pub fn from_legacy_response(
-        response: &crate::model::Response,
-    ) -> Result<Self, CanonicalModelContractError> {
+    /// Returns [`CanonicalModelContractError`] when the legacy message somehow fails canonical
+    /// validation.
+    pub fn from_legacy_response(response: &crate::model::Response) -> Result<Self, CanonicalModelContractError> {
         let items = [CanonicalModelResponseItemDraft::AssistantText {
             text: response.message(),
         }];
@@ -97,14 +106,11 @@ impl CanonicalModelResponseEnvelope {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when projection would lose structured, tool, refusal, safety, or malformed semantics.
-    pub fn to_legacy_response(
-        &self,
-    ) -> Result<crate::model::Response, CanonicalModelContractError> {
-        if !matches!(
-            self.finish_reason,
-            CanonicalFinishReason::Stop | CanonicalFinishReason::Length
-        ) || !self.diagnostics.is_empty()
+    /// Returns [`CanonicalModelContractError`] when projection would lose structured, tool,
+    /// refusal, safety, or malformed semantics.
+    pub fn to_legacy_response(&self) -> Result<crate::model::Response, CanonicalModelContractError> {
+        if !matches!(self.finish_reason, CanonicalFinishReason::Stop | CanonicalFinishReason::Length)
+            || !self.diagnostics.is_empty()
             || self.usage.is_some()
             || !self.provenance.is_empty()
         {
@@ -156,10 +162,7 @@ impl CanonicalModelResponseEnvelope {
     }
 }
 
-pub fn validate_contract_identity(
-    expected: &'static str,
-    raw: &str,
-) -> Result<(), CanonicalModelContractError> {
+pub fn validate_contract_identity(expected: &'static str, raw: &str) -> Result<(), CanonicalModelContractError> {
     let actual = safe_text(CONTRACT_IDENTITY_FIELD, raw)?;
     if actual == expected {
         return Ok(());
@@ -170,41 +173,25 @@ pub fn validate_contract_identity(
 pub fn validate_messages(
     drafts: &[CanonicalModelMessageDraft<'_>],
 ) -> Result<alloc::vec::Vec<CanonicalModelMessage>, CanonicalModelContractError> {
-    drafts
-        .iter()
-        .copied()
-        .map(CanonicalModelMessage::from_draft)
-        .collect()
+    drafts.iter().copied().map(CanonicalModelMessage::from_draft).collect()
 }
 
 pub fn validate_content_parts(
     drafts: &[CanonicalContentPartDraft<'_>],
 ) -> Result<alloc::vec::Vec<CanonicalContentPart>, CanonicalModelContractError> {
-    drafts
-        .iter()
-        .copied()
-        .map(CanonicalContentPart::from_draft)
-        .collect()
+    drafts.iter().copied().map(CanonicalContentPart::from_draft).collect()
 }
 
 pub fn validate_tools(
     drafts: &[CanonicalToolDeclarationDraft<'_>],
 ) -> Result<alloc::vec::Vec<CanonicalToolDeclaration>, CanonicalModelContractError> {
-    drafts
-        .iter()
-        .copied()
-        .map(CanonicalToolDeclaration::from_draft)
-        .collect()
+    drafts.iter().copied().map(CanonicalToolDeclaration::from_draft).collect()
 }
 
 fn validate_response_items(
     drafts: &[CanonicalModelResponseItemDraft<'_>],
 ) -> Result<alloc::vec::Vec<CanonicalModelResponseItem>, CanonicalModelContractError> {
-    drafts
-        .iter()
-        .copied()
-        .map(CanonicalModelResponseItem::from_draft)
-        .collect()
+    drafts.iter().copied().map(CanonicalModelResponseItem::from_draft).collect()
 }
 
 pub fn validate_text_slice(

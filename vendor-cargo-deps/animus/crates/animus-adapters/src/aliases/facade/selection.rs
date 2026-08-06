@@ -1,8 +1,18 @@
-pub use crate::router::{
-    DurationBucket, FallbackEligibility, FallbackPolicy, OutputContract, PrivacyBand, QuorumClass,
-    RouteFamily, RouteResult, RouteResultStatus, SelectionDenial, SignalBand, SignalSource,
-    TaskShape, project_signals, select_recipe,
-};
+pub use crate::router::DurationBucket;
+pub use crate::router::FallbackEligibility;
+pub use crate::router::FallbackPolicy;
+pub use crate::router::OutputContract;
+pub use crate::router::PrivacyBand;
+pub use crate::router::QuorumClass;
+pub use crate::router::RouteFamily;
+pub use crate::router::RouteResult;
+pub use crate::router::RouteResultStatus;
+pub use crate::router::SelectionDenial;
+pub use crate::router::SignalBand;
+pub use crate::router::SignalSource;
+pub use crate::router::TaskShape;
+pub use crate::router::project_signals;
+pub use crate::router::select_recipe;
 
 /// Hard model-router execution bounds.
 pub type ExecutionBounds = crate::router::Bounds;
@@ -60,9 +70,7 @@ pub fn validate_router_receipt_text(text: &str) -> Result<(), RouterReceiptLeak>
 
 /// Projects bounded request metadata with the default router rules.
 #[must_use]
-pub fn project_router_signals(
-    metadata: &RouterRequestMetadata,
-) -> crate::router::SignalDraft<'static> {
+pub fn project_router_signals(metadata: &RouterRequestMetadata) -> crate::router::SignalDraft<'static> {
     project_signals(metadata)
 }
 

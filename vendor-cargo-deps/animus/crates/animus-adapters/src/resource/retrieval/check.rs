@@ -3,14 +3,9 @@ pub(super) fn required_text(
     value: Option<&str>,
 ) -> Result<alloc::string::String, super::failure::Error> {
     value
-        .map(|raw| {
-            crate::validation::normalized_adapter_field(field, raw)
-                .map_err(super::failure::Error::from)
-        })
+        .map(|raw| crate::validation::normalized_adapter_field(field, raw).map_err(super::failure::Error::from))
         .transpose()?
-        .ok_or(super::failure::Error::MissingField {
-            field: field.as_str(),
-        })
+        .ok_or(super::failure::Error::MissingField { field: field.as_str() })
 }
 
 pub(super) fn conditions(
@@ -24,21 +19,13 @@ pub(super) fn conditions(
     condition_count(field, values)?;
     values
         .iter()
-        .map(|value| {
-            crate::validation::normalized_adapter_field(field, value)
-                .map_err(super::failure::Error::from)
-        })
+        .map(|value| crate::validation::normalized_adapter_field(field, value).map_err(super::failure::Error::from))
         .collect()
 }
 
-fn condition_count(
-    field: crate::validation::FieldName,
-    values: &[&str],
-) -> Result<(), super::failure::Error> {
+fn condition_count(field: crate::validation::FieldName, values: &[&str]) -> Result<(), super::failure::Error> {
     if values.is_empty() {
-        return Err(super::failure::Error::EmptyConditionList {
-            field: field.as_str(),
-        });
+        return Err(super::failure::Error::EmptyConditionList { field: field.as_str() });
     }
     if values.len() > super::MAX_CONDITIONS {
         return Err(super::failure::Error::ConditionLimit {
@@ -50,9 +37,7 @@ fn condition_count(
     Ok(())
 }
 
-pub(super) fn limit(
-    value: Option<u32>,
-) -> Result<Option<core::num::NonZeroU32>, super::failure::Error> {
+pub(super) fn limit(value: Option<u32>) -> Result<Option<core::num::NonZeroU32>, super::failure::Error> {
     value
         .map(|raw| core::num::NonZeroU32::new(raw).ok_or(super::failure::Error::InvalidLimit))
         .transpose()
@@ -89,9 +74,7 @@ pub(super) fn safe_reference(
     Ok(reference)
 }
 
-pub(super) fn content_hash(
-    value: Option<&str>,
-) -> Result<Option<crate::artifact::Hash>, super::failure::Error> {
+pub(super) fn content_hash(value: Option<&str>) -> Result<Option<crate::artifact::Hash>, super::failure::Error> {
     value
         .map(crate::artifact::Hash::new)
         .transpose()
@@ -99,24 +82,15 @@ pub(super) fn content_hash(
 }
 
 fn unsafe_reference(value: &str) -> bool {
-    super::UNSAFE_REFERENCE_MARKERS
-        .iter()
-        .any(|marker| value.contains(marker))
+    super::UNSAFE_REFERENCE_MARKERS.iter().any(|marker| value.contains(marker))
 }
 
-pub(super) fn truncate_chars(
-    mut value: alloc::string::String,
-    max_chars: usize,
-) -> alloc::string::String {
+pub(super) fn truncate_chars(mut value: alloc::string::String, max_chars: usize) -> alloc::string::String {
     let char_count = value.chars().count();
     if char_count <= max_chars {
         return value;
     }
-    let byte_index = value
-        .char_indices()
-        .map(|(index, _character)| index)
-        .nth(max_chars)
-        .unwrap_or(value.len());
+    let byte_index = value.char_indices().map(|(index, _character)| index).nth(max_chars).unwrap_or(value.len());
     value.truncate(byte_index);
     value
 }

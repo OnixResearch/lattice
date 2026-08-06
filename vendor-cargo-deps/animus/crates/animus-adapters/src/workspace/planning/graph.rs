@@ -2,13 +2,8 @@ type Descriptor = crate::workspace::intent::Descriptor;
 type Capability = crate::workspace::adapter::Capability;
 type Capabilities = crate::workspace::adapter::Capabilities;
 
-pub(super) fn find_descriptor<'a>(
-    descriptors: &'a [Descriptor],
-    workspace_id: &str,
-) -> Option<&'a Descriptor> {
-    descriptors
-        .iter()
-        .find(|descriptor| descriptor.workspace_id() == workspace_id)
+pub(super) fn find_descriptor<'a>(descriptors: &'a [Descriptor], workspace_id: &str) -> Option<&'a Descriptor> {
+    descriptors.iter().find(|descriptor| descriptor.workspace_id() == workspace_id)
 }
 
 pub(super) fn has_duplicate_identity(descriptors: &[Descriptor]) -> bool {
@@ -30,21 +25,14 @@ pub(super) fn has_missing_parent(descriptors: &[Descriptor]) -> bool {
 }
 
 pub(super) fn has_parent_cycle(descriptors: &[Descriptor]) -> bool {
-    descriptors
-        .iter()
-        .any(|descriptor| descriptor_has_parent_cycle(descriptor, descriptors))
+    descriptors.iter().any(|descriptor| descriptor_has_parent_cycle(descriptor, descriptors))
 }
 
 pub(super) fn has_child(descriptors: &[Descriptor], workspace_id: &str) -> bool {
-    descriptors
-        .iter()
-        .any(|descriptor| descriptor.parent_workspace_id() == Some(workspace_id))
+    descriptors.iter().any(|descriptor| descriptor.parent_workspace_id() == Some(workspace_id))
 }
 
-pub(super) fn missing_capabilities(
-    selected: &Descriptor,
-    adapter: &Capabilities,
-) -> alloc::vec::Vec<Capability> {
+pub(super) fn missing_capabilities(selected: &Descriptor, adapter: &Capabilities) -> alloc::vec::Vec<Capability> {
     selected
         .required_capabilities()
         .iter()
@@ -61,8 +49,7 @@ fn descriptor_has_parent_cycle(descriptor: &Descriptor, descriptors: &[Descripto
             return true;
         }
         visited.push(alloc::string::String::from(workspace_id));
-        current =
-            find_descriptor(descriptors, workspace_id).and_then(Descriptor::parent_workspace_id);
+        current = find_descriptor(descriptors, workspace_id).and_then(Descriptor::parent_workspace_id);
     }
     false
 }

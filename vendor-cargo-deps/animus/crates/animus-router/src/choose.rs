@@ -1,6 +1,9 @@
 mod data;
 
-pub use data::{Budget, CatalogEntry, CatalogEntryDraft, SelectedPlan};
+pub use data::Budget;
+pub use data::CatalogEntry;
+pub use data::CatalogEntryDraft;
+pub use data::SelectedPlan;
 
 /// Typed router-selection denial.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -32,14 +35,8 @@ pub fn select_recipe(
 ) -> Result<SelectedPlan, SelectionDenial> {
     let preferred_family = preferred_family(signals);
     let recipe = find_recipe(recipes, preferred_family)?;
-    assert!(
-        !recipe.roles().is_empty(),
-        "validated recipe must keep roles"
-    );
-    assert!(
-        recipe.bounds().max_candidates() > crate::limit::ZERO_COUNT,
-        "validated bounds must cap candidates"
-    );
+    assert!(!recipe.roles().is_empty(), "validated recipe must keep roles");
+    assert!(recipe.bounds().max_candidates() > crate::limit::ZERO_COUNT, "validated bounds must cap candidates");
     if recipe.bounds().max_candidates() > budget.max_candidates() {
         return Err(SelectionDenial::BudgetExceeded);
     }
@@ -87,19 +84,11 @@ pub struct RotatingSelectionRequest<'a> {
 /// # Panics
 ///
 /// Panics only if a previously validated recipe loses its role list or candidate bound.
-pub fn select_recipe_with_rotation(
-    request: RotatingSelectionRequest<'_>,
-) -> Result<SelectedPlan, SelectionDenial> {
+pub fn select_recipe_with_rotation(request: RotatingSelectionRequest<'_>) -> Result<SelectedPlan, SelectionDenial> {
     let preferred_family = preferred_family(request.signals);
     let recipe = find_recipe(request.recipes, preferred_family)?;
-    assert!(
-        !recipe.roles().is_empty(),
-        "validated recipe must keep roles"
-    );
-    assert!(
-        recipe.bounds().max_candidates() > crate::limit::ZERO_COUNT,
-        "validated bounds must cap candidates"
-    );
+    assert!(!recipe.roles().is_empty(), "validated recipe must keep roles");
+    assert!(recipe.bounds().max_candidates() > crate::limit::ZERO_COUNT, "validated bounds must cap candidates");
     if recipe.bounds().max_candidates() > request.budget.max_candidates() {
         return Err(SelectionDenial::BudgetExceeded);
     }
@@ -130,25 +119,15 @@ fn find_recipe(
     recipes
         .iter()
         .find(|recipe| recipe.family() == preferred_family)
-        .or_else(|| {
-            recipes
-                .iter()
-                .find(|recipe| recipe.family() == crate::RouteFamily::Single)
-        })
+        .or_else(|| recipes.iter().find(|recipe| recipe.family() == crate::RouteFamily::Single))
         .ok_or(SelectionDenial::NoRecipe)
 }
 
 fn preferred_family(signals: &crate::Signals) -> crate::RouteFamily {
-    match (
-        signals.task_shape(),
-        signals.risk(),
-        signals.contract_pressure(),
-    ) {
+    match (signals.task_shape(), signals.risk(), signals.contract_pressure()) {
         (crate::TaskShape::Workflow, _, _) => crate::RouteFamily::Workflow,
         (_, crate::SignalBand::Strict, _) => crate::RouteFamily::Fusion,
-        (_, crate::SignalBand::High, crate::SignalBand::Strict | crate::SignalBand::High) => {
-            crate::RouteFamily::Remom
-        }
+        (_, crate::SignalBand::High, crate::SignalBand::Strict | crate::SignalBand::High) => crate::RouteFamily::Remom,
         (_, crate::SignalBand::High, _) => crate::RouteFamily::Ratings,
         (_, crate::SignalBand::Medium, _) => crate::RouteFamily::Confidence,
         _ => crate::RouteFamily::Single,
@@ -179,8 +158,7 @@ fn select_entries(request: SelectionRequest<'_>) -> Result<SelectionOutput, Sele
     let mut selected_models = alloc::vec::Vec::with_capacity(role_count);
     let mut rotation_decisions = alloc::vec::Vec::with_capacity(role_count);
     for role in request.recipe.roles() {
-        let eligible_labels =
-            collect_eligible_labels(request.catalog, *role, request.budget, request.signals);
+        let eligible_labels = collect_eligible_labels(request.catalog, *role, request.budget, request.signals);
         if eligible_labels.is_empty() {
             return Err(SelectionDenial::NoEligibleModel);
         }
@@ -229,29 +207,18 @@ fn selection_denial_from_rotation(error: &crate::RouterRotationError) -> Selecti
     }
 }
 
-fn entry_allowed(
-    entry: &CatalogEntry,
-    role: crate::Role,
-    budget: &Budget,
-    signals: &crate::Signals,
-) -> bool {
+fn entry_allowed(entry: &CatalogEntry, role: crate::Role, budget: &Budget, signals: &crate::Signals) -> bool {
     entry.role() == role
         && budget.allows_backend(entry.backend())
         && (signals.privacy() == crate::PrivacyBand::RemoteAllowed || entry.is_local())
 }
 
 #[cfg(test)]
-pub(crate) fn test_selected_plan(
-    fixture: crate::test_support::SelectedPlanFixture<'_>,
-) -> SelectedPlan {
+pub(crate) fn test_selected_plan(fixture: crate::test_support::SelectedPlanFixture<'_>) -> SelectedPlan {
     SelectedPlan {
         recipe_id: alloc::string::String::from(fixture.recipe_id),
         family: fixture.family,
-        selected_models: fixture
-            .selected_models
-            .iter()
-            .map(|model| alloc::string::String::from(*model))
-            .collect(),
+        selected_models: fixture.selected_models.iter().map(|model| alloc::string::String::from(*model)).collect(),
         output_contract: fixture.output_contract,
         bounds: fixture.bounds,
         privacy: fixture.privacy,

@@ -39,12 +39,7 @@ fn baseline_coverage_inventory_is_valid() {
 
     assert!(outcome.is_valid(), "issues: {:?}", outcome.issues);
     assert_eq!(outcome.rows.len(), BASELINE_ROW_COUNT);
-    assert!(
-        outcome
-            .rows
-            .iter()
-            .any(|row| row.feature_id == FEATURE_BUFFER)
-    );
+    assert!(outcome.rows.iter().any(|row| row.feature_id == FEATURE_BUFFER));
 }
 
 #[test]
@@ -125,46 +120,22 @@ fn malformed_inventory_rows_fail_with_deterministic_diagnostics() {
     assert!(!outcome.is_valid());
     assert_eq!(outcome.rows.len(), MALFORMED_ROW_COUNT);
     assert!(outcome.issues.len() >= MIN_MALFORMED_ISSUES);
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::DuplicateFeatureId,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::MissingEvidence,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::MissingNextAction,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::MissingReason,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::UnknownStatus,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::DuplicateFeatureId);
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::MissingEvidence);
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::MissingNextAction);
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::MissingReason);
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::UnknownStatus);
 }
 
 #[test]
 fn required_fields_are_checked_before_status_policy() {
-    let row = crate::ratatui_integration::CoverageRow::new(
-        "",
-        "",
-        "",
-        STATUS_SHOWCASE_ONLY,
-        NEXT_SHOWCASE,
-    )
-    .with_evidence(EVIDENCE_SHOWCASE);
+    let row = crate::ratatui_integration::CoverageRow::new("", "", "", STATUS_SHOWCASE_ONLY, NEXT_SHOWCASE)
+        .with_evidence(EVIDENCE_SHOWCASE);
 
     let outcome = crate::ratatui_integration::validate_ratatui_coverage(&[row]);
 
     assert!(!outcome.is_valid());
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::CoverageIssueCode::MissingRequiredField,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::CoverageIssueCode::MissingRequiredField);
 }
 
 #[test]

@@ -34,18 +34,12 @@ impl core::fmt::Display for CheckpointError {
         match self {
             Self::AdapterContract(error) => write!(formatter, "{error}"),
             Self::UnsupportedValue { field, value } => {
-                write!(
-                    formatter,
-                    "{field} contains unsupported checkpoint value {value}"
-                )
+                write!(formatter, "{field} contains unsupported checkpoint value {value}")
             }
             Self::ChangedFileCountTooLarge {
                 max_count,
                 actual_count,
-            } => write!(
-                formatter,
-                "{TOO_MANY_CHANGED_FILES_REASON}: maximum {max_count}, got {actual_count}"
-            ),
+            } => write!(formatter, "{TOO_MANY_CHANGED_FILES_REASON}: maximum {max_count}, got {actual_count}"),
         }
     }
 }
@@ -109,9 +103,7 @@ pub(super) fn required_string(
     field_name: crate::validation::FieldName,
     value: &str,
 ) -> Result<alloc::string::String, CheckpointError> {
-    Ok(crate::validation::normalized_adapter_field(
-        field_name, value,
-    )?)
+    Ok(crate::validation::normalized_adapter_field(field_name, value)?)
 }
 
 pub(super) fn optional_string(
@@ -125,9 +117,7 @@ pub(super) fn optional_hash(
     field_name: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<CheckpointHash>, CheckpointError> {
-    value.map_or(Ok(None), |text| {
-        CheckpointHash::new_for_field(field_name, text).map(Some)
-    })
+    value.map_or(Ok(None), |text| CheckpointHash::new_for_field(field_name, text).map(Some))
 }
 
 pub(super) fn validate_changed_file_count(value: u32) -> Result<(), CheckpointError> {
@@ -140,17 +130,11 @@ pub(super) fn validate_changed_file_count(value: u32) -> Result<(), CheckpointEr
     Ok(())
 }
 
-fn validate_hash(
-    field_name: crate::validation::FieldName,
-    value: &str,
-) -> Result<(), CheckpointError> {
+fn validate_hash(field_name: crate::validation::FieldName, value: &str) -> Result<(), CheckpointError> {
     crate::validation::validate_required_adapter_field(field_name, value)?;
     let actual_chars = value.chars().count();
     assert!(actual_chars > 0, "validated hash cannot be empty");
-    assert!(
-        actual_chars <= value.len(),
-        "hash char count must fit in byte length"
-    );
+    assert!(actual_chars <= value.len(), "hash char count must fit in byte length");
     if actual_chars != super::HASH_HEX_CHARS {
         return Err(crate::AdapterContractError::InvalidEvidenceHash {
             field: field_name.as_str(),
@@ -158,10 +142,7 @@ fn validate_hash(
         }
         .into());
     }
-    if !value
-        .chars()
-        .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
-    {
+    if !value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase()) {
         return Err(crate::AdapterContractError::InvalidEvidenceHash {
             field: field_name.as_str(),
             reason: HASH_NOT_HEX_REASON,

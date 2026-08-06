@@ -1,9 +1,17 @@
 //! Shared rat-chrome overlay helpers for rat-widgets popup shells.
 
-use rat_chrome::{OverlayAnchor, OverlayModel, OverlaySize, OverlayStyle};
+use rat_chrome::OverlayAnchor;
+use rat_chrome::OverlayModel;
+use rat_chrome::OverlaySize;
+use rat_chrome::OverlayStyle;
 use ratatui::style::Style;
 
 use crate::theme::WidgetTheme;
+
+pub mod adapter;
+pub mod semantics {
+    pub use super::adapter::*;
+}
 
 pub const POPUP_MARGIN: u16 = 4;
 pub const TOAST_OFFSET_X: i16 = -2;

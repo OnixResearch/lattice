@@ -24,7 +24,7 @@ pub enum Command {
     /// Create a tab in an existing workspace.
     CreateTab {
         /// Target workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Tab to insert.
         tab: super::state::Tab,
         /// Focus behavior after insertion.
@@ -33,11 +33,11 @@ pub enum Command {
     /// Split a pane by inserting a sibling pane.
     SplitPane {
         /// Target workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Target tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
         /// Pane live ID being split.
-        target_pane: super::types::LiveId,
+        target_pane: super::types::PaneId,
         /// Pane to insert.
         pane: super::state::Pane,
         /// Requested split axis.
@@ -48,20 +48,20 @@ pub enum Command {
     /// Move focus to a pane.
     FocusPane {
         /// Target workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Target tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
         /// Target pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Close a pane and retire its live ID.
     ClosePane {
         /// Target workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Target tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
         /// Target pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Restore a validated shell model.
     RestoreLayout {
@@ -71,14 +71,14 @@ pub enum Command {
     /// Update a pane task status.
     UpdateTaskStatus {
         /// Target pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
         /// New task status.
         status: super::types::TaskStatus,
     },
     /// Represent a disabled command activation attempt.
     DisabledAction {
         /// Stable action ID.
-        action_id: String,
+        action_id: crate::action_registry::ActionId,
         /// Disabled reason.
         reason: String,
     },
@@ -90,29 +90,29 @@ pub enum EffectRequest {
     /// Application may create resources associated with a tab.
     CreateTab {
         /// Inserted tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
     },
     /// Application may arrange renderer-owned split visuals.
     SplitPane {
         /// Inserted pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
         /// Requested split axis.
         axis: SplitAxis,
     },
     /// Application may update external focus affordances.
     FocusPane {
         /// Focused pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Application may dispose resources associated with a pane.
     ClosePane {
         /// Closed pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Application may publish status changes.
     UpdateTaskStatus {
         /// Updated pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
         /// New task status.
         status: super::types::TaskStatus,
     },
@@ -135,7 +135,7 @@ pub struct CommandOutput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDescriptor {
     /// Stable action ID.
-    pub id: String,
+    pub id: crate::action_registry::ActionId,
     /// User-facing action label.
     pub label: String,
     /// Optional action description.
@@ -153,7 +153,11 @@ pub struct ActionDescriptor {
 impl ActionDescriptor {
     /// Creates enabled workspace action metadata.
     #[must_use]
-    pub fn new(id: impl Into<String>, label: impl Into<String>, focus_policy: FocusPolicy) -> Self {
+    pub fn new(
+        id: impl Into<crate::action_registry::ActionId>,
+        label: impl Into<String>,
+        focus_policy: FocusPolicy,
+    ) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -192,7 +196,7 @@ impl ActionDescriptor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: crate::action_registry::ActionId,
     /// User-facing action label.
     pub label: String,
     /// Workspace action category.
@@ -223,7 +227,7 @@ pub struct ActionSurfaces {
     /// Command palette projection.
     pub palette: Vec<crate::action_registry::CommandPaletteItemProjection>,
     /// Shortcut help labels by action ID.
-    pub help: std::collections::BTreeMap<String, String>,
+    pub help: std::collections::BTreeMap<crate::action_registry::ActionId, String>,
 }
 
 /// Typed UI intent emitted by workspace shell components.
@@ -232,34 +236,34 @@ pub enum Intent {
     /// Focus a pane row.
     FocusPane {
         /// Workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
         /// Pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Select a tab row.
     SelectTab {
         /// Workspace live ID.
-        workspace: super::types::LiveId,
+        workspace: super::types::WorkspaceId,
         /// Tab live ID.
-        tab: super::types::LiveId,
+        tab: super::types::TabId,
     },
     /// Open a pane context menu.
     OpenContextMenu {
         /// Pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
     },
     /// Request a split gesture.
     SplitPane {
         /// Pane live ID.
-        pane: super::types::LiveId,
+        pane: super::types::PaneId,
         /// Requested axis.
         axis: SplitAxis,
     },
     /// Invoke an action registry command.
     InvokeAction {
         /// Stable action ID.
-        action_id: String,
+        action_id: crate::action_registry::ActionId,
     },
 }

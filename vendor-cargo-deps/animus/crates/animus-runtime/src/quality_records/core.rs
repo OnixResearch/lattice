@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,33 +7,49 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
-use super::{
-    BLAKE3_ALGORITHM, CURRENT_QUALITY_VERSION, FIELD_BODY, FIELD_ID, FIELD_ISSUER, FIELD_LIFECYCLE,
-    FIELD_REDACTION, FIELD_SPAN, FIELD_SUBJECT, FIELD_VERSION, FULL_LINE_HASH_DOMAIN,
-    HASH_PART_SEPARATOR, QUALITY_HASH_DOMAIN, REQUIRED_COUNT,
-    data::{
-        QualityAgentsGuidanceError, QualityAgentsGuidancePage, QualityAnnotationBody,
-        QualityDependencyIsolationReport, QualityDependencyRequirement, QualityDiagnostic,
-        QualityDiagnosticKind, QualityEditReport, QualityFingerprint, QualityFreshness,
-        QualityIssuerClassification, QualityLifecycleReport, QualityMetadataField,
-        QualityRecordEnvelope, QualitySidecarExport, QualitySpan, QualitySpanFreshnessReport,
-        QualityUnknownSidecarRecord, QualityValidationResult,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::CURRENT_QUALITY_VERSION;
+use super::FIELD_BODY;
+use super::FIELD_ID;
+use super::FIELD_ISSUER;
+use super::FIELD_LIFECYCLE;
+use super::FIELD_REDACTION;
+use super::FIELD_SPAN;
+use super::FIELD_SUBJECT;
+use super::FIELD_VERSION;
+use super::FULL_LINE_HASH_DOMAIN;
+use super::HASH_PART_SEPARATOR;
+use super::QUALITY_HASH_DOMAIN;
+use super::REQUIRED_COUNT;
+use super::data::QualityAgentsGuidanceError;
+use super::data::QualityAgentsGuidancePage;
+use super::data::QualityAnnotationBody;
+use super::data::QualityDependencyIsolationReport;
+use super::data::QualityDependencyRequirement;
+use super::data::QualityDiagnostic;
+use super::data::QualityDiagnosticKind;
+use super::data::QualityEditReport;
+use super::data::QualityFingerprint;
+use super::data::QualityFreshness;
+use super::data::QualityIssuerClassification;
+use super::data::QualityLifecycleReport;
+use super::data::QualityMetadataField;
+use super::data::QualityRecordEnvelope;
+use super::data::QualitySidecarExport;
+use super::data::QualitySpan;
+use super::data::QualitySpanFreshnessReport;
+use super::data::QualityUnknownSidecarRecord;
+use super::data::QualityValidationResult;
 
 const AGENTS_TOPIC_CONCEPTS: &str = "concepts";
 const AGENTS_TOPIC_ORIENTATION: &str = "orientation";
@@ -107,10 +124,7 @@ pub fn validate_quality_record(record: &QualityRecordEnvelope) -> QualityValidat
         ));
     }
     validate_body(record.body.annotation(), &mut diagnostics);
-    if matches!(
-        record.issuer_classification,
-        Some(QualityIssuerClassification::Unknown)
-    ) {
+    if matches!(record.issuer_classification, Some(QualityIssuerClassification::Unknown)) {
         diagnostics.push(QualityDiagnostic::new(
             QualityDiagnosticKind::InvalidField,
             FIELD_ISSUER,
@@ -237,10 +251,7 @@ pub fn report_quality_after_edit(records: &[QualityRecordEnvelope]) -> QualityEd
 
 /// Classifies span freshness over caller-supplied lines.
 #[must_use]
-pub fn classify_quality_span_freshness(
-    lines: &[String],
-    span: &QualitySpan,
-) -> QualitySpanFreshnessReport {
+pub fn classify_quality_span_freshness(lines: &[String], span: &QualitySpan) -> QualitySpanFreshnessReport {
     let diagnostics = validate_span(span);
     if !diagnostics.is_empty() {
         return QualitySpanFreshnessReport {
@@ -323,40 +334,27 @@ fn canonical_body(body: &QualityAnnotationBody) -> String {
             span.end_line,
             span.start_column,
             span.end_column,
-            span.content_hash
-                .as_ref()
-                .map_or("", |hash| hash.value_hex.as_str())
+            span.content_hash.as_ref().map_or("", |hash| hash.value_hex.as_str())
         ));
     }
     if let Some(suggested_fix) = &body.suggested_fix {
         parts.push(format!("suggested_fix={suggested_fix}"));
     }
-    parts.push(format!(
-        "references={}",
-        sorted(body.references.clone()).join(",")
-    ));
-    parts.push(format!(
-        "supersedes={}",
-        sorted(body.supersedes.clone()).join(",")
-    ));
+    parts.push(format!("references={}", sorted(body.references.clone()).join(",")));
+    parts.push(format!("supersedes={}", sorted(body.supersedes.clone()).join(",")));
     parts.push(format!("tags={}", sorted(body.tags.clone()).join(",")));
     parts.push(format!("metadata={}", canonical_metadata(&body.metadata)));
     parts.join(";")
 }
 
 fn canonical_metadata(metadata: &[QualityMetadataField]) -> String {
-    let mut pairs: Vec<String> = metadata
-        .iter()
-        .map(|field| format!("{}={}", field.key, field.value))
-        .collect();
+    let mut pairs: Vec<String> = metadata.iter().map(|field| format!("{}={}", field.key, field.value)).collect();
     pairs.sort();
     pairs.join(",")
 }
 
 fn canonical_record_without_id(record: &QualityRecordEnvelope) -> String {
-    let class = record
-        .issuer_classification
-        .map_or("", QualityIssuerClassification::as_str);
+    let class = record.issuer_classification.map_or("", QualityIssuerClassification::as_str);
     format!(
         "version={};type={};subject={};issuer={};class={};created={};body={}",
         record.version,
@@ -380,18 +378,10 @@ fn contains_unsafe_marker(text: &str) -> bool {
         || text.contains(WINDOWS_PATH_MARKER)
 }
 
-fn detect_supersession_cycles(
-    records: &[QualityRecordEnvelope],
-    diagnostics: &mut Vec<QualityDiagnostic>,
-) {
+fn detect_supersession_cycles(records: &[QualityRecordEnvelope], diagnostics: &mut Vec<QualityDiagnostic>) {
     let graph: BTreeMap<String, Vec<String>> = records
         .iter()
-        .map(|record| {
-            (
-                record.id.value_hex.clone(),
-                record.body.annotation().supersedes.clone(),
-            )
-        })
+        .map(|record| (record.id.value_hex.clone(), record.body.annotation().supersedes.clone()))
         .collect();
     for record in records {
         let mut seen = BTreeSet::new();
@@ -434,11 +424,7 @@ fn hash_span_lines(lines: &[String]) -> QualityFingerprint {
     QualityFingerprint::new(BLAKE3_ALGORITHM, hasher.finalize().to_hex().to_string())
 }
 
-fn require_hash(
-    fingerprint: &QualityFingerprint,
-    field: &str,
-    diagnostics: &mut Vec<QualityDiagnostic>,
-) {
+fn require_hash(fingerprint: &QualityFingerprint, field: &str, diagnostics: &mut Vec<QualityDiagnostic>) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM || fingerprint.value_hex.trim().is_empty() {
         diagnostics.push(QualityDiagnostic::new(
             QualityDiagnosticKind::InvalidId,
@@ -491,12 +477,7 @@ fn validate_body(body: &QualityAnnotationBody, diagnostics: &mut Vec<QualityDiag
     if let Some(suggested_fix) = &body.suggested_fix {
         validate_text(suggested_fix, FIELD_REDACTION, diagnostics);
     }
-    for text in body
-        .references
-        .iter()
-        .chain(body.supersedes.iter())
-        .chain(body.tags.iter())
-    {
+    for text in body.references.iter().chain(body.supersedes.iter()).chain(body.tags.iter()) {
         validate_text(text, FIELD_BODY, diagnostics);
     }
     for field in &body.metadata {

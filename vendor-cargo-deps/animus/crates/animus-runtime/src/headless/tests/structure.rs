@@ -9,21 +9,15 @@ fn structured_output_validation_accepts_required_fields_and_reports_bad_outputs(
         allowed_fields: &[REQUIRED_FIELD],
         allow_extra_fields: false,
     };
-    let valid = validate_structured_output(
-        &schema,
-        &StructuredOutputDraft {
-            fields: &[REQUIRED_FIELD],
-        },
-    )
+    let valid = validate_structured_output(&schema, &StructuredOutputDraft {
+        fields: &[REQUIRED_FIELD],
+    })
     .expect("valid output should report success");
     let missing = validate_structured_output(&schema, &StructuredOutputDraft { fields: &[] })
         .expect("missing required field should report failure");
-    let extra = validate_structured_output(
-        &schema,
-        &StructuredOutputDraft {
-            fields: &[REQUIRED_FIELD, EXTRA_FIELD],
-        },
-    )
+    let extra = validate_structured_output(&schema, &StructuredOutputDraft {
+        fields: &[REQUIRED_FIELD, EXTRA_FIELD],
+    })
     .expect("extra field should report failure");
     let malformed = validate_structured_output(
         &StructuredSchemaDraft {
@@ -53,11 +47,8 @@ fn structured_output_validation_accepts_required_fields_and_reports_bad_outputs(
             field: Text::from(EXTRA_FIELD),
         })
     );
-    assert_eq!(
-        malformed,
-        AutomationError::DuplicateValue {
-            field: STRUCTURED_FIELD,
-            value: Text::from(REQUIRED_FIELD),
-        }
-    );
+    assert_eq!(malformed, AutomationError::DuplicateValue {
+        field: STRUCTURED_FIELD,
+        value: Text::from(REQUIRED_FIELD),
+    });
 }

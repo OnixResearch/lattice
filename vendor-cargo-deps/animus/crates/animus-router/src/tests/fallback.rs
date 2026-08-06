@@ -5,12 +5,7 @@ use super::*;
 #[test]
 fn fallback_policy_deny_returns_deny() {
     assert_eq!(
-        evaluate_with(
-            &standard_ledger(),
-            &remote_chain(),
-            crate::FallbackPolicy::Deny,
-            false,
-        ),
+        evaluate_with(&standard_ledger(), &remote_chain(), crate::FallbackPolicy::Deny, false,),
         crate::FallbackDecision::Deny,
     );
 }
@@ -18,12 +13,7 @@ fn fallback_policy_deny_returns_deny() {
 #[test]
 fn exhausted_repair_budget_fails_route() {
     assert_eq!(
-        evaluate_with(
-            &standard_ledger(),
-            &local_chain(),
-            crate::FallbackPolicy::BestValidEvidence,
-            true,
-        ),
+        evaluate_with(&standard_ledger(), &local_chain(), crate::FallbackPolicy::BestValidEvidence, true,),
         budget_exhausted_decision(crate::BudgetKind::Repair),
     );
 }
@@ -31,12 +21,7 @@ fn exhausted_repair_budget_fails_route() {
 #[test]
 fn exhausted_candidate_budget_fails_route() {
     assert_eq!(
-        evaluate_with(
-            &candidate_exhausted_ledger(),
-            &remote_chain(),
-            crate::FallbackPolicy::BestValidEvidence,
-            false,
-        ),
+        evaluate_with(&candidate_exhausted_ledger(), &remote_chain(), crate::FallbackPolicy::BestValidEvidence, false,),
         budget_exhausted_decision(crate::BudgetKind::Candidate),
     );
 }
@@ -57,12 +42,7 @@ fn exhausted_parallelism_budget_fails_route() {
 #[test]
 fn cyclic_fallback_chain_fails_route() {
     assert_eq!(
-        evaluate_with(
-            &standard_ledger(),
-            &cyclic_chain(),
-            crate::FallbackPolicy::BestValidEvidence,
-            false,
-        ),
+        evaluate_with(&standard_ledger(), &cyclic_chain(), crate::FallbackPolicy::BestValidEvidence, false,),
         crate::FallbackDecision::FailRoute(crate::FallbackRouteReason::CyclicFallback),
     );
 }
@@ -70,12 +50,7 @@ fn cyclic_fallback_chain_fails_route() {
 #[test]
 fn safe_single_requires_eligible_fallback() {
     assert_eq!(
-        evaluate_with(
-            &standard_ledger(),
-            &remote_chain(),
-            crate::FallbackPolicy::SafeSingle,
-            false,
-        ),
+        evaluate_with(&standard_ledger(), &remote_chain(), crate::FallbackPolicy::SafeSingle, false,),
         crate::FallbackDecision::FailRoute(crate::FallbackRouteReason::IneligibleFallback),
     );
 }
@@ -155,18 +130,13 @@ fn evaluate_with(
     policy: crate::FallbackPolicy,
     can_retry_same_model: bool,
 ) -> crate::FallbackDecision {
-    crate::evaluate_fallback(
-        &crate::StepFailure::new(MODEL_PRIMARY, can_retry_same_model),
-        ledger,
-        chain,
-        policy,
-    )
+    crate::evaluate_fallback(&crate::StepFailure::new(MODEL_PRIMARY, can_retry_same_model), ledger, chain, policy)
 }
 
 fn budget_exhausted_decision(kind: crate::BudgetKind) -> crate::FallbackDecision {
-    crate::FallbackDecision::FailRoute(crate::FallbackRouteReason::BudgetExhausted(
-        crate::BudgetExhausted::new(kind, ZERO_COUNT),
-    ))
+    crate::FallbackDecision::FailRoute(crate::FallbackRouteReason::BudgetExhausted(crate::BudgetExhausted::new(
+        kind, ZERO_COUNT,
+    )))
 }
 
 fn standard_ledger() -> crate::BudgetLedger {

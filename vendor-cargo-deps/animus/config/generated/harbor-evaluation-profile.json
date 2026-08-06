@@ -1,0 +1,60 @@
+{
+  "agent": {
+    "identity": "agent:fixture",
+    "model_route_identity": "model:fixture"
+  },
+  "budgets": {
+    "artifacts": 128,
+    "atif_steps": 4096,
+    "concurrency": 16,
+    "trials": 256
+  },
+  "enabled": true,
+  "environment": {
+    "backend": "fixture_local",
+    "cpus": 1,
+    "identity": "environment:fixture-local",
+    "memory_mb": 512,
+    "network": "none",
+    "storage_mb": 1024
+  },
+  "harbor": {
+    "atif_schema": "ATIF-v1.7",
+    "license": "Apache-2.0",
+    "release": "v0.18.0",
+    "revision": "527d50deb63a5d279e8c20593c18a2cbc7f61f9e",
+    "task_schema": "1.3"
+  },
+  "non_claims": [
+    "not-verifier-soundness",
+    "not-benchmark-superiority",
+    "not-automatic-completion",
+    "not-harbor-cloud-or-hub-parity",
+    "not-production-or-release-readiness"
+  ],
+  "profile_id": "harbor-v0.18-local-atif-v1.7",
+  "redaction": "metadata_only",
+  "rewards": {
+    "invalid": "error",
+    "judge": "advisory",
+    "missing": "error",
+    "non_finite": "error"
+  },
+  "schema": "animus.harbor-evaluation-profile.v1",
+  "secrets": {
+    "declarations": [],
+    "values_allowed": false
+  },
+  "task": {
+    "dataset_identity": "dataset:fixture-local",
+    "identity": "task:fixture-local",
+    "network": "none",
+    "remote_inputs": false
+  },
+  "verifier": {
+    "identity": "verifier:fixture-separate",
+    "mode": "separate",
+    "network": "none",
+    "rubric_identity": "rubric:fixture-v1"
+  }
+}

@@ -23,10 +23,7 @@ fn untrusted_project_descriptor_is_omitted() {
 
     assert!(context.catalog().summaries().is_empty());
     assert_eq!(context.catalog().diagnostics().len(), EXPECTED_SINGLE_ITEM);
-    assert_eq!(
-        context.catalog().diagnostics()[0].issue(),
-        Issue::UntrustedDescriptor
-    );
+    assert_eq!(context.catalog().diagnostics()[0].issue(), Issue::UntrustedDescriptor);
     assert_eq!(context.catalog().diagnostics()[0].scope(), Scope::Project);
     assert!(context.selected_content().is_none());
 }
@@ -53,14 +50,15 @@ fn duplicate_names_disable_lookup_deterministically() {
 
     assert!(context.catalog().summaries().is_empty());
     assert_eq!(context.catalog().diagnostics().len(), EXPECTED_TWO_ITEMS);
-    assert!(context.catalog().diagnostics().iter().all(|diagnostic| {
-        diagnostic.issue() == Issue::DuplicateName && diagnostic.name() == NAME
-    }));
-    assert_eq!(context.catalog().diagnostics()[0].kind(), Kind::Skill);
-    assert_eq!(
-        context.catalog().diagnostics()[1].kind(),
-        Kind::PromptTemplate
+    assert!(
+        context
+            .catalog()
+            .diagnostics()
+            .iter()
+            .all(|diagnostic| { diagnostic.issue() == Issue::DuplicateName && diagnostic.name() == NAME })
     );
+    assert_eq!(context.catalog().diagnostics()[0].kind(), Kind::Skill);
+    assert_eq!(context.catalog().diagnostics()[1].kind(), Kind::PromptTemplate);
     assert!(context.selected_content().is_none());
 }
 

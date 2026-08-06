@@ -41,6 +41,7 @@ impl Default for ContinuationPriority {
 pub struct ContinuationPolicy {
     label: Text,
     priority: ContinuationPriority,
+    requires_authoritative_completion: bool,
 }
 
 impl ContinuationPolicy {
@@ -54,7 +55,22 @@ impl ContinuationPolicy {
         Ok(Self {
             label: validate_safe_label(FIELD_POLICY_LABEL, label)?,
             priority,
+            requires_authoritative_completion: false,
         })
+    }
+
+    /// Builds a policy that waits for authoritative evidence after queues empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContinuationError`] when the label or priority is invalid.
+    pub fn new_with_authoritative_completion(
+        label: &str,
+        priority: ContinuationPriority,
+    ) -> Result<Self, ContinuationError> {
+        let mut policy = Self::new(label, priority)?;
+        policy.requires_authoritative_completion = true;
+        Ok(policy)
     }
 
     /// Returns the policy label.
@@ -69,6 +85,12 @@ impl ContinuationPolicy {
         self.priority
     }
 
+    /// Returns whether empty queues must await authoritative completion evidence.
+    #[must_use]
+    pub const fn requires_authoritative_completion(&self) -> bool {
+        self.requires_authoritative_completion
+    }
+
     /// Returns a BLAKE3 hash over safe policy metadata.
     #[must_use]
     pub fn policy_hash(&self) -> Text {
@@ -77,6 +99,14 @@ impl ContinuationPolicy {
         for candidate in self.priority.order() {
             push_hash_part(&mut normalized, candidate.as_str());
         }
+        push_hash_part(
+            &mut normalized,
+            if self.requires_authoritative_completion {
+                "authoritative-completion-required"
+            } else {
+                "queue-empty-completion-compatible"
+            },
+        );
         blake3_hex(normalized.as_bytes())
     }
 }
@@ -86,6 +116,7 @@ impl Default for ContinuationPolicy {
         Self {
             label: Text::from(DEFAULT_POLICY_LABEL),
             priority: ContinuationPriority::default(),
+            requires_authoritative_completion: false,
         }
     }
 }

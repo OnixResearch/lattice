@@ -76,16 +76,8 @@ fn anchored_origin(
     model: &super::OverlayModel,
 ) -> PlacementOrigin {
     PlacementOrigin {
-        x: clamp_axis(
-            anchor_x(viewport, extent, model.anchor),
-            model.offset_x,
-            horizontal_bounds(viewport, extent),
-        ),
-        y: clamp_axis(
-            anchor_y(viewport, extent, model.anchor),
-            model.offset_y,
-            vertical_bounds(viewport, extent),
-        ),
+        x: clamp_axis(anchor_x(viewport, extent, model.anchor), model.offset_x, horizontal_bounds(viewport, extent)),
+        y: clamp_axis(anchor_y(viewport, extent, model.anchor), model.offset_y, vertical_bounds(viewport, extent)),
     }
 }
 
@@ -103,11 +95,7 @@ fn vertical_bounds(viewport: ratatui::layout::Rect, extent: PlacementExtent) -> 
     }
 }
 
-fn anchor_x(
-    viewport: ratatui::layout::Rect,
-    extent: PlacementExtent,
-    anchor: super::OverlayAnchor,
-) -> i32 {
+fn anchor_x(viewport: ratatui::layout::Rect, extent: PlacementExtent, anchor: super::OverlayAnchor) -> i32 {
     match anchor {
         super::OverlayAnchor::Center | super::OverlayAnchor::Top | super::OverlayAnchor::Bottom => {
             i32::from(viewport.x.saturating_add(center_offset(CenterSpan {
@@ -115,22 +103,16 @@ fn anchor_x(
                 extent_cells: extent.width,
             })))
         }
-        super::OverlayAnchor::TopRight
-        | super::OverlayAnchor::Right
-        | super::OverlayAnchor::BottomRight => {
+        super::OverlayAnchor::TopRight | super::OverlayAnchor::Right | super::OverlayAnchor::BottomRight => {
             i32::from(rect_right(viewport).saturating_sub(extent.width))
         }
-        super::OverlayAnchor::BottomLeft
-        | super::OverlayAnchor::Left
-        | super::OverlayAnchor::TopLeft => i32::from(viewport.x),
+        super::OverlayAnchor::BottomLeft | super::OverlayAnchor::Left | super::OverlayAnchor::TopLeft => {
+            i32::from(viewport.x)
+        }
     }
 }
 
-fn anchor_y(
-    viewport: ratatui::layout::Rect,
-    extent: PlacementExtent,
-    anchor: super::OverlayAnchor,
-) -> i32 {
+fn anchor_y(viewport: ratatui::layout::Rect, extent: PlacementExtent, anchor: super::OverlayAnchor) -> i32 {
     match anchor {
         super::OverlayAnchor::Center | super::OverlayAnchor::Left | super::OverlayAnchor::Right => {
             i32::from(viewport.y.saturating_add(center_offset(CenterSpan {
@@ -138,14 +120,12 @@ fn anchor_y(
                 extent_cells: extent.height,
             })))
         }
-        super::OverlayAnchor::Bottom
-        | super::OverlayAnchor::BottomLeft
-        | super::OverlayAnchor::BottomRight => {
+        super::OverlayAnchor::Bottom | super::OverlayAnchor::BottomLeft | super::OverlayAnchor::BottomRight => {
             i32::from(rect_bottom(viewport).saturating_sub(extent.height))
         }
-        super::OverlayAnchor::Top
-        | super::OverlayAnchor::TopLeft
-        | super::OverlayAnchor::TopRight => i32::from(viewport.y),
+        super::OverlayAnchor::Top | super::OverlayAnchor::TopLeft | super::OverlayAnchor::TopRight => {
+            i32::from(viewport.y)
+        }
     }
 }
 

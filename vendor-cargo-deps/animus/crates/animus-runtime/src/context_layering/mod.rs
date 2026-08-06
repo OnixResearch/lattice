@@ -4,7 +4,8 @@
 //! canonicalization, clocks, and persistence. Runtime core only evaluates
 //! already-loaded descriptors and emits safe prompt sections/receipts.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
+// drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -12,12 +13,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -27,16 +23,27 @@
 mod core;
 mod data;
 
-pub use core::{
-    assemble_context_layers, blake3_context_layer_fingerprint, validate_context_descriptor,
-};
-pub use data::{
-    ContextLayerAdmissionPolicy, ContextLayerBoundaryEffect, ContextLayerClass,
-    ContextLayerDescriptor, ContextLayerDiagnostic, ContextLayerDiagnosticKind,
-    ContextLayerDiscoveryBoundary, ContextLayerFreshness, ContextLayerInclusionPolicy,
-    ContextLayerPlan, ContextLayerPolicySwitch, ContextLayerReceipt, ContextLayerReceiptEntry,
-    ContextLayerRedaction, ContextLayerSourceKind, ContextLayerTrust, ContextLayerValidationResult,
-};
+pub use core::assemble_context_layers;
+pub use core::blake3_context_layer_fingerprint;
+pub use core::validate_context_descriptor;
+
+pub use data::ContextLayerAdmissionPolicy;
+pub use data::ContextLayerBoundaryEffect;
+pub use data::ContextLayerClass;
+pub use data::ContextLayerDescriptor;
+pub use data::ContextLayerDiagnostic;
+pub use data::ContextLayerDiagnosticKind;
+pub use data::ContextLayerDiscoveryBoundary;
+pub use data::ContextLayerFreshness;
+pub use data::ContextLayerInclusionPolicy;
+pub use data::ContextLayerPlan;
+pub use data::ContextLayerPolicySwitch;
+pub use data::ContextLayerReceipt;
+pub use data::ContextLayerReceiptEntry;
+pub use data::ContextLayerRedaction;
+pub use data::ContextLayerSourceKind;
+pub use data::ContextLayerTrust;
+pub use data::ContextLayerValidationResult;
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const CONTEXT_LAYER_HASH_DOMAIN: &str = "animus.context-layer.v1";

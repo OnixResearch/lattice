@@ -28,9 +28,7 @@ impl super::DataTable {
 
         let constraints: Vec<ratatui::layout::Constraint> = visible_columns
             .iter()
-            .map(|(_, width)| {
-                ratatui::layout::Constraint::Length(width.saturating_add(style.column_spacing))
-            })
+            .map(|(_, width)| ratatui::layout::Constraint::Length(width.saturating_add(style.column_spacing)))
             .collect();
 
         let header_cells: Vec<ratatui::widgets::Cell> = visible_columns
@@ -51,12 +49,11 @@ impl super::DataTable {
                     .iter()
                     .enumerate()
                     .map(|(visible_idx, (_, width))| {
-                        let col_idx = self.scroll_col.saturating_add(visible_idx);
+                        let col_idx = self.scroll_col.get() as usize + visible_idx;
                         let cell_content = row_data.get(col_idx).map_or("", String::as_str);
-                        let display_content =
-                            super::truncate_cell(cell_content, *width, &style.truncation_suffix);
+                        let display_content = super::truncate_cell(cell_content, *width, &style.truncation_suffix);
 
-                        let cell_style = if row_idx == self.selected_row {
+                        let cell_style = if row_idx == self.selected_row.get() as usize {
                             style.selected_style
                         } else {
                             style.normal_style
@@ -72,7 +69,7 @@ impl super::DataTable {
         let table = ratatui::widgets::Table::new(data_rows, constraints).header(header_row);
         let mut table_state = ratatui::widgets::TableState::new();
         if !self.rows.is_empty() {
-            table_state.select(Some(self.selected_row));
+            table_state.select(Some(self.selected_row.get() as usize));
         }
 
         frame.render_stateful_widget(table, render_area, &mut table_state);
@@ -89,14 +86,14 @@ impl super::DataTable {
 
     /// Get visible columns that fit within the given width.
     pub(crate) fn get_visible_columns(&self, available_width: u16) -> Vec<(String, u16)> {
-        let mut visible = Vec::with_capacity(self.columns.len().saturating_sub(self.scroll_col));
+        let scroll_col = self.scroll_col.get() as usize;
+        let mut visible = Vec::with_capacity(self.columns.len().saturating_sub(scroll_col));
         let mut used_width = 0_u16;
 
-        for column_index in self.scroll_col..self.columns.len() {
-            if let (Some(col_name), Some(&col_width)) = (
-                self.columns.get(column_index),
-                self.column_widths.get(column_index),
-            ) {
+        for column_index in scroll_col..self.columns.len() {
+            if let (Some(col_name), Some(&col_width)) =
+                (self.columns.get(column_index), self.column_widths.get(column_index))
+            {
                 let spacing = if visible.is_empty() {
                     0
                 } else {

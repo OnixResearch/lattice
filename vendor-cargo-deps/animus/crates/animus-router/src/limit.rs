@@ -6,9 +6,11 @@ mod class;
 
 pub(super) const ZERO_COUNT: u32 = 0;
 
-pub use bounds::{Bounds, BoundsDraft};
+pub use bounds::Bounds;
+pub use bounds::BoundsDraft;
 pub use budget::BudgetLedger;
-pub use class::{DeadlineClass, FallbackPolicy};
+pub use class::DeadlineClass;
+pub use class::FallbackPolicy;
 
 #[cfg(test)]
 pub(crate) fn test_bounds(fixture: crate::test_support::BoundsFixture) -> Bounds {

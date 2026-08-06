@@ -24,8 +24,8 @@
 //! let keymap = default_keymap();
 //! let style = TreeStyle::default();
 //!
-//! // In your event loop, resolve keys to actions:
-//! // if let Some(action) = keymap.resolve(&(), &key_event) {
+//! // In your adapter, normalize a physical event to a logical stroke first:
+//! // if let Some(action) = keymap.resolve(&(), &logical_stroke) {
 //! //     state.apply(action, &data, viewport_height);
 //! // }
 //! ```
@@ -36,9 +36,17 @@ pub mod navigation;
 pub mod render;
 pub mod state;
 pub mod style;
+pub mod virtualization;
 
-pub use keymap::{TreeAction, default_keymap, parse_tree_action};
-pub use model::{NodeId, SimpleTree, TreeData, VisibleRow, compute_visible_rows};
-pub use render::{Tree, TreeInfo};
+pub use keymap::TreeAction;
+pub use keymap::default_keymap;
+pub use keymap::parse_tree_action;
+pub use model::NodeId;
+pub use model::SimpleTree;
+pub use model::TreeData;
+pub use model::VisibleRow;
+pub use model::compute_visible_rows;
+pub use render::Tree;
+pub use render::TreeInfo;
 pub use state::TreeState;
 pub use style::TreeStyle;

@@ -1,0 +1,332 @@
+{
+  "adapter": "met-widgets.project_dom_semantics",
+  "fixtures": [
+    {
+      "fixture_id": "accessibility.menu-dialog",
+      "generation": 1,
+      "nodes": [
+        {
+          "attributes": {
+            "aria-describedby": "semantic.dialog-description",
+            "aria-description": "Choose an available command",
+            "aria-labelledby": "semantic.dialog-title"
+          },
+          "description": "Choose an available command",
+          "focus_linked": false,
+          "id": "semantic.command-dialog",
+          "live_region": null,
+          "name": null,
+          "order": 0,
+          "parent": null,
+          "role": "dialog"
+        },
+        {
+          "attributes": {
+            "aria-label": "Commands"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.dialog-title",
+          "live_region": null,
+          "name": "Commands",
+          "order": 0,
+          "parent": "semantic.command-dialog",
+          "role": "heading"
+        },
+        {
+          "attributes": {
+            "aria-label": "Command help"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.dialog-description",
+          "live_region": null,
+          "name": "Command help",
+          "order": 1,
+          "parent": "semantic.command-dialog",
+          "role": "group"
+        },
+        {
+          "attributes": {
+            "aria-label": "Available commands"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-menu",
+          "live_region": null,
+          "name": "Available commands",
+          "order": 2,
+          "parent": "semantic.command-dialog",
+          "role": "menu"
+        },
+        {
+          "attributes": {
+            "aria-label": "Open file",
+            "aria-level": "1",
+            "aria-posinset": "1",
+            "aria-selected": "true",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.command-open",
+          "live_region": null,
+          "name": "Open file",
+          "order": 0,
+          "parent": "semantic.command-menu",
+          "role": "menuitem"
+        },
+        {
+          "attributes": {
+            "aria-disabled": "true",
+            "aria-label": "Delete file",
+            "aria-level": "1",
+            "aria-posinset": "2",
+            "aria-selected": "false",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.command-delete",
+          "live_region": null,
+          "name": "Delete file",
+          "order": 1,
+          "parent": "semantic.command-menu",
+          "role": "menuitem"
+        },
+        {
+          "attributes": {
+            "aria-label": "Indexing progress",
+            "aria-valuemax": "100",
+            "aria-valuemin": "0",
+            "aria-valuenow": "40"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-progress",
+          "live_region": null,
+          "name": "Indexing progress",
+          "order": 3,
+          "parent": "semantic.command-dialog",
+          "role": "progressbar"
+        },
+        {
+          "attributes": {
+            "aria-label": "Command diagnostics",
+            "aria-live": "polite"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-status",
+          "live_region": "One command is unavailable",
+          "name": "Command diagnostics",
+          "order": 4,
+          "parent": "semantic.command-dialog",
+          "role": "status"
+        }
+      ],
+      "semantic_hash": "e169ff2fa51404a32e488b3a1f57c40c450f7d51e449800124d71d0d41aceff8"
+    },
+    {
+      "fixture_id": "accessibility.tree",
+      "generation": 7,
+      "nodes": [
+        {
+          "attributes": {
+            "aria-label": "Project files"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.project-tree",
+          "live_region": null,
+          "name": "Project files",
+          "order": 0,
+          "parent": null,
+          "role": "tree"
+        },
+        {
+          "attributes": {
+            "aria-expanded": "true",
+            "aria-label": "Source",
+            "aria-level": "1",
+            "aria-posinset": "1",
+            "aria-selected": "true",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.tree-source",
+          "live_region": null,
+          "name": "Source",
+          "order": 0,
+          "parent": "semantic.project-tree",
+          "role": "treeitem"
+        },
+        {
+          "attributes": {
+            "aria-label": "Library source",
+            "aria-level": "2",
+            "aria-posinset": "1",
+            "aria-setsize": "1"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.tree-library",
+          "live_region": null,
+          "name": "Library source",
+          "order": 0,
+          "parent": "semantic.tree-source",
+          "role": "treeitem"
+        },
+        {
+          "attributes": {
+            "aria-expanded": "false",
+            "aria-label": "Archive",
+            "aria-level": "1",
+            "aria-posinset": "2",
+            "aria-selected": "false",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.tree-archive",
+          "live_region": null,
+          "name": "Archive",
+          "order": 1,
+          "parent": "semantic.project-tree",
+          "role": "treeitem"
+        }
+      ],
+      "semantic_hash": "8f910f79fffcf4203503c776078dbf4e3194059a329a31db27eb6cf94227f779"
+    },
+    {
+      "fixture_id": "accessibility.menu-dialog.hidden",
+      "generation": 1,
+      "nodes": [
+        {
+          "attributes": {
+            "aria-describedby": "semantic.dialog-description",
+            "aria-description": "Choose an available command",
+            "aria-labelledby": "semantic.dialog-title"
+          },
+          "description": "Choose an available command",
+          "focus_linked": false,
+          "id": "semantic.command-dialog",
+          "live_region": null,
+          "name": null,
+          "order": 0,
+          "parent": null,
+          "role": "dialog"
+        },
+        {
+          "attributes": {
+            "aria-label": "Commands"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.dialog-title",
+          "live_region": null,
+          "name": "Commands",
+          "order": 0,
+          "parent": "semantic.command-dialog",
+          "role": "heading"
+        },
+        {
+          "attributes": {
+            "aria-label": "Command help"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.dialog-description",
+          "live_region": null,
+          "name": "Command help",
+          "order": 1,
+          "parent": "semantic.command-dialog",
+          "role": "group"
+        },
+        {
+          "attributes": {
+            "aria-label": "Available commands"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-menu",
+          "live_region": null,
+          "name": "Available commands",
+          "order": 2,
+          "parent": "semantic.command-dialog",
+          "role": "menu"
+        },
+        {
+          "attributes": {
+            "aria-label": "Open file",
+            "aria-level": "1",
+            "aria-posinset": "1",
+            "aria-selected": "true",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.command-open",
+          "live_region": null,
+          "name": "Open file",
+          "order": 0,
+          "parent": "semantic.command-menu",
+          "role": "menuitem"
+        },
+        {
+          "attributes": {
+            "aria-disabled": "true",
+            "aria-hidden": "true",
+            "aria-label": "Delete file",
+            "aria-level": "1",
+            "aria-posinset": "2",
+            "aria-selected": "false",
+            "aria-setsize": "2"
+          },
+          "description": null,
+          "focus_linked": true,
+          "id": "semantic.command-delete",
+          "live_region": null,
+          "name": "Delete file",
+          "order": 1,
+          "parent": "semantic.command-menu",
+          "role": "menuitem"
+        },
+        {
+          "attributes": {
+            "aria-label": "Indexing progress",
+            "aria-valuemax": "100",
+            "aria-valuemin": "0",
+            "aria-valuenow": "40"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-progress",
+          "live_region": null,
+          "name": "Indexing progress",
+          "order": 3,
+          "parent": "semantic.command-dialog",
+          "role": "progressbar"
+        },
+        {
+          "attributes": {
+            "aria-label": "Command diagnostics",
+            "aria-live": "polite"
+          },
+          "description": null,
+          "focus_linked": false,
+          "id": "semantic.command-status",
+          "live_region": "One command is unavailable",
+          "name": "Command diagnostics",
+          "order": 4,
+          "parent": "semantic.command-dialog",
+          "role": "status"
+        }
+      ],
+      "semantic_hash": "aa9c3f6e5d790bbe0c591e72c20bc33682d25b02fb08420015f6a884a8c1f0da"
+    }
+  ],
+  "renderer_target": "meteorite.web.dom",
+  "schema": "meteorite-browser-accessibility-manifest-v1"
+}

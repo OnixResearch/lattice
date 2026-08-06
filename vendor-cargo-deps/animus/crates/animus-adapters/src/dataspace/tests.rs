@@ -67,11 +67,7 @@ fn agent_scope(fixture: ScopeFixture) -> super::Scope {
     .expect("valid scope should parse")
 }
 
-fn runtime_assertion(
-    stable_id: &str,
-    scope: super::Scope,
-    lease_expires_at: Option<u64>,
-) -> super::Assertion {
+fn runtime_assertion(stable_id: &str, scope: super::Scope, lease_expires_at: Option<u64>) -> super::Assertion {
     super::Assertion::new(super::AssertionDraft {
         stable_id,
         kind: ASSERTION_KIND_RUNTIME_EVENT,
@@ -116,27 +112,16 @@ fn adapter_contract_accepts_bounded_publish_subscribe() {
     let assertion = runtime_assertion(ASSERTION_RUNTIME, scope.clone(), None);
     let mut dataspace = super::fake::Backend::new();
 
-    dataspace
-        .publish(&assertion)
-        .expect("fake publish should not fail");
-    let matches = dataspace
-        .subscribe(&runtime_subscription(scope))
-        .expect("fake subscription should not fail");
+    dataspace.publish(&assertion).expect("fake publish should not fail");
+    let matches = dataspace.subscribe(&runtime_subscription(scope)).expect("fake subscription should not fail");
 
     assert_eq!(matches.len(), EXPECTED_ONE);
     assert_eq!(matches[0].stable_id(), ASSERTION_RUNTIME);
     assert_eq!(matches[0].kind(), super::AssertionKind::RuntimeEvent);
     assert_eq!(matches[0].status(), super::AssertionStatus::Active);
     assert_eq!(matches[0].item_count(), ITEM_COUNT);
-    assert_eq!(
-        matches[0].content_hash().map(crate::SafeHash::as_str),
-        Some(SAFE_HASH)
-    );
-    assert!(
-        matches[0]
-            .redactions()
-            .contains(&super::AssertionRedaction::ProviderPayloadOmitted)
-    );
+    assert_eq!(matches[0].content_hash().map(crate::SafeHash::as_str), Some(SAFE_HASH));
+    assert!(matches[0].redactions().contains(&super::AssertionRedaction::ProviderPayloadOmitted));
     assert_eq!(dataspace.assertions()[0].sequence(), FIRST_SEQUENCE);
 }
 
@@ -145,49 +130,28 @@ fn scoped_cancellation_only_updates_matching_scope() {
     let affected_scope = agent_scope(MAIN_SCOPE);
     let unaffected_scope = agent_scope(OTHER_WORKSPACE_SCOPE);
     let mut dataspace = super::fake::Backend::new();
-    dataspace.publish_assertion(runtime_assertion(
-        ASSERTION_RUNTIME,
-        affected_scope.clone(),
-        None,
-    ));
+    dataspace.publish_assertion(runtime_assertion(ASSERTION_RUNTIME, affected_scope.clone(), None));
     dataspace.publish_assertion(runtime_assertion(ASSERTION_OTHER, unaffected_scope, None));
 
     let changed = dataspace.apply_event(&cancellation_event(affected_scope));
 
     assert_eq!(changed, EXPECTED_ONE);
     assert_eq!(dataspace.assertions().len(), EXPECTED_TWO);
-    assert_eq!(
-        dataspace.assertions()[0].assertion().status(),
-        super::AssertionStatus::Cancelled
-    );
-    assert_eq!(
-        dataspace.assertions()[1].assertion().status(),
-        super::AssertionStatus::Active
-    );
+    assert_eq!(dataspace.assertions()[0].assertion().status(), super::AssertionStatus::Cancelled);
+    assert_eq!(dataspace.assertions()[1].assertion().status(), super::AssertionStatus::Active);
 }
 
 #[test]
 fn stale_cleanup_is_deterministic() {
     let mut dataspace = super::fake::Backend::new();
-    dataspace.publish_assertion(runtime_assertion(
-        ASSERTION_RUNTIME,
-        agent_scope(MAIN_SCOPE),
-        Some(EXPIRES_EARLY),
-    ));
-    dataspace.publish_assertion(runtime_assertion(
-        ASSERTION_OTHER,
-        agent_scope(OTHER_ACTOR_SCOPE),
-        Some(EXPIRES_LATE),
-    ));
+    dataspace.publish_assertion(runtime_assertion(ASSERTION_RUNTIME, agent_scope(MAIN_SCOPE), Some(EXPIRES_EARLY)));
+    dataspace.publish_assertion(runtime_assertion(ASSERTION_OTHER, agent_scope(OTHER_ACTOR_SCOPE), Some(EXPIRES_LATE)));
 
     let removed = dataspace.cleanup_stale(CLEANUP_TICK);
 
     assert_eq!(removed, EXPECTED_ONE);
     assert_eq!(dataspace.assertions().len(), EXPECTED_ONE);
-    assert_eq!(
-        dataspace.assertions()[0].assertion().stable_id(),
-        ASSERTION_OTHER
-    );
+    assert_eq!(dataspace.assertions()[0].assertion().stable_id(), ASSERTION_OTHER);
 }
 
 #[test]
@@ -201,10 +165,7 @@ fn ownership_transfer_event_carries_target_owner() {
     })
     .expect("ownership transfer with target owner should parse");
 
-    assert_eq!(
-        event.kind(),
-        super::OrchestrationEventKind::OwnershipTransferred
-    );
+    assert_eq!(event.kind(), super::OrchestrationEventKind::OwnershipTransferred);
     assert_eq!(event.target_owner(), Some(OWNER));
 }
 
@@ -272,12 +233,9 @@ fn assertion_rejects_empty_redactions() {
     })
     .expect_err("assertions without redaction evidence should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::EmptyCollection {
-            field: "dataspace_assertion_redactions",
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::EmptyCollection {
+        field: "dataspace_assertion_redactions",
+    });
 }
 
 #[test]
@@ -290,10 +248,7 @@ fn ownership_transfer_rejects_missing_target_owner() {
     })
     .expect_err("ownership transfer without target owner should fail");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::EmptyField {
-            field: "dataspace_event_target_owner",
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::EmptyField {
+        field: "dataspace_event_target_owner",
+    });
 }

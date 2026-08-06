@@ -30,8 +30,7 @@ impl RouterRotationReceipt {
         let cursor_class = super::RouterRotationCursorClass::parse(draft.cursor_class)?;
         let selected_model = receipt_label(super::MODEL_LABEL_FIELD, draft.selected_model)?;
         let catalog_hash = crate::SafeHash::new(draft.catalog_hash)?;
-        let next_cursor_hash =
-            parse_receipt_hash(super::NEXT_CURSOR_HASH_FIELD, draft.next_cursor_hash)?;
+        let next_cursor_hash = parse_receipt_hash(super::NEXT_CURSOR_HASH_FIELD, draft.next_cursor_hash)?;
         let redactions = collect_redactions(draft.redactions)?;
         let candidate_count = draft.candidate_count.to_string();
         let identity_hash = crate::hash_parts(&[
@@ -179,31 +178,21 @@ pub struct RouterRotationReceiptDraft<'a> {
     pub redactions: &'a [&'a str],
 }
 
-fn receipt_label(
-    field: crate::FieldName,
-    value: &str,
-) -> Result<alloc::string::String, super::RouterRotationError> {
+fn receipt_label(field: crate::FieldName, value: &str) -> Result<alloc::string::String, super::RouterRotationError> {
     crate::validate_receipt_text(value).map_err(super::RouterRotationError::ReceiptLeak)?;
     crate::normalized_adapter_field(field, value).map_err(super::RouterRotationError::from)
 }
 
-fn parse_receipt_hash(
-    _field: crate::FieldName,
-    value: &str,
-) -> Result<crate::SafeHash, super::RouterRotationError> {
+fn parse_receipt_hash(_field: crate::FieldName, value: &str) -> Result<crate::SafeHash, super::RouterRotationError> {
     crate::validate_receipt_text(value).map_err(super::RouterRotationError::ReceiptLeak)?;
     crate::SafeHash::new(value).map_err(super::RouterRotationError::from)
 }
 
-fn collect_redactions(
-    values: &[&str],
-) -> Result<alloc::vec::Vec<crate::Redaction>, super::RouterRotationError> {
+fn collect_redactions(values: &[&str]) -> Result<alloc::vec::Vec<crate::Redaction>, super::RouterRotationError> {
     if values.is_empty() {
-        return Err(super::RouterRotationError::Contract(
-            crate::AdapterContractError::EmptyCollection {
-                field: super::EMPTY_REDACTIONS_FIELD,
-            },
-        ));
+        return Err(super::RouterRotationError::Contract(crate::AdapterContractError::EmptyCollection {
+            field: super::EMPTY_REDACTIONS_FIELD,
+        }));
     }
     values
         .iter()

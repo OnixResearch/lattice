@@ -1,0 +1,15 @@
+fact	Ratcore	Meteorite action prompt	Subwayrat fuzzy	owner_or_limit
+session identity	PromptSessionId	fixed command-palette identity	fixed fuzzy identity	adapter chooses stable instance ID
+committed input	string plus PromptInputRevision	DOM oninput message	terminal character normalization	physical editing remains renderer-owned
+catalog	generation-bound snapshot	action catalog conversion	FuzzySource slice conversion	provider work remains caller-owned
+candidate identity	PromptCandidateId	ActionId mapping	FuzzyCandidate.id mapping	domain payload lookup after output
+ordering	explicit fuzzy/source policy	fuzzy compatibility	fuzzy compatibility	stable source-order tie break
+active state	stable candidate ID	listbox selected row	terminal selected projection	no stale index authority
+movement	wrap/clamp/reject	wrap	clamp	adapter configuration explicit
+disabled	eligible state plus reason	contextual action reason	candidate pilot currently enabled	movement skips; activation rejects
+history	supplied namespace/generation	disabled	disabled	persistence and sensitive policy application-owned
+validation	revision-bound snapshot	action contextual eligibility	unused in pilot	no validator callback
+acceptance	generation-bound typed output	ActionId after adapter mapping	candidate clone after ID lookup	no effect authorization
+cancel	Cancelled output	controlled on_close	terminal close/clear compatibility	mount/focus owner remains adapter
+projection	shared parts/diagnostics	DOM markup/listbox	Ratatui rows/highlights	styles/geometry differ
+replay	production reducer	compatibility parity tests	adapter tests	sensitive raw text omitted/redacted

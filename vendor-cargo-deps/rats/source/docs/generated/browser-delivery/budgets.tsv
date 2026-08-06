@@ -1,0 +1,15 @@
+entrypoint	role	raw_limit_bytes	gzip_limit_bytes	rationale
+rat-ratzilla	html	12000	5000	Release shell plus reviewed Trunk bootstrap headroom.
+rat-ratzilla	javascript	80000	30000	WASM glue with bounded release growth headroom.
+rat-ratzilla	wasm	750000	300000	Functional Ratatui fixtures and browser lifecycle with 25 percent reviewed headroom.
+rat-ratzilla	css	0	0	No separate CSS artifact is maintained.
+rat-ratzilla	font	0	0	System monospace fallback only; no font payload.
+rat-ratzilla	asset	0	0	No additional image or data asset payload.
+rat-ratzilla	total	842000	335000	Sum headroom; not a startup or network-performance target.
+met-showcase	html	12000	5000	Dioxus release shell and base-path headroom.
+met-showcase	javascript	220000	80000	Dioxus glue plus pinned focus-trap asset headroom.
+met-showcase	wasm	5500000	2200000	Showcase, embedded Ratzilla, and browser effects with reviewed growth headroom.
+met-showcase	css	0	0	No separate CSS artifact is maintained.
+met-showcase	font	0	0	System/browser fonts only; no font payload.
+met-showcase	asset	0	0	No non-JavaScript auxiliary payload.
+met-showcase	total	5732000	2285000	Sum headroom; not a startup or network-performance target.

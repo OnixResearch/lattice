@@ -1,0 +1,25 @@
+case	layer	expected_outcome	mutation_or_overwrite	evidence
+clean-install	Amethystate Redb	None then accepted save	new private temporary store	native store test
+v2-round-trip	DTO mapping	fresh session/live IDs and same durable values	accepted explicit load	mapping test
+v1-to-v2	DTO migration	theme/workspace names migrate;new defaults explicit	accepted only with migration enabled	migration test
+missing-v1-step	DTO migration	MissingMigration	none	migration policy test
+future-version	DTO migration	FutureVersion	none and no overwrite	negative corpus
+corrupt-json	DTO decode	Corrupt	none and no overwrite	negative corpus
+schema-drift	DTO decode unknown field	Corrupt	none and no overwrite	deny-unknown test
+duplicate-durable-id	DTO validation	DuplicateId	none	negative corpus
+stale-external-reference	authority join	StaleExternalReference	none;protocol refresh required	authority test
+canonical-external-snapshot	authority boundary	ExternalAuthority	none	typed rejection test
+local-write	message bridge	Save effect with generation	only effect owner may write	bridge test
+same-source-callback	message bridge	LocalEchoSuppressed	accepted payload update;no second write	bridge test
+identical-external-value	message bridge	DuplicateIgnored	none	bridge test
+external-new-value	message bridge	ExternalChanged message	no direct domain mutation	bridge test
+dropped-subscription	message bridge	SubscriptionInactive	none	bridge test
+failed-open	Amethystate adapter	OpenFailed content-free diagnostic	none	invalid nested path test
+failed-write	adapter normalization	SaveFailed content-free diagnostic	none	operation normalization test
+failed-flush	adapter normalization	FlushFailed content-free diagnostic	no success claim	operation normalization test
+shutdown-flush	Amethystate adapter	close calls explicit save	durable before reopen	native reopen test
+browser-missing	browser codec	Missing with in-memory default	no initial storage write	met-hooks unit test
+browser-malformed	browser codec	DecodeFailed with in-memory default	malformed bytes retained until user change	met-hooks unit test
+browser-denied	browser codec	ReadDenied or WriteFailed	in-memory fallback only	met-hooks unit test
+browser-quota	browser write classifier	WriteFailed	in-memory value remains	met-hooks unit test
+native-browser-hook	non-wasm met-hooks	Unsupported	in-memory fallback only	target-gated implementation

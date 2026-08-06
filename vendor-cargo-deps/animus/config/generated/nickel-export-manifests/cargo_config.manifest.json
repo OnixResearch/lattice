@@ -1,0 +1,59 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=toml",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=cargo_config"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.repo.cargo",
+      "source": {
+        "path": "config/repo.ncl",
+        "identity": "b3:8f14d2bda46a1eaed8b4dd9f79c8e967d9f115f3af43c7bb1235913bfb1b6430",
+        "bytes": 5820
+      },
+      "dependencies": [
+        {
+          "path": "config/agent-check-registry.ncl",
+          "identity": "b3:ea8e8fd248d181918b47ceeea0b2d1958dfe1f9cc30aeca0cb6eaa9bf5fe95f1",
+          "bytes": 12433
+        }
+      ],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "cargo_config",
+      "contract": "",
+      "format": "toml",
+      "output": {
+        "path": ".cargo/config.toml",
+        "identity": "b3:b26664ece259fe886d5a28fa23fc45f05ca071359b172695a1374ae5c37b2a18",
+        "bytes": 69
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=toml",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=cargo_config"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:8a263d5d392a3c255f38617b514859f0f4aedf9d5301b357f738019e6821356f"
+}

@@ -1,0 +1,21 @@
+responsibility	authority	classification	target	path	evidence	intentional_divergence	generation_decision
+validated-tabs-state	Ratcore	semantic-source	shared	ratcore/src/headless/selection/model.rs	headless contract tests	none	never-generate
+reduction	Ratcore	semantic-source	shared	ratcore/src/headless/selection/reducer.rs	headless transition tests	none	never-generate
+projection	Ratcore	semantic-source	shared	ratcore/src/headless/selection/output.rs	headless projection tests	none	never-generate
+semantics-diagnostics	Ratcore	semantic-source	shared	ratcore/src/headless/selection/output.rs	semantic receipts	none	never-generate
+adapter-state-wrapper	frontend lifetime	generation-candidate	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/behavior.rs	adapter tests	target naming and docs	rejected-by-gate
+adapter-state-wrapper	frontend lifetime	generation-candidate	Meteorite	meteorite/crates/met-widgets/src/tabs/behavior.rs	adapter tests	target naming and docs	rejected-by-gate
+physical-key-vocabulary	Subwayrat	renderer-owned-leaf	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/behavior.rs	key tests	terminal key names	retain-handwritten
+physical-key-vocabulary	Meteorite	renderer-owned-leaf	Meteorite	meteorite/crates/met-widgets/src/tabs/behavior.rs	key tests	browser key names	retain-handwritten
+key-normalization	frontend	renderer-owned-leaf	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/behavior.rs	key tests	terminal physical events	retain-handwritten
+key-normalization	frontend	renderer-owned-leaf	Meteorite	meteorite/crates/met-widgets/src/tabs/behavior.rs	key tests	browser physical events	retain-handwritten
+pointer-hit-testing	frontend	renderer-owned-leaf	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/view.rs	view tests	cell geometry	retain-handwritten
+pointer-hit-testing	frontend	renderer-owned-leaf	Meteorite	meteorite/crates/met-widgets/src/tabs.rs	component tests	DOM lifecycle	retain-handwritten
+view-composition	frontend	renderer-owned-leaf	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/view.rs	buffer projection tests	Ratatui cells styles layout	never-generate
+view-composition	frontend	renderer-owned-leaf	Meteorite	meteorite/crates/met-widgets/src/tabs.rs	RSX tests	Dioxus RSX CSS lifecycle	never-generate
+caller-panel-content	application	caller-owned-slot	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/view.rs	headless boundary	terminal content ownership	never-generate
+caller-panel-content	application	caller-owned-slot	Meteorite	meteorite/crates/met-widgets/src/tabs.rs	headless boundary	Dioxus children ownership	never-generate
+adapter-receipt	Ratcore fixture plus frontend mapping	evidence-owner	Subwayrat	subwayrat/crates/rat-widgets/src/tab_bar/behavior.rs	checked parity receipt	target mapping identity	retain-local
+adapter-receipt	Ratcore fixture plus frontend mapping	evidence-owner	Meteorite	meteorite/crates/met-widgets/src/tabs/behavior.rs	checked parity receipt	target mapping identity	retain-local
+experimental-tabs-binding	none	intentional-gap	Iced	iced/crates/iced-showcase/src	Iced pilot has no tabs binding	experimental scope and no named consumer	do-not-create
+application-identities-effects	downstream application	caller-owned-slot	downstream frontend	docs/downstream-application-authority.md	authority contract	downstream IDs revisions policy authorization	never-generate

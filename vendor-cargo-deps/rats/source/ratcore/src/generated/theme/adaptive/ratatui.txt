@@ -1,0 +1,13 @@
+generator=rats-adaptive-theme-v1
+source-blake3=463e69cf119ca95615d1080aca2096cf4d87dfcd8425bbaf088cb9b00d23dfe8
+renderer=ratatui
+density.compact.target=2cell gap=1cell padding=1cell
+density.comfortable.target=3cell gap=2cell padding=2cell
+density.touch.target=4cell gap=2cell padding=3cell
+mapping.surface-elevation=approximated fallback=border-and-emphasis reason=terminal cells do not support shadow elevation
+mapping.typography=approximated fallback=terminal-modifiers reason=terminal fonts are selected outside Ratatui styles
+mapping.control-metrics=supported fallback=- reason=-
+mapping.focus-indicator=supported fallback=- reason=-
+mapping.interaction-state=supported fallback=- reason=-
+mapping.contrast=approximated fallback=palette-and-modifier-emphasis reason=terminal forced colors cannot be queried or controlled portably
+mapping.motion=supported fallback=- reason=-

@@ -144,14 +144,8 @@ pub enum ReceiptLeak {
 ///
 /// Returns [`ReceiptLeak`] when known unsafe sentinels appear.
 pub fn validate_text(text: &str) -> Result<(), ReceiptLeak> {
-    assert!(
-        text.len() >= text.chars().count(),
-        "text length bounds chars"
-    );
-    assert!(
-        !RAW_PROMPT_MARKER.is_empty(),
-        "leak marker must not be empty"
-    );
+    assert!(text.len() >= text.chars().count(), "text length bounds chars");
+    assert!(!RAW_PROMPT_MARKER.is_empty(), "leak marker must not be empty");
     if text.contains(RAW_PROMPT_MARKER) {
         return Err(ReceiptLeak::RawPrompt);
     }

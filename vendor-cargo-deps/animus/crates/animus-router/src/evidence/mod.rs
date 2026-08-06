@@ -8,12 +8,20 @@ mod plan;
 mod record;
 mod screen;
 
-pub use label::{DurationBucket, QuorumClass, Redaction};
-pub use record::{Receipt, ReceiptDraft, ReceiptLeak, validate_receipt_text};
-pub use screen::{
-    ExecutionPlanError, FallbackChain, FallbackStep, RoleStep, RouterExecutionPlan,
-    materialize_execution_plan, materialize_execution_plan_with_rotation,
-};
+pub use label::DurationBucket;
+pub use label::QuorumClass;
+pub use label::Redaction;
+pub use record::Receipt;
+pub use record::ReceiptDraft;
+pub use record::ReceiptLeak;
+pub use record::validate_receipt_text;
+pub use screen::ExecutionPlanError;
+pub use screen::FallbackChain;
+pub use screen::FallbackStep;
+pub use screen::RoleStep;
+pub use screen::RouterExecutionPlan;
+pub use screen::materialize_execution_plan;
+pub use screen::materialize_execution_plan_with_rotation;
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug)]

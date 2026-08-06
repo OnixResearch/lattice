@@ -12,14 +12,53 @@ const DEFAULT_GROUP: &str = "default";
 #[cfg(test)]
 const ZERO_UNREAD: usize = 0;
 
-/// Stable notification identifier.
-pub type NotificationId = String;
+/// Ordered instant on the caller-owned notification timeline.
+///
+/// The scalar has no implied epoch or wall-clock unit. Applications must use
+/// one consistent timeline for creation, update, expiry, and explicit `now`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NotificationTime(u64);
 
-/// Stable activity identifier.
-pub type ActivityId = String;
+impl NotificationTime {
+    /// Creates a timeline instant from the caller's documented tick scale.
+    #[must_use]
+    pub const fn from_timeline_tick(value: u64) -> Self {
+        Self(value)
+    }
 
-/// Stable notification action identifier.
-pub type NotificationActionId = String;
+    /// Returns the caller-owned timeline tick.
+    #[must_use]
+    pub const fn timeline_tick(self) -> u64 {
+        self.0
+    }
+}
+
+semantic_string_id! {
+    /// Stable notification identifier.
+    ///
+    /// ```compile_fail
+    /// use ratcore::notification_activity_center::{ActivityId, NotificationId};
+    /// let activity = ActivityId::new("build");
+    /// let _: NotificationId = activity;
+    /// ```
+    pub struct NotificationId;
+}
+
+semantic_string_id! {
+    /// Stable activity identifier.
+    pub struct ActivityId;
+}
+
+semantic_string_id! {
+    /// Stable notification-local action identifier.
+    ///
+    /// ```compile_fail
+    /// use ratcore::notification_activity_center::{NotificationActionId, NotificationId};
+    /// let action = NotificationActionId::new("retry");
+    /// let _: NotificationId = action;
+    /// ```
+    pub struct NotificationActionId;
+}
 
 /// Severity for notification display and sorting.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,10 +147,10 @@ pub struct NotificationRecord {
     pub unread: bool,
     /// Grouping key.
     pub group_key: Option<String>,
-    /// Caller-supplied creation timestamp.
-    pub created_at: u64,
-    /// Caller-supplied expiry timestamp.
-    pub expires_at: Option<u64>,
+    /// Caller-supplied creation time.
+    pub created_at: NotificationTime,
+    /// Caller-supplied expiry time on the same timeline.
+    pub expires_at: Option<NotificationTime>,
     /// Notification actions.
     pub actions: Vec<NotificationAction>,
 }
@@ -123,7 +162,7 @@ impl NotificationRecord {
         id: impl Into<NotificationId>,
         title: impl Into<String>,
         severity: NotificationSeverity,
-        created_at: u64,
+        created_at: NotificationTime,
     ) -> Self {
         Self {
             id: id.into(),
@@ -175,11 +214,28 @@ impl NotificationRecord {
         self
     }
 
-    /// Sets expiry timestamp.
+    /// Sets expiry time on the caller-owned timeline.
     #[must_use]
-    pub const fn with_expires_at(mut self, expires_at: u64) -> Self {
+    pub const fn with_expires_at(mut self, expires_at: NotificationTime) -> Self {
         self.expires_at = Some(expires_at);
         self
+    }
+
+    /// Creates a notification from a compatibility raw timeline tick.
+    #[must_use]
+    pub fn new_at_timeline_tick(
+        id: impl Into<NotificationId>,
+        title: impl Into<String>,
+        severity: NotificationSeverity,
+        created_at: u64,
+    ) -> Self {
+        Self::new(id, title, severity, NotificationTime::from_timeline_tick(created_at))
+    }
+
+    /// Sets expiry from a compatibility raw timeline tick.
+    #[must_use]
+    pub const fn with_expires_at_timeline_tick(self, expires_at: u64) -> Self {
+        self.with_expires_at(NotificationTime::from_timeline_tick(expires_at))
     }
 
     /// Sets actions.
@@ -216,10 +272,10 @@ pub struct ActivityRecord {
     pub source: String,
     /// Status.
     pub status: ActivityStatus,
-    /// Optional progress percent supplied by caller.
-    pub progress_percent: Option<u8>,
-    /// Caller-supplied timestamp.
-    pub updated_at: u64,
+    /// Optional validated progress supplied by caller.
+    pub progress: Option<crate::validated_values::Percent>,
+    /// Caller-supplied update time.
+    pub updated_at: NotificationTime,
 }
 
 impl ActivityRecord {
@@ -229,14 +285,14 @@ impl ActivityRecord {
         id: impl Into<ActivityId>,
         title: impl Into<String>,
         status: ActivityStatus,
-        updated_at: u64,
+        updated_at: NotificationTime,
     ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
             source: DEFAULT_GROUP.to_string(),
             status,
-            progress_percent: None,
+            progress: None,
             updated_at,
         }
     }
@@ -248,11 +304,27 @@ impl ActivityRecord {
         self
     }
 
-    /// Sets progress percent.
+    /// Sets validated activity progress.
     #[must_use]
-    pub const fn with_progress(mut self, progress_percent: u8) -> Self {
-        self.progress_percent = Some(progress_percent);
+    pub const fn with_progress(mut self, progress: crate::validated_values::Percent) -> Self {
+        self.progress = Some(progress);
         self
+    }
+
+    /// Creates an activity from a compatibility raw timeline tick.
+    #[must_use]
+    pub fn new_at_timeline_tick(
+        id: impl Into<ActivityId>,
+        title: impl Into<String>,
+        status: ActivityStatus,
+        updated_at: u64,
+    ) -> Self {
+        Self::new(id, title, status, NotificationTime::from_timeline_tick(updated_at))
+    }
+
+    /// Validates and sets a compatibility percentage atomically.
+    pub fn try_with_progress_percent(self, progress_percent: u8) -> Result<Self, crate::validated_values::ValueError> {
+        crate::validated_values::Percent::try_new(progress_percent).map(|progress| self.with_progress(progress))
     }
 }
 
@@ -380,8 +452,8 @@ pub struct ActivityTrayRowProjection {
     pub source: String,
     /// Status.
     pub status: ActivityStatus,
-    /// Optional progress percent.
-    pub progress_percent: Option<u8>,
+    /// Optional validated progress.
+    pub progress: Option<crate::validated_values::Percent>,
 }
 
 /// Status badge projection.
@@ -487,7 +559,7 @@ pub struct NotificationCommandOutcome {
 #[must_use]
 pub fn project_notification_surfaces(
     state: &NotificationActivityState,
-    now: u64,
+    now: NotificationTime,
 ) -> NotificationSurfaceProjections {
     let mut diagnostics = validate_state(state, now);
     let toast_stack = state
@@ -503,11 +575,7 @@ pub fn project_notification_surfaces(
         .collect();
     let activity_tray = state.activities.iter().map(activity_projection).collect();
     let status_badge = status_badge_projection(state, now);
-    let action_targets = state
-        .notifications
-        .iter()
-        .flat_map(action_target_projections)
-        .collect();
+    let action_targets = state.notifications.iter().flat_map(action_target_projections).collect();
     diagnostics.sort_by(|left, right| left.message.cmp(&right.message));
     NotificationSurfaceProjections {
         toast_stack,
@@ -533,10 +601,9 @@ pub fn apply_notification_command(
             update_notification_lifecycle(state, &id, NotificationLifecycle::Dismissed, false)
         }
         NotificationCommand::ClearDismissed => clear_dismissed(state),
-        NotificationCommand::SetGroupExpanded {
-            group_key,
-            expanded,
-        } => set_group_expanded(state, &group_key, expanded),
+        NotificationCommand::SetGroupExpanded { group_key, expanded } => {
+            set_group_expanded(state, &group_key, expanded)
+        }
         NotificationCommand::InvokeAction {
             notification_id,
             action_id,
@@ -560,7 +627,7 @@ pub fn apply_notification_command(
 pub fn project_notification_renderer(
     renderer: NotificationRenderer,
     state: &NotificationActivityState,
-    now: u64,
+    now: NotificationTime,
 ) -> NotificationRendererProjection {
     NotificationRendererProjection {
         renderer,
@@ -568,7 +635,7 @@ pub fn project_notification_renderer(
     }
 }
 
-fn validate_state(state: &NotificationActivityState, now: u64) -> Vec<NotificationDiagnostic> {
+fn validate_state(state: &NotificationActivityState, now: NotificationTime) -> Vec<NotificationDiagnostic> {
     let mut diagnostics = Vec::new();
     diagnostics.extend(duplicate_notification_diagnostics(&state.notifications));
     diagnostics.extend(duplicate_activity_diagnostics(&state.activities));
@@ -581,9 +648,7 @@ fn validate_state(state: &NotificationActivityState, now: u64) -> Vec<Notificati
     diagnostics
 }
 
-fn duplicate_notification_diagnostics(
-    notifications: &[NotificationRecord],
-) -> Vec<NotificationDiagnostic> {
+fn duplicate_notification_diagnostics(notifications: &[NotificationRecord]) -> Vec<NotificationDiagnostic> {
     let mut seen = BTreeSet::new();
     let mut diagnostics = Vec::new();
     for notification in notifications {
@@ -619,7 +684,7 @@ fn duplicate_activity_diagnostics(activities: &[ActivityRecord]) -> Vec<Notifica
 
 fn validate_notification(
     notification: &NotificationRecord,
-    now: u64,
+    now: NotificationTime,
     diagnostics: &mut Vec<NotificationDiagnostic>,
 ) {
     if notification.title.trim() == EMPTY_TEXT {
@@ -650,7 +715,7 @@ fn validate_notification(
         ));
     }
     for action in &notification.actions {
-        if action.id.trim() == EMPTY_TEXT || action.label.trim() == EMPTY_TEXT {
+        if action.id.as_str().trim() == EMPTY_TEXT || action.label.trim() == EMPTY_TEXT {
             diagnostics.push(NotificationDiagnostic::new(
                 NotificationDiagnosticCode::InvalidAction,
                 Some(notification.id.clone()),
@@ -683,13 +748,11 @@ fn validate_activity(activity: &ActivityRecord, diagnostics: &mut Vec<Notificati
     }
 }
 
-fn is_expired(notification: &NotificationRecord, now: u64) -> bool {
-    notification
-        .expires_at
-        .is_some_and(|expires_at| expires_at <= now)
+fn is_expired(notification: &NotificationRecord, now: NotificationTime) -> bool {
+    notification.expires_at.is_some_and(|expires_at| expires_at <= now)
 }
 
-fn is_toast_visible(notification: &NotificationRecord, now: u64) -> bool {
+fn is_toast_visible(notification: &NotificationRecord, now: NotificationTime) -> bool {
     notification.lifecycle == NotificationLifecycle::Active && !is_expired(notification, now)
 }
 
@@ -707,19 +770,13 @@ fn toast_projection(notification: &NotificationRecord) -> ToastItemProjection {
     }
 }
 
-fn inbox_projection(
-    notification: &NotificationRecord,
-    diagnostics: &[NotificationDiagnostic],
-) -> InboxRowProjection {
+fn inbox_projection(notification: &NotificationRecord, diagnostics: &[NotificationDiagnostic]) -> InboxRowProjection {
     InboxRowProjection {
         notification_id: notification.id.clone(),
         title: notification.title.clone(),
         lifecycle: notification.lifecycle,
         unread: notification.unread,
-        group_key: notification
-            .group_key
-            .clone()
-            .unwrap_or_else(|| DEFAULT_GROUP.to_string()),
+        group_key: notification.group_key.clone().unwrap_or_else(|| DEFAULT_GROUP.to_string()),
         diagnostics: diagnostics
             .iter()
             .filter(|diagnostic| diagnostic.notification_id.as_ref() == Some(&notification.id))
@@ -734,11 +791,11 @@ fn activity_projection(activity: &ActivityRecord) -> ActivityTrayRowProjection {
         title: activity.title.clone(),
         source: activity.source.clone(),
         status: activity.status.clone(),
-        progress_percent: activity.progress_percent,
+        progress: activity.progress,
     }
 }
 
-fn status_badge_projection(state: &NotificationActivityState, now: u64) -> StatusBadgeProjection {
+fn status_badge_projection(state: &NotificationActivityState, now: NotificationTime) -> StatusBadgeProjection {
     let unread_count = state
         .notifications
         .iter()
@@ -747,12 +804,7 @@ fn status_badge_projection(state: &NotificationActivityState, now: u64) -> Statu
     let active_activity_count = state
         .activities
         .iter()
-        .filter(|activity| {
-            matches!(
-                activity.status,
-                ActivityStatus::Pending | ActivityStatus::Running
-            )
-        })
+        .filter(|activity| matches!(activity.status, ActivityStatus::Pending | ActivityStatus::Running))
         .count();
     let has_error = state.notifications.iter().any(|notification| {
         notification.lifecycle == NotificationLifecycle::Active
@@ -766,9 +818,7 @@ fn status_badge_projection(state: &NotificationActivityState, now: u64) -> Statu
     }
 }
 
-fn action_target_projections(
-    notification: &NotificationRecord,
-) -> Vec<NotificationActionTargetProjection> {
+fn action_target_projections(notification: &NotificationRecord) -> Vec<NotificationActionTargetProjection> {
     notification
         .actions
         .iter()
@@ -784,12 +834,12 @@ fn action_target_projections(
 
 fn update_notification_lifecycle(
     state: &NotificationActivityState,
-    id: &str,
+    id: &NotificationId,
     lifecycle: NotificationLifecycle,
     unread: bool,
 ) -> NotificationCommandOutcome {
     let mut next = state.clone();
-    let Some(notification) = next.notifications.iter_mut().find(|record| record.id == id) else {
+    let Some(notification) = next.notifications.iter_mut().find(|record| &record.id == id) else {
         return stale_command(state, id);
     };
     if notification.lifecycle == NotificationLifecycle::Dismissed {
@@ -798,7 +848,7 @@ fn update_notification_lifecycle(
             invoked_action: None,
             diagnostic: Some(NotificationDiagnostic::new(
                 NotificationDiagnosticCode::StaleId,
-                Some(id.to_string()),
+                Some(id.clone()),
                 None,
                 None,
                 "notification is already dismissed",
@@ -816,8 +866,7 @@ fn update_notification_lifecycle(
 
 fn clear_dismissed(state: &NotificationActivityState) -> NotificationCommandOutcome {
     let mut next = state.clone();
-    next.notifications
-        .retain(|notification| notification.lifecycle != NotificationLifecycle::Dismissed);
+    next.notifications.retain(|notification| notification.lifecycle != NotificationLifecycle::Dismissed);
     NotificationCommandOutcome {
         state: next,
         invoked_action: None,
@@ -847,32 +896,24 @@ fn set_group_expanded(
 
 fn invoke_action(
     state: &NotificationActivityState,
-    notification_id: &str,
-    action_id: &str,
+    notification_id: &NotificationId,
+    action_id: &NotificationActionId,
 ) -> NotificationCommandOutcome {
-    let Some(notification) = state
-        .notifications
-        .iter()
-        .find(|notification| notification.id == notification_id)
-    else {
+    let Some(notification) = state.notifications.iter().find(|notification| &notification.id == notification_id) else {
         return stale_command(state, notification_id);
     };
     if notification.lifecycle == NotificationLifecycle::Dismissed {
         return stale_command(state, notification_id);
     }
-    let Some(action) = notification
-        .actions
-        .iter()
-        .find(|action| action.id == action_id)
-    else {
+    let Some(action) = notification.actions.iter().find(|action| &action.id == action_id) else {
         return NotificationCommandOutcome {
             state: state.clone(),
             invoked_action: None,
             diagnostic: Some(NotificationDiagnostic::new(
                 NotificationDiagnosticCode::StaleId,
-                Some(notification_id.to_string()),
+                Some(notification_id.clone()),
                 None,
-                Some(action_id.to_string()),
+                Some(action_id.clone()),
                 "notification action is absent",
             )),
         };
@@ -883,21 +924,18 @@ fn invoke_action(
             invoked_action: None,
             diagnostic: Some(NotificationDiagnostic::new(
                 NotificationDiagnosticCode::DisabledAction,
-                Some(notification_id.to_string()),
+                Some(notification_id.clone()),
                 None,
-                Some(action_id.to_string()),
-                action
-                    .diagnostic
-                    .clone()
-                    .unwrap_or_else(|| "notification action is disabled".to_string()),
+                Some(action_id.clone()),
+                action.diagnostic.clone().unwrap_or_else(|| "notification action is disabled".to_string()),
             )),
         };
     }
     NotificationCommandOutcome {
         state: state.clone(),
         invoked_action: Some(NotificationActionTargetProjection {
-            notification_id: notification_id.to_string(),
-            action_id: action_id.to_string(),
+            notification_id: notification_id.clone(),
+            action_id: action_id.clone(),
             label: action.label.clone(),
             enabled: action.enabled,
             diagnostic: action.diagnostic.clone(),
@@ -906,13 +944,13 @@ fn invoke_action(
     }
 }
 
-fn stale_command(state: &NotificationActivityState, id: &str) -> NotificationCommandOutcome {
+fn stale_command(state: &NotificationActivityState, id: &NotificationId) -> NotificationCommandOutcome {
     NotificationCommandOutcome {
         state: state.clone(),
         invoked_action: None,
         diagnostic: Some(NotificationDiagnostic::new(
             NotificationDiagnosticCode::StaleId,
-            Some(id.to_string()),
+            Some(id.clone()),
             None,
             None,
             "notification command target is stale",
@@ -924,36 +962,26 @@ fn stale_command(state: &NotificationActivityState, id: &str) -> NotificationCom
 mod tests {
     use super::*;
 
-    const CREATED_AT: u64 = 10;
-    const NOW: u64 = 20;
-    const EXPIRED_AT: u64 = 15;
-    const PROGRESS_HALF: u8 = 50;
+    const CREATED_AT: NotificationTime = NotificationTime::from_timeline_tick(10);
+    const NOW: NotificationTime = NotificationTime::from_timeline_tick(20);
+    const EXPIRED_AT: NotificationTime = NotificationTime::from_timeline_tick(15);
+    const PROGRESS_HALF: crate::validated_values::Percent = match crate::validated_values::Percent::try_new(50) {
+        Ok(progress) => progress,
+        Err(_) => panic!("test percentage is valid"),
+    };
 
     fn valid_notification() -> NotificationRecord {
-        NotificationRecord::new(
-            "build.failed",
-            "Build failed",
-            NotificationSeverity::Error,
-            CREATED_AT,
-        )
-        .with_body("cargo test failed")
-        .with_group("build")
-        .with_actions(vec![NotificationAction::new("open.log", "Open log")])
+        NotificationRecord::new("build.failed", "Build failed", NotificationSeverity::Error, CREATED_AT)
+            .with_body("cargo test failed")
+            .with_group("build")
+            .with_actions(vec![NotificationAction::new("open.log", "Open log")])
     }
 
     fn valid_state() -> NotificationActivityState {
-        NotificationActivityState::new(
-            vec![valid_notification()],
-            vec![
-                ActivityRecord::new(
-                    "build",
-                    "Workspace check",
-                    ActivityStatus::Running,
-                    CREATED_AT,
-                )
+        NotificationActivityState::new(vec![valid_notification()], vec![
+            ActivityRecord::new("build", "Workspace check", ActivityStatus::Running, CREATED_AT)
                 .with_progress(PROGRESS_HALF),
-            ],
-        )
+        ])
     }
 
     #[test]
@@ -962,10 +990,7 @@ mod tests {
 
         assert_eq!(surfaces.toast_stack[0].notification_id, "build.failed");
         assert_eq!(surfaces.inbox_rows[0].group_key, "build");
-        assert_eq!(
-            surfaces.activity_tray[0].progress_percent,
-            Some(PROGRESS_HALF)
-        );
+        assert_eq!(surfaces.activity_tray[0].progress, Some(PROGRESS_HALF));
         assert_eq!(surfaces.status_badge.unread_count, 1);
         assert!(surfaces.status_badge.has_error);
         assert_eq!(surfaces.action_targets[0].action_id, "open.log");
@@ -974,29 +999,23 @@ mod tests {
 
     #[test]
     fn malformed_duplicate_expired_and_unsupported_records_remain_diagnostic() {
-        let malformed = NotificationRecord::new(
-            "bad",
-            "",
-            NotificationSeverity::Unsupported("loud".to_string()),
-            CREATED_AT,
-        )
-        .with_expires_at(EXPIRED_AT)
-        .with_actions(vec![NotificationAction::new("", "")]);
-        let duplicate =
-            NotificationRecord::new("bad", "Duplicate", NotificationSeverity::Info, CREATED_AT);
-        let activity = ActivityRecord::new(
-            "activity",
-            "",
-            ActivityStatus::Unsupported("paused".to_string()),
-            CREATED_AT,
-        );
+        let malformed =
+            NotificationRecord::new("bad", "", NotificationSeverity::Unsupported("loud".to_string()), CREATED_AT)
+                .with_expires_at(EXPIRED_AT)
+                .with_actions(vec![NotificationAction::new("", "")]);
+        let duplicate = NotificationRecord::new("bad", "Duplicate", NotificationSeverity::Info, CREATED_AT);
+        let activity =
+            ActivityRecord::new("activity", "", ActivityStatus::Unsupported("paused".to_string()), CREATED_AT);
         let state = NotificationActivityState::new(vec![malformed, duplicate], vec![activity]);
 
         let surfaces = project_notification_surfaces(&state, NOW);
 
-        assert!(surfaces.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == NotificationDiagnosticCode::DuplicateNotificationId
-        }));
+        assert!(
+            surfaces
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == NotificationDiagnosticCode::DuplicateNotificationId })
+        );
         assert!(
             surfaces
                 .diagnostics
@@ -1015,63 +1034,53 @@ mod tests {
                 .iter()
                 .any(|diagnostic| { diagnostic.code == NotificationDiagnosticCode::Expired })
         );
-        assert!(surfaces.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == NotificationDiagnosticCode::UnsupportedSeverity
-        }));
-        assert!(surfaces.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == NotificationDiagnosticCode::UnsupportedActivityStatus
-        }));
+        assert!(
+            surfaces
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == NotificationDiagnosticCode::UnsupportedSeverity })
+        );
+        assert!(
+            surfaces
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == NotificationDiagnosticCode::UnsupportedActivityStatus })
+        );
         assert_eq!(surfaces.status_badge.unread_count, ZERO_UNREAD + 1);
     }
 
     #[test]
     fn lifecycle_commands_update_state_purely() {
         let state = valid_state();
-        let acknowledged = apply_notification_command(
-            &state,
-            NotificationCommand::Acknowledge("build.failed".to_string()),
-        );
+        let acknowledged =
+            apply_notification_command(&state, NotificationCommand::Acknowledge(NotificationId::new("build.failed")));
         let dismissed = apply_notification_command(
             &acknowledged.state,
-            NotificationCommand::Dismiss("build.failed".to_string()),
+            NotificationCommand::Dismiss(NotificationId::new("build.failed")),
         );
-        let cleared =
-            apply_notification_command(&dismissed.state, NotificationCommand::ClearDismissed);
+        let cleared = apply_notification_command(&dismissed.state, NotificationCommand::ClearDismissed);
 
-        assert_eq!(
-            acknowledged.state.notifications[0].lifecycle,
-            NotificationLifecycle::Acknowledged
-        );
+        assert_eq!(acknowledged.state.notifications[0].lifecycle, NotificationLifecycle::Acknowledged);
         assert!(!acknowledged.state.notifications[0].unread);
-        assert_eq!(
-            dismissed.state.notifications[0].lifecycle,
-            NotificationLifecycle::Dismissed
-        );
+        assert_eq!(dismissed.state.notifications[0].lifecycle, NotificationLifecycle::Dismissed);
         assert!(cleared.state.notifications.is_empty());
     }
 
     #[test]
     fn stale_disabled_and_unsupported_commands_fail_closed() {
         let state = NotificationActivityState::new(
-            vec![valid_notification().with_actions(vec![
-                NotificationAction::new("retry", "Retry").with_enabled(false),
-            ])],
+            vec![
+                valid_notification().with_actions(vec![NotificationAction::new("retry", "Retry").with_enabled(false)]),
+            ],
             Vec::new(),
         );
 
-        let stale =
-            apply_notification_command(&state, NotificationCommand::Dismiss("missing".to_string()));
-        let disabled = apply_notification_command(
-            &state,
-            NotificationCommand::InvokeAction {
-                notification_id: "build.failed".to_string(),
-                action_id: "retry".to_string(),
-            },
-        );
-        let unsupported = apply_notification_command(
-            &state,
-            NotificationCommand::Unsupported("teleport".to_string()),
-        );
+        let stale = apply_notification_command(&state, NotificationCommand::Dismiss(NotificationId::new("missing")));
+        let disabled = apply_notification_command(&state, NotificationCommand::InvokeAction {
+            notification_id: NotificationId::new("build.failed"),
+            action_id: NotificationActionId::new("retry"),
+        });
+        let unsupported = apply_notification_command(&state, NotificationCommand::Unsupported("teleport".to_string()));
 
         assert!(matches!(
             stale.diagnostic,
@@ -1096,6 +1105,16 @@ mod tests {
         ));
         assert_eq!(state, stale.state);
         assert_eq!(state, disabled.state);
+    }
+
+    #[test]
+    fn timeline_and_progress_boundaries_are_explicit() {
+        assert_eq!(CREATED_AT.timeline_tick(), 10);
+        assert!(
+            ActivityRecord::new_at_timeline_tick("invalid-progress", "Invalid", ActivityStatus::Running, 10,)
+                .try_with_progress_percent(101)
+                .is_err()
+        );
     }
 
     #[test]

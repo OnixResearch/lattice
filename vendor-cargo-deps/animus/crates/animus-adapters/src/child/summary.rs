@@ -1,18 +1,24 @@
-use super::{
-    ID_FIELD, MIN_TURN_COUNT, OUTCOME_CANCELLATION, OUTCOME_DENIED_TOOL, OUTCOME_FAILURE,
-    OUTCOME_KIND_FIELD, OUTCOME_MALFORMED_SUMMARY, OUTCOME_PARTIAL_PARALLEL_SUCCESS,
-    OUTCOME_SUCCESS, OUTCOME_TIMEOUT, OUTCOME_WRITE_CONFLICT, SubagentError, Text, optional_text,
-    parse_value, required_text,
-};
+use super::ID_FIELD;
+use super::MIN_TURN_COUNT;
+use super::OUTCOME_CANCELLATION;
+use super::OUTCOME_DENIED_TOOL;
+use super::OUTCOME_FAILURE;
+use super::OUTCOME_KIND_FIELD;
+use super::OUTCOME_MALFORMED_SUMMARY;
+use super::OUTCOME_PARTIAL_PARALLEL_SUCCESS;
+use super::OUTCOME_SUCCESS;
+use super::OUTCOME_TIMEOUT;
+use super::OUTCOME_WRITE_CONFLICT;
+use super::SubagentError;
+use super::Text;
+use super::optional_text;
+use super::parse_value;
+use super::required_text;
 
-const EVENT_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_event_kind");
-const EVENT_PARENT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_parent_id");
-const EVENT_STATUS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_event_status");
-const EVENT_EVIDENCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_event_evidence");
+const EVENT_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_event_kind");
+const EVENT_PARENT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_parent_id");
+const EVENT_STATUS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_event_status");
+const EVENT_EVIDENCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_event_evidence");
 
 const EVENT_START: &str = "start";
 const EVENT_STOP: &str = "stop";
@@ -144,9 +150,8 @@ pub fn aggregate_subagent_outcomes(
         } else {
             failure_count = failure_count.saturating_add(MIN_TURN_COUNT);
         }
-        has_write_conflict = has_write_conflict
-            || draft.write_conflict
-            || matches!(kind, SubagentOutcomeKind::WriteConflict);
+        has_write_conflict =
+            has_write_conflict || draft.write_conflict || matches!(kind, SubagentOutcomeKind::WriteConflict);
     }
     let status = classify_aggregate(AggregateCounts {
         success_count,

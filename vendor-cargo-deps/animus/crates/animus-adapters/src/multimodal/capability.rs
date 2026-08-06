@@ -28,10 +28,7 @@ impl ModelInputCapabilities {
     /// Returns [`super::Error`] when the model label is unsafe.
     pub fn from_draft(draft: ModelInputCapabilitiesDraft<'_>) -> Result<Self, super::Error> {
         Ok(Self {
-            model_label: super::check::normalized_safe_text(
-                super::MODEL_LABEL_FIELD,
-                draft.model_label,
-            )?,
+            model_label: super::check::normalized_safe_text(super::MODEL_LABEL_FIELD, draft.model_label)?,
             supports_text: draft.supports_text,
             supports_images: draft.supports_images,
             image_adapter_available: draft.image_adapter_available,
@@ -92,7 +89,8 @@ impl DispatchPlan {
 ///
 /// # Errors
 ///
-/// Returns [`super::Error`] when text or image input is unsupported or the image adapter is unavailable.
+/// Returns [`super::Error`] when text or image input is unsupported or the image adapter is
+/// unavailable.
 pub fn prepare_dispatch(
     assembly: &super::PromptAssembly,
     capabilities: &ModelInputCapabilities,

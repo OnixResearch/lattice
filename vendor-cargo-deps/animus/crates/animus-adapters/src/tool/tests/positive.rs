@@ -14,10 +14,7 @@ fn request_accepts_current_shape_contract() {
     assert_eq!(request.arguments()[FIRST_INDEX].name(), CURRENT_ARGUMENT);
     assert_eq!(request.arguments()[FIRST_INDEX].value(), ARGUMENT_VALUE);
     assert_eq!(request.mutation_targets()[FIRST_INDEX], TARGET_FILE);
-    assert_eq!(
-        request.required_capability_labels()[FIRST_INDEX],
-        CAPABILITY_READ
-    );
+    assert_eq!(request.required_capability_labels()[FIRST_INDEX], CAPABILITY_READ);
     assert_eq!(request.approval_posture(), ApprovalPosture::PreApproved);
     assert_eq!(request.argument_summary(), "query=adapter contracts");
     assert_eq!(Request::contract_identity(), TOOL_REQUEST_CONTRACT_IDENTITY);
@@ -36,10 +33,7 @@ fn response_accepts_bounded_result_contract() {
     assert_eq!(response.line_count(), crate::MIN_ADAPTER_FIELD_CHARS as u64);
     assert_eq!(response.redaction_class(), OutputRedactionClass::Safe);
     assert!(response.content_hash().is_some());
-    assert_eq!(
-        Response::contract_identity(),
-        TOOL_RESPONSE_CONTRACT_IDENTITY
-    );
+    assert_eq!(Response::contract_identity(), TOOL_RESPONSE_CONTRACT_IDENTITY);
 }
 
 #[test]
@@ -109,19 +103,10 @@ fn mutation_windows_serialize_conflicting_targets_only() {
     ])
     .expect("mutation windows should plan");
 
-    assert_eq!(
-        windows[FIRST_INDEX].status(),
-        MutationWindowStatus::Independent
-    );
-    assert_eq!(
-        windows[SECOND_INDEX].status(),
-        MutationWindowStatus::Serialized
-    );
+    assert_eq!(windows[FIRST_INDEX].status(), MutationWindowStatus::Independent);
+    assert_eq!(windows[SECOND_INDEX].status(), MutationWindowStatus::Serialized);
     assert_eq!(windows[SECOND_INDEX].waits_for(), Some(CALL_FIRST));
-    assert_eq!(
-        windows[THIRD_INDEX].status(),
-        MutationWindowStatus::Independent
-    );
+    assert_eq!(windows[THIRD_INDEX].status(), MutationWindowStatus::Independent);
     assert_eq!(windows[THIRD_INDEX].waits_for(), None);
 }
 
@@ -145,10 +130,7 @@ fn hashed_edit_plan_validates_ordered_spans_and_safe_receipt() {
 
     assert_eq!(plan.resource_class(), RESOURCE_CLASS_FILE);
     assert_eq!(plan.snapshot_hash(), HASH_A);
-    assert_eq!(
-        plan.newline_policy(),
-        hashed::NewlinePolicy::PreserveSnapshot
-    );
+    assert_eq!(plan.newline_policy(), hashed::NewlinePolicy::PreserveSnapshot);
     assert_eq!(plan.spans().len(), HASHED_EDIT_COUNT);
     assert_eq!(plan.spans()[FIRST_INDEX].start_line(), FIRST_LINE_NUMBER);
     assert_eq!(plan.spans()[SECOND_INDEX].start_line(), THIRD_LINE_NUMBER);
@@ -164,10 +146,7 @@ fn hashed_edit_plan_validates_ordered_spans_and_safe_receipt() {
     })
     .expect("receipt should validate");
 
-    assert_eq!(
-        receipt.resource_redaction(),
-        hashed::ResourceRedaction::ResourceHash
-    );
+    assert_eq!(receipt.resource_redaction(), hashed::ResourceRedaction::ResourceHash);
     assert_eq!(receipt.resource_identity(), Some(RESOURCE_ID_HASH));
     assert_eq!(receipt.before_snapshot_hash(), HASH_A);
     assert_eq!(receipt.after_snapshot_hash(), HASH_D);
@@ -185,8 +164,7 @@ fn hashed_edit_validation_runs_without_host_adapter() {
         replacement: REPLACEMENT_TEXT,
     })];
     let request = hashed_request(&spans);
-    let plan = hashed::validate_plan(&snapshot, &request)
-        .expect("pure validation should not require a host adapter");
+    let plan = hashed::validate_plan(&snapshot, &request).expect("pure validation should not require a host adapter");
 
     assert_eq!(plan.spans().len(), SINGLE_HASHED_EDIT_COUNT);
     assert_eq!(plan.snapshot_hash(), HASH_A);
@@ -215,23 +193,11 @@ fn progressive_discovery_returns_metadata_only_details_and_receipt() {
     assert_eq!(discovered.summaries().len(), SUMMARY_COUNT);
     assert_eq!(discovered.details().len(), DETAIL_COUNT);
     assert_eq!(discovered.summaries()[FIRST_INDEX].tool_name(), NAME);
-    assert_eq!(
-        discovered.summaries()[FIRST_INDEX].schema_identity(),
-        SCHEMA_ID
-    );
-    assert_eq!(
-        discovered.summaries()[FIRST_INDEX].capability_labels()[FIRST_INDEX],
-        CAPABILITY_READ
-    );
+    assert_eq!(discovered.summaries()[FIRST_INDEX].schema_identity(), SCHEMA_ID);
+    assert_eq!(discovered.summaries()[FIRST_INDEX].capability_labels()[FIRST_INDEX], CAPABILITY_READ);
     assert_eq!(discovered.details()[FIRST_INDEX].description(), DESCRIPTION);
-    assert_eq!(
-        discovered.details()[FIRST_INDEX].source_identity(),
-        SOURCE_IDENTITY
-    );
-    assert_eq!(
-        discovered.receipt().status(),
-        crate::ReceiptStatus::Completed
-    );
+    assert_eq!(discovered.details()[FIRST_INDEX].source_identity(), SOURCE_IDENTITY);
+    assert_eq!(discovered.receipt().status(), crate::ReceiptStatus::Completed);
     assert!(!discovered.discovery_identity().is_empty());
 }
 
@@ -251,14 +217,8 @@ fn steel_fabric_and_declarative_batch_plan_are_admitted() {
     assert_eq!(plan.status(), PlanStatus::Admitted);
     assert_eq!(plan.issue(), PlanIssue::None);
     assert_eq!(plan.steps().len(), DOUBLE_STEP_COUNT);
-    assert_eq!(
-        plan.steps()[SECOND_INDEX].dependencies()[FIRST_INDEX],
-        STEP_FIRST
-    );
-    assert_eq!(
-        plan.steps()[SECOND_INDEX].intermediate_bindings()[FIRST_INDEX].binding_id(),
-        BINDING_FIRST
-    );
+    assert_eq!(plan.steps()[SECOND_INDEX].dependencies()[FIRST_INDEX], STEP_FIRST);
+    assert_eq!(plan.steps()[SECOND_INDEX].intermediate_bindings()[FIRST_INDEX].binding_id(), BINDING_FIRST);
     assert!(!plan.plan_identity().is_empty());
 
     let receipt = PlanReceipt::new(&PlanReceiptDraft {

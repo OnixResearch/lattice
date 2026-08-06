@@ -1,11 +1,25 @@
 #![allow(non_trait_imports)]
-use super::{
-    CanonicalModelContractError, CanonicalUnsafeTextReason, FINISH_LENGTH, FINISH_MALFORMED,
-    FINISH_REASON_FIELD, FINISH_REFUSAL, FINISH_SAFETY, FINISH_STOP, FINISH_TOOL_CALL,
-    HIDDEN_REASONING_FIELD, MALFORMED_DIAGNOSTIC_FIELD, RAW_PROVIDER_PAYLOAD_FIELD,
-    REFUSAL_REASON_FIELD, RESPONSE_SCHEMA_FIELD, RESPONSE_TEXT_FIELD, SAFETY_CATEGORY_FIELD,
-    STRUCTURED_PAYLOAD_FIELD, TOOL_ARGUMENTS_FIELD, TOOL_CALL_ID_FIELD, TOOL_NAME_FIELD, safe_text,
-};
+use super::CanonicalModelContractError;
+use super::CanonicalUnsafeTextReason;
+use super::FINISH_LENGTH;
+use super::FINISH_MALFORMED;
+use super::FINISH_REASON_FIELD;
+use super::FINISH_REFUSAL;
+use super::FINISH_SAFETY;
+use super::FINISH_STOP;
+use super::FINISH_TOOL_CALL;
+use super::HIDDEN_REASONING_FIELD;
+use super::MALFORMED_DIAGNOSTIC_FIELD;
+use super::RAW_PROVIDER_PAYLOAD_FIELD;
+use super::REFUSAL_REASON_FIELD;
+use super::RESPONSE_SCHEMA_FIELD;
+use super::RESPONSE_TEXT_FIELD;
+use super::SAFETY_CATEGORY_FIELD;
+use super::STRUCTURED_PAYLOAD_FIELD;
+use super::TOOL_ARGUMENTS_FIELD;
+use super::TOOL_CALL_ID_FIELD;
+use super::TOOL_NAME_FIELD;
+use super::safe_text;
 
 /// Canonical terminal finish reason.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -158,9 +172,7 @@ impl CanonicalModelResponseItem {
     /// # Errors
     ///
     /// Returns [`CanonicalModelContractError`] when the item is empty, unsafe, or leaky.
-    pub fn from_draft(
-        draft: CanonicalModelResponseItemDraft<'_>,
-    ) -> Result<Self, CanonicalModelContractError> {
+    pub fn from_draft(draft: CanonicalModelResponseItemDraft<'_>) -> Result<Self, CanonicalModelContractError> {
         match draft {
             CanonicalModelResponseItemDraft::AssistantText { text } => Ok(Self::AssistantText {
                 text: safe_text(RESPONSE_TEXT_FIELD, text)?,
@@ -187,22 +199,18 @@ impl CanonicalModelResponseItem {
             CanonicalModelResponseItemDraft::Safety { category } => Ok(Self::Safety {
                 category: safe_text(SAFETY_CATEGORY_FIELD, category)?,
             }),
-            CanonicalModelResponseItemDraft::MalformedOutput { diagnostic } => {
-                Ok(Self::MalformedOutput {
-                    diagnostic: safe_text(MALFORMED_DIAGNOSTIC_FIELD, diagnostic)?,
-                })
-            }
+            CanonicalModelResponseItemDraft::MalformedOutput { diagnostic } => Ok(Self::MalformedOutput {
+                diagnostic: safe_text(MALFORMED_DIAGNOSTIC_FIELD, diagnostic)?,
+            }),
             CanonicalModelResponseItemDraft::RawProviderPayload { label } => {
-                let _label =
-                    crate::validation::normalized_adapter_field(RAW_PROVIDER_PAYLOAD_FIELD, label)?;
+                let _label = crate::validation::normalized_adapter_field(RAW_PROVIDER_PAYLOAD_FIELD, label)?;
                 Err(CanonicalModelContractError::UnsafeText {
                     field: RAW_PROVIDER_PAYLOAD_FIELD.as_str(),
                     reason: CanonicalUnsafeTextReason::RawProviderPayload,
                 })
             }
             CanonicalModelResponseItemDraft::HiddenReasoning { label } => {
-                let _label =
-                    crate::validation::normalized_adapter_field(HIDDEN_REASONING_FIELD, label)?;
+                let _label = crate::validation::normalized_adapter_field(HIDDEN_REASONING_FIELD, label)?;
                 Err(CanonicalModelContractError::UnsafeText {
                     field: HIDDEN_REASONING_FIELD.as_str(),
                     reason: CanonicalUnsafeTextReason::HiddenReasoning,

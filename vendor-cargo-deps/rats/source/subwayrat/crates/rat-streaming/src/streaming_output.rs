@@ -275,10 +275,7 @@ impl StreamingOutputManager {
 
     /// Get the call_id of the currently focused tool output, if any.
     pub fn focused_call_id(&self) -> Option<&str> {
-        self.outputs
-            .iter()
-            .find(|(_, out)| out.focused)
-            .map(|(id, _)| id.as_str())
+        self.outputs.iter().find(|(_, out)| out.focused).map(|(id, _)| id.as_str())
     }
 
     /// Focus a specific tool's output.

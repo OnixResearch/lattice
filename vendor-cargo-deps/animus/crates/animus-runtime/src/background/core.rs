@@ -22,15 +22,12 @@ pub fn resolve_process_job_profile(
     request: super::ProcessJobProfileResolveRequest<'_>,
 ) -> Result<super::ResolvedProcessJobProfile, super::ProcessJobProfileError> {
     let selected = select_profile_source(request.sources, request.profile_name)?;
-    resolve_manifest(
-        &selected.manifest,
-        ResolutionContext {
-            profile_name: request.profile_name,
-            owner_label: request.owner_label,
-            policy: request.policy,
-            source_label: selected.safe_label.as_str(),
-        },
-    )
+    resolve_manifest(&selected.manifest, ResolutionContext {
+        profile_name: request.profile_name,
+        owner_label: request.owner_label,
+        policy: request.policy,
+        source_label: selected.safe_label.as_str(),
+    })
 }
 
 impl super::ProcessJobProfileManifest {
@@ -45,15 +42,12 @@ impl super::ProcessJobProfileManifest {
         owner_label: &str,
         policy: &super::ProcessJobProfilePolicy,
     ) -> Result<super::ResolvedProcessJobProfile, super::ProcessJobProfileError> {
-        resolve_manifest(
-            self,
-            ResolutionContext {
-                profile_name,
-                owner_label,
-                policy,
-                source_label: super::INLINE_SOURCE_LABEL,
-            },
-        )
+        resolve_manifest(self, ResolutionContext {
+            profile_name,
+            owner_label,
+            policy,
+            source_label: super::INLINE_SOURCE_LABEL,
+        })
     }
 }
 
@@ -63,13 +57,10 @@ fn resolve_manifest(
 ) -> Result<super::ResolvedProcessJobProfile, super::ProcessJobProfileError> {
     super::checks::validate_schema_version(context.profile_name, manifest.schema_version)?;
     let profile = find_unique_profile(manifest, context.profile_name)?;
-    resolve_profile(
-        &profile.profile,
-        ResolutionContext {
-            profile_name: profile.name.as_str(),
-            ..context
-        },
-    )
+    resolve_profile(&profile.profile, ResolutionContext {
+        profile_name: profile.name.as_str(),
+        ..context
+    })
 }
 
 fn find_unique_profile<'a>(
@@ -77,16 +68,8 @@ fn find_unique_profile<'a>(
     profile_name: &str,
 ) -> Result<&'a super::NamedProcessJobProfile, super::ProcessJobProfileError> {
     debug_assert!(!profile_name.is_empty());
-    debug_assert!(
-        manifest
-            .profiles
-            .iter()
-            .all(|profile| !profile.name.is_empty())
-    );
-    let mut matches = manifest
-        .profiles
-        .iter()
-        .filter(|profile| profile.name == profile_name);
+    debug_assert!(manifest.profiles.iter().all(|profile| !profile.name.is_empty()));
+    let mut matches = manifest.profiles.iter().filter(|profile| profile.name == profile_name);
     let Some(first) = matches.next() else {
         return Err(super::ProcessJobProfileError::new(
             super::ProcessJobProfileErrorKind::UnknownProfile,
@@ -146,19 +129,15 @@ fn build_resolution(
     );
     let mut request = start_request(profile, context, backend, profile_hash.as_str());
     let request_hash = super::digest::request_hash(&request);
-    request.metadata.insert(
-        String::from(super::IDENTITY_REQUEST_HASH_FIELD),
-        request_hash.clone(),
-    );
-    let identity =
-        super::envelope::ProcessJobProfileIdentity::new(super::envelope::ProfileIdentityInput {
-            profile_name: context.profile_name,
-            source_label: context.source_label,
-            policy_hash: context.policy.policy_hash.as_str(),
-            selected_backend: backend,
-            profile_hash,
-            request_hash,
-        })?;
+    request.metadata.insert(String::from(super::IDENTITY_REQUEST_HASH_FIELD), request_hash.clone());
+    let identity = super::envelope::ProcessJobProfileIdentity::new(super::envelope::ProfileIdentityInput {
+        profile_name: context.profile_name,
+        source_label: context.source_label,
+        policy_hash: context.policy.policy_hash.as_str(),
+        selected_backend: backend,
+        profile_hash,
+        request_hash,
+    })?;
     Ok(super::ResolvedProcessJobProfile { request, identity })
 }
 
@@ -174,17 +153,9 @@ fn start_request(
         backend,
         command: trimmed_optional(profile.command.as_deref()),
         program: trimmed_optional(profile.program.as_deref()),
-        args: profile
-            .args
-            .iter()
-            .map(|arg| arg.trim().to_owned())
-            .collect(),
+        args: profile.args.iter().map(|arg| arg.trim().to_owned()).collect(),
         cwd: trimmed_optional(profile.cwd.as_deref()),
-        writable_paths: profile
-            .writable_paths
-            .iter()
-            .map(|path| path.trim().to_owned())
-            .collect(),
+        writable_paths: profile.writable_paths.iter().map(|path| path.trim().to_owned()).collect(),
         env: profile.env.clone(),
         resources: profile.resources.clone(),
         notification: profile.notification,
@@ -192,9 +163,7 @@ fn start_request(
         metadata: identity_metadata(context, backend, profile_hash),
     };
     for field in &profile.metadata {
-        request
-            .metadata
-            .insert(field.key.clone(), field.value.clone());
+        request.metadata.insert(field.key.clone(), field.value.clone());
     }
     request
 }
@@ -210,16 +179,8 @@ fn select_profile_source<'a>(
     let mut matches: std::collections::BTreeMap<u8, Vec<&super::ProcessJobProfileSource>> =
         std::collections::BTreeMap::new();
     for source in sources {
-        if source
-            .manifest
-            .profiles
-            .iter()
-            .any(|entry| entry.name == profile_name)
-        {
-            matches
-                .entry(source.precedence.rank())
-                .or_default()
-                .push(source);
+        if source.manifest.profiles.iter().any(|entry| entry.name == profile_name) {
+            matches.entry(source.precedence.rank()).or_default().push(source);
         }
     }
     select_highest_precedence(&matches, profile_name)
@@ -240,11 +201,7 @@ fn select_highest_precedence<'a>(
         ));
     };
     if selected_sources.len() != UNIQUE_SOURCE_COUNT {
-        let labels = selected_sources
-            .iter()
-            .map(|source| source.safe_label.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
+        let labels = selected_sources.iter().map(|source| source.safe_label.as_str()).collect::<Vec<_>>().join(", ");
         return Err(super::ProcessJobProfileError::new(
             super::ProcessJobProfileErrorKind::DuplicateProfile,
             profile_name,
@@ -271,37 +228,19 @@ fn identity_metadata(
     debug_assert!(!profile_hash.is_empty());
     debug_assert!(!context.policy.policy_hash.is_empty());
     let mut metadata = std::collections::BTreeMap::from([
-        (
-            String::from(super::IDENTITY_PROFILE_NAME_FIELD),
-            String::from(context.profile_name),
-        ),
+        (String::from(super::IDENTITY_PROFILE_NAME_FIELD), String::from(context.profile_name)),
         (
             String::from(super::IDENTITY_SCHEMA_VERSION_FIELD),
             super::PROCESS_JOB_PROFILE_SCHEMA_VERSION.to_string(),
         ),
-        (
-            String::from(super::IDENTITY_SOURCE_FIELD),
-            String::from(context.source_label),
-        ),
-        (
-            String::from(super::IDENTITY_POLICY_HASH_FIELD),
-            context.policy.policy_hash.clone(),
-        ),
-        (
-            String::from(super::IDENTITY_PROFILE_HASH_FIELD),
-            String::from(profile_hash),
-        ),
+        (String::from(super::IDENTITY_SOURCE_FIELD), String::from(context.source_label)),
+        (String::from(super::IDENTITY_POLICY_HASH_FIELD), context.policy.policy_hash.clone()),
+        (String::from(super::IDENTITY_PROFILE_HASH_FIELD), String::from(profile_hash)),
     ]);
-    metadata.insert(
-        String::from("identity.profile.backend"),
-        String::from(backend.as_str()),
-    );
+    metadata.insert(String::from("identity.profile.backend"), String::from(backend.as_str()));
     metadata
 }
 
 fn trimmed_optional(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(String::from)
+    value.map(str::trim).filter(|value| !value.is_empty()).map(String::from)
 }

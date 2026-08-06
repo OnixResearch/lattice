@@ -1,0 +1,15 @@
+schema=iced.semantic-projection.v1
+fixture=workspace-shell.positive
+adapter=iced-semantic
+generator=iced-workspace-semantic-v1
+evidence-role=semantic-projection
+state-blake3=178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f
+workspace-snapshot-blake3=178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f
+state.diagnostics=effect.focus-pane,effect.split-pane,effect.status-update
+state.focus_pane=pane:task
+state.layout_shape=workspaces=1,tabs=1,panes=2
+state.pane_content=pane:editor:editor ready,pane:task:task starting
+state.panes=pane:editor,pane:task
+state.workspace_status=working
+effects=effect.focus-pane,effect.split-pane,effect.status-update
+diagnostics=-

@@ -16,13 +16,26 @@ const PANEL_GRAPH: &str = "graph";
 const TAG_PREFIX: char = '#';
 
 mod assembly;
-pub use assembly::{KnowledgePanels, KnowledgeWorkflowBuild, build_knowledge_workflow};
+pub use assembly::KnowledgePanels;
+pub use assembly::KnowledgeWorkflowBuild;
+pub use assembly::build_knowledge_workflow;
+
+semantic_string_id! {
+    /// Stable identity for a document in a knowledge workspace.
+    ///
+    /// ```compile_fail
+    /// use ratcore::{knowledge_kit::DocumentId, showcase_fixtures::FixtureId};
+    /// let fixture = FixtureId::new("doc");
+    /// let _: DocumentId = fixture;
+    /// ```
+    pub struct DocumentId;
+}
 
 /// Normalized document supplied by an application adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeDocument {
     /// Stable document ID.
-    pub id: String,
+    pub id: DocumentId,
     /// Display title.
     pub title: String,
     /// Raw or rendered body text owned by the application.
@@ -32,7 +45,7 @@ pub struct KnowledgeDocument {
 impl KnowledgeDocument {
     /// Creates a normalized document.
     #[must_use]
-    pub fn new(id: impl Into<String>, title: impl Into<String>, body: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<DocumentId>, title: impl Into<String>, body: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -45,7 +58,7 @@ impl KnowledgeDocument {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeHeading {
     /// Owning document ID.
-    pub document_id: String,
+    pub document_id: DocumentId,
     /// Heading text.
     pub title: String,
     /// Nesting level, starting at one.
@@ -55,7 +68,7 @@ pub struct KnowledgeHeading {
 impl KnowledgeHeading {
     /// Creates a heading.
     #[must_use]
-    pub fn new(document_id: impl Into<String>, title: impl Into<String>, level: u8) -> Self {
+    pub fn new(document_id: impl Into<DocumentId>, title: impl Into<String>, level: u8) -> Self {
         Self {
             document_id: document_id.into(),
             title: title.into(),
@@ -68,7 +81,7 @@ impl KnowledgeHeading {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeTag {
     /// Owning document ID.
-    pub document_id: String,
+    pub document_id: DocumentId,
     /// Tag label, including the `#` prefix.
     pub label: String,
 }
@@ -76,7 +89,7 @@ pub struct KnowledgeTag {
 impl KnowledgeTag {
     /// Creates a tag assignment.
     #[must_use]
-    pub fn new(document_id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn new(document_id: impl Into<DocumentId>, label: impl Into<String>) -> Self {
         Self {
             document_id: document_id.into(),
             label: label.into(),
@@ -88,15 +101,15 @@ impl KnowledgeTag {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeBacklink {
     /// Source document ID.
-    pub source_id: String,
+    pub source_id: DocumentId,
     /// Target document ID.
-    pub target_id: String,
+    pub target_id: DocumentId,
 }
 
 impl KnowledgeBacklink {
     /// Creates a backlink edge.
     #[must_use]
-    pub fn new(source_id: impl Into<String>, target_id: impl Into<String>) -> Self {
+    pub fn new(source_id: impl Into<DocumentId>, target_id: impl Into<DocumentId>) -> Self {
         Self {
             source_id: source_id.into(),
             target_id: target_id.into(),
@@ -104,27 +117,23 @@ impl KnowledgeBacklink {
     }
 }
 
-/// Normalized agenda item.
+/// Raw agenda DTO preserving configured date text for diagnostics and recovery.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KnowledgeAgendaItem {
+pub struct RawKnowledgeAgendaItem {
     /// Owning document ID.
-    pub document_id: String,
+    pub document_id: DocumentId,
     /// Item title.
     pub title: String,
-    /// Inclusive start date in `YYYY-MM-DD` form.
+    /// Unvalidated inclusive start date text.
     pub start: String,
-    /// Optional inclusive end date in `YYYY-MM-DD` form.
+    /// Unvalidated optional inclusive end date text.
     pub end: Option<String>,
 }
 
-impl KnowledgeAgendaItem {
-    /// Creates an agenda item.
+impl RawKnowledgeAgendaItem {
+    /// Creates a raw agenda DTO without accepting it into operational state.
     #[must_use]
-    pub fn new(
-        document_id: impl Into<String>,
-        title: impl Into<String>,
-        start: impl Into<String>,
-    ) -> Self {
+    pub fn new(document_id: impl Into<DocumentId>, title: impl Into<String>, start: impl Into<String>) -> Self {
         Self {
             document_id: document_id.into(),
             title: title.into(),
@@ -133,13 +142,92 @@ impl KnowledgeAgendaItem {
         }
     }
 
-    /// Sets an end date.
+    /// Sets unvalidated end-date text.
     #[must_use]
     pub fn with_end(mut self, end: impl Into<String>) -> Self {
         self.end = Some(end.into());
         self
     }
+
+    /// Atomically validates the complete raw record.
+    pub fn validate(&self) -> Result<KnowledgeAgendaItem, KnowledgeAgendaDateError> {
+        let start = crate::caldate::CalDate::parse(&self.start)
+            .map_err(|source| KnowledgeAgendaDateError::InvalidDate { field: "start", source })?;
+        let end = self
+            .end
+            .as_deref()
+            .map(crate::caldate::CalDate::parse)
+            .transpose()
+            .map_err(|source| KnowledgeAgendaDateError::InvalidDate { field: "end", source })?;
+        KnowledgeAgendaItem::new(self.document_id.clone(), self.title.clone(), start).with_optional_end(end)
+    }
 }
+
+/// Validated normalized agenda item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeAgendaItem {
+    /// Owning document ID.
+    pub document_id: DocumentId,
+    /// Item title.
+    pub title: String,
+    /// Inclusive canonical start date.
+    pub start: crate::caldate::CalDate,
+    /// Optional inclusive canonical end date.
+    pub end: Option<crate::caldate::CalDate>,
+}
+
+impl KnowledgeAgendaItem {
+    /// Creates an agenda item with one validated date.
+    #[must_use]
+    pub fn new(document_id: impl Into<DocumentId>, title: impl Into<String>, start: crate::caldate::CalDate) -> Self {
+        Self {
+            document_id: document_id.into(),
+            title: title.into(),
+            start,
+            end: None,
+        }
+    }
+
+    /// Sets an ordered inclusive end date.
+    pub fn with_end(self, end: crate::caldate::CalDate) -> Result<Self, KnowledgeAgendaDateError> {
+        self.with_optional_end(Some(end))
+    }
+
+    fn with_optional_end(mut self, end: Option<crate::caldate::CalDate>) -> Result<Self, KnowledgeAgendaDateError> {
+        if end.is_some_and(|value| value < self.start) {
+            return Err(KnowledgeAgendaDateError::EndBeforeStart);
+        }
+        self.end = end;
+        Ok(self)
+    }
+}
+
+/// Deterministic raw agenda date conversion error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KnowledgeAgendaDateError {
+    /// One raw date field was malformed or impossible.
+    InvalidDate {
+        /// Raw field name.
+        field: &'static str,
+        /// Calendar validation error.
+        source: crate::caldate::CalendarDateError,
+    },
+    /// Inclusive end date was earlier than the start date.
+    EndBeforeStart,
+}
+
+impl std::fmt::Display for KnowledgeAgendaDateError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidDate { field, source } => {
+                write!(formatter, "invalid agenda {field}: {source}")
+            }
+            Self::EndBeforeStart => formatter.write_str("agenda end date must not precede start date"),
+        }
+    }
+}
+
+impl std::error::Error for KnowledgeAgendaDateError {}
 
 /// Application-owned capture target status.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,7 +256,7 @@ impl KnowledgeCaptureTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeSearchRecord {
     /// Owning document ID.
-    pub document_id: String,
+    pub document_id: DocumentId,
     /// Searchable title or snippet.
     pub text: String,
 }
@@ -176,7 +264,7 @@ pub struct KnowledgeSearchRecord {
 impl KnowledgeSearchRecord {
     /// Creates a search record.
     #[must_use]
-    pub fn new(document_id: impl Into<String>, text: impl Into<String>) -> Self {
+    pub fn new(document_id: impl Into<DocumentId>, text: impl Into<String>) -> Self {
         Self {
             document_id: document_id.into(),
             text: text.into(),
@@ -187,16 +275,16 @@ impl KnowledgeSearchRecord {
 /// Graph edge between knowledge records.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeGraphEdge {
-    /// Source node ID.
-    pub source_id: String,
-    /// Target node ID.
-    pub target_id: String,
+    /// Source document ID.
+    pub source_id: DocumentId,
+    /// Target document ID.
+    pub target_id: DocumentId,
 }
 
 impl KnowledgeGraphEdge {
     /// Creates a graph edge.
     #[must_use]
-    pub fn new(source_id: impl Into<String>, target_id: impl Into<String>) -> Self {
+    pub fn new(source_id: impl Into<DocumentId>, target_id: impl Into<DocumentId>) -> Self {
         Self {
             source_id: source_id.into(),
             target_id: target_id.into(),
@@ -264,11 +352,7 @@ pub struct KnowledgeIssue {
 }
 
 impl KnowledgeIssue {
-    fn new(
-        code: KnowledgeIssueCode,
-        subject: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    fn new(code: KnowledgeIssueCode, subject: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             subject: subject.into(),

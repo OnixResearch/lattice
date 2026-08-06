@@ -1,0 +1,20 @@
+term_or_path	meaning	authority	state_scope	consumer_or_evidence	next_action
+document	application semantic content and metadata	application	content lifetime	candidate fixture only	keep content/I-O outside Ratcore
+knowledge-DocumentId/KnowledgeDocument	application-supplied knowledge workflow projection	Ratcore adapter validates normalized copy	adapter snapshot	ratcore/src/adapter/core.rs	existing panel model is not editor/view authority
+view	one presentation of a document	application or renderer adapter	per-presentation	candidate fixture only	require maintained consumers before API
+pane	workspace/layout host	workspace owner	layout lifetime	workspace shell	do not equate pane close with document delete
+prompt-editor	rat-editor Vec<String> input and submission history	rat-editor	widget instance	Subwayrat only	localize Unicode fixes if requested
+outline-editor	rat-outline embeds rat-editor plus headings/folds	rat-outline	widget instance	Subwayrat only	not an independent cross-renderer consumer
+render-buffer	Ratatui cell Buffer	renderer	frame	Subwayrat render code	never use as document identity
+stream-output-buffer	terminal/process output owner	application runtime	session	terminal integration	never persist or treat as editable document by default
+workspace-content-summary	bounded replay/pane text	fixture/workspace owner	snapshot	workspace replay	not content or editing evidence
+viewport-row-anchor	Ratcore collection/window projection	pure projection	generation	viewport tests	row indices are not text positions
+Meteorite-editor	none	unowned	none	no maintained consumer	consumer gate unsatisfied
+Iced-editor	none	experimental only	none	no tabs/editor pilot	no parity claim
+Tile-ResourceId	downstream resource identity	Tile daemon	external lifecycle	pinned source inventory	nominally separate
+Tile-BufferId	downstream buffer identity	Tile daemon	external lifecycle	pinned source inventory	never map by backing integer
+Tile-ViewId	downstream per-buffer view identity	Tile daemon	external lifecycle	pinned source inventory	explicit frontend adapter only
+cursor-selection	position/range in one presentation	current widget/application	view lifetime	rat-editor terminal behavior	unit policy unresolved
+fold-narrowing	visibility state	rat-outline or application	view/document policy varies	Subwayrat only	no shared ownership decision
+decoration	diagnostic/search/link/selection/fold/annotation projection	source owner plus renderer	observed revision	private fixture	closed roles only if follow-up
+history	prompt submissions,text undo,layout undo,workspace commands,persistence	separate domain owners	domain-specific	current packages	never one global stack

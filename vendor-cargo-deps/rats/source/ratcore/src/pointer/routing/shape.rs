@@ -1,8 +1,10 @@
-/// Stable target identifier for a hit region.
-pub type PointerTargetId = String;
+semantic_string_id! {
+    /// Stable target identifier for a hit region.
+    pub struct PointerTargetId;
+}
 
-/// Stable action identifier associated with a pointer route.
-pub type PointerActionId = String;
+/// Canonical registry action identifier associated with a pointer route.
+pub type PointerActionId = crate::action_registry::ActionId;
 
 /// Integer pointer coordinate in renderer-neutral viewport space.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -38,12 +40,7 @@ impl PointerRect {
     /// Creates a rectangle.
     #[must_use]
     pub const fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
+        Self { x, y, width, height }
     }
 
     /// Returns true when the point is inside the half-open rectangle.

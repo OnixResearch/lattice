@@ -13,14 +13,12 @@ pub use rest::*;
 #[cfg(test)]
 mod tests;
 
-pub const FAMILY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("provider_projection_family");
+pub const FAMILY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("provider_projection_family");
 pub const FEATURE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("provider_projection_feature");
 pub const EVIDENCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("provider_projection_evidence");
-pub const REASON_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("provider_projection_reason");
+pub const REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("provider_projection_reason");
 pub const OPENAI_RESPONSES_LABEL: &str = "openai_responses";
 pub const OPENAI_CHAT_LABEL: &str = "openai_chat";
 pub const ANTHROPIC_MESSAGES_LABEL: &str = "anthropic_messages";

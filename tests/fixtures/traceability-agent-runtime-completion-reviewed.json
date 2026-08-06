@@ -340,7 +340,7 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
         },
         {
           "path": "tests/test_animus_agent.rs",
@@ -356,7 +356,7 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
         },
         {
           "path": "tests/test_animus_agent.rs",
@@ -372,7 +372,7 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
+          "blake3": "1e8adf64bd462484f7b86af6d4f819fe5f6219482ff2fde6eba946c2a87fd3d6"
         }
       ],
       "rationale_code": "assertions.absent-tool-adapter-fails-without-model-effect"
@@ -396,7 +396,7 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
+          "blake3": "1e8adf64bd462484f7b86af6d4f819fe5f6219482ff2fde6eba946c2a87fd3d6"
         }
       ],
       "rationale_code": "assertions.turn-ceiling-blocks-additional-dispatch"
@@ -452,11 +452,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "39244cec69e3768b230760b27111577a908c2cdf2b770636053d9c1a27cdf693"
+          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
         },
         {
           "path": "src/animus_agent/shell/tests.rs",
-          "blake3": "b76e5e38ec26d2938e8f75b2df666062d6ea0227bd2562e63b6ed3485639f299"
+          "blake3": "1e8adf64bd462484f7b86af6d4f819fe5f6219482ff2fde6eba946c2a87fd3d6"
         }
       ],
       "rationale_code": "assertions.all-nonfinal-statuses-map-to-errors"

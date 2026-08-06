@@ -45,17 +45,11 @@ impl core::fmt::Display for Error {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} supports at most {max_items} items; got {actual_items}"
-            ),
+            } => write!(formatter, "{field} supports at most {max_items} items; got {actual_items}"),
             Self::PromptTooLong {
                 max_chars,
                 actual_chars,
-            } => write!(
-                formatter,
-                "agent prompt fragments support at most {max_chars} characters; got {actual_chars}"
-            ),
+            } => write!(formatter, "agent prompt fragments support at most {max_chars} characters; got {actual_chars}"),
         }
     }
 }

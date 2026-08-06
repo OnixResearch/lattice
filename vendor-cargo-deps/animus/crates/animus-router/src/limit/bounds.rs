@@ -1,6 +1,8 @@
 #![allow(unknown_lints, path_segment_repetition)]
 
-use super::{DeadlineClass, FallbackPolicy, ZERO_COUNT};
+use super::DeadlineClass;
+use super::FallbackPolicy;
+use super::ZERO_COUNT;
 
 /// Hard execution bounds validated before host execution begins.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,11 +33,8 @@ impl Bounds {
         if draft.min_success_quorum > draft.max_candidates {
             return Err(crate::ValidationError::ImpossibleQuorum);
         }
-        let deadline =
-            DeadlineClass::parse(draft.timeout_class).map_err(crate::ValidationError::Contract)?;
-        let max_repair_attempts = draft
-            .max_repair_attempts
-            .ok_or(crate::ValidationError::UnlimitedRepair)?;
+        let deadline = DeadlineClass::parse(draft.timeout_class).map_err(crate::ValidationError::Contract)?;
+        let max_repair_attempts = draft.max_repair_attempts.ok_or(crate::ValidationError::UnlimitedRepair)?;
 
         Ok(Self {
             max_candidates: draft.max_candidates,
@@ -44,8 +43,7 @@ impl Bounds {
             deadline,
             max_synthesis_attempts: draft.max_synthesis_attempts,
             max_repair_attempts,
-            fallback_policy: FallbackPolicy::parse(draft.fallback_policy)
-                .map_err(crate::ValidationError::Contract)?,
+            fallback_policy: FallbackPolicy::parse(draft.fallback_policy).map_err(crate::ValidationError::Contract)?,
         })
     }
 

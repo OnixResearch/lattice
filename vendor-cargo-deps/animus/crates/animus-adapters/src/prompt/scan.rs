@@ -1,15 +1,31 @@
-use super::base::{
-    CURRENT_DIR_PREFIX, DIFF_PREFIX, EMPTY_HASH_INPUT, FTP_PREFIX, HOME_DIR_PREFIX, HTTP_PREFIX,
-    HTTPS_PREFIX, IMAGE_PREFIX, LOCAL_RANGE_SEPARATOR, MALFORMED_RANGE_REASON, PARENT_DIR_SEGMENT,
-    PATH_ESCAPE_REASON, PATH_SEPARATOR, RANGE_SPAN_SEPARATOR, REFERENCE_SIGIL,
-    UNSUPPORTED_KIND_REASON, URL_CREDENTIAL_REASON, URL_LABEL_PREFIX, WINDOWS_PATH_SEPARATOR,
-    hash_text,
-};
-use super::data::{
-    ContextLineRange, ContextReference, ContextReferenceError, ContextReferenceKind,
-    ContextRenderMode, ContextSourceTrust,
-};
 use alloc::string::ToString;
+
+use super::base::CURRENT_DIR_PREFIX;
+use super::base::DIFF_PREFIX;
+use super::base::EMPTY_HASH_INPUT;
+use super::base::FTP_PREFIX;
+use super::base::HOME_DIR_PREFIX;
+use super::base::HTTP_PREFIX;
+use super::base::HTTPS_PREFIX;
+use super::base::IMAGE_PREFIX;
+use super::base::LOCAL_RANGE_SEPARATOR;
+use super::base::MALFORMED_RANGE_REASON;
+use super::base::PARENT_DIR_SEGMENT;
+use super::base::PATH_ESCAPE_REASON;
+use super::base::PATH_SEPARATOR;
+use super::base::RANGE_SPAN_SEPARATOR;
+use super::base::REFERENCE_SIGIL;
+use super::base::UNSUPPORTED_KIND_REASON;
+use super::base::URL_CREDENTIAL_REASON;
+use super::base::URL_LABEL_PREFIX;
+use super::base::WINDOWS_PATH_SEPARATOR;
+use super::base::hash_text;
+use super::data::ContextLineRange;
+use super::data::ContextReference;
+use super::data::ContextReferenceError;
+use super::data::ContextReferenceKind;
+use super::data::ContextRenderMode;
+use super::data::ContextSourceTrust;
 
 /// Parses a raw prompt context reference into a typed DTO.
 ///
@@ -20,10 +36,7 @@ use alloc::string::ToString;
 /// a malformed line range.
 pub fn parse_context_reference(raw: &str) -> Result<ContextReference, ContextReferenceError> {
     let trimmed = raw.trim();
-    let body = trimmed
-        .strip_prefix(REFERENCE_SIGIL)
-        .ok_or(ContextReferenceError::MissingSigil)?
-        .trim();
+    let body = trimmed.strip_prefix(REFERENCE_SIGIL).ok_or(ContextReferenceError::MissingSigil)?.trim();
     if body.is_empty() {
         return Err(ContextReferenceError::EmptyReference);
     }
@@ -39,13 +52,8 @@ struct BodyParseInput<'a> {
     body: &'a str,
 }
 
-fn parse_context_body(
-    input: BodyParseInput<'_>,
-) -> Result<ContextReference, ContextReferenceError> {
-    assert!(
-        !input.raw_label.is_empty(),
-        "raw label is validated by parser"
-    );
+fn parse_context_body(input: BodyParseInput<'_>) -> Result<ContextReference, ContextReferenceError> {
+    assert!(!input.raw_label.is_empty(), "raw label is validated by parser");
     assert!(!input.body.is_empty(), "body is validated by parser");
     if input.body.starts_with(HTTP_PREFIX) || input.body.starts_with(HTTPS_PREFIX) {
         return parse_url_reference(TargetParseInput {
@@ -83,23 +91,19 @@ struct TargetParseInput<'a> {
     target: &'a str,
 }
 
-fn parse_url_reference(
-    input: TargetParseInput<'_>,
-) -> Result<ContextReference, ContextReferenceError> {
+fn parse_url_reference(input: TargetParseInput<'_>) -> Result<ContextReference, ContextReferenceError> {
     reject_url_credentials(input.target)?;
     let hash = hash_text(input.target);
     let safe_target_label = alloc::format!("{URL_LABEL_PREFIX}{}", hash.as_str());
-    Ok(ContextReference::new(
-        super::data::forms::ContextReferenceInput {
-            raw_label: input.raw_label,
-            normalized_target: safe_target_label.clone(),
-            safe_target_label,
-            kind: ContextReferenceKind::Url,
-            range: None,
-            render_mode: ContextRenderMode::Text,
-            source_trust: ContextSourceTrust::UserSupplied,
-        },
-    ))
+    Ok(ContextReference::new(super::data::forms::ContextReferenceInput {
+        raw_label: input.raw_label,
+        normalized_target: safe_target_label.clone(),
+        safe_target_label,
+        kind: ContextReferenceKind::Url,
+        range: None,
+        render_mode: ContextRenderMode::Text,
+        source_trust: ContextSourceTrust::UserSupplied,
+    }))
 }
 
 #[derive(Clone, Copy)]
@@ -110,30 +114,21 @@ struct PrefixedParseInput<'a> {
     render_mode: ContextRenderMode,
 }
 
-fn parse_prefixed_reference(
-    input: PrefixedParseInput<'_>,
-) -> Result<ContextReference, ContextReferenceError> {
+fn parse_prefixed_reference(input: PrefixedParseInput<'_>) -> Result<ContextReference, ContextReferenceError> {
     let normalized_target = normalize_local_target(input.target)?;
-    Ok(ContextReference::new(
-        super::data::forms::ContextReferenceInput {
-            raw_label: input.raw_label,
-            safe_target_label: safe_label_for_local(input.kind, normalized_target.as_str()),
-            normalized_target,
-            kind: input.kind,
-            range: None,
-            render_mode: input.render_mode,
-            source_trust: ContextSourceTrust::UserSupplied,
-        },
-    ))
+    Ok(ContextReference::new(super::data::forms::ContextReferenceInput {
+        raw_label: input.raw_label,
+        safe_target_label: safe_label_for_local(input.kind, normalized_target.as_str()),
+        normalized_target,
+        kind: input.kind,
+        range: None,
+        render_mode: input.render_mode,
+        source_trust: ContextSourceTrust::UserSupplied,
+    }))
 }
 
-fn parse_local_reference(
-    input: BodyParseInput<'_>,
-) -> Result<ContextReference, ContextReferenceError> {
-    assert!(
-        !input.raw_label.is_empty(),
-        "raw label is validated by parser"
-    );
+fn parse_local_reference(input: BodyParseInput<'_>) -> Result<ContextReference, ContextReferenceError> {
+    assert!(!input.raw_label.is_empty(), "raw label is validated by parser");
     assert!(!input.body.is_empty(), "body is validated by parser");
     let (target, range) = split_target_range(input.body)?;
     let kind = if target.ends_with(PATH_SEPARATOR) {
@@ -147,30 +142,27 @@ fn parse_local_reference(
         ContextRenderMode::Text
     };
     let normalized_target = normalize_local_target(target)?;
-    Ok(ContextReference::new(
-        super::data::forms::ContextReferenceInput {
-            raw_label: input.raw_label,
-            safe_target_label: safe_label_for_local(kind, normalized_target.as_str()),
-            normalized_target,
-            kind,
-            range,
-            render_mode,
-            source_trust: ContextSourceTrust::UserSupplied,
-        },
-    ))
+    Ok(ContextReference::new(super::data::forms::ContextReferenceInput {
+        raw_label: input.raw_label,
+        safe_target_label: safe_label_for_local(kind, normalized_target.as_str()),
+        normalized_target,
+        kind,
+        range,
+        render_mode,
+        source_trust: ContextSourceTrust::UserSupplied,
+    }))
 }
 
-fn split_target_range(
-    body: &str,
-) -> Result<(&str, Option<ContextLineRange>), ContextReferenceError> {
+fn split_target_range(body: &str) -> Result<(&str, Option<ContextLineRange>), ContextReferenceError> {
     let Some(separator_index) = body.rfind(LOCAL_RANGE_SEPARATOR) else {
         return Ok((body, None));
     };
-    let after_separator = separator_index
-        .checked_add(LOCAL_RANGE_SEPARATOR.len_utf8())
-        .ok_or(ContextReferenceError::MalformedRange {
-            reason: MALFORMED_RANGE_REASON,
-        })?;
+    let after_separator =
+        separator_index
+            .checked_add(LOCAL_RANGE_SEPARATOR.len_utf8())
+            .ok_or(ContextReferenceError::MalformedRange {
+                reason: MALFORMED_RANGE_REASON,
+            })?;
     let target = &body[..separator_index];
     let range_text = &body[after_separator..];
     if target.is_empty() || range_text.is_empty() {
@@ -187,15 +179,13 @@ fn parse_line_range(text: &str) -> Result<ContextLineRange, ContextReferenceErro
         let start = parse_line_number(text)?;
         return ContextLineRange::new(start, Some(start));
     };
-    assert!(
-        separator_index < text.len(),
-        "range separator index stays within range text"
-    );
-    let after_separator = separator_index
-        .checked_add(RANGE_SPAN_SEPARATOR.len_utf8())
-        .ok_or(ContextReferenceError::MalformedRange {
-            reason: MALFORMED_RANGE_REASON,
-        })?;
+    assert!(separator_index < text.len(), "range separator index stays within range text");
+    let after_separator =
+        separator_index
+            .checked_add(RANGE_SPAN_SEPARATOR.len_utf8())
+            .ok_or(ContextReferenceError::MalformedRange {
+                reason: MALFORMED_RANGE_REASON,
+            })?;
     let start_text = &text[..separator_index];
     let end_text = &text[after_separator..];
     let start_line = parse_line_number(start_text)?;
@@ -213,10 +203,9 @@ fn parse_line_number(text: &str) -> Result<u32, ContextReferenceError> {
             reason: MALFORMED_RANGE_REASON,
         });
     }
-    text.parse::<u32>()
-        .map_err(|_error| ContextReferenceError::MalformedRange {
-            reason: MALFORMED_RANGE_REASON,
-        })
+    text.parse::<u32>().map_err(|_error| ContextReferenceError::MalformedRange {
+        reason: MALFORMED_RANGE_REASON,
+    })
 }
 
 fn normalize_local_target(target: &str) -> Result<alloc::string::String, ContextReferenceError> {
@@ -240,9 +229,7 @@ fn is_path_escape(target: &str) -> bool {
     target.starts_with(PATH_SEPARATOR)
         || target.starts_with(WINDOWS_PATH_SEPARATOR)
         || target.starts_with(HOME_DIR_PREFIX)
-        || target
-            .split(is_path_separator)
-            .any(|segment| segment == PARENT_DIR_SEGMENT)
+        || target.split(is_path_separator).any(|segment| segment == PARENT_DIR_SEGMENT)
 }
 
 fn is_path_separator(character: char) -> bool {
@@ -260,14 +247,8 @@ fn reject_url_credentials(target: &str) -> Result<(), ContextReferenceError> {
 }
 
 fn url_authority(target: &str) -> &str {
-    let after_scheme = target
-        .strip_prefix(HTTP_PREFIX)
-        .or_else(|| target.strip_prefix(HTTPS_PREFIX))
-        .unwrap_or(target);
-    after_scheme
-        .split(PATH_SEPARATOR)
-        .next()
-        .unwrap_or(EMPTY_HASH_INPUT)
+    let after_scheme = target.strip_prefix(HTTP_PREFIX).or_else(|| target.strip_prefix(HTTPS_PREFIX)).unwrap_or(target);
+    after_scheme.split(PATH_SEPARATOR).next().unwrap_or(EMPTY_HASH_INPUT)
 }
 
 fn safe_label_for_local(kind: ContextReferenceKind, target: &str) -> alloc::string::String {

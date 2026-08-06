@@ -6,9 +6,14 @@
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
 
 const DEFAULT_DIALOG_PERCENT: u16 = 50;
 const MAX_PERCENT: u16 = 100;
@@ -138,9 +143,7 @@ impl DialogModel {
 
     /// Activate the focused button, returning its index and label.
     pub fn activate(&self) -> Option<(usize, String)> {
-        self.buttons
-            .get(self.focused_button)
-            .map(|label| (self.focused_button, label.clone()))
+        self.buttons.get(self.focused_button).map(|label| (self.focused_button, label.clone()))
     }
 
     fn clamp_focus(&mut self) {
@@ -174,13 +177,9 @@ impl Default for DialogStyle {
         Self {
             background: Style::default().bg(Color::Black),
             border: Style::default().fg(Color::Gray),
-            title: Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            title: Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
             button: Style::default().fg(Color::White),
-            focused_button: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            focused_button: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             dim: Style::default().bg(Color::DarkGray),
         }
     }
@@ -244,22 +243,12 @@ pub fn compute_dialog_layout(viewport: Rect, model: &DialogModel) -> DialogLayou
     }
 
     let width = resolve_dialog_axis(model.size, viewport.width, Axis::Width).min(viewport.width);
-    let height =
-        resolve_dialog_axis(model.size, viewport.height, Axis::Height).min(viewport.height);
-    let x = viewport
-        .x
-        .saturating_add(viewport.width.saturating_sub(width) / 2);
-    let y = viewport
-        .y
-        .saturating_add(viewport.height.saturating_sub(height) / 2);
+    let height = resolve_dialog_axis(model.size, viewport.height, Axis::Height).min(viewport.height);
+    let x = viewport.x.saturating_add(viewport.width.saturating_sub(width) / 2);
+    let y = viewport.y.saturating_add(viewport.height.saturating_sub(height) / 2);
     let outer = Rect::new(x, y, width, height);
     let inner = Block::default().borders(Borders::ALL).inner(outer);
-    let title = Rect::new(
-        inner.x,
-        inner.y,
-        inner.width,
-        TITLE_ROW_HEIGHT.min(inner.height),
-    );
+    let title = Rect::new(inner.x, inner.y, inner.width, TITLE_ROW_HEIGHT.min(inner.height));
     let buttons = if inner.height == 0 {
         Rect::new(inner.x, inner.y, inner.width, 0)
     } else {
@@ -303,9 +292,7 @@ pub fn render_dialog_frame(
     frame.render_widget(Clear, layout.outer);
     fill_area(frame.buffer_mut(), layout.outer, style.background);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(style.border);
+    let block = Block::default().borders(Borders::ALL).border_style(style.border);
     frame.render_widget(block, layout.outer);
     render_title_row(frame.buffer_mut(), layout.title, model, style);
     render_button_row(frame.buffer_mut(), layout.buttons, model, style);
@@ -340,10 +327,7 @@ fn render_title_row(buffer: &mut Buffer, area: Rect, model: &DialogModel, style:
     if area.width == 0 || area.height == 0 || model.title.is_empty() {
         return;
     }
-    let line = Line::from(Span::styled(
-        model.title.clone(),
-        style.title.patch(style.background),
-    ));
+    let line = Line::from(Span::styled(model.title.clone(), style.title.patch(style.background)));
     buffer.set_line(area.x, area.y, &line, area.width);
 }
 
@@ -355,9 +339,7 @@ fn render_button_row(buffer: &mut Buffer, area: Rect, model: &DialogModel, style
     let spans = button_spans(model, style);
     let line = Line::from(spans);
     let line_width = usize_to_u16(line.width()).min(area.width);
-    let x = area
-        .x
-        .saturating_add(area.width.saturating_sub(line_width) / 2);
+    let x = area.x.saturating_add(area.width.saturating_sub(line_width) / 2);
     buffer.set_line(x, area.y, &line, line_width);
 }
 
@@ -404,9 +386,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const TEST_BORDER_SIZE: u16 = 2;
     const VIEWPORT_X: u16 = 0;
@@ -434,10 +417,7 @@ mod tests {
 
         let layout = compute_dialog_layout(viewport(), &model);
 
-        assert_eq!(
-            layout.outer,
-            Rect::new(CENTERED_X, CENTERED_Y, FIXED_WIDTH, FIXED_HEIGHT)
-        );
+        assert_eq!(layout.outer, Rect::new(CENTERED_X, CENTERED_Y, FIXED_WIDTH, FIXED_HEIGHT));
     }
 
     #[test]
@@ -446,18 +426,9 @@ mod tests {
 
         let layout = compute_dialog_layout(viewport(), &model);
 
-        assert_eq!(
-            layout.title,
-            Rect::new(INNER_X, TITLE_Y, CONTENT_WIDTH, TITLE_ROW_HEIGHT)
-        );
-        assert_eq!(
-            layout.content,
-            Rect::new(INNER_X, CONTENT_Y, CONTENT_WIDTH, CONTENT_HEIGHT)
-        );
-        assert_eq!(
-            layout.buttons,
-            Rect::new(INNER_X, BUTTON_ROW_Y, CONTENT_WIDTH, BUTTON_ROW_HEIGHT)
-        );
+        assert_eq!(layout.title, Rect::new(INNER_X, TITLE_Y, CONTENT_WIDTH, TITLE_ROW_HEIGHT));
+        assert_eq!(layout.content, Rect::new(INNER_X, CONTENT_Y, CONTENT_WIDTH, CONTENT_HEIGHT));
+        assert_eq!(layout.buttons, Rect::new(INNER_X, BUTTON_ROW_Y, CONTENT_WIDTH, BUTTON_ROW_HEIGHT));
     }
 
     #[test]
@@ -467,10 +438,7 @@ mod tests {
         assert_eq!(model.move_left(), Some(FIRST_BUTTON_INDEX));
         assert_eq!(model.move_right(), Some(SECOND_BUTTON_INDEX));
         assert_eq!(model.move_right(), Some(SECOND_BUTTON_INDEX));
-        assert_eq!(
-            model.activate(),
-            Some((SECOND_BUTTON_INDEX, "Cancel".to_string()))
-        );
+        assert_eq!(model.activate(), Some((SECOND_BUTTON_INDEX, "Cancel".to_string())));
     }
 
     #[test]
@@ -505,10 +473,7 @@ mod tests {
     #[test]
     fn zero_sized_viewport_returns_empty_layout() {
         let model = sample_model();
-        let layout = compute_dialog_layout(
-            Rect::new(VIEWPORT_X, VIEWPORT_Y, 0, VIEWPORT_HEIGHT),
-            &model,
-        );
+        let layout = compute_dialog_layout(Rect::new(VIEWPORT_X, VIEWPORT_Y, 0, VIEWPORT_HEIGHT), &model);
 
         assert_eq!(layout, DialogLayout::default());
     }

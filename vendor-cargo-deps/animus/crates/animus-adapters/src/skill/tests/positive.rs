@@ -51,9 +51,7 @@ fn explicit_load_includes_only_selected_trusted_body() {
     });
 
     assert_eq!(context.catalog().summaries().len(), EXPECTED_TWO_ITEMS);
-    let selected = context
-        .selected_body()
-        .expect("selected trusted body should load");
+    let selected = context.selected_body().expect("selected trusted body should load");
     assert_eq!(selected.name(), SECOND_NAME);
     assert_eq!(selected.content_identity().as_str(), SECOND_HASH);
     assert_eq!(selected.body(), SELECTED_BODY);
@@ -62,8 +60,7 @@ fn explicit_load_includes_only_selected_trusted_body() {
 
 #[test]
 fn non_hermes_store_uses_same_descriptor_boundary() {
-    let manifest = Descriptor::validate(&database_draft())
-        .expect("database-backed descriptor should validate as data");
+    let manifest = Descriptor::validate(&database_draft()).expect("database-backed descriptor should validate as data");
     let context = build_context(Request {
         manifests: &[manifest],
         loaded_bodies: &[],
@@ -71,14 +68,8 @@ fn non_hermes_store_uses_same_descriptor_boundary() {
     });
 
     assert_eq!(context.catalog().summaries().len(), EXPECTED_SINGLE_ITEM);
-    assert_eq!(
-        context.catalog().summaries()[0].category(),
-        DATABASE_CATEGORY
-    );
-    assert_eq!(
-        context.catalog().summaries()[0].provenance(),
-        DATABASE_PROVENANCE
-    );
+    assert_eq!(context.catalog().summaries()[0].category(), DATABASE_CATEGORY);
+    assert_eq!(context.catalog().summaries()[0].provenance(), DATABASE_PROVENANCE);
     assert!(context.selected_body().is_none());
     assert!(PROHIBITED_MANIFEST_EFFECTS.contains(&"home-directory scan"));
     assert!(PROHIBITED_MANIFEST_EFFECTS.contains(&"skill body file read"));

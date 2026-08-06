@@ -58,11 +58,7 @@ pub fn build_registry(actions: Vec<ActionDescriptor>) -> ActionRegistryBuild {
 
 impl ActionShortcut {
     fn canonical_key(&self) -> ShortcutConflictKey {
-        let mut modifiers = self
-            .modifiers
-            .iter()
-            .map(|modifier| modifier.trim().to_lowercase())
-            .collect::<Vec<_>>();
+        let mut modifiers = self.modifiers.iter().map(|modifier| modifier.trim().to_lowercase()).collect::<Vec<_>>();
         modifiers.sort();
         ShortcutConflictKey {
             scope: self.scope.trim().to_lowercase(),
@@ -72,11 +68,11 @@ impl ActionShortcut {
     }
 }
 
-fn duplicate_ids(actions: &[ActionDescriptor]) -> std::collections::BTreeSet<String> {
+fn duplicate_ids(actions: &[ActionDescriptor]) -> std::collections::BTreeSet<ActionId> {
     let mut seen = std::collections::BTreeSet::new();
     let mut duplicates = std::collections::BTreeSet::new();
     for action in actions {
-        let id = action.id.trim().to_string();
+        let id = ActionId::new(action.id.as_str().trim());
         if id.is_empty() {
             continue;
         }
@@ -88,12 +84,12 @@ fn duplicate_ids(actions: &[ActionDescriptor]) -> std::collections::BTreeSet<Str
 }
 
 fn validate_descriptor(action: &ActionDescriptor) -> Vec<ActionRegistryIssue> {
-    debug_assert!(action.id.trim().len() <= action.id.len());
+    debug_assert!(action.id.as_str().trim().len() <= action.id.as_str().len());
     debug_assert!(action.label.trim().len() <= action.label.len());
     let mut issues = Vec::new();
     push_if_empty(
         &mut issues,
-        action.id.trim(),
+        action.id.as_str().trim(),
         ActionRegistryIssue::field_issue(
             ActionRegistryIssueCode::EmptyId,
             action.id.clone(),
@@ -137,10 +133,7 @@ fn validate_descriptor(action: &ActionDescriptor) -> Vec<ActionRegistryIssue> {
     issues
 }
 
-fn validate_shortcut(
-    action: &ActionDescriptor,
-    shortcut: &ActionShortcut,
-) -> Vec<ActionRegistryIssue> {
+fn validate_shortcut(action: &ActionDescriptor, shortcut: &ActionShortcut) -> Vec<ActionRegistryIssue> {
     let issue_bound = shortcut.modifiers.len().saturating_add(2);
     let mut issues = Vec::with_capacity(issue_bound);
     debug_assert!(issues.capacity() >= issue_bound);
@@ -180,11 +173,7 @@ fn validate_shortcut(
     issues
 }
 
-fn push_if_empty(
-    issues: &mut impl Extend<ActionRegistryIssue>,
-    value: &str,
-    issue: ActionRegistryIssue,
-) {
+fn push_if_empty(issues: &mut impl Extend<ActionRegistryIssue>, value: &str, issue: ActionRegistryIssue) {
     if value.is_empty() {
         issues.extend(std::iter::once(issue));
     }
@@ -192,11 +181,8 @@ fn push_if_empty(
 
 fn shortcut_conflicts(
     actions: &[ActionDescriptor],
-) -> (
-    Vec<ActionRegistryIssue>,
-    std::collections::BTreeMap<String, String>,
-) {
-    let mut by_shortcut: std::collections::BTreeMap<ShortcutConflictKey, Vec<String>> =
+) -> (Vec<ActionRegistryIssue>, std::collections::BTreeMap<ActionId, String>) {
+    let mut by_shortcut: std::collections::BTreeMap<ShortcutConflictKey, Vec<ActionId>> =
         std::collections::BTreeMap::new();
     for action in actions {
         if !action.enablement.is_enabled() {
@@ -205,23 +191,14 @@ fn shortcut_conflicts(
         let Some(shortcut) = &action.shortcut else {
             continue;
         };
-        by_shortcut
-            .entry(shortcut.canonical_key())
-            .or_default()
-            .push(action.id.clone());
+        by_shortcut.entry(shortcut.canonical_key()).or_default().push(action.id.clone());
     }
 
     debug_assert!(by_shortcut.len() <= actions.len());
-    debug_assert!(
-        by_shortcut
-            .values()
-            .all(|action_ids| !action_ids.is_empty())
-    );
+    debug_assert!(by_shortcut.values().all(|action_ids| !action_ids.is_empty()));
 
-    let conflicts: Vec<(ShortcutConflictKey, Vec<String>)> = by_shortcut
-        .into_iter()
-        .filter(|(_shortcut, action_ids)| action_ids.len() > 1)
-        .collect();
+    let conflicts: Vec<(ShortcutConflictKey, Vec<ActionId>)> =
+        by_shortcut.into_iter().filter(|(_shortcut, action_ids)| action_ids.len() > 1).collect();
     let blocked = conflicts
         .iter()
         .flat_map(|(_shortcut, action_ids)| action_ids.iter())
@@ -234,10 +211,7 @@ fn shortcut_conflicts(
         issues.push(ActionRegistryIssue::multi_action_issue(
             ActionRegistryIssueCode::ShortcutConflict,
             action_ids,
-            format!(
-                "shortcut conflict in scope `{}` for `{}`",
-                shortcut.scope, shortcut.key
-            ),
+            format!("shortcut conflict in scope `{}` for `{}`", shortcut.scope, shortcut.key),
         ));
     }
     (issues, blocked)

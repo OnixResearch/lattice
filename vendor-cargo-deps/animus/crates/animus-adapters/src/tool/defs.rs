@@ -64,28 +64,13 @@ impl Definition {
             name: super::required_text(super::NAME_FIELD, draft.name)?,
             label: super::required_text(super::LABEL_FIELD, draft.label)?,
             description: super::required_text(super::DESCRIPTION_FIELD, draft.description)?,
-            parameter_schema_identity: super::required_text(
-                super::SCHEMA_FIELD,
-                draft.parameter_schema_identity,
-            )?,
-            prompt_snippet: super::required_text(
-                super::PROMPT_SNIPPET_FIELD,
-                draft.prompt_snippet,
-            )?,
-            prompt_guidelines: super::required_texts(
-                super::PROMPT_GUIDELINE_FIELD,
-                draft.prompt_guidelines,
-            )?,
+            parameter_schema_identity: super::required_text(super::SCHEMA_FIELD, draft.parameter_schema_identity)?,
+            prompt_snippet: super::required_text(super::PROMPT_SNIPPET_FIELD, draft.prompt_snippet)?,
+            prompt_guidelines: super::required_texts(super::PROMPT_GUIDELINE_FIELD, draft.prompt_guidelines)?,
             source_identity: super::required_text(super::SOURCE_FIELD, draft.source_identity)?,
             provenance: super::required_text(super::PROVENANCE_FIELD, draft.provenance)?,
-            capability_labels: super::normalized_label_set(
-                super::CAPABILITY_FIELD,
-                draft.capability_labels,
-            )?,
-            result_metadata_shape: super::required_text(
-                super::RESULT_SHAPE_FIELD,
-                draft.result_metadata_shape,
-            )?,
+            capability_labels: super::normalized_label_set(super::CAPABILITY_FIELD, draft.capability_labels)?,
+            result_metadata_shape: super::required_text(super::RESULT_SHAPE_FIELD, draft.result_metadata_shape)?,
             status: draft.status,
         })
     }
@@ -206,10 +191,7 @@ pub fn build_prompt_context(definitions: &[Definition]) -> alloc::vec::Vec<Promp
         "tool definitions are bounded before prompt assembly"
     );
     let entry_count = prompt_context_entry_count(definitions);
-    assert!(
-        entry_count <= max_prompt_context_entries(),
-        "prompt context capacity is bounded"
-    );
+    assert!(entry_count <= max_prompt_context_entries(), "prompt context capacity is bounded");
     let mut entries = super::Collection::with_capacity(entry_count);
     for definition in definitions {
         push_active_prompt_entries(&mut entries, definition);
@@ -232,10 +214,7 @@ const fn max_prompt_context_entries() -> usize {
     super::MAX_TOOL_METADATA_ITEMS.saturating_mul(super::MAX_TOOL_METADATA_ITEMS.saturating_add(1))
 }
 
-fn push_active_prompt_entries(
-    entries: &mut super::Collection<PromptContextEntry>,
-    definition: &Definition,
-) {
+fn push_active_prompt_entries(entries: &mut super::Collection<PromptContextEntry>, definition: &Definition) {
     if definition.status() != DefinitionStatus::Active {
         return;
     }

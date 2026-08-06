@@ -4,7 +4,8 @@ mod taxonomy;
 
 pub use identity::EntryId;
 pub use record::Entry;
-pub use taxonomy::{EntryKind, SummaryKind};
+pub use taxonomy::EntryKind;
+pub use taxonomy::SummaryKind;
 
 const TEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("ledger_text");
 const LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("ledger_label");

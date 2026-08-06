@@ -55,10 +55,7 @@ fn sufficient_first_evidence_stops() {
     })
     .expect("sufficient evidence should validate");
 
-    assert_eq!(
-        super::facts::plan(&budget, &evidence),
-        super::facts::Decision::AnswerFromEvidence
-    );
+    assert_eq!(super::facts::plan(&budget, &evidence), super::facts::Decision::AnswerFromEvidence);
 }
 
 #[test]
@@ -66,12 +63,9 @@ fn missing_required_fact_authorizes_targeted_repeat() {
     let budget = repeat_budget();
     let evidence = missing_evidence(FIRST_RETRIEVAL);
 
-    assert_eq!(
-        super::facts::plan(&budget, &evidence),
-        super::facts::Decision::TargetedRepeat {
-            missing_evidence: alloc::vec![alloc::string::String::from(MISSING_FACT)],
-        }
-    );
+    assert_eq!(super::facts::plan(&budget, &evidence), super::facts::Decision::TargetedRepeat {
+        missing_evidence: alloc::vec![alloc::string::String::from(MISSING_FACT)],
+    });
 }
 
 #[test]
@@ -79,12 +73,9 @@ fn exhausted_missing_fact_requests_smallest_input() {
     let budget = repeat_budget();
     let exhausted = missing_evidence(SECOND_RETRIEVAL);
 
-    assert_eq!(
-        super::facts::plan(&budget, &exhausted),
-        super::facts::Decision::RequestSmallestMissingInput {
-            missing_evidence: alloc::vec![alloc::string::String::from(MISSING_FACT)],
-        }
-    );
+    assert_eq!(super::facts::plan(&budget, &exhausted), super::facts::Decision::RequestSmallestMissingInput {
+        missing_evidence: alloc::vec![alloc::string::String::from(MISSING_FACT)],
+    });
 }
 
 #[test]
@@ -129,15 +120,11 @@ fn evidence_metadata_rejects_unsafe_references() {
     })
     .expect_err("unsafe reference should be rejected");
 
-    assert!(matches!(
-        error,
-        super::failure::Error::UnsafeReference { .. }
-    ));
+    assert!(matches!(error, super::failure::Error::UnsafeReference { .. }));
 }
 
 fn valid_budget() -> super::contract::Budget {
-    super::contract::Budget::validate(&super::contract::Draft::default())
-        .expect("budget should validate")
+    super::contract::Budget::validate(&super::contract::Draft::default()).expect("budget should validate")
 }
 
 fn repeat_budget() -> super::contract::Budget {

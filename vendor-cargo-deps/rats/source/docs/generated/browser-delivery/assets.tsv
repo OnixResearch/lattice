@@ -1,0 +1,4 @@
+entrypoint	bundle_role	source	revision_or_version	license	policy
+rat-ratzilla	font-system-fallback	ui-monospace/Cascadia Mono/Liberation Mono/monospace	platform-supplied	not-vendored	No font is fetched or bundled; exact glyph metrics and font availability are non-claims.
+met-showcase	javascript	DioxusLabs/components primitives/src/js/focus-trap.js	ccdb07f69383de008a0afadda0e5ab7ec14c1a9c	MIT OR Apache-2.0	Copied by the pinned dioxus-primitives Cargo dependency into the checked release bundle.
+met-showcase	font-system-fallback	browser CSS system defaults	platform-supplied	not-vendored	No font is fetched or bundled; exact glyph metrics and font availability are non-claims.

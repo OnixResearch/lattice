@@ -39,6 +39,11 @@ impl ContinuationDispatch {
 pub enum ContinuationDecision {
     /// Dispatch a shell-owned follow-up action.
     Dispatch(ContinuationDispatch),
+    /// Await host-owned completion evidence because no dispatchable work remains.
+    AwaitingCompletionEvidence {
+        /// Safe reason for awaiting evidence.
+        reason: ContinuationReason,
+    },
     /// Finish because no continuation work remains.
     Complete {
         /// Safe reason for completion.
@@ -53,12 +58,16 @@ pub enum ContinuationDecision {
     },
 }
 
+// r[impl agent_harness_runtime.authoritative_completion.continuation]
 impl ContinuationDecision {
     /// Returns the selected action class.
     #[must_use]
     pub fn action(&self) -> ContinuationAction {
         match self {
             Self::Dispatch(dispatch) => dispatch.action(),
+            Self::AwaitingCompletionEvidence { .. } => {
+                ContinuationAction::AwaitCompletionEvidence
+            }
             Self::Complete { .. } => ContinuationAction::Complete,
             Self::Cancel { .. } => ContinuationAction::Cancel,
         }
@@ -69,7 +78,9 @@ impl ContinuationDecision {
     pub fn reason(&self) -> ContinuationReason {
         match self {
             Self::Dispatch(dispatch) => dispatch.reason(),
-            Self::Complete { reason } | Self::Cancel { reason, .. } => *reason,
+            Self::AwaitingCompletionEvidence { reason }
+            | Self::Complete { reason }
+            | Self::Cancel { reason, .. } => *reason,
         }
     }
 
@@ -79,7 +90,7 @@ impl ContinuationDecision {
         match self {
             Self::Dispatch(dispatch) => Some(dispatch.work_id()),
             Self::Cancel { work_id, .. } => Some(work_id.as_str()),
-            Self::Complete { .. } => None,
+            Self::AwaitingCompletionEvidence { .. } | Self::Complete { .. } => None,
         }
     }
 

@@ -138,14 +138,8 @@ impl Descriptor {
         super::support::validate_capabilities(draft.required_capabilities)?;
         super::support::validate_body(draft.body)?;
         Ok(Self {
-            profile_id: super::support::required_text(
-                super::support::PROFILE_ID_FIELD,
-                draft.profile_id,
-            )?,
-            purpose: super::support::required_text(
-                super::support::PROFILE_PURPOSE_FIELD,
-                draft.purpose,
-            )?,
+            profile_id: super::support::required_text(super::support::PROFILE_ID_FIELD, draft.profile_id)?,
+            purpose: super::support::required_text(super::support::PROFILE_PURPOSE_FIELD, draft.purpose)?,
             action_posture: draft.action_posture,
             required_capabilities: draft.required_capabilities.to_vec(),
             source_identity: super::support::required_text(

@@ -203,12 +203,7 @@ fn horizontal_regions(area: ratatui::layout::Rect, lengths: SplitLengths) -> Spl
     let divider_x = area.x.saturating_add(lengths.first);
     SplitRegions {
         first: ratatui::layout::Rect::new(area.x, area.y, lengths.first, area.height),
-        divider: ratatui::layout::Rect::new(
-            divider_x,
-            area.y,
-            DIVIDER_THICKNESS.min(area.width),
-            area.height,
-        ),
+        divider: ratatui::layout::Rect::new(divider_x, area.y, DIVIDER_THICKNESS.min(area.width), area.height),
         second: ratatui::layout::Rect::new(
             divider_x.saturating_add(DIVIDER_THICKNESS),
             area.y,
@@ -222,12 +217,7 @@ fn vertical_regions(area: ratatui::layout::Rect, lengths: SplitLengths) -> Split
     let divider_y = area.y.saturating_add(lengths.first);
     SplitRegions {
         first: ratatui::layout::Rect::new(area.x, area.y, area.width, lengths.first),
-        divider: ratatui::layout::Rect::new(
-            area.x,
-            divider_y,
-            area.width,
-            DIVIDER_THICKNESS.min(area.height),
-        ),
+        divider: ratatui::layout::Rect::new(area.x, divider_y, area.width, DIVIDER_THICKNESS.min(area.height)),
         second: ratatui::layout::Rect::new(
             area.x,
             divider_y.saturating_add(DIVIDER_THICKNESS),
@@ -256,10 +246,7 @@ fn clamp_divider_offset(raw: u16, bounds: ClampBounds) -> u16 {
         return bounds.min_first.min(bounds.content_len);
     }
 
-    raw.clamp(
-        bounds.min_first,
-        bounds.content_len.saturating_sub(bounds.min_second),
-    )
+    raw.clamp(bounds.min_first, bounds.content_len.saturating_sub(bounds.min_second))
 }
 
 fn pane_space(total_len: u16) -> u16 {
@@ -273,16 +260,10 @@ fn primary_len(area: ratatui::layout::Rect, orientation: SplitOrientation) -> u1
     }
 }
 
-fn paint_divider(
-    buffer: &mut ratatui::buffer::Buffer,
-    divider: ratatui::layout::Rect,
-    style: &SplitPaneStyle,
-) {
+fn paint_divider(buffer: &mut ratatui::buffer::Buffer, divider: ratatui::layout::Rect, style: &SplitPaneStyle) {
     for y in divider.y..rect_bottom(divider) {
         for x in divider.x..rect_right(divider) {
-            buffer[(x, y)]
-                .set_char(style.divider_char)
-                .set_style(style.divider);
+            buffer[(x, y)].set_char(style.divider_char).set_style(style.divider);
         }
     }
 }

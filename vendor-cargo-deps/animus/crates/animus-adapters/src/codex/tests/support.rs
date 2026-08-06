@@ -51,10 +51,7 @@ pub fn request(
     })
 }
 
-pub fn report(
-    run_id: &str,
-    findings: &[DiffReviewFindingDraft<'_>],
-) -> Result<DiffReviewReport, DiffReviewError> {
+pub fn report(run_id: &str, findings: &[DiffReviewFindingDraft<'_>]) -> Result<DiffReviewReport, DiffReviewError> {
     DiffReviewReport::validate(&DiffReviewReportDraft {
         run_id,
         reviewed_source_labels: &[TARGET_LABEL],

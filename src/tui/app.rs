@@ -828,7 +828,7 @@ impl PaletteData {
             },
             FuzzyCandidate {
                 id: "history".into(),
-                text: "Run History (Ctrl-H)".into(),
+                text: "Workflow History (Ctrl-H)".into(),
                 context: None,
                 icon: Some('◷'),
             },
@@ -2085,10 +2085,10 @@ impl App {
                 continue;
             }
             if let Some(bounds) = node_bounds(&self.workflow.graph, node.id) {
-                let right = bounds.x + bounds.width as i32;
+                let right = bounds.x.get() + i32::from(bounds.width);
                 if right > max_right {
                     max_right = right;
-                    stack_y = bounds.y;
+                    stack_y = bounds.y.get();
                 }
             }
         }

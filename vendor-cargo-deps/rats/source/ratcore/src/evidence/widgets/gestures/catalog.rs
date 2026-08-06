@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 pub(super) const ACTION_CLICK_CHROME: &str = "mouse.click.chrome";
 pub(super) const ACTION_DOUBLE_COMMAND: &str = "mouse.double-click.command-palette";
@@ -107,42 +108,30 @@ fn routed(spec: ActionSpec<'_>) -> (String, super::core::PointerMouseAction) {
 fn drag_start_action() -> (String, super::core::PointerMouseAction) {
     (
         ACTION_DRAG_START_DOCKING.to_string(),
-        super::core::PointerMouseAction::route(
-            CLASS_DRAG_START,
-            SURFACE_DOCKING,
-            ROUTE_DOCKING_SPLITTER,
-        )
-        .with_behavior(super::core::PointerMouseBehavior::DragStart {
-            capture: CAPTURE_DOCKING_SPLITTER.to_string(),
-        }),
+        super::core::PointerMouseAction::route(CLASS_DRAG_START, SURFACE_DOCKING, ROUTE_DOCKING_SPLITTER)
+            .with_behavior(super::core::PointerMouseBehavior::DragStart {
+                capture: CAPTURE_DOCKING_SPLITTER.to_string(),
+            }),
     )
 }
 
 fn drag_update_action(action_id: &str) -> (String, super::core::PointerMouseAction) {
     (
         action_id.to_string(),
-        super::core::PointerMouseAction::route(
-            CLASS_DRAG_UPDATE,
-            SURFACE_DOCKING,
-            ROUTE_DOCKING_SPLITTER,
-        )
-        .with_behavior(super::core::PointerMouseBehavior::DragUpdate {
-            capture: CAPTURE_DOCKING_SPLITTER.to_string(),
-        }),
+        super::core::PointerMouseAction::route(CLASS_DRAG_UPDATE, SURFACE_DOCKING, ROUTE_DOCKING_SPLITTER)
+            .with_behavior(super::core::PointerMouseBehavior::DragUpdate {
+                capture: CAPTURE_DOCKING_SPLITTER.to_string(),
+            }),
     )
 }
 
 fn drag_release_action(action_id: &str) -> (String, super::core::PointerMouseAction) {
     (
         action_id.to_string(),
-        super::core::PointerMouseAction::route(
-            CLASS_DRAG_RELEASE,
-            SURFACE_DOCKING,
-            ROUTE_DOCKING_SPLITTER,
-        )
-        .with_behavior(super::core::PointerMouseBehavior::DragRelease {
-            capture: CAPTURE_DOCKING_SPLITTER.to_string(),
-        }),
+        super::core::PointerMouseAction::route(CLASS_DRAG_RELEASE, SURFACE_DOCKING, ROUTE_DOCKING_SPLITTER)
+            .with_behavior(super::core::PointerMouseBehavior::DragRelease {
+                capture: CAPTURE_DOCKING_SPLITTER.to_string(),
+            }),
     )
 }
 
@@ -157,28 +146,20 @@ fn cancel_action() -> (String, super::core::PointerMouseAction) {
 fn stale_capture_action() -> (String, super::core::PointerMouseAction) {
     (
         ACTION_STALE_CAPTURE.to_string(),
-        super::core::PointerMouseAction::route(
-            CLASS_DRAG_RELEASE,
-            SURFACE_DOCKING,
-            ROUTE_DOCKING_SPLITTER,
-        )
-        .with_behavior(super::core::PointerMouseBehavior::StaleCapture {
-            expected: CAPTURE_DOCKING_SPLITTER.to_string(),
-            actual: CAPTURE_STALE.to_string(),
-        }),
+        super::core::PointerMouseAction::route(CLASS_DRAG_RELEASE, SURFACE_DOCKING, ROUTE_DOCKING_SPLITTER)
+            .with_behavior(super::core::PointerMouseBehavior::StaleCapture {
+                expected: CAPTURE_DOCKING_SPLITTER.to_string(),
+                actual: CAPTURE_STALE.to_string(),
+            }),
     )
 }
 
 fn unsupported_action() -> (String, super::core::PointerMouseAction) {
     (
         ACTION_UNSUPPORTED_BACKEND.to_string(),
-        super::core::PointerMouseAction::route(
-            CLASS_UNSUPPORTED,
-            SURFACE_BACKEND,
-            ROUTE_BACKEND_UNSUPPORTED,
-        )
-        .with_behavior(super::core::PointerMouseBehavior::Unsupported {
-            diagnostic: DIAGNOSTIC_BACKEND_UNSUPPORTED.to_string(),
-        }),
+        super::core::PointerMouseAction::route(CLASS_UNSUPPORTED, SURFACE_BACKEND, ROUTE_BACKEND_UNSUPPORTED)
+            .with_behavior(super::core::PointerMouseBehavior::Unsupported {
+                diagnostic: DIAGNOSTIC_BACKEND_UNSUPPORTED.to_string(),
+            }),
     )
 }

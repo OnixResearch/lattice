@@ -223,13 +223,7 @@ impl Outcome {
 #[must_use]
 pub fn bind(binding: &Binding<'_>) -> Outcome {
     debug_assert!(!binding.input.evidence_hashes().is_empty());
-    debug_assert!(
-        binding
-            .scan_report
-            .findings()
-            .iter()
-            .all(|finding| !finding.evidence_hash().is_empty())
-    );
+    debug_assert!(binding.scan_report.findings().iter().all(|finding| !finding.evidence_hash().is_empty()));
     if !binding.permissions.authority.is_granted() {
         return make_outcome(*binding, Status::Denied, Issue::MissingAuthority);
     }
@@ -251,37 +245,22 @@ fn dispatchable_review(binding: &Binding<'_>) -> Outcome {
     if binding.scan_report.has_blocking_finding() {
         return make_outcome(*binding, Status::Denied, Issue::BlockingFinding);
     }
-    if binding
-        .advisory_reviews
-        .iter()
-        .any(super::AdvisoryReview::blocks_dispatch)
-    {
+    if binding.advisory_reviews.iter().any(super::AdvisoryReview::blocks_dispatch) {
         return make_outcome(*binding, Status::Denied, Issue::AdvisoryBlocked);
     }
     if !binding.permissions.confirmation.is_granted() {
-        return make_outcome(
-            *binding,
-            Status::RequiresConfirmation,
-            Issue::ConfirmationRequired,
-        );
+        return make_outcome(*binding, Status::RequiresConfirmation, Issue::ConfirmationRequired);
     }
     make_outcome(*binding, Status::Allowed, Issue::None)
 }
 
 fn make_outcome(binding: Binding<'_>, status: Status, issue: Issue) -> Outcome {
-    Outcome::new(Draft {
-        binding,
-        status,
-        issue,
-    })
+    Outcome::new(Draft { binding, status, issue })
 }
 
 fn outage_status(binding: &Binding<'_>) -> Option<Status> {
     let is_review_unavailable = !binding.scan_report.status().is_complete()
-        || binding
-            .advisory_reviews
-            .iter()
-            .any(super::AdvisoryReview::is_outage);
+        || binding.advisory_reviews.iter().any(super::AdvisoryReview::is_outage);
     if !is_review_unavailable {
         return None;
     }

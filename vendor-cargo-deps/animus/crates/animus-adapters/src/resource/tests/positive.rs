@@ -65,9 +65,7 @@ fn explicit_load_includes_only_selected_trusted_content() {
     });
 
     assert_eq!(context.catalog().summaries().len(), EXPECTED_TWO_ITEMS);
-    let selected = context
-        .selected_content()
-        .expect("selected trusted content should load");
+    let selected = context.selected_content().expect("selected trusted content should load");
     assert_eq!(selected.name(), SECOND_NAME);
     assert_eq!(selected.kind(), Kind::PromptTemplate);
     assert_eq!(selected.content_identity().as_str(), VALID_HASH);

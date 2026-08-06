@@ -1,8 +1,8 @@
 mod checks;
-pub use checks::{
-    WorkspaceShellRendererSnapshotIssue, WorkspaceShellRendererSnapshotIssueCode,
-    WorkspaceShellRendererSnapshotReport, validate_workspace_shell_renderer_snapshots,
-};
+pub use checks::WorkspaceShellRendererSnapshotIssue;
+pub use checks::WorkspaceShellRendererSnapshotIssueCode;
+pub use checks::WorkspaceShellRendererSnapshotReport;
+pub use checks::validate_workspace_shell_renderer_snapshots;
 
 const RENDERER_SUBWAYRAT_TUI: &str = "subwayrat-tui";
 const RENDERER_METEORITE_DOM: &str = "meteorite-dom";
@@ -138,9 +138,5 @@ fn artifact_path(input: ArtifactPathInput<'_>) -> String {
 }
 
 fn html_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }

@@ -12,14 +12,14 @@ impl FocusGraph {
             if !self.scopes.contains_key(&node.scope) {
                 return Err(FocusError::new(
                     FocusErrorCode::UnknownScope,
-                    Some(node.scope.clone()),
+                    Some(FocusErrorId::Scope(node.scope.clone())),
                     "node references unknown focus scope",
                 ));
             }
             if node.label.trim().is_empty() {
                 return Err(FocusError::new(
                     FocusErrorCode::MissingLabel,
-                    Some(node.id.clone()),
+                    Some(FocusErrorId::Node(node.id.clone())),
                     "focus node label must not be empty",
                 ));
             }
@@ -28,21 +28,21 @@ impl FocusGraph {
             let active = self.nodes.get(active_id).ok_or_else(|| {
                 FocusError::new(
                     FocusErrorCode::UnknownNode,
-                    Some(active_id.clone()),
+                    Some(FocusErrorId::Node(active_id.clone())),
                     "active focus node is missing",
                 )
             })?;
             if active.disabled {
                 return Err(FocusError::new(
                     FocusErrorCode::ActiveDisabled,
-                    Some(active_id.clone()),
+                    Some(FocusErrorId::Node(active_id.clone())),
                     "active focus node is disabled",
                 ));
             }
             if active.hidden {
                 return Err(FocusError::new(
                     FocusErrorCode::ActiveHidden,
-                    Some(active_id.clone()),
+                    Some(FocusErrorId::Node(active_id.clone())),
                     "active focus node is hidden",
                 ));
             }
@@ -52,7 +52,7 @@ impl FocusGraph {
         {
             return Err(FocusError::new(
                 FocusErrorCode::UnknownScope,
-                Some(scope_id.clone()),
+                Some(FocusErrorId::Scope(scope_id.clone())),
                 "modal focus scope is missing",
             ));
         }

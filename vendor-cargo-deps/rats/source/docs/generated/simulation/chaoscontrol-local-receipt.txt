@@ -1,0 +1,13 @@
+schema=rats.chaoscontrol-local-instrumentation.v1
+evidence_class=instrumentation-dry-run
+sdk_revision=c6d8ec98c222f1a60b86a94f3a734e0d78676ff1
+adapter=simulation.adapter.chaoscontrol-sdk-v1
+setup_complete=true
+cataloged_assertions=3
+exercised_assertions=3
+failed_assertions=0
+random_choice_calls=0
+compatibility_blockers=2
+ambient_fields_excluded=elapsed_ms,local-random
+claims=public-sdk-local-instrumentation-only
+not_claimed=deterministic-replay,vm-execution,snapshot-reproduction,fault-application

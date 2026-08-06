@@ -54,11 +54,7 @@ pub struct MessageQueueError {
 }
 
 impl MessageQueueError {
-    pub(crate) fn new(
-        kind: MessageQueueErrorKind,
-        field: &'static str,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub(crate) fn new(kind: MessageQueueErrorKind, field: &'static str, detail: impl Into<String>) -> Self {
         Self {
             kind,
             field,

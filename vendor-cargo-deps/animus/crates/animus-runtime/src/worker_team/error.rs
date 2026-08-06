@@ -67,11 +67,7 @@ impl DelegationFailure {
 
 impl std::fmt::Display for DelegationFailure {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "worker team field `{}` failed ({:?}): {}",
-            self.field, self.kind, self.reason
-        )
+        write!(formatter, "worker team field `{}` failed ({:?}): {}", self.field, self.kind, self.reason)
     }
 }
 

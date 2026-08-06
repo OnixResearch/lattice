@@ -1,0 +1,40 @@
+{
+  "admitted_child_profiles": [
+    "focused-child"
+  ],
+  "admitted_operations": [
+    "file_read",
+    "file_edit",
+    "shell",
+    "tool",
+    "subagent",
+    "context_read",
+    "kernel_clear"
+  ],
+  "bounds": {
+    "max_allocation_bytes": 4194304,
+    "max_bindings": 64,
+    "max_child_depth": 2,
+    "max_child_fan_out": 4,
+    "max_child_result_chars": 16384,
+    "max_child_tokens": 32000,
+    "max_child_wall_time_ms": 300000,
+    "max_definitions": 128,
+    "max_environment_chars": 65536,
+    "max_evaluation_fuel": 100000,
+    "max_host_request_chars": 16384,
+    "max_recursion_depth": 64,
+    "max_source_chars": 4096
+  },
+  "cohort": "prime-agent-rlm-2026-08-06",
+  "cohort_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4",
+  "non_claims": [
+    "security_sandboxing",
+    "model_correctness",
+    "task_completion",
+    "production_readiness",
+    "release_eligibility"
+  ],
+  "profile": "model-facing-steel",
+  "schema": "animus.rlm-kernel-policy.v1"
+}

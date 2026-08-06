@@ -1,7 +1,5 @@
-pub(super) const VALID_HASH: &str =
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-pub(super) const OTHER_VALID_HASH: &str =
-    "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+pub(super) const VALID_HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+pub(super) const OTHER_VALID_HASH: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 pub(super) const IMAGE_LABEL: &str = "screenshot-redacted";
 pub(super) const TEXT_BEFORE: &str = "describe this";
 pub(super) const TEXT_AFTER: &str = "focus on errors";
@@ -106,12 +104,10 @@ pub(super) fn text_only_capabilities() -> super::super::ModelInputCapabilities {
 }
 
 pub(super) fn native_policy() -> super::super::ProviderSerializationPolicy {
-    super::super::ProviderSerializationPolicy::from_draft(
-        super::super::ProviderSerializationPolicyDraft {
-            provider_label: PROVIDER_LABEL,
-            mode: super::super::ProviderSerializationMode::NativeFixture,
-        },
-    )
+    super::super::ProviderSerializationPolicy::from_draft(super::super::ProviderSerializationPolicyDraft {
+        provider_label: PROVIDER_LABEL,
+        mode: super::super::ProviderSerializationMode::NativeFixture,
+    })
     .expect("policy should validate")
 }
 
@@ -125,8 +121,7 @@ pub(super) fn valid_handle_draft() -> super::super::ImagePayloadHandleDraft<'sta
 }
 
 pub(super) fn valid_handle() -> super::super::ImagePayloadHandle {
-    super::super::ImagePayloadHandle::from_draft(valid_handle_draft())
-        .expect("handle should validate")
+    super::super::ImagePayloadHandle::from_draft(valid_handle_draft()).expect("handle should validate")
 }
 
 pub(super) fn valid_receipt_draft() -> super::super::ImageReceiptDraft<'static> {
@@ -145,51 +140,18 @@ pub(super) fn valid_receipt_draft() -> super::super::ImageReceiptDraft<'static> 
 }
 
 pub(super) const UNSAFE_DESCRIPTOR_FIXTURES: [(&str, super::super::UnsafeContentReason); 4] = [
-    (
-        "raw_bytes=[137,80,78,71]",
-        super::super::UnsafeContentReason::RawBytes,
-    ),
-    (
-        "base64:iVBORw0KGgo=",
-        super::super::UnsafeContentReason::Base64Payload,
-    ),
-    (
-        "data:image/png;base64,iVBORw0KGgo=",
-        super::super::UnsafeContentReason::DataUrl,
-    ),
-    (
-        "/home/user/private/screenshot.png",
-        super::super::UnsafeContentReason::AbsolutePath,
-    ),
+    ("raw_bytes=[137,80,78,71]", super::super::UnsafeContentReason::RawBytes),
+    ("base64:iVBORw0KGgo=", super::super::UnsafeContentReason::Base64Payload),
+    ("data:image/png;base64,iVBORw0KGgo=", super::super::UnsafeContentReason::DataUrl),
+    ("/home/user/private/screenshot.png", super::super::UnsafeContentReason::AbsolutePath),
 ];
 
 pub(super) const RECEIPT_LEAK_FIXTURES: [(&str, super::super::UnsafeContentReason); 7] = [
-    (
-        "raw_bytes=[1,2,3]",
-        super::super::UnsafeContentReason::RawBytes,
-    ),
-    (
-        "base64:AAAA",
-        super::super::UnsafeContentReason::Base64Payload,
-    ),
-    (
-        "data:image/jpeg;base64,AAAA",
-        super::super::UnsafeContentReason::DataUrl,
-    ),
-    (
-        "/Users/person/Desktop/private.png",
-        super::super::UnsafeContentReason::AbsolutePath,
-    ),
-    (
-        "api_key=sk-secret",
-        super::super::UnsafeContentReason::Credential,
-    ),
-    (
-        "provider_payload:{raw-json}",
-        super::super::UnsafeContentReason::ProviderPayload,
-    ),
-    (
-        "unbounded_image_payload",
-        super::super::UnsafeContentReason::UnboundedPayload,
-    ),
+    ("raw_bytes=[1,2,3]", super::super::UnsafeContentReason::RawBytes),
+    ("base64:AAAA", super::super::UnsafeContentReason::Base64Payload),
+    ("data:image/jpeg;base64,AAAA", super::super::UnsafeContentReason::DataUrl),
+    ("/Users/person/Desktop/private.png", super::super::UnsafeContentReason::AbsolutePath),
+    ("api_key=sk-secret", super::super::UnsafeContentReason::Credential),
+    ("provider_payload:{raw-json}", super::super::UnsafeContentReason::ProviderPayload),
+    ("unbounded_image_payload", super::super::UnsafeContentReason::UnboundedPayload),
 ];

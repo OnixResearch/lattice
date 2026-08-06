@@ -1,11 +1,18 @@
 //! Confirmation dialog
 
-use rat_chrome::{OverlayAnchor, OverlayModel, OverlaySize, OverlayStyle, overlay_frame};
+use rat_chrome::OverlayAnchor;
+use rat_chrome::OverlayModel;
+use rat_chrome::OverlaySize;
+use rat_chrome::OverlayStyle;
+use rat_chrome::overlay_frame;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, Wrap};
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Wrap;
 
 use crate::theme::WidgetTheme;
 
@@ -52,8 +59,7 @@ impl ConfirmDialog {
             return;
         }
 
-        let paragraph = Paragraph::new(confirm_content(&self.message, self.selected, theme))
-            .wrap(Wrap { trim: true });
+        let paragraph = Paragraph::new(confirm_content(&self.message, self.selected, theme)).wrap(Wrap { trim: true });
         frame.render_widget(paragraph, layout.inner);
     }
 }
@@ -96,16 +102,12 @@ fn confirm_content(message: &str, selected: bool, theme: &WidgetTheme) -> Vec<Li
 
 fn confirm_button_styles(selected: bool, theme: &WidgetTheme) -> (Style, Style) {
     let yes_style = if selected {
-        Style::default()
-            .fg(theme.success)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(theme.success).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(theme.text_disabled)
     };
     let no_style = if !selected {
-        Style::default()
-            .fg(theme.error)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(theme.error).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(theme.text_disabled)
     };
@@ -115,13 +117,14 @@ fn confirm_button_styles(selected: bool, theme: &WidgetTheme) -> (Style, Style) 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::style::Color;
     use ratatui::widgets::Paragraph;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 60;
     const VIEWPORT_HEIGHT: u16 = 12;

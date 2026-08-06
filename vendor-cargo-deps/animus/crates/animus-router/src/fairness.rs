@@ -2,21 +2,25 @@ mod input;
 mod safe;
 mod select;
 
-pub use input::{
-    RouterRotationCursor, RouterRotationCursorClass, RouterRotationCursorDraft,
-    RouterRotationPolicy, RouterRotationSnapshot, RouterRotationSnapshotDraft,
-    RouterRotationStaleCursorPolicy,
-};
-pub use safe::{RouterRotationReceipt, RouterRotationReceiptDraft};
-pub use select::{RouterRotationDecision, RouterRotationError, rotate_eligible_candidates};
+pub use input::RouterRotationCursor;
+pub use input::RouterRotationCursorClass;
+pub use input::RouterRotationCursorDraft;
+pub use input::RouterRotationPolicy;
+pub use input::RouterRotationSnapshot;
+pub use input::RouterRotationSnapshotDraft;
+pub use input::RouterRotationStaleCursorPolicy;
+pub use safe::RouterRotationReceipt;
+pub use safe::RouterRotationReceiptDraft;
+pub use select::RouterRotationDecision;
+pub use select::RouterRotationError;
+pub use select::rotate_eligible_candidates;
 
 const POLICY_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_policy");
 const STALE_POLICY_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_stale_policy");
 const CURSOR_CLASS_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_cursor_class");
 const MODEL_LABEL_FIELD: crate::FieldName = crate::FieldName::new("router_model_label");
 const RECIPE_ID_FIELD: crate::FieldName = crate::FieldName::new("router_recipe_id");
-const NEXT_CURSOR_HASH_FIELD: crate::FieldName =
-    crate::FieldName::new("router_rotation_next_cursor_hash");
+const NEXT_CURSOR_HASH_FIELD: crate::FieldName = crate::FieldName::new("router_rotation_next_cursor_hash");
 const EMPTY_CURSORS_FIELD: &str = "router_rotation_cursors";
 const EMPTY_REDACTIONS_FIELD: &str = "router_rotation_receipt_redactions";
 const CURSOR_HASH_SCHEMA: &str = "animus.router-rotation.cursor.v1";

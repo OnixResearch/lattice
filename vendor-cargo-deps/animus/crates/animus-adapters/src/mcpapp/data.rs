@@ -78,15 +78,10 @@ impl Descriptor {
     /// Returns [`super::EvaluationError`] when required fields are missing, field text is
     /// malformed, collection ceilings are exceeded, or size/lifecycle labels are
     /// unsupported.
-    pub fn evaluate(
-        draft: &DescriptorDraft<'_>,
-    ) -> Result<super::Evaluation, super::EvaluationError> {
+    pub fn evaluate(draft: &DescriptorDraft<'_>) -> Result<super::Evaluation, super::EvaluationError> {
         let descriptor = Self::validate(draft)?;
         let decision = super::classify::descriptor(&descriptor);
-        Ok(super::Evaluation {
-            descriptor,
-            decision,
-        })
+        Ok(super::Evaluation { descriptor, decision })
     }
 
     /// Validates descriptor-shaped metadata without executing UI behavior.
@@ -97,16 +92,11 @@ impl Descriptor {
     /// malformed, collection ceilings are exceeded, or size/lifecycle labels are
     /// unsupported.
     pub fn validate(draft: &DescriptorDraft<'_>) -> Result<Self, super::EvaluationError> {
-        let resource_uri =
-            super::norm::required_text(super::RESOURCE_URI_FIELD, draft.resource_uri)?;
-        let mime_profile =
-            super::norm::required_text(super::MIME_PROFILE_FIELD, draft.mime_profile)?;
+        let resource_uri = super::norm::required_text(super::RESOURCE_URI_FIELD, draft.resource_uri)?;
+        let mime_profile = super::norm::required_text(super::MIME_PROFILE_FIELD, draft.mime_profile)?;
         let title = super::norm::required_text(super::TITLE_FIELD, draft.title)?;
-        let csp_domains = super::norm::normalize_collection(
-            super::CSP_DOMAIN_FIELD,
-            draft.csp_domains,
-            super::MAX_CSP_DOMAIN_ITEMS,
-        )?;
+        let csp_domains =
+            super::norm::normalize_collection(super::CSP_DOMAIN_FIELD, draft.csp_domains, super::MAX_CSP_DOMAIN_ITEMS)?;
         let permission_requests = super::norm::normalize_collection(
             super::PERMISSION_FIELD,
             draft.permission_requests,
@@ -122,19 +112,20 @@ impl Descriptor {
             draft.callback_channels,
             super::MAX_CALLBACK_ITEMS,
         )?;
-        let dimension_policy_label =
-            super::norm::required_text(super::SIZE_POLICY_FIELD, draft.size_policy)?;
-        let lifecycle_policy_label =
-            super::norm::required_text(super::LIFECYCLE_POLICY_FIELD, draft.lifecycle_policy)?;
-        let dimension_policy = super::norm::parse_size_policy(dimension_policy_label.as_str())
-            .ok_or_else(|| super::EvaluationError::UnsupportedValue {
+        let dimension_policy_label = super::norm::required_text(super::SIZE_POLICY_FIELD, draft.size_policy)?;
+        let lifecycle_policy_label = super::norm::required_text(super::LIFECYCLE_POLICY_FIELD, draft.lifecycle_policy)?;
+        let dimension_policy = super::norm::parse_size_policy(dimension_policy_label.as_str()).ok_or_else(|| {
+            super::EvaluationError::UnsupportedValue {
                 field: super::SIZE_POLICY_FIELD.as_str(),
                 value: dimension_policy_label.clone(),
-            })?;
-        let lifecycle_policy = super::norm::parse_lifecycle_policy(lifecycle_policy_label.as_str())
-            .ok_or_else(|| super::EvaluationError::UnsupportedValue {
-                field: super::LIFECYCLE_POLICY_FIELD.as_str(),
-                value: lifecycle_policy_label,
+            }
+        })?;
+        let lifecycle_policy =
+            super::norm::parse_lifecycle_policy(lifecycle_policy_label.as_str()).ok_or_else(|| {
+                super::EvaluationError::UnsupportedValue {
+                    field: super::LIFECYCLE_POLICY_FIELD.as_str(),
+                    value: lifecycle_policy_label,
+                }
             })?;
 
         Ok(Self {

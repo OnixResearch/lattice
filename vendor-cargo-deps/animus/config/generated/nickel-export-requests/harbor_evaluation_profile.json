@@ -1,0 +1,15 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [],
+  "destination": "config/generated/harbor-evaluation-profile.json",
+  "family_id": "animus.harbor-evaluation-profile",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "harbor_evaluation_profile",
+  "source": "config/harbor-evaluation-profile.ncl"
+}

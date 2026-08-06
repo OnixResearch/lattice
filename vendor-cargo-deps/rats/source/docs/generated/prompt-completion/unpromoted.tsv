@@ -1,0 +1,8 @@
+family	status	reason	revisit_requirement
+forms	unpromoted	field validation, payload and sensitivity differ	two maintained equivalent prompt reducers with privacy policy
+select	unpromoted	generic item payload and controlled lifecycle not evaluated	focused identity/ownership compatibility study
+date	unpromoted	calendar semantics are not completion semantics	maintained second date prompt and measured duplication
+tags	unpromoted	domain mutation and persistence ownership differ	typed tag intent adapter and privacy evidence
+spreadsheet	unpromoted	cell editing and grid navigation remain authoritative	separate formula/address completion evaluation
+editor	unpromoted	cursor, selection, IME and document ownership differ	two maintained editor consumers and explicit position contract
+quick-capture	unpromoted	free text may contain sensitive application notes	named product consumer and redaction/history policy

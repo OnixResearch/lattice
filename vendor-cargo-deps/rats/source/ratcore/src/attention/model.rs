@@ -3,12 +3,12 @@ use super::*;
 /// Pure focus graph.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FocusGraph {
-    pub(super) scopes: std::collections::BTreeMap<String, FocusScope>,
-    pub(super) nodes: std::collections::BTreeMap<String, FocusNode>,
-    pub(super) order: Vec<String>,
-    pub(super) active: Option<String>,
-    pub(super) modal_scope: Option<String>,
-    pub(super) restore_stack: Vec<String>,
+    pub(super) scopes: std::collections::BTreeMap<FocusScopeId, FocusScope>,
+    pub(super) nodes: std::collections::BTreeMap<FocusNodeId, FocusNode>,
+    pub(super) order: Vec<FocusNodeId>,
+    pub(super) active: Option<FocusNodeId>,
+    pub(super) modal_scope: Option<FocusScopeId>,
+    pub(super) restore_stack: Vec<FocusNodeId>,
 }
 
 impl FocusGraph {
@@ -37,25 +37,25 @@ impl FocusGraph {
 
     /// Returns the active node ID.
     #[must_use]
-    pub fn active_id(&self) -> Option<&str> {
-        self.active.as_deref()
+    pub fn active_id(&self) -> Option<&FocusNodeId> {
+        self.active.as_ref()
     }
 
     /// Returns the active modal scope ID.
     #[must_use]
-    pub fn modal_scope(&self) -> Option<&str> {
-        self.modal_scope.as_deref()
+    pub fn modal_scope(&self) -> Option<&FocusScopeId> {
+        self.modal_scope.as_ref()
     }
 
     /// Returns a node by ID.
     #[must_use]
-    pub fn node(&self, id: &str) -> Option<&FocusNode> {
+    pub fn node(&self, id: &FocusNodeId) -> Option<&FocusNode> {
         self.nodes.get(id)
     }
 
     /// Returns a scope by ID.
     #[must_use]
-    pub fn scope(&self, id: &str) -> Option<&FocusScope> {
+    pub fn scope(&self, id: &FocusScopeId) -> Option<&FocusScope> {
         self.scopes.get(id)
     }
 
@@ -67,13 +67,11 @@ impl FocusGraph {
     /// another validation error when the graph is invalid.
     pub fn activate_first(mut self) -> Result<Self, FocusError> {
         self.validate()?;
-        let target = self.eligible_ids().into_iter().next().ok_or_else(|| {
-            FocusError::new(
-                FocusErrorCode::NoEligibleTarget,
-                None,
-                "no eligible focus target",
-            )
-        })?;
+        let target = self
+            .eligible_ids()
+            .into_iter()
+            .next()
+            .ok_or_else(|| FocusError::new(FocusErrorCode::NoEligibleTarget, None, "no eligible focus target"))?;
         self.active = Some(target);
         Ok(self)
     }
@@ -84,31 +82,31 @@ impl FocusGraph {
     ///
     /// Returns [`FocusError`] when the target is missing, disabled, hidden, or
     /// outside the active modal scope.
-    pub fn focus_node(mut self, id: &str) -> Result<(Self, FocusTransition), FocusError> {
+    pub fn focus_node(mut self, id: &FocusNodeId) -> Result<(Self, FocusTransition), FocusError> {
         self.validate()?;
         let target = self.nodes.get(id).ok_or_else(|| {
             FocusError::new(
                 FocusErrorCode::UnknownNode,
-                Some(id.to_string()),
+                Some(FocusErrorId::Node(id.clone())),
                 "focus target is missing",
             )
         })?;
         if !target.eligible() {
             return Err(FocusError::new(
                 FocusErrorCode::NoEligibleTarget,
-                Some(id.to_string()),
+                Some(FocusErrorId::Node(id.clone())),
                 "focus target is disabled or hidden",
             ));
         }
         if !self.node_allowed_by_modal(target) {
             return Err(FocusError::new(
                 FocusErrorCode::ModalEscape,
-                Some(id.to_string()),
+                Some(FocusErrorId::Node(id.clone())),
                 "focus target is outside active modal scope",
             ));
         }
         let previous = self.active.clone();
-        self.active = Some(id.to_string());
+        self.active = Some(id.clone());
         let transition = self.transition(previous);
         Ok((self, transition))
     }
@@ -118,24 +116,24 @@ impl FocusGraph {
     /// # Errors
     ///
     /// Returns [`FocusError`] when the scope is missing or has no eligible target.
-    pub fn enter_modal(mut self, scope_id: &str) -> Result<(Self, FocusTransition), FocusError> {
+    pub fn enter_modal(mut self, scope_id: &FocusScopeId) -> Result<(Self, FocusTransition), FocusError> {
         self.validate()?;
         if !self.scopes.contains_key(scope_id) {
             return Err(FocusError::new(
                 FocusErrorCode::UnknownScope,
-                Some(scope_id.to_string()),
+                Some(FocusErrorId::Scope(scope_id.clone())),
                 "modal scope is missing",
             ));
         }
         if let Some(active) = &self.active {
             self.restore_stack.push(active.clone());
         }
-        self.modal_scope = Some(scope_id.to_string());
+        self.modal_scope = Some(scope_id.clone());
         let previous = self.active.clone();
         let target = self.eligible_ids().into_iter().next().ok_or_else(|| {
             FocusError::new(
                 FocusErrorCode::NoEligibleTarget,
-                Some(scope_id.to_string()),
+                Some(FocusErrorId::Scope(scope_id.clone())),
                 "modal scope has no eligible focus target",
             )
         })?;
@@ -157,27 +155,17 @@ impl FocusGraph {
         let target = restore
             .filter(|id| self.nodes.get(id).is_some_and(FocusNode::eligible))
             .or_else(|| self.eligible_ids().into_iter().next())
-            .ok_or_else(|| {
-                FocusError::new(
-                    FocusErrorCode::NoEligibleTarget,
-                    None,
-                    "no restore focus target",
-                )
-            })?;
+            .ok_or_else(|| FocusError::new(FocusErrorCode::NoEligibleTarget, None, "no restore focus target"))?;
         self.active = Some(target);
         let transition = self.transition(previous);
         Ok((self, transition))
     }
 
-    pub(super) fn transition(&self, previous: Option<String>) -> FocusTransition {
+    pub(super) fn transition(&self, previous: Option<FocusNodeId>) -> FocusTransition {
         FocusTransition {
             previous,
             active: self.active.clone(),
-            announcement: self
-                .active
-                .as_ref()
-                .and_then(|id| self.nodes.get(id))
-                .map(Self::announcement_for),
+            announcement: self.active.as_ref().and_then(|id| self.nodes.get(id)).map(Self::announcement_for),
         }
     }
 

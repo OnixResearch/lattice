@@ -1,0 +1,7 @@
+alternative	duplication_removed	validation_reuse	privacy_risk	public_api_cost	dependency_cost	consumer_gate	decision
+renderer-direct-composition	low	none beyond existing family validators	low	none	none	available today	preferred current
+ordinary-family-helper	medium within one family	family-specific	low	local or private	none	requires real repeated renderer code	localize if needed
+family-specific-dto	medium	family-specific bounds	low to medium	one API per family	none	requires named component consumer	defer
+closed-header-typed-envelope	shallow common header only	common IDs generation and bounds	medium	new shared sum type	none	fails meaningful overlap across two families	defer
+universal-trait-property-bag	apparent high	unreviewable dynamic schema	high	permanent reflection surface	reflection or dynamic value	forbidden	reject
+no-new-abstraction	none	existing authoritative validators	lowest	none	none	preserves current seams	selected

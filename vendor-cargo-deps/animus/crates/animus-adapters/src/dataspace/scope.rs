@@ -1,17 +1,10 @@
-const TENANT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_tenant_id");
-const WORKSPACE_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_workspace_id");
-const SESSION_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_session_id");
-const BRANCH_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_branch_id");
-const FACET_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_facet_id");
-const ACTOR_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_actor_kind");
-const ACTOR_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_actor_id");
+const TENANT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_tenant_id");
+const WORKSPACE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_workspace_id");
+const SESSION_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_session_id");
+const BRANCH_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_branch_id");
+const FACET_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_facet_id");
+const ACTOR_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_actor_kind");
+const ACTOR_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_actor_id");
 
 const ACTOR_KIND_AGENT: &str = "agent";
 const ACTOR_KIND_SUBAGENT: &str = "subagent";
@@ -88,14 +81,10 @@ impl Projection {
     /// Returns [`crate::AdapterContractError`] when a scope label is empty,
     /// malformed, too long, or uses an unknown actor kind.
     pub fn new(draft: Draft<'_>) -> Result<Self, crate::AdapterContractError> {
-        let tenant_id =
-            crate::validation::normalized_adapter_field(TENANT_ID_FIELD, draft.tenant_id)?;
-        let workspace_id =
-            crate::validation::normalized_adapter_field(WORKSPACE_ID_FIELD, draft.workspace_id)?;
-        let session_id =
-            crate::validation::normalized_adapter_field(SESSION_ID_FIELD, draft.session_id)?;
-        let branch_id =
-            crate::validation::normalized_adapter_field(BRANCH_ID_FIELD, draft.branch_id)?;
+        let tenant_id = crate::validation::normalized_adapter_field(TENANT_ID_FIELD, draft.tenant_id)?;
+        let workspace_id = crate::validation::normalized_adapter_field(WORKSPACE_ID_FIELD, draft.workspace_id)?;
+        let session_id = crate::validation::normalized_adapter_field(SESSION_ID_FIELD, draft.session_id)?;
+        let branch_id = crate::validation::normalized_adapter_field(BRANCH_ID_FIELD, draft.branch_id)?;
         let facet_id = crate::validation::normalized_adapter_field(FACET_ID_FIELD, draft.facet_id)?;
         let actor_kind = ActorKind::parse(draft.actor_kind)?;
         let actor_id = crate::validation::normalized_adapter_field(ACTOR_ID_FIELD, draft.actor_id)?;

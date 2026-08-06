@@ -5,8 +5,7 @@ const HASH_SEPARATOR: &str = super::data::HASH_SEPARATOR;
 const INTERRUPTED_TOOL_ACTION_HASH_DOMAIN: &str = super::data::INTERRUPTED_TOOL_ACTION_HASH_DOMAIN;
 const INTERRUPTED_TOOL_LEAF_HASH_DOMAIN: &str = super::data::INTERRUPTED_TOOL_LEAF_HASH_DOMAIN;
 const INTERRUPTED_TOOL_PLAN_HASH_DOMAIN: &str = super::data::INTERRUPTED_TOOL_PLAN_HASH_DOMAIN;
-const INTERRUPTED_TOOL_SNAPSHOT_HASH_DOMAIN: &str =
-    super::data::INTERRUPTED_TOOL_SNAPSHOT_HASH_DOMAIN;
+const INTERRUPTED_TOOL_SNAPSHOT_HASH_DOMAIN: &str = super::data::INTERRUPTED_TOOL_SNAPSHOT_HASH_DOMAIN;
 const MAX_BRANCH_ENTRIES: usize = super::data::MAX_BRANCH_ENTRIES;
 const MAX_CALLS_PER_ENTRY: usize = super::data::MAX_CALLS_PER_ENTRY;
 const MAX_INTERRUPTION_OBSERVATIONS: usize = super::data::MAX_INTERRUPTION_OBSERVATIONS;
@@ -28,8 +27,7 @@ type InterruptedToolProviderGateDecision = super::data::InterruptedToolProviderG
 type InterruptedToolProviderGateStatus = super::data::InterruptedToolProviderGateStatus;
 type InterruptedToolReason = super::data::InterruptedToolReason;
 type InterruptedToolRepairAction = super::data::InterruptedToolRepairAction;
-type InterruptedToolRepairApplicationDraft<'a> =
-    super::data::InterruptedToolRepairApplicationDraft<'a>;
+type InterruptedToolRepairApplicationDraft<'a> = super::data::InterruptedToolRepairApplicationDraft<'a>;
 type InterruptedToolRepairApplicationOutcome = super::data::InterruptedToolRepairApplicationOutcome;
 type InterruptedToolRepairApplicationRequest = super::data::InterruptedToolRepairApplicationRequest;
 type InterruptedToolRepairApplicationStatus = super::data::InterruptedToolRepairApplicationStatus;
@@ -123,10 +121,7 @@ pub fn diagnose_interrupted_tool_branch(
         matched_call_count,
         unmatched,
     };
-    debug_assert_eq!(
-        diagnosis.status == InterruptedToolDiagnosisStatus::Clean,
-        diagnosis.unmatched.is_empty()
-    );
+    debug_assert_eq!(diagnosis.status == InterruptedToolDiagnosisStatus::Clean, diagnosis.unmatched.is_empty());
     Ok(diagnosis)
 }
 
@@ -145,28 +140,19 @@ pub fn reduce_interrupted_tool_reason(
     let mut matched_kind = None;
     for observation in observations {
         let is_correlated_to_gap = observation.run_id == gap.run_id
-            && observation
-                .affected_call_ids
-                .iter()
-                .any(|call_id| call_id == &gap.call.call_id);
+            && observation.affected_call_ids.iter().any(|call_id| call_id == &gap.call.call_id);
         if !is_correlated_to_gap {
             continue;
         }
         if let Some(existing) = matched_kind {
             if existing != observation.kind {
-                return Err(error(
-                    InterruptedToolRepairIssue::ConflictingEvidence,
-                    FIELD_OBSERVATION,
-                ));
+                return Err(error(InterruptedToolRepairIssue::ConflictingEvidence, FIELD_OBSERVATION));
             }
         } else {
             matched_kind = Some(observation.kind);
         }
     }
-    let reason = matched_kind.map_or(
-        InterruptedToolReason::UnknownInterruption,
-        observation_reason,
-    );
+    let reason = matched_kind.map_or(InterruptedToolReason::UnknownInterruption, observation_reason);
     debug_assert!(observations.len() <= MAX_INTERRUPTION_OBSERVATIONS);
     debug_assert!(!gap.call.call_id.is_empty());
     Ok(reason)
@@ -187,10 +173,7 @@ pub fn plan_interrupted_tool_repair(
 ) -> Result<InterruptedToolRepairPlan, InterruptedToolRepairError> {
     let current = diagnose_interrupted_tool_branch(snapshot)?;
     if &current != diagnosis || diagnosis.status != InterruptedToolDiagnosisStatus::Repairable {
-        return Err(error(
-            InterruptedToolRepairIssue::MissingRepairAnchor,
-            FIELD_PLAN,
-        ));
+        return Err(error(InterruptedToolRepairIssue::MissingRepairAnchor, FIELD_PLAN));
     }
     let parts = derive_plan_parts(snapshot, diagnosis, observations)?;
     let identities = derive_plan_identities(snapshot, diagnosis, &parts);
@@ -224,10 +207,7 @@ fn derive_plan_parts(
         .get(first_gap.entry_index)
         .ok_or_else(|| error(InterruptedToolRepairIssue::MissingRepairAnchor, FIELD_PLAN))?;
     if anchor.entry_id != first_gap.entry_id || anchor.entry_hash != first_gap.entry_hash {
-        return Err(error(
-            InterruptedToolRepairIssue::MissingRepairAnchor,
-            FIELD_PLAN,
-        ));
+        return Err(error(InterruptedToolRepairIssue::MissingRepairAnchor, FIELD_PLAN));
     }
     let affected_suffix_entry_hashes = snapshot
         .entries
@@ -251,11 +231,7 @@ fn derive_plan_identities(
     diagnosis: &InterruptedToolDiagnosis,
     parts: &PlanParts,
 ) -> PlanIdentities {
-    let action_hashes = parts
-        .actions
-        .iter()
-        .map(|action| action.action_hash.clone())
-        .collect::<Vec<_>>();
+    let action_hashes = parts.actions.iter().map(|action| action.action_hash.clone()).collect::<Vec<_>>();
     let proposed_new_leaf_hash = hash_owned_parts(
         INTERRUPTED_TOOL_LEAF_HASH_DOMAIN,
         [
@@ -312,11 +288,7 @@ pub fn interrupted_tool_repair_application_request(
         proposed_new_leaf_hash: plan.proposed_new_leaf_hash.clone(),
         repair_anchor_entry_id: plan.repair_anchor_entry_id.clone(),
         actions: plan.actions.clone(),
-        action_hashes: plan
-            .actions
-            .iter()
-            .map(|action| action.action_hash.clone())
-            .collect(),
+        action_hashes: plan.actions.iter().map(|action| action.action_hash.clone()).collect(),
         affected_suffix_entry_hashes: plan.affected_suffix_entry_hashes.clone(),
     };
     debug_assert_eq!(request.actions.len(), plan.actions.len());
@@ -335,11 +307,7 @@ pub fn evaluate_interrupted_tool_repair_application(
     draft: &InterruptedToolRepairApplicationDraft<'_>,
 ) -> Result<InterruptedToolRepairApplicationOutcome, InterruptedToolRepairError> {
     validate_application_draft(draft)?;
-    let expected_action_hashes = plan
-        .actions
-        .iter()
-        .map(|action| action.action_hash.as_str())
-        .collect::<Vec<_>>();
+    let expected_action_hashes = plan.actions.iter().map(|action| action.action_hash.as_str()).collect::<Vec<_>>();
     let status = application_status(plan, draft, expected_action_hashes.as_slice());
     let committed_action_count = u32::try_from(draft.committed_action_hashes.len())
         .map_err(|_error| error(InterruptedToolRepairIssue::InvalidInput, FIELD_APPLICATION))?;
@@ -411,30 +379,18 @@ pub fn project_interrupted_tool_repair_results(
         && outcome.new_leaf_hash == plan.proposed_new_leaf_hash
         && outcome.status.permits_provider_continuation();
     if !is_ready {
-        return Err(error(
-            InterruptedToolRepairIssue::ProviderGateBlocked,
-            FIELD_APPLICATION,
-        ));
+        return Err(error(InterruptedToolRepairIssue::ProviderGateBlocked, FIELD_APPLICATION));
     }
     let mut messages = Vec::with_capacity(plan.actions.len());
     for action in &plan.actions {
         let marker = format!("{SYNTHETIC_RESULT_PREFIX}{}", action.reason.as_str());
-        let content = [animus_adapters::CanonicalMessageContentPartDraft::Text {
-            text: marker.as_str(),
-        }];
-        let message = animus_adapters::CanonicalModelMessage::from_draft(
-            animus_adapters::CanonicalModelMessageDraft {
-                role: animus_adapters::CanonicalModelRole::Tool.as_str(),
-                content: &content,
-                tool_call_id: Some(action.call_id.as_str()),
-            },
-        )
-        .map_err(|_error| {
-            error(
-                InterruptedToolRepairIssue::ProviderGateBlocked,
-                FIELD_RESULT,
-            )
-        })?;
+        let content = [animus_adapters::CanonicalMessageContentPartDraft::Text { text: marker.as_str() }];
+        let message = animus_adapters::CanonicalModelMessage::from_draft(animus_adapters::CanonicalModelMessageDraft {
+            role: animus_adapters::CanonicalModelRole::Tool.as_str(),
+            content: &content,
+            tool_call_id: Some(action.call_id.as_str()),
+        })
+        .map_err(|_error| error(InterruptedToolRepairIssue::ProviderGateBlocked, FIELD_RESULT))?;
         messages.push(message);
     }
     debug_assert_eq!(messages.len(), plan.actions.len());
@@ -442,9 +398,7 @@ pub fn project_interrupted_tool_repair_results(
 }
 
 // r[impl agent_harness_runtime.tau_tool_repair.verification]
-fn validate_snapshot(
-    snapshot: &InterruptedToolBranchSnapshot,
-) -> Result<(), InterruptedToolRepairError> {
+fn validate_snapshot(snapshot: &InterruptedToolBranchSnapshot) -> Result<(), InterruptedToolRepairError> {
     safe_label(snapshot.session_id.as_str(), FIELD_BRANCH)?;
     safe_label(snapshot.branch_id.as_str(), FIELD_BRANCH)?;
     lowercase_blake3(snapshot.active_leaf_hash.as_str(), FIELD_LEAF)?;
@@ -453,10 +407,7 @@ fn validate_snapshot(
         return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_ENTRY));
     }
     if snapshot.active_leaf_hash != snapshot.snapshot_leaf_hash
-        || snapshot
-            .entries
-            .last()
-            .is_none_or(|entry| entry.entry_hash != snapshot.active_leaf_hash)
+        || snapshot.entries.last().is_none_or(|entry| entry.entry_hash != snapshot.active_leaf_hash)
     {
         return Err(error(InterruptedToolRepairIssue::StaleLeaf, FIELD_LEAF));
     }
@@ -465,9 +416,7 @@ fn validate_snapshot(
     let mut total_calls = usize::default();
     for entry in &snapshot.entries {
         validate_entry(entry)?;
-        if !entry_ids.insert(entry.entry_id.as_str())
-            || !entry_hashes.insert(entry.entry_hash.as_str())
-        {
+        if !entry_ids.insert(entry.entry_id.as_str()) || !entry_hashes.insert(entry.entry_hash.as_str()) {
             return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_ENTRY));
         }
         total_calls = total_calls
@@ -487,18 +436,13 @@ fn validate_entry(entry: &InterruptedToolBranchEntry) -> Result<(), InterruptedT
     lowercase_blake3(entry.entry_hash.as_str(), FIELD_ENTRY)?;
     safe_label(entry.run_id.as_str(), FIELD_ENTRY)?;
     if entry.kind == InterruptedToolEntryKind::Unsupported {
-        return Err(error(
-            InterruptedToolRepairIssue::UnsupportedEntry,
-            FIELD_ENTRY,
-        ));
+        return Err(error(InterruptedToolRepairIssue::UnsupportedEntry, FIELD_ENTRY));
     }
     if entry.tool_calls.len() > MAX_CALLS_PER_ENTRY {
         return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_CALL));
     }
     let is_shape_valid = match entry.kind {
-        InterruptedToolEntryKind::AssistantToolCalls => {
-            !entry.tool_calls.is_empty() && entry.tool_result.is_none()
-        }
+        InterruptedToolEntryKind::AssistantToolCalls => !entry.tool_calls.is_empty() && entry.tool_result.is_none(),
         InterruptedToolEntryKind::ToolResult | InterruptedToolEntryKind::SyntheticToolResult => {
             entry.tool_calls.is_empty() && entry.tool_result.is_some()
         }
@@ -506,10 +450,7 @@ fn validate_entry(entry: &InterruptedToolBranchEntry) -> Result<(), InterruptedT
         _other => entry.tool_calls.is_empty() && entry.tool_result.is_none(),
     };
     if !is_shape_valid {
-        return Err(error(
-            InterruptedToolRepairIssue::InvalidEntryShape,
-            FIELD_ENTRY,
-        ));
+        return Err(error(InterruptedToolRepairIssue::InvalidEntryShape, FIELD_ENTRY));
     }
     for call in &entry.tool_calls {
         safe_label(call.call_id.as_str(), FIELD_CALL)?;
@@ -534,9 +475,7 @@ fn collect_entry_calls(
             return Err(error(InterruptedToolRepairIssue::DuplicateCall, FIELD_CALL));
         }
         let state_index = accumulator.states.len();
-        accumulator
-            .indices
-            .insert(call.call_id.clone(), state_index);
+        accumulator.indices.insert(call.call_id.clone(), state_index);
         accumulator.states.push(CallState {
             gap: InterruptedToolGap {
                 entry_index,
@@ -563,28 +502,19 @@ fn collect_entry_result(
         return Ok(());
     };
     let Some(state_index) = call_indices.get(result.call_id.as_str()).copied() else {
-        return Err(error(
-            InterruptedToolRepairIssue::ResultBeforeCall,
-            FIELD_RESULT,
-        ));
+        return Err(error(InterruptedToolRepairIssue::ResultBeforeCall, FIELD_RESULT));
     };
     let state = call_states
         .get_mut(state_index)
         .ok_or_else(|| error(InterruptedToolRepairIssue::ResultBeforeCall, FIELD_RESULT))?;
     if state.has_result {
-        return Err(error(
-            InterruptedToolRepairIssue::DuplicateResult,
-            FIELD_RESULT,
-        ));
+        return Err(error(InterruptedToolRepairIssue::DuplicateResult, FIELD_RESULT));
     }
     if state.gap.run_id != entry.run_id {
         return Err(error(InterruptedToolRepairIssue::RunMismatch, FIELD_RESULT));
     }
     if state.gap.call.tool_identity_hash != result.tool_identity_hash {
-        return Err(error(
-            InterruptedToolRepairIssue::ToolMismatch,
-            FIELD_RESULT,
-        ));
+        return Err(error(InterruptedToolRepairIssue::ToolMismatch, FIELD_RESULT));
     }
     state.has_result = true;
     debug_assert!(state.has_result);
@@ -592,33 +522,20 @@ fn collect_entry_result(
     Ok(())
 }
 
-fn validate_observations(
-    observations: &[InterruptedToolObservation],
-) -> Result<(), InterruptedToolRepairError> {
+fn validate_observations(observations: &[InterruptedToolObservation]) -> Result<(), InterruptedToolRepairError> {
     if observations.len() > MAX_INTERRUPTION_OBSERVATIONS {
-        return Err(error(
-            InterruptedToolRepairIssue::InvalidInput,
-            FIELD_OBSERVATION,
-        ));
+        return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_OBSERVATION));
     }
     for observation in observations {
         safe_label(observation.run_id.as_str(), FIELD_OBSERVATION)?;
-        if observation.affected_call_ids.is_empty()
-            || observation.affected_call_ids.len() > MAX_TOTAL_TOOL_CALLS
-        {
-            return Err(error(
-                InterruptedToolRepairIssue::InvalidInput,
-                FIELD_OBSERVATION,
-            ));
+        if observation.affected_call_ids.is_empty() || observation.affected_call_ids.len() > MAX_TOTAL_TOOL_CALLS {
+            return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_OBSERVATION));
         }
         let mut calls = std::collections::BTreeSet::new();
         for call_id in &observation.affected_call_ids {
             safe_label(call_id.as_str(), FIELD_OBSERVATION)?;
             if !calls.insert(call_id.as_str()) {
-                return Err(error(
-                    InterruptedToolRepairIssue::ConflictingEvidence,
-                    FIELD_OBSERVATION,
-                ));
+                return Err(error(InterruptedToolRepairIssue::ConflictingEvidence, FIELD_OBSERVATION));
             }
         }
     }
@@ -639,21 +556,10 @@ const fn observation_reason(kind: InterruptedToolObservationKind) -> Interrupted
     }
 }
 
-fn repair_mode(
-    snapshot: &InterruptedToolBranchSnapshot,
-    anchor_index: usize,
-) -> InterruptedToolRepairMode {
-    let has_later_non_result = snapshot
-        .entries
-        .iter()
-        .skip(anchor_index.saturating_add(1))
-        .any(|entry| {
-            !matches!(
-                entry.kind,
-                InterruptedToolEntryKind::ToolResult
-                    | InterruptedToolEntryKind::SyntheticToolResult
-            )
-        });
+fn repair_mode(snapshot: &InterruptedToolBranchSnapshot, anchor_index: usize) -> InterruptedToolRepairMode {
+    let has_later_non_result = snapshot.entries.iter().skip(anchor_index.saturating_add(1)).any(|entry| {
+        !matches!(entry.kind, InterruptedToolEntryKind::ToolResult | InterruptedToolEntryKind::SyntheticToolResult)
+    });
     if has_later_non_result {
         InterruptedToolRepairMode::HistoricalBranch
     } else {
@@ -669,21 +575,18 @@ fn build_repair_actions(
     let mut actions = Vec::with_capacity(diagnosis.unmatched.len());
     for gap in &diagnosis.unmatched {
         let reason = reduce_interrupted_tool_reason(gap, observations)?;
-        let action_hash = hash_owned_parts(
-            INTERRUPTED_TOOL_ACTION_HASH_DOMAIN,
-            &[
-                snapshot.session_id.clone(),
-                snapshot.branch_id.clone(),
-                snapshot.active_leaf_hash.clone(),
-                gap.entry_hash.clone(),
-                gap.entry_index.to_string(),
-                gap.call_index.to_string(),
-                gap.run_id.clone(),
-                gap.call.call_id.clone(),
-                gap.call.tool_identity_hash.clone(),
-                reason.as_str().to_string(),
-            ],
-        );
+        let action_hash = hash_owned_parts(INTERRUPTED_TOOL_ACTION_HASH_DOMAIN, &[
+            snapshot.session_id.clone(),
+            snapshot.branch_id.clone(),
+            snapshot.active_leaf_hash.clone(),
+            gap.entry_hash.clone(),
+            gap.entry_index.to_string(),
+            gap.call_index.to_string(),
+            gap.run_id.clone(),
+            gap.call.call_id.clone(),
+            gap.call.tool_identity_hash.clone(),
+            reason.as_str().to_string(),
+        ]);
         actions.push(InterruptedToolRepairAction {
             call_id: gap.call.call_id.clone(),
             tool_identity_hash: gap.call.tool_identity_hash.clone(),
@@ -704,19 +607,12 @@ fn validate_application_draft(
     if draft.committed_action_hashes.len() > MAX_TOTAL_TOOL_CALLS
         || draft.previously_applied_plan_hashes.len() > MAX_PREVIOUSLY_APPLIED_PLANS
     {
-        return Err(error(
-            InterruptedToolRepairIssue::InvalidInput,
-            FIELD_APPLICATION,
-        ));
+        return Err(error(InterruptedToolRepairIssue::InvalidInput, FIELD_APPLICATION));
     }
     lowercase_blake3(draft.plan_hash, FIELD_APPLICATION)?;
     lowercase_blake3(draft.observed_old_leaf_hash, FIELD_APPLICATION)?;
     lowercase_blake3(draft.observed_new_leaf_hash, FIELD_APPLICATION)?;
-    for hash in draft
-        .committed_action_hashes
-        .iter()
-        .chain(draft.previously_applied_plan_hashes.iter())
-    {
+    for hash in draft.committed_action_hashes.iter().chain(draft.previously_applied_plan_hashes.iter()) {
         lowercase_blake3(hash, FIELD_APPLICATION)?;
     }
     debug_assert!(draft.committed_action_hashes.len() <= MAX_TOTAL_TOOL_CALLS);
@@ -737,13 +633,10 @@ fn application_status(
     if draft.plan_hash != plan.plan_hash {
         return InterruptedToolRepairApplicationStatus::BlockedStale;
     }
-    let was_previously_applied = draft
-        .previously_applied_plan_hashes
-        .iter()
-        .any(|hash| *hash == plan.plan_hash);
+    let was_previously_applied = draft.previously_applied_plan_hashes.iter().any(|hash| *hash == plan.plan_hash);
     if was_previously_applied {
-        let has_consistent_actions = draft.committed_action_hashes.is_empty()
-            || draft.committed_action_hashes == expected_action_hashes;
+        let has_consistent_actions =
+            draft.committed_action_hashes.is_empty() || draft.committed_action_hashes == expected_action_hashes;
         if draft.observed_old_leaf_hash != plan.old_leaf_hash {
             return InterruptedToolRepairApplicationStatus::BlockedStale;
         }
@@ -812,37 +705,25 @@ pub(super) fn hash_owned_parts(domain: &str, parts: &[String]) -> String {
     blake3::hash(material.as_bytes()).to_hex().to_string()
 }
 
-pub(super) fn safe_label(
-    value: &str,
-    field: RepairField,
-) -> Result<(), InterruptedToolRepairError> {
+pub(super) fn safe_label(value: &str, field: RepairField) -> Result<(), InterruptedToolRepairError> {
     let has_valid_label_chars = !value.is_empty() && value.chars().count() <= MAX_SAFE_LABEL_CHARS;
-    let has_valid_chars = value
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'));
+    let has_valid_chars =
+        value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'));
     if !has_valid_label_chars || !has_valid_chars {
         return Err(error(InterruptedToolRepairIssue::InvalidInput, field));
     }
     Ok(())
 }
 
-pub(super) fn lowercase_blake3(
-    value: &str,
-    field: RepairField,
-) -> Result<(), InterruptedToolRepairError> {
+pub(super) fn lowercase_blake3(value: &str, field: RepairField) -> Result<(), InterruptedToolRepairError> {
     let is_valid = value.len() == BLAKE3_HEX_CHARS
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'));
+        && value.bytes().all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'));
     if !is_valid {
         return Err(error(InterruptedToolRepairIssue::InvalidInput, field));
     }
     Ok(())
 }
 
-pub(super) const fn error(
-    issue: InterruptedToolRepairIssue,
-    field: RepairField,
-) -> InterruptedToolRepairError {
+pub(super) const fn error(issue: InterruptedToolRepairIssue, field: RepairField) -> InterruptedToolRepairError {
     InterruptedToolRepairError::new(issue, field.0)
 }

@@ -1,7 +1,14 @@
-use super::{
-    ACTION_FIELD, CONTROL_CANCEL, CONTROL_EDIT, CONTROL_PAUSE, CONTROL_RESUME, CONTROL_RUN_NOW,
-    ID_FIELD, ScheduleError, Text, parse_value, required_text,
-};
+use super::ACTION_FIELD;
+use super::CONTROL_CANCEL;
+use super::CONTROL_EDIT;
+use super::CONTROL_PAUSE;
+use super::CONTROL_RESUME;
+use super::CONTROL_RUN_NOW;
+use super::ID_FIELD;
+use super::ScheduleError;
+use super::Text;
+use super::parse_value;
+use super::required_text;
 
 /// Schedule control action.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,10 +79,7 @@ impl ScheduleControlRequest {
         }
         let schedule_id = required_text(ID_FIELD, draft.schedule_id)?;
         let action = ScheduleControlAction::parse(draft.action)?;
-        Ok(Self {
-            schedule_id,
-            action,
-        })
+        Ok(Self { schedule_id, action })
     }
 
     /// Returns schedule identity.

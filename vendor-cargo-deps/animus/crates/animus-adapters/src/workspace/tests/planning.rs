@@ -3,12 +3,7 @@ use super::support::*;
 #[test]
 fn plan_accepts_leaf_commit_and_receipt_hashes_are_stable() {
     let parent = descriptor(PARENT_ID, None, OP_CREATE, &[CAP_NESTED, CAP_COMMIT]);
-    let child = descriptor(
-        WORKSPACE_ID,
-        Some(PARENT_ID),
-        OP_COMMIT,
-        &[CAP_NESTED, CAP_COMMIT],
-    );
+    let child = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_COMMIT, &[CAP_NESTED, CAP_COMMIT]);
     let adapter = branchfs_available(&[
         CAP_BRANCHFS,
         CAP_NESTED,
@@ -46,27 +41,16 @@ fn plan_accepts_leaf_commit_and_receipt_hashes_are_stable() {
     assert_eq!(first_plan.parent_workspace_id(), Some(PARENT_ID));
     assert_eq!(first_plan.descriptor_hash(), second_plan.descriptor_hash());
     assert_eq!(receipt.status(), crate::WorkspacePlanStatus::Ready);
-    assert_eq!(
-        receipt.outcome_kind(),
-        Some(crate::WorkspaceAdapterOutcomeKind::Committed)
-    );
+    assert_eq!(receipt.outcome_kind(), Some(crate::WorkspaceAdapterOutcomeKind::Committed));
     assert_eq!(receipt.manifest_count(), 1);
-    assert_eq!(
-        receipt.capability_labels().len(),
-        first_plan.required_capabilities().len()
-    );
+    assert_eq!(receipt.capability_labels().len(), first_plan.required_capabilities().len());
     assert_eq!(receipt.descriptor_hash(), first_plan.descriptor_hash());
 }
 
 #[test]
 fn plan_accepts_leaf_abort_without_touching_siblings() {
     let parent = descriptor(PARENT_ID, None, OP_CREATE, &[CAP_NESTED, CAP_ABORT]);
-    let child = descriptor(
-        WORKSPACE_ID,
-        Some(PARENT_ID),
-        OP_ABORT,
-        &[CAP_NESTED, CAP_ABORT],
-    );
+    let child = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_ABORT, &[CAP_NESTED, CAP_ABORT]);
     let sibling = descriptor("ws:sibling", Some(PARENT_ID), OP_CREATE, &[CAP_NESTED]);
     let adapter = branchfs_available(&[CAP_BRANCHFS, CAP_NESTED, CAP_ABORT, CAP_CLEANUP]);
     let descriptors = [parent, child, sibling];
@@ -89,10 +73,7 @@ fn plan_accepts_leaf_abort_without_touching_siblings() {
 
     assert!(plan.dispatch_allowed());
     assert_eq!(plan.issue(), crate::WorkspacePlanIssue::None);
-    assert_eq!(
-        receipt.outcome_kind(),
-        Some(crate::WorkspaceAdapterOutcomeKind::Aborted)
-    );
+    assert_eq!(receipt.outcome_kind(), Some(crate::WorkspaceAdapterOutcomeKind::Aborted));
 }
 
 #[test]
@@ -105,10 +86,7 @@ fn plan_rejects_invalid_graphs_before_adapter_dispatch() {
         selected_workspace_id: WORKSPACE_ID,
         adapter: &adapter,
     });
-    assert_eq!(
-        duplicate_plan.issue(),
-        crate::WorkspacePlanIssue::DuplicateWorkspace
-    );
+    assert_eq!(duplicate_plan.issue(), crate::WorkspacePlanIssue::DuplicateWorkspace);
     assert!(!duplicate_plan.dispatch_allowed());
 
     let missing_parent = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_CREATE, &[CAP_NESTED]);
@@ -118,10 +96,7 @@ fn plan_rejects_invalid_graphs_before_adapter_dispatch() {
         selected_workspace_id: WORKSPACE_ID,
         adapter: &adapter,
     });
-    assert_eq!(
-        missing_parent_plan.issue(),
-        crate::WorkspacePlanIssue::MissingParent
-    );
+    assert_eq!(missing_parent_plan.issue(), crate::WorkspacePlanIssue::MissingParent);
 
     let cycle_parent = descriptor(PARENT_ID, Some(WORKSPACE_ID), OP_CREATE, &[CAP_NESTED]);
     let cycle_child = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_CREATE, &[CAP_NESTED]);
@@ -137,12 +112,7 @@ fn plan_rejects_invalid_graphs_before_adapter_dispatch() {
 #[test]
 fn plan_rejects_non_leaf_mutation_and_capability_gaps() {
     let root = descriptor(ROOT_PARENT_ID, None, OP_CREATE, &[CAP_NESTED]);
-    let parent = descriptor(
-        PARENT_ID,
-        Some(ROOT_PARENT_ID),
-        OP_COMMIT,
-        &[CAP_NESTED, CAP_COMMIT],
-    );
+    let parent = descriptor(PARENT_ID, Some(ROOT_PARENT_ID), OP_COMMIT, &[CAP_NESTED, CAP_COMMIT]);
     let child = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_CREATE, &[CAP_NESTED]);
     let adapter = branchfs_available(&[CAP_BRANCHFS, CAP_NESTED, CAP_COMMIT]);
     let descriptors = [root, parent, child];
@@ -151,10 +121,7 @@ fn plan_rejects_non_leaf_mutation_and_capability_gaps() {
         selected_workspace_id: PARENT_ID,
         adapter: &adapter,
     });
-    assert_eq!(
-        non_leaf_plan.issue(),
-        crate::WorkspacePlanIssue::NonLeafCommit
-    );
+    assert_eq!(non_leaf_plan.issue(), crate::WorkspacePlanIssue::NonLeafCommit);
     assert!(!non_leaf_plan.dispatch_allowed());
 
     let requires_cleanup = descriptor(WORKSPACE_ID, None, OP_CREATE, &[CAP_CLEANUP]);
@@ -170,18 +137,9 @@ fn plan_rejects_non_leaf_mutation_and_capability_gaps() {
         outcome: None,
         manifest_labels: &[SAFE_MANIFEST_LABEL],
     });
-    assert_eq!(
-        capability_gap_plan.issue(),
-        crate::WorkspacePlanIssue::UnsupportedCapability
-    );
-    assert_eq!(
-        capability_gap_plan.unsupported_capabilities(),
-        &[crate::WorkspaceCapability::CleanupGuarantee]
-    );
-    assert_eq!(
-        receipt.unsupported_capability_labels(),
-        &[alloc::string::String::from(CAP_CLEANUP)]
-    );
+    assert_eq!(capability_gap_plan.issue(), crate::WorkspacePlanIssue::UnsupportedCapability);
+    assert_eq!(capability_gap_plan.unsupported_capabilities(), &[crate::WorkspaceCapability::CleanupGuarantee]);
+    assert_eq!(receipt.unsupported_capability_labels(), &[alloc::string::String::from(CAP_CLEANUP)]);
 }
 
 #[test]
@@ -208,18 +166,9 @@ fn plan_fails_closed_for_unavailable_partial_or_placeholder_adapters() {
         adapter: &placeholder,
     });
 
-    assert_eq!(
-        unavailable_plan.issue(),
-        crate::WorkspacePlanIssue::AdapterUnavailable
-    );
-    assert_eq!(
-        partial_plan.issue(),
-        crate::WorkspacePlanIssue::AdapterPartiallyEnforceable
-    );
-    assert_eq!(
-        placeholder_plan.issue(),
-        crate::WorkspacePlanIssue::AdapterUnsupported
-    );
+    assert_eq!(unavailable_plan.issue(), crate::WorkspacePlanIssue::AdapterUnavailable);
+    assert_eq!(partial_plan.issue(), crate::WorkspacePlanIssue::AdapterPartiallyEnforceable);
+    assert_eq!(placeholder_plan.issue(), crate::WorkspacePlanIssue::AdapterUnsupported);
     assert!(!unavailable_plan.dispatch_allowed());
     assert!(!partial_plan.dispatch_allowed());
     assert!(!placeholder_plan.dispatch_allowed());

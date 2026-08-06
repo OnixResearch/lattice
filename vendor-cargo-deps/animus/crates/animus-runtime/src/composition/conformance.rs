@@ -255,11 +255,7 @@ pub struct CompositionDiagnostic {
 impl CompositionDiagnostic {
     /// Builds a conformance diagnostic.
     #[must_use]
-    pub fn new(
-        kind: CompositionDiagnosticKind,
-        subject: impl Into<String>,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub fn new(kind: CompositionDiagnosticKind, subject: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
             kind,
             subject: subject.into(),
@@ -275,11 +271,7 @@ pub fn composition_conformance_matrix() -> Vec<CompositionScenario> {
         scenario(ScenarioSeed {
             id: "provider-model-dispatch",
             surface: CompositionSurface::ProviderModelDispatch,
-            features: &[
-                FEATURE_RUNTIME,
-                FEATURE_ADAPTERS,
-                FEATURE_PROVIDER_HARDENING,
-            ],
+            features: &[FEATURE_RUNTIME, FEATURE_ADAPTERS, FEATURE_PROVIDER_HARDENING],
             positive_case: "text-agent-provider-selection-dispatches-model",
             negative_case: "malformed-response-and-disabled-model-class-fail-closed",
             safe_evidence_label: "provider_model_dispatch_safe",
@@ -325,9 +317,7 @@ pub fn composition_conformance_matrix() -> Vec<CompositionScenario> {
 ///
 /// Returns diagnostics when an entry lacks owner, feature, positive, negative,
 /// or safe-evidence metadata, or when a required surface is absent.
-pub fn validate_composition_matrix(
-    matrix: &[CompositionScenario],
-) -> Result<(), Vec<CompositionDiagnostic>> {
+pub fn validate_composition_matrix(matrix: &[CompositionScenario]) -> Result<(), Vec<CompositionDiagnostic>> {
     let mut diagnostics = Vec::new();
     for entry in matrix {
         diagnostics.extend(validate_matrix_entry(entry));
@@ -404,7 +394,8 @@ pub fn render_composition_evidence(report: &CompositionRailReport) -> String {
     rendered.push_str(REPORT_SAFE_SECTION);
     rendered.push_str(":\n");
     rendered.push_str("- scenario names, case classes, counts, labels, and hashes only\n");
-    rendered.push_str("- raw prompts, provider payloads, credentials, private paths, and unbounded tool outputs omitted\n");
+    rendered
+        .push_str("- raw prompts, provider payloads, credentials, private paths, and unbounded tool outputs omitted\n");
     rendered
 }
 
@@ -441,11 +432,7 @@ fn scenario(seed: ScenarioSeed<'_>) -> CompositionScenario {
         id: String::from(seed.id),
         surface: seed.surface,
         owner: String::from(OWNER_RUNTIME),
-        feature_requirements: seed
-            .features
-            .iter()
-            .map(|feature| String::from(*feature))
-            .collect(),
+        feature_requirements: seed.features.iter().map(|feature| String::from(*feature)).collect(),
         positive_case: String::from(seed.positive_case),
         negative_case: String::from(seed.negative_case),
         safe_evidence_label: String::from(seed.safe_evidence_label),
@@ -455,11 +442,7 @@ fn scenario(seed: ScenarioSeed<'_>) -> CompositionScenario {
 fn validate_matrix_entry(entry: &CompositionScenario) -> Vec<CompositionDiagnostic> {
     let mut diagnostics = Vec::new();
     if entry.owner.trim().is_empty() {
-        diagnostics.push(matrix_issue(
-            CompositionDiagnosticKind::MissingOwner,
-            entry,
-            "owner is required",
-        ));
+        diagnostics.push(matrix_issue(CompositionDiagnosticKind::MissingOwner, entry, "owner is required"));
     }
     if entry.feature_requirements.is_empty() {
         diagnostics.push(matrix_issue(
@@ -506,17 +489,11 @@ fn validate_required_surfaces(matrix: &[CompositionScenario]) -> Vec<Composition
     diagnostics
 }
 
-fn matrix_issue(
-    kind: CompositionDiagnosticKind,
-    entry: &CompositionScenario,
-    detail: &str,
-) -> CompositionDiagnostic {
+fn matrix_issue(kind: CompositionDiagnosticKind, entry: &CompositionScenario, detail: &str) -> CompositionDiagnostic {
     CompositionDiagnostic::new(kind, entry.id.clone(), detail)
 }
 
-fn evaluate_scenario(
-    entry: &CompositionScenario,
-) -> Result<Vec<CompositionEvidenceRecord>, CompositionDiagnostic> {
+fn evaluate_scenario(entry: &CompositionScenario) -> Result<Vec<CompositionEvidenceRecord>, CompositionDiagnostic> {
     match entry.surface {
         CompositionSurface::ProviderModelDispatch => provider_model_dispatch(entry),
         CompositionSurface::ToolProvenanceReceipt => tool_provenance_receipt(entry),
@@ -544,10 +521,7 @@ fn provider_model_dispatch(
     let response = animus_adapters::ComponentAdapter::call(&mut adapter, &request)
         .map_err(|error| scenario_failure(entry, error))?;
     if response.message() != SAFE_MODEL_MESSAGE || adapter.calls != EXPECTED_FAKE_CALL_COUNT {
-        return Err(scenario_failure(
-            entry,
-            "fake model adapter did not dispatch once",
-        ));
+        return Err(scenario_failure(entry, "fake model adapter did not dispatch once"));
     }
     let receipt = crate::provider_selection_receipt(&crate::ProviderSelectionReceiptInput {
         provider_id: String::from(SAFE_PROVIDER_ID),
@@ -559,46 +533,21 @@ fn provider_model_dispatch(
         diagnostics: Vec::new(),
     });
     if !receipt.endpoint_identity.starts_with(HASH_ALGORITHM) {
-        return Err(scenario_failure(
-            entry,
-            "sensitive provider endpoint was not hashed",
-        ));
+        return Err(scenario_failure(entry, "sensitive provider endpoint was not hashed"));
     }
 
     let is_malformed_response_rejected = animus_adapters::ModelResponse::new("").is_err();
     let is_disabled_model_rejected = crate::filter_agent_model(&image_model(), false).is_err();
-    let is_ambiguous_style_rejected = crate::resolve_provider_api_style(
-        None,
-        false,
-        crate::ProviderApiStylePolicy::RequireExplicit,
-    )
-    .is_err();
-    if !is_malformed_response_rejected
-        || !is_disabled_model_rejected
-        || !is_ambiguous_style_rejected
-    {
-        return Err(scenario_failure(
-            entry,
-            "provider/model negative cases did not fail closed",
-        ));
+    let is_ambiguous_style_rejected =
+        crate::resolve_provider_api_style(None, false, crate::ProviderApiStylePolicy::RequireExplicit).is_err();
+    if !is_malformed_response_rejected || !is_disabled_model_rejected || !is_ambiguous_style_rejected {
+        return Err(scenario_failure(entry, "provider/model negative cases did not fail closed"));
     }
 
     Ok(vec![
-        record(
-            entry,
-            CompositionCaseKind::Positive,
-            "model_dispatch_completed",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "malformed_response_rejected",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "disabled_feature_surface_rejected",
-        ),
+        record(entry, CompositionCaseKind::Positive, "model_dispatch_completed"),
+        record(entry, CompositionCaseKind::Negative, "malformed_response_rejected"),
+        record(entry, CompositionCaseKind::Negative, "disabled_feature_surface_rejected"),
     ])
 }
 
@@ -608,26 +557,10 @@ fn tool_provenance_receipt(
     let positive = tool_provenance_positive(entry)?;
     tool_provenance_negative(entry, &positive.definition, positive.output_byte_count)?;
     Ok(vec![
-        record(
-            entry,
-            CompositionCaseKind::Positive,
-            "tool_receipt_completed",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "unauthorized_tool_denied",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "oversized_output_rejected",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "unsafe_receipt_rejected",
-        ),
+        record(entry, CompositionCaseKind::Positive, "tool_receipt_completed"),
+        record(entry, CompositionCaseKind::Negative, "unauthorized_tool_denied"),
+        record(entry, CompositionCaseKind::Negative, "oversized_output_rejected"),
+        record(entry, CompositionCaseKind::Negative, "unsafe_receipt_rejected"),
     ])
 }
 
@@ -636,42 +569,27 @@ struct ToolProvenancePositive {
     output_byte_count: u64,
 }
 
-fn tool_provenance_positive(
-    entry: &CompositionScenario,
-) -> Result<ToolProvenancePositive, CompositionDiagnostic> {
+fn tool_provenance_positive(entry: &CompositionScenario) -> Result<ToolProvenancePositive, CompositionDiagnostic> {
     let definition = tool_definition(entry)?;
     let request = tool_request(entry)?;
     let mut adapter = FakeToolAdapter::new(TOOL_OUTPUT_SUMMARY);
     let response = animus_adapters::ComponentAdapter::call(&mut adapter, &request)
         .map_err(|error| scenario_failure(entry, error))?;
-    let output = bounded_tool_output(
-        TOOL_OUTPUT_SUMMARY,
-        animus_adapters::tool::HashRequirement::Required,
-    )
-    .map_err(|error| scenario_failure(entry, format!("bounded output: {error:?}")))?;
+    let output = bounded_tool_output(TOOL_OUTPUT_SUMMARY, animus_adapters::tool::HashRequirement::Required)
+        .map_err(|error| scenario_failure(entry, format!("bounded output: {error:?}")))?;
     if response.output() != output.visible_text() || adapter.calls != EXPECTED_FAKE_CALL_COUNT {
-        return Err(scenario_failure(
-            entry,
-            "fake tool adapter did not return bounded output",
-        ));
+        return Err(scenario_failure(entry, "fake tool adapter did not return bounded output"));
     }
     let kit_receipt = tool_executor_kit_receipt(entry, definition.clone(), &request)?;
     if kit_receipt.status() != crate::tool_executor_kit::ToolExecutionReceiptStatus::Completed {
-        return Err(scenario_failure(
-            entry,
-            "tool executor kit did not produce a completed safe receipt",
-        ));
+        return Err(scenario_failure(entry, "tool executor kit did not produce a completed safe receipt"));
     }
-    let effect =
-        completed_tool_effect(entry, Some(output.byte_count()), Some(output.byte_count()))?;
+    let effect = completed_tool_effect(entry, Some(output.byte_count()), Some(output.byte_count()))?;
     let (_fact, receipt) = effect
         .completed_evidence(TOOL_RECEIPT_ID, TOOL_ARTIFACT_HASH)
         .map_err(|error| scenario_failure(entry, format!("completed evidence: {error:?}")))?;
     if receipt.artifact_hashes.is_empty() || receipt.redaction_markers.is_empty() {
-        return Err(scenario_failure(
-            entry,
-            "receipt omitted artifact hash or redaction marker",
-        ));
+        return Err(scenario_failure(entry, "receipt omitted artifact hash or redaction marker"));
     }
     Ok(ToolProvenancePositive {
         definition,
@@ -696,10 +614,8 @@ fn tool_provenance_negative(
         animus_adapters::tool::CapabilityStatus::Allowed,
         animus_adapters::tool::OutputBoundaryStatus::UnboundedOversized,
     );
-    let is_denial_failed_closed = failed_without_fallback(
-        denied,
-        Some(animus_adapters::tool::FailureClass::DeniedCapability),
-    );
+    let is_denial_failed_closed =
+        failed_without_fallback(denied, Some(animus_adapters::tool::FailureClass::DeniedCapability));
     let is_boundary_rejection_recorded = failed_without_fallback(
         output_boundary_decision,
         Some(animus_adapters::tool::FailureClass::UnboundedOversizedOutput),
@@ -718,10 +634,7 @@ fn tool_provenance_negative(
     ]) {
         return Ok(());
     }
-    Err(scenario_failure(
-        entry,
-        "tool/provenance negative cases did not fail closed",
-    ))
+    Err(scenario_failure(entry, "tool/provenance negative cases did not fail closed"))
 }
 
 fn unsafe_receipt_is_rejected(output_byte_count: u64) -> bool {
@@ -744,9 +657,7 @@ fn unsafe_receipt_is_rejected(output_byte_count: u64) -> bool {
     .is_err()
 }
 
-fn denied_effect_refuses_completion(
-    entry: &CompositionScenario,
-) -> Result<bool, CompositionDiagnostic> {
+fn denied_effect_refuses_completion(entry: &CompositionScenario) -> Result<bool, CompositionDiagnostic> {
     let denied_effect = crate::ProvenanceToolEffect::validate(&crate::ProvenanceToolEffectDraft {
         tool_kind: TOOL_NAME,
         service_label: TOOL_SERVICE_LABEL,
@@ -757,21 +668,13 @@ fn denied_effect_refuses_completion(
         retained_output_bytes: None,
     })
     .map_err(|error| scenario_failure(entry, format!("denied effect: {error:?}")))?;
-    Ok(denied_effect
-        .completed_evidence(TOOL_RECEIPT_ID, TOOL_ARTIFACT_HASH)
-        .is_err())
+    Ok(denied_effect.completed_evidence(TOOL_RECEIPT_ID, TOOL_ARTIFACT_HASH).is_err())
 }
 
 fn oversized_output_is_hashed(entry: &CompositionScenario) -> Result<bool, CompositionDiagnostic> {
-    let truncated = bounded_tool_output(
-        "oversized-result-body",
-        animus_adapters::tool::HashRequirement::Required,
-    )
-    .map_err(|error| scenario_failure(entry, format!("truncated output: {error:?}")))?;
-    Ok(
-        truncated.status() == animus_adapters::tool::OutputStatus::Truncated
-            && truncated.content_hash().is_some(),
-    )
+    let truncated = bounded_tool_output("oversized-result-body", animus_adapters::tool::HashRequirement::Required)
+        .map_err(|error| scenario_failure(entry, format!("truncated output: {error:?}")))?;
+    Ok(truncated.status() == animus_adapters::tool::OutputStatus::Truncated && truncated.content_hash().is_some())
 }
 
 fn headless_runtime_events(
@@ -786,45 +689,22 @@ fn headless_runtime_events(
         },
     ])
     .map_err(|error| scenario_failure(entry, format!("headless projection: {error:?}")))?;
-    if events.is_empty()
-        || events
-            .iter()
-            .any(|event| event.summary().contains(TOOL_INPUT_SUMMARY))
-    {
-        return Err(scenario_failure(
-            entry,
-            "headless event projection leaked tool input",
-        ));
+    if events.is_empty() || events.iter().any(|event| event.summary().contains(TOOL_INPUT_SUMMARY)) {
+        return Err(scenario_failure(entry, "headless event projection leaked tool input"));
     }
     let unsafe_response = match crate::parse_headless_command_record(HEADLESS_UNSAFE_RECORD) {
         Ok(_command) => {
-            return Err(scenario_failure(
-                entry,
-                "unsafe headless record was accepted",
-            ));
+            return Err(scenario_failure(entry, "unsafe headless record was accepted"));
         }
         Err(response) => response,
     };
-    let is_error_redacted = unsafe_response
-        .error()
-        .is_some_and(|error| !error.message().contains("secret"));
+    let is_error_redacted = unsafe_response.error().is_some_and(|error| !error.message().contains("secret"));
     if !is_error_redacted {
-        return Err(scenario_failure(
-            entry,
-            "unsafe headless record echoed unsafe payload",
-        ));
+        return Err(scenario_failure(entry, "unsafe headless record echoed unsafe payload"));
     }
     Ok(vec![
-        record(
-            entry,
-            CompositionCaseKind::Positive,
-            "headless_projection_completed",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "unsafe_headless_record_redacted",
-        ),
+        record(entry, CompositionCaseKind::Positive, "headless_projection_completed"),
+        record(entry, CompositionCaseKind::Negative, "unsafe_headless_record_redacted"),
     ])
 }
 
@@ -833,10 +713,8 @@ fn middleware_failure_report(
 ) -> Result<Vec<CompositionEvidenceRecord>, CompositionDiagnostic> {
     let request = tool_request(entry)?;
     let mut stack = crate::RuntimeMiddlewareStack::empty();
-    let is_dispatch_accepted = matches!(
-        stack.prepare_tool_dispatch(request.clone()),
-        crate::hooks::chain::MiddlewareOutcome::Accepted(_)
-    );
+    let is_dispatch_accepted =
+        matches!(stack.prepare_tool_dispatch(request.clone()), crate::hooks::chain::MiddlewareOutcome::Accepted(_));
     let blocked_turn = crate::complete_with_guard_block(
         turn_state(entry)?,
         crate::AdapterRequest::Tool {
@@ -845,43 +723,19 @@ fn middleware_failure_report(
         String::from(MIDDLEWARE_HOOK),
         String::from(MIDDLEWARE_REASON),
     );
-    let failure = crate::MiddlewareError::new(
-        crate::HookBoundary::ToolDispatch,
-        MIDDLEWARE_HOOK,
-        MIDDLEWARE_FAILURE,
-    );
-    let failed_turn = crate::complete_with_guard_failure(
-        turn_state(entry)?,
-        crate::AdapterRequest::Tool { request },
-        &failure,
-    );
+    let failure = crate::MiddlewareError::new(crate::HookBoundary::ToolDispatch, MIDDLEWARE_HOOK, MIDDLEWARE_FAILURE);
+    let failed_turn =
+        crate::complete_with_guard_failure(turn_state(entry)?, crate::AdapterRequest::Tool { request }, &failure);
     let is_block_failed_closed = failed_middleware_report(&blocked_turn, MIDDLEWARE_REASON)
-        && blocked_turn
-            .events()
-            .iter()
-            .any(|event| matches!(event, crate::RuntimeEvent::HookBlocked { .. }));
+        && blocked_turn.events().iter().any(|event| matches!(event, crate::RuntimeEvent::HookBlocked { .. }));
     let is_failure_failed_closed = failed_middleware_report(&failed_turn, MIDDLEWARE_FAILURE)
-        && failed_turn
-            .events()
-            .iter()
-            .any(|event| matches!(event, crate::RuntimeEvent::HookFailed { .. }));
+        && failed_turn.events().iter().any(|event| matches!(event, crate::RuntimeEvent::HookFailed { .. }));
     if !is_dispatch_accepted || !is_block_failed_closed || !is_failure_failed_closed {
-        return Err(scenario_failure(
-            entry,
-            "middleware acceptance or failure report did not compose",
-        ));
+        return Err(scenario_failure(entry, "middleware acceptance or failure report did not compose"));
     }
     Ok(vec![
-        record(
-            entry,
-            CompositionCaseKind::Positive,
-            "middleware_dispatch_accepted",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "middleware_denial_failed_report",
-        ),
+        record(entry, CompositionCaseKind::Positive, "middleware_dispatch_accepted"),
+        record(entry, CompositionCaseKind::Negative, "middleware_denial_failed_report"),
     ])
 }
 
@@ -913,47 +767,26 @@ fn capability_no_fallback(
         animus_adapters::tool::CapabilityStatus::Allowed,
         animus_adapters::tool::OutputBoundaryStatus::Bounded,
     );
-    let is_ready_without_fallback = ready.status() == animus_adapters::tool::DispatchStatus::Ready
-        && !ready.fallback_attempted();
-    let is_missing_failed_closed = failed_without_fallback(
-        missing,
-        Some(animus_adapters::tool::FailureClass::MissingExecutor),
-    );
-    let is_denied_failed_closed = failed_without_fallback(
-        denied,
-        Some(animus_adapters::tool::FailureClass::DeniedCapability),
-    );
-    let is_unknown_tool_failed_closed = failed_without_fallback(
-        unknown_tool,
-        Some(animus_adapters::tool::FailureClass::InvalidInput),
-    );
+    let is_ready_without_fallback =
+        ready.status() == animus_adapters::tool::DispatchStatus::Ready && !ready.fallback_attempted();
+    let is_missing_failed_closed =
+        failed_without_fallback(missing, Some(animus_adapters::tool::FailureClass::MissingExecutor));
+    let is_denied_failed_closed =
+        failed_without_fallback(denied, Some(animus_adapters::tool::FailureClass::DeniedCapability));
+    let is_unknown_tool_failed_closed =
+        failed_without_fallback(unknown_tool, Some(animus_adapters::tool::FailureClass::InvalidInput));
     if !all_checks_pass::<CAPABILITY_CHECK_COUNT>([
         is_ready_without_fallback,
         is_missing_failed_closed,
         is_denied_failed_closed,
         is_unknown_tool_failed_closed,
     ]) {
-        return Err(scenario_failure(
-            entry,
-            "capability dispatch attempted fallback or missed denial",
-        ));
+        return Err(scenario_failure(entry, "capability dispatch attempted fallback or missed denial"));
     }
     Ok(vec![
-        record(
-            entry,
-            CompositionCaseKind::Positive,
-            "capability_dispatch_ready",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "missing_service_no_fallback",
-        ),
-        record(
-            entry,
-            CompositionCaseKind::Negative,
-            "ambient_fallback_not_attempted",
-        ),
+        record(entry, CompositionCaseKind::Positive, "capability_dispatch_ready"),
+        record(entry, CompositionCaseKind::Negative, "missing_service_no_fallback"),
+        record(entry, CompositionCaseKind::Negative, "ambient_fallback_not_attempted"),
     ])
 }
 
@@ -976,9 +809,7 @@ fn model(model_class: crate::ProviderModelClass) -> crate::ProviderModelMetadata
     }
 }
 
-fn tool_definition(
-    entry: &CompositionScenario,
-) -> Result<animus_adapters::tool::Definition, CompositionDiagnostic> {
+fn tool_definition(entry: &CompositionScenario) -> Result<animus_adapters::tool::Definition, CompositionDiagnostic> {
     animus_adapters::tool::Definition::validate(&animus_adapters::tool::DefinitionDraft {
         name: Some(TOOL_NAME),
         label: Some(TOOL_LABEL),
@@ -995,22 +826,19 @@ fn tool_definition(
     .map_err(|error| scenario_failure(entry, format!("tool definition: {error:?}")))
 }
 
-fn tool_request(
-    entry: &CompositionScenario,
-) -> Result<animus_adapters::ToolRequest, CompositionDiagnostic> {
+fn tool_request(entry: &CompositionScenario) -> Result<animus_adapters::ToolRequest, CompositionDiagnostic> {
     let fields = [animus_adapters::tool::ArgumentFieldDraft {
         name: Some(TOOL_ARGUMENT_NAME),
         value: Some(TOOL_INPUT_SUMMARY),
     }];
-    let arguments = animus_adapters::tool::PreparedArguments::prepare(
-        &animus_adapters::tool::ArgumentPreparationRequest {
+    let arguments =
+        animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
             current_schema_identity: TOOL_SCHEMA_ID,
             allowed_field_names: &[TOOL_ARGUMENT_NAME],
             compatibility_rules: &[],
             fields: &fields,
-        },
-    )
-    .map_err(|error| scenario_failure(entry, format!("tool arguments: {error:?}")))?;
+        })
+        .map_err(|error| scenario_failure(entry, format!("tool arguments: {error:?}")))?;
     animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
         name: Some(TOOL_NAME),
         arguments: Some(&arguments),
@@ -1037,23 +865,18 @@ fn tool_executor_kit_receipt(
         crate::tool_executor_kit::ToolExecutorReadiness::Ready,
     )
     .map_err(|error| scenario_failure(entry, format!("executor binding: {error:?}")))?;
-    let plan = crate::tool_executor_kit::plan_tool_execution(
-        crate::tool_executor_kit::ToolExecutionPlanRequest {
-            request,
-            catalog: &catalog,
-            capabilities: &registry,
-            executors: &[executor_binding],
-            admission: crate::tool_executor_kit::ToolExecutorAdmission::admitted(),
-        },
-    );
+    let plan = crate::tool_executor_kit::plan_tool_execution(crate::tool_executor_kit::ToolExecutionPlanRequest {
+        request,
+        catalog: &catalog,
+        capabilities: &registry,
+        executors: &[executor_binding],
+        admission: crate::tool_executor_kit::ToolExecutorAdmission::admitted(),
+    });
     let mut executor = FakeKitExecutor::new();
     let receipt = crate::tool_executor_kit::execute_admitted_tool(&mut executor, &plan)
         .map_err(|error| scenario_failure(entry, format!("kit execution: {error:?}")))?;
     if executor.calls != EXPECTED_FAKE_CALL_COUNT {
-        return Err(scenario_failure(
-            entry,
-            "tool executor kit fake service was not called exactly once",
-        ));
+        return Err(scenario_failure(entry, "tool executor kit fake service was not called exactly once"));
     }
     Ok(receipt)
 }
@@ -1065,19 +888,16 @@ fn tool_executor_kit_missing_fails_closed(
     let request = tool_request(entry)?;
     let catalog = tool_executor_kit_catalog(entry, definition.clone())?;
     let registry = tool_executor_kit_registry(entry)?;
-    let plan = crate::tool_executor_kit::plan_tool_execution(
-        crate::tool_executor_kit::ToolExecutionPlanRequest {
-            request: &request,
-            catalog: &catalog,
-            capabilities: &registry,
-            executors: &[],
-            admission: crate::tool_executor_kit::ToolExecutorAdmission::admitted(),
-        },
-    );
+    let plan = crate::tool_executor_kit::plan_tool_execution(crate::tool_executor_kit::ToolExecutionPlanRequest {
+        request: &request,
+        catalog: &catalog,
+        capabilities: &registry,
+        executors: &[],
+        admission: crate::tool_executor_kit::ToolExecutorAdmission::admitted(),
+    });
     let receipt = crate::tool_executor_kit::denied_tool_receipt(&plan)
         .map_err(|error| scenario_failure(entry, format!("kit denial receipt: {error:?}")))?;
-    Ok(plan.failure_class()
-        == Some(crate::tool_executor_kit::ToolExecutionFailureClass::MissingExecutor)
+    Ok(plan.failure_class() == Some(crate::tool_executor_kit::ToolExecutionFailureClass::MissingExecutor)
         && receipt.status() == crate::tool_executor_kit::ToolExecutionReceiptStatus::Denied)
 }
 
@@ -1091,17 +911,16 @@ fn tool_executor_kit_catalog(
         false,
     )
     .map_err(|error| scenario_failure(entry, format!("kit output policy: {error:?}")))?;
-    let definition = crate::tool_executor_kit::ToolDefinition::from_draft(
-        crate::tool_executor_kit::ToolDefinitionDraft {
+    let definition =
+        crate::tool_executor_kit::ToolDefinition::from_draft(crate::tool_executor_kit::ToolDefinitionDraft {
             metadata: definition,
             executor_binding: TOOL_EXECUTOR_BINDING,
             argument_names: &[TOOL_ARGUMENT_NAME],
             mutation_posture: crate::tool_executor_kit::ToolMutationPosture::DeclaredTargets,
             output_policy,
             approval_posture: animus_adapters::tool::ApprovalPosture::PreApproved,
-        },
-    )
-    .map_err(|error| scenario_failure(entry, format!("kit definition: {error:?}")))?;
+        })
+        .map_err(|error| scenario_failure(entry, format!("kit definition: {error:?}")))?;
     crate::tool_executor_kit::ToolCatalog::new(vec![definition])
         .map_err(|error| scenario_failure(entry, format!("kit catalog: {error:?}")))
 }
@@ -1117,9 +936,7 @@ fn tool_executor_kit_registry(
     .map_err(|error| scenario_failure(entry, format!("kit capability registry: {error:?}")))
 }
 
-fn tool_response(
-    body: &str,
-) -> Result<animus_adapters::ToolResponse, animus_adapters::tool::ContractError> {
+fn tool_response(body: &str) -> Result<animus_adapters::ToolResponse, animus_adapters::tool::ContractError> {
     let bounded = bounded_tool_output(body, animus_adapters::tool::HashRequirement::Required)?;
     Ok(animus_adapters::ToolResponse::from_bounded(
         bounded,
@@ -1202,34 +1019,19 @@ fn failed_middleware_report(report: &crate::RunReport, message: &str) -> bool {
     )
 }
 
-fn report_from_records(
-    scenario_count: usize,
-    records: Vec<CompositionEvidenceRecord>,
-) -> CompositionRailReport {
-    let positive_count = records
-        .iter()
-        .filter(|record| record.case_kind == CompositionCaseKind::Positive)
-        .count();
-    let negative_count = records
-        .iter()
-        .filter(|record| record.case_kind == CompositionCaseKind::Negative)
-        .count();
-    let record_hashes: Vec<&str> = records
-        .iter()
-        .map(|record| record.evidence_hash.as_str())
-        .collect();
+fn report_from_records(scenario_count: usize, records: Vec<CompositionEvidenceRecord>) -> CompositionRailReport {
+    let positive_count = records.iter().filter(|record| record.case_kind == CompositionCaseKind::Positive).count();
+    let negative_count = records.iter().filter(|record| record.case_kind == CompositionCaseKind::Negative).count();
+    let record_hashes: Vec<&str> = records.iter().map(|record| record.evidence_hash.as_str()).collect();
     let scenario_count_text = scenario_count.to_string();
     let positive_count_text = positive_count.to_string();
     let negative_count_text = negative_count.to_string();
-    let rail_fingerprint = fingerprint(
-        "report",
-        &[
-            scenario_count_text.as_str(),
-            positive_count_text.as_str(),
-            negative_count_text.as_str(),
-            &record_hashes.join(HASH_SEPARATOR),
-        ],
-    );
+    let rail_fingerprint = fingerprint("report", &[
+        scenario_count_text.as_str(),
+        positive_count_text.as_str(),
+        negative_count_text.as_str(),
+        &record_hashes.join(HASH_SEPARATOR),
+    ]);
     CompositionRailReport {
         scenario_count,
         positive_count,
@@ -1239,21 +1041,14 @@ fn report_from_records(
     }
 }
 
-fn record(
-    entry: &CompositionScenario,
-    case_kind: CompositionCaseKind,
-    outcome: &str,
-) -> CompositionEvidenceRecord {
-    let evidence_hash = fingerprint(
-        "record",
-        &[
-            entry.id.as_str(),
-            entry.surface.as_str(),
-            case_kind.as_str(),
-            outcome,
-            entry.safe_evidence_label.as_str(),
-        ],
-    );
+fn record(entry: &CompositionScenario, case_kind: CompositionCaseKind, outcome: &str) -> CompositionEvidenceRecord {
+    let evidence_hash = fingerprint("record", &[
+        entry.id.as_str(),
+        entry.surface.as_str(),
+        case_kind.as_str(),
+        outcome,
+        entry.safe_evidence_label.as_str(),
+    ]);
     CompositionEvidenceRecord {
         scenario_id: entry.id.clone(),
         surface: entry.surface,
@@ -1276,15 +1071,8 @@ fn fingerprint(label: &str, parts: &[&str]) -> String {
     format!("{HASH_ALGORITHM}:{}", hasher.finalize().to_hex())
 }
 
-fn scenario_failure(
-    entry: &CompositionScenario,
-    detail: impl Into<String>,
-) -> CompositionDiagnostic {
-    CompositionDiagnostic::new(
-        CompositionDiagnosticKind::ScenarioFailed,
-        entry.id.clone(),
-        detail,
-    )
+fn scenario_failure(entry: &CompositionScenario, detail: impl Into<String>) -> CompositionDiagnostic {
+    CompositionDiagnostic::new(CompositionDiagnosticKind::ScenarioFailed, entry.id.clone(), detail)
 }
 
 struct FakeModelAdapter {
@@ -1301,22 +1089,17 @@ impl FakeModelAdapter {
     }
 }
 
-impl
-    animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse>
+impl animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse>
     for FakeModelAdapter
 {
     type Error = String;
 
-    fn call(
-        &mut self,
-        request: &animus_adapters::ModelRequest,
-    ) -> Result<animus_adapters::ModelResponse, Self::Error> {
+    fn call(&mut self, request: &animus_adapters::ModelRequest) -> Result<animus_adapters::ModelResponse, Self::Error> {
         if request.prompt().trim().is_empty() {
             return Err(String::from("empty_prompt"));
         }
         self.calls += 1;
-        animus_adapters::ModelResponse::new(self.response_message)
-            .map_err(|error| format!("{error:?}"))
+        animus_adapters::ModelResponse::new(self.response_message).map_err(|error| format!("{error:?}"))
     }
 }
 
@@ -1338,10 +1121,8 @@ impl crate::tool_executor_kit::ToolExecutorService for FakeKitExecutor {
     fn execute(
         &mut self,
         _plan: &crate::tool_executor_kit::ToolExecutionPlan,
-    ) -> Result<
-        crate::tool_executor_kit::ToolExecutorOutput,
-        crate::tool_executor_kit::ToolExecutorServiceFailure,
-    > {
+    ) -> Result<crate::tool_executor_kit::ToolExecutorOutput, crate::tool_executor_kit::ToolExecutorServiceFailure>
+    {
         self.calls += EXPECTED_FAKE_CALL_COUNT;
         Ok(crate::tool_executor_kit::ToolExecutorOutput::new(
             TOOL_OUTPUT_SUMMARY,
@@ -1367,10 +1148,7 @@ impl animus_adapters::ComponentAdapter<animus_adapters::ToolRequest, animus_adap
 {
     type Error = String;
 
-    fn call(
-        &mut self,
-        request: &animus_adapters::ToolRequest,
-    ) -> Result<animus_adapters::ToolResponse, Self::Error> {
+    fn call(&mut self, request: &animus_adapters::ToolRequest) -> Result<animus_adapters::ToolResponse, Self::Error> {
         if request.name() != TOOL_NAME {
             return Err(String::from("unknown_tool"));
         }
@@ -1396,18 +1174,10 @@ mod tests {
         validate_composition_matrix(&matrix).expect("matrix should be complete");
         assert_eq!(matrix.len(), EXPECTED_SCENARIO_COUNT);
         assert!(matrix.iter().all(|entry| !entry.owner.is_empty()));
-        assert!(
-            matrix
-                .iter()
-                .all(|entry| !entry.feature_requirements.is_empty())
-        );
+        assert!(matrix.iter().all(|entry| !entry.feature_requirements.is_empty()));
         assert!(matrix.iter().all(|entry| !entry.positive_case.is_empty()));
         assert!(matrix.iter().all(|entry| !entry.negative_case.is_empty()));
-        assert!(
-            matrix
-                .iter()
-                .all(|entry| !entry.safe_evidence_label.is_empty())
-        );
+        assert!(matrix.iter().all(|entry| !entry.safe_evidence_label.is_empty()));
     }
 
     #[test]
@@ -1422,22 +1192,27 @@ mod tests {
 
         let diagnostics = validate_composition_matrix(&matrix).expect_err("matrix should fail");
 
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingOwner));
         assert!(
             diagnostics
                 .iter()
-                .any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingOwner)
+                .any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingFeatureRequirements)
         );
         assert!(
-            diagnostics.iter().any(|diagnostic| diagnostic.kind
-                == CompositionDiagnosticKind::MissingFeatureRequirements)
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingPositiveCase)
         );
-        assert!(diagnostics.iter().any(|diagnostic| diagnostic.kind
-            == CompositionDiagnosticKind::MissingPositiveCase));
-        assert!(diagnostics.iter().any(|diagnostic| diagnostic.kind
-            == CompositionDiagnosticKind::MissingNegativeCase));
-        assert!(diagnostics.iter().any(
-            |diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingSafeEvidenceLabel
-        ));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingNegativeCase)
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.kind == CompositionDiagnosticKind::MissingSafeEvidenceLabel)
+        );
     }
 
     #[test]
@@ -1447,36 +1222,11 @@ mod tests {
 
         assert_eq!(rail_snapshot.scenario_count, EXPECTED_SCENARIO_COUNT);
         assert_eq!(rail_snapshot.positive_count, EXPECTED_POSITIVE_RECORDS);
-        assert!(
-            rail_snapshot
-                .records
-                .iter()
-                .any(|record| record.outcome == "model_dispatch_completed")
-        );
-        assert!(
-            rail_snapshot
-                .records
-                .iter()
-                .any(|record| record.outcome == "tool_receipt_completed")
-        );
-        assert!(
-            rail_snapshot
-                .records
-                .iter()
-                .any(|record| record.outcome == "headless_projection_completed")
-        );
-        assert!(
-            rail_snapshot
-                .records
-                .iter()
-                .any(|record| record.outcome == "middleware_dispatch_accepted")
-        );
-        assert!(
-            rail_snapshot
-                .records
-                .iter()
-                .any(|record| record.outcome == "capability_dispatch_ready")
-        );
+        assert!(rail_snapshot.records.iter().any(|record| record.outcome == "model_dispatch_completed"));
+        assert!(rail_snapshot.records.iter().any(|record| record.outcome == "tool_receipt_completed"));
+        assert!(rail_snapshot.records.iter().any(|record| record.outcome == "headless_projection_completed"));
+        assert!(rail_snapshot.records.iter().any(|record| record.outcome == "middleware_dispatch_accepted"));
+        assert!(rail_snapshot.records.iter().any(|record| record.outcome == "capability_dispatch_ready"));
     }
 
     #[test]
@@ -1500,8 +1250,7 @@ mod tests {
                 rail_snapshot
                     .records
                     .iter()
-                    .any(|record| record.outcome == outcome
-                        && record.case_kind == CompositionCaseKind::Negative),
+                    .any(|record| record.outcome == outcome && record.case_kind == CompositionCaseKind::Negative),
                 "missing negative outcome {outcome}"
             );
         }
@@ -1527,12 +1276,8 @@ mod tests {
         // r[verify agent_harness_runtime.composability.conformance_rail.safe_evidence]
         for marker in UNSAFE_EVIDENCE_MARKERS {
             let evidence = format!("schema: {RAIL_SCHEMA}\nrail: {RAIL_NAME}\n{marker}\n");
-            let diagnostics =
-                validate_composition_evidence_text(&evidence).expect_err("leak marker should fail");
-            assert_eq!(
-                diagnostics[0].kind,
-                CompositionDiagnosticKind::UnsafeEvidence
-            );
+            let diagnostics = validate_composition_evidence_text(&evidence).expect_err("leak marker should fail");
+            assert_eq!(diagnostics[0].kind, CompositionDiagnosticKind::UnsafeEvidence);
         }
     }
 }

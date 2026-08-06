@@ -2,14 +2,22 @@
 
 use rat_chrome::overlay_frame;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
+use ratatui::layout::Constraint;
+use ratatui::layout::Direction;
+use ratatui::layout::Layout;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
-use crate::popup_chrome::{
-    POPUP_MARGIN, centered_overlay_model, clamped_axis, themed_overlay_style, title, usize_to_u16,
-};
+use crate::popup_chrome::POPUP_MARGIN;
+use crate::popup_chrome::centered_overlay_model;
+use crate::popup_chrome::clamped_axis;
+use crate::popup_chrome::themed_overlay_style;
+use crate::popup_chrome::title;
+use crate::popup_chrome::usize_to_u16;
 use crate::theme::WidgetTheme;
 
 const GRID_CELL_WIDTH: u16 = 20;
@@ -152,12 +160,7 @@ impl GridSelect {
             return;
         }
 
-        let model = grid_overlay_model(
-            area,
-            &self.title,
-            self.model.items.len(),
-            self.model.columns,
-        );
+        let model = grid_overlay_model(area, &self.title, self.model.items.len(), self.model.columns);
         let style = themed_overlay_style(theme, theme.primary);
         let layout = overlay_frame(frame, area, &model, &style);
 
@@ -187,10 +190,7 @@ impl GridSelect {
         // Create row constraints
         let row_constraints: Vec<Constraint> = (0..rows).map(|_| Constraint::Length(1)).collect();
 
-        let row_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(row_constraints)
-            .split(area);
+        let row_layout = Layout::default().direction(Direction::Vertical).constraints(row_constraints).split(area);
 
         for row in 0..rows {
             if row >= row_layout.len() {
@@ -200,16 +200,12 @@ impl GridSelect {
             let row_area = row_layout[row];
 
             // Create column constraints for this row
-            let items_in_row = ((row + 1) * self.model.columns).min(self.model.items.len())
-                - row * self.model.columns;
-            let col_constraints: Vec<Constraint> = (0..items_in_row)
-                .map(|_| Constraint::Ratio(1, items_in_row as u32))
-                .collect();
+            let items_in_row = ((row + 1) * self.model.columns).min(self.model.items.len()) - row * self.model.columns;
+            let col_constraints: Vec<Constraint> =
+                (0..items_in_row).map(|_| Constraint::Ratio(1, items_in_row as u32)).collect();
 
-            let col_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(col_constraints)
-                .split(row_area);
+            let col_layout =
+                Layout::default().direction(Direction::Horizontal).constraints(col_constraints).split(row_area);
 
             for col in 0..items_in_row {
                 let item_index = row * self.model.columns + col;
@@ -226,14 +222,7 @@ impl GridSelect {
         }
     }
 
-    fn render_cell(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        item: &GridItem,
-        selected: bool,
-        theme: &WidgetTheme,
-    ) {
+    fn render_cell(&self, frame: &mut Frame, area: Rect, item: &GridItem, selected: bool, theme: &WidgetTheme) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -271,16 +260,10 @@ impl GridSelect {
     }
 }
 
-fn grid_overlay_model(
-    area: Rect,
-    title_text: &str,
-    item_count: usize,
-    columns: usize,
-) -> rat_chrome::OverlayModel {
+fn grid_overlay_model(area: Rect, title_text: &str, item_count: usize, columns: usize) -> rat_chrome::OverlayModel {
     let rows = item_count.div_ceil(columns.max(1));
-    let content_columns = columns
-        .saturating_mul(usize::from(GRID_CELL_WIDTH))
-        .saturating_add(columns.saturating_sub(1));
+    let content_columns =
+        columns.saturating_mul(usize::from(GRID_CELL_WIDTH)).saturating_add(columns.saturating_sub(1));
     let preferred_width = usize_to_u16(content_columns).saturating_add(GRID_BORDER_COLUMNS);
     let preferred_height = usize_to_u16(rows).saturating_add(GRID_BORDER_ROWS);
     let width = clamped_axis(area.width, preferred_width, POPUP_MARGIN);
@@ -497,9 +480,7 @@ mod tests {
         // 0 1 2
         // 3 4 5
         // 6 7
-        let items: Vec<GridItem> = (0..8)
-            .map(|i| GridItem::new(format!("Item {}", i)))
-            .collect();
+        let items: Vec<GridItem> = (0..8).map(|i| GridItem::new(format!("Item {}", i))).collect();
         let mut grid = GridSelect::new("Test", items, 3);
 
         // Start at 0
@@ -546,11 +527,7 @@ mod tests {
 
         assert_eq!(buffer[(layout.outer.x, layout.outer.y)].fg, Color::Blue);
         assert_eq!(buffer[(layout.inner.x, layout.inner.y)].symbol(), "A");
-        assert!(
-            buffer[(layout.inner.x, layout.inner.y)]
-                .modifier
-                .contains(ratatui::style::Modifier::BOLD)
-        );
+        assert!(buffer[(layout.inner.x, layout.inner.y)].modifier.contains(ratatui::style::Modifier::BOLD));
     }
 
     #[test]
@@ -586,16 +563,11 @@ mod tests {
     }
 
     fn sample_grid() -> GridSelect {
-        GridSelect::new(
-            GRID_TITLE,
-            vec![GridItem::new("Alpha"), GridItem::new("Beta")],
-            2,
-        )
+        GridSelect::new(GRID_TITLE, vec![GridItem::new("Alpha"), GridItem::new("Beta")], 2)
     }
 
     fn render_grid_select(grid: &GridSelect, viewport: Rect) -> ratatui::buffer::Buffer {
-        let backend =
-            ratatui::backend::TestBackend::new(viewport.width.max(1), viewport.height.max(1));
+        let backend = ratatui::backend::TestBackend::new(viewport.width.max(1), viewport.height.max(1));
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
@@ -608,8 +580,7 @@ mod tests {
     }
 
     fn render_background(viewport: Rect) -> ratatui::buffer::Buffer {
-        let backend =
-            ratatui::backend::TestBackend::new(viewport.width.max(1), viewport.height.max(1));
+        let backend = ratatui::backend::TestBackend::new(viewport.width.max(1), viewport.height.max(1));
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| {
@@ -629,20 +600,12 @@ mod tests {
     fn grid_layout(viewport: Rect, grid: &GridSelect) -> rat_chrome::OverlayLayout {
         rat_chrome::compute_overlay_layout(
             viewport,
-            &grid_overlay_model(
-                viewport,
-                &grid.title,
-                grid.model.items.len(),
-                grid.model.columns,
-            ),
+            &grid_overlay_model(viewport, &grid.title, grid.model.items.len(), grid.model.columns),
         )
     }
 
     fn empty_grid_layout(viewport: Rect, grid: &GridSelect) -> rat_chrome::OverlayLayout {
-        rat_chrome::compute_overlay_layout(
-            viewport,
-            &empty_grid_overlay_model(viewport, &grid.title),
-        )
+        rat_chrome::compute_overlay_layout(viewport, &empty_grid_overlay_model(viewport, &grid.title))
     }
 
     fn viewport() -> Rect {

@@ -3,8 +3,11 @@ mod denial;
 #[cfg(feature = "steel")]
 mod halt;
 
-pub use boundary::{AdapterOutcome, AdapterStep, apply_adapter_outcome};
-pub use denial::{complete_with_guard_block, complete_with_guard_failure};
+pub use boundary::AdapterOutcome;
+pub use boundary::AdapterStep;
+pub use boundary::apply_adapter_outcome;
+pub use denial::complete_with_guard_block;
+pub use denial::complete_with_guard_failure;
 #[cfg(feature = "steel")]
 pub use halt::complete_with_steel_policy_denial;
 
@@ -132,20 +135,16 @@ impl TurnState {
     }
 
     fn next_turn(&self) -> Result<crate::RuntimeLoopTurn, crate::RuntimeError> {
-        crate::RuntimeLoopTurn::new(
-            self.summary(),
-            self.last_model_message(),
-            self.last_tool_output(),
+        crate::RuntimeLoopTurn::new(self.summary(), self.last_model_message(), self.last_tool_output()).map_err(
+            |source| crate::RuntimeError::LoopTurn {
+                message: source.to_string(),
+            },
         )
-        .map_err(|source| crate::RuntimeError::LoopTurn {
-            message: source.to_string(),
-        })
     }
 
     fn complete(mut self, status: crate::RuntimeStatus) -> crate::RunReport {
         let terminal = crate::RuntimeTerminalKind::from_status(&status);
-        self.events
-            .push(crate::RuntimeEvent::Shutdown { status: terminal });
+        self.events.push(crate::RuntimeEvent::Shutdown { status: terminal });
         crate::RunReport::new(self.events, status)
     }
 
@@ -226,6 +225,7 @@ pub fn apply_decision(state: TurnState, decision: crate::RuntimeLoopDecision) ->
                 report: state.complete(crate::RuntimeStatus::FinalResponse { response }),
             }
         }
+        crate::RuntimeLoopDecision::CompletionCandidate { candidate } => complete_candidate(state, candidate),
         crate::RuntimeLoopDecision::Stop => {
             let turn_index = state.turns_completed();
             let state = state
@@ -241,6 +241,20 @@ pub fn apply_decision(state: TurnState, decision: crate::RuntimeLoopDecision) ->
     }
 }
 
+fn complete_candidate(state: TurnState, candidate: crate::RuntimeCompletionCandidate) -> DecisionStep {
+    let turn_index = state.turns_completed();
+    let request_hash = blake3::hash(candidate.request().as_bytes()).to_hex().to_string();
+    let state = state
+        .with_event(crate::RuntimeEvent::LoopDecision {
+            turn_index,
+            decision: crate::LoopDecisionKind::CompletionCandidate,
+        })
+        .with_event(crate::RuntimeEvent::CompletionCandidateRequested { request_hash });
+    DecisionStep::Complete {
+        report: state.complete(crate::RuntimeStatus::CompletionCandidate { candidate }),
+    }
+}
+
 /// Completes a runtime report after a fabric failure.
 #[must_use]
 pub fn complete_with_fabric_error(state: TurnState, message: String) -> crate::RunReport {
@@ -250,4 +264,11 @@ pub fn complete_with_fabric_error(state: TurnState, message: String) -> crate::R
     state.complete(crate::RuntimeStatus::Failed {
         failure: crate::RuntimeFailure::Fabric { message },
     })
+}
+
+pub(crate) fn complete_with_agent_control_stop(state: TurnState, reason: &'static str) -> crate::RunReport {
+    let state = state.with_event(crate::RuntimeEvent::Cancelled {
+        reason: String::from(reason),
+    });
+    state.complete(crate::RuntimeStatus::Stopped)
 }

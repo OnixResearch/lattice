@@ -6,15 +6,28 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::types::{
-    MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN, ModelNamedResourceReference, ModelProfileAdmissionStatus,
-    ModelProfileEnablementPolicy, ModelProfileSourceScope, ModelProfileSpecificity,
-    ModelProfileTrustStatus, ModelRuntimeBinding, ModelRuntimeBudgetPolicy, ModelRuntimeProfile,
-    ModelRuntimeProfileError, ModelRuntimeProfileIssue, ModelRuntimeProfileResolution,
-    ModelRuntimeProfileSet, ModelRuntimeTarget, ModelRuntimeTargetDraft,
-    ResolvedModelRuntimeProfile,
-};
-use super::validation::{ModelProfileField, blake3_parts, error, lowercase_blake3, safe_label};
+use super::types::MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN;
+use super::types::ModelNamedResourceReference;
+use super::types::ModelProfileAdmissionStatus;
+use super::types::ModelProfileEnablementPolicy;
+use super::types::ModelProfileSourceScope;
+use super::types::ModelProfileSpecificity;
+use super::types::ModelProfileTrustStatus;
+use super::types::ModelRuntimeBinding;
+use super::types::ModelRuntimeBudgetPolicy;
+use super::types::ModelRuntimeProfile;
+use super::types::ModelRuntimeProfileError;
+use super::types::ModelRuntimeProfileIssue;
+use super::types::ModelRuntimeProfileResolution;
+use super::types::ModelRuntimeProfileSet;
+use super::types::ModelRuntimeTarget;
+use super::types::ModelRuntimeTargetDraft;
+use super::types::ResolvedModelRuntimeProfile;
+use super::validation::ModelProfileField;
+use super::validation::blake3_parts;
+use super::validation::error;
+use super::validation::lowercase_blake3;
+use super::validation::safe_label;
 
 const TARGET_HASH_DOMAIN: &str = "animus.model-runtime-target.v1";
 const FIELD_PROFILE: &str = "profile";
@@ -69,28 +82,18 @@ pub fn resolve_model_runtime_profile(
     Ok(ModelRuntimeProfileResolution::Resolved(Box::new(resolved)))
 }
 
-fn validate_target(
-    draft: ModelRuntimeTargetDraft<'_>,
-) -> Result<ModelRuntimeTarget, ModelRuntimeProfileError> {
+fn validate_target(draft: ModelRuntimeTargetDraft<'_>) -> Result<ModelRuntimeTarget, ModelRuntimeProfileError> {
     let provider_id = safe_label(ModelProfileField("provider_id"), draft.provider_id)?;
     let model_id = safe_label(ModelProfileField("model_id"), draft.model_id)?;
-    let router_role = draft
-        .router_role
-        .map(|role| safe_label(ModelProfileField("router_role"), role))
-        .transpose()?;
-    let capability_identity = lowercase_blake3(
-        ModelProfileField(FIELD_CAPABILITY_IDENTITY),
-        draft.capability_identity,
-    )?;
-    let target_hash = blake3_parts(
-        TARGET_HASH_DOMAIN,
-        &[
-            provider_id.clone(),
-            model_id.clone(),
-            router_role.clone().unwrap_or_else(|| String::from("none")),
-            capability_identity.clone(),
-        ],
-    );
+    let router_role = draft.router_role.map(|role| safe_label(ModelProfileField("router_role"), role)).transpose()?;
+    let capability_identity =
+        lowercase_blake3(ModelProfileField(FIELD_CAPABILITY_IDENTITY), draft.capability_identity)?;
+    let target_hash = blake3_parts(TARGET_HASH_DOMAIN, &[
+        provider_id.clone(),
+        model_id.clone(),
+        router_role.clone().unwrap_or_else(|| String::from("none")),
+        capability_identity.clone(),
+    ]);
     let target = ModelRuntimeTarget {
         provider_id,
         model_id,
@@ -108,10 +111,7 @@ fn select_profile<'a>(
     target: &ModelRuntimeTarget,
 ) -> Result<(&'a ModelRuntimeProfile, ModelProfileSpecificity), ModelRuntimeProfileError> {
     assert!(!profile_set.profiles().is_empty());
-    assert_eq!(
-        profile_set.enablement(),
-        ModelProfileEnablementPolicy::Required
-    );
+    assert_eq!(profile_set.enablement(), ModelProfileEnablementPolicy::Required);
     if let Some(router_role) = target.router_role() {
         let role_matches: Vec<&ModelRuntimeProfile> = profile_set
             .profiles()
@@ -178,16 +178,9 @@ fn select_explicit_default(
     let profile = profile_set
         .profiles()
         .iter()
-        .find(|profile| {
-            profile.profile_id() == default_id
-                && matches!(profile.binding(), ModelRuntimeBinding::Default)
-        })
+        .find(|profile| profile.profile_id() == default_id && matches!(profile.binding(), ModelRuntimeBinding::Default))
         .ok_or_else(|| {
-            error(
-                ModelRuntimeProfileIssue::MissingProfile,
-                FIELD_PROFILE,
-                "explicit default profile is unavailable",
-            )
+            error(ModelRuntimeProfileIssue::MissingProfile, FIELD_PROFILE, "explicit default profile is unavailable")
         })?;
     assert_eq!(profile.profile_id(), default_id);
     assert!(matches!(profile.binding(), ModelRuntimeBinding::Default));
@@ -200,8 +193,7 @@ fn validate_selected_profile(
 ) -> Result<(), ModelRuntimeProfileError> {
     if profile.trust_status() != ModelProfileTrustStatus::Trusted
         || profile.admission_status() != ModelProfileAdmissionStatus::Admitted
-        || (profile.source_scope() == ModelProfileSourceScope::Project
-            && !profile.project_profile_admitted())
+        || (profile.source_scope() == ModelProfileSourceScope::Project && !profile.project_profile_admitted())
     {
         return Err(error(
             ModelRuntimeProfileIssue::UntrustedProfile,
@@ -210,8 +202,7 @@ fn validate_selected_profile(
         ));
     }
     if let ModelRuntimeBinding::Exact {
-        capability_identity,
-        ..
+        capability_identity, ..
     } = profile.binding()
         && capability_identity != target.capability_identity()
     {
@@ -222,10 +213,7 @@ fn validate_selected_profile(
         ));
     }
     assert_eq!(profile.trust_status(), ModelProfileTrustStatus::Trusted);
-    assert_eq!(
-        profile.admission_status(),
-        ModelProfileAdmissionStatus::Admitted
-    );
+    assert_eq!(profile.admission_status(), ModelProfileAdmissionStatus::Admitted);
     Ok(())
 }
 
@@ -253,20 +241,18 @@ fn expand_tool_references(
 ) -> Result<Vec<ModelNamedResourceReference>, ModelRuntimeProfileError> {
     let mut expanded = profile.tools().to_vec();
     for reference in profile.toolsets() {
-        let toolset = profile_set
-            .toolsets()
-            .iter()
-            .find(|toolset| toolset.toolset_id() == reference.name())
-            .ok_or_else(|| {
-                error(
-                    ModelRuntimeProfileIssue::MissingReference,
-                    FIELD_TOOLSET,
-                    "resolved profile references a missing toolset",
-                )
-            })?;
+        let toolset =
+            profile_set.toolsets().iter().find(|toolset| toolset.toolset_id() == reference.name()).ok_or_else(
+                || {
+                    error(
+                        ModelRuntimeProfileIssue::MissingReference,
+                        FIELD_TOOLSET,
+                        "resolved profile references a missing toolset",
+                    )
+                },
+            )?;
         for tool_name in toolset.tool_names() {
-            if let Some(new_reference) =
-                merge_tool_reference(expanded.as_mut_slice(), tool_name, reference.required())
+            if let Some(new_reference) = merge_tool_reference(expanded.as_mut_slice(), tool_name, reference.required())
             {
                 expanded.push(new_reference);
             }
@@ -283,10 +269,7 @@ fn merge_tool_reference(
     tool_name: &str,
     required: bool,
 ) -> Option<ModelNamedResourceReference> {
-    if let Some(existing) = references
-        .iter_mut()
-        .find(|reference| reference.name == tool_name)
-    {
+    if let Some(existing) = references.iter_mut().find(|reference| reference.name == tool_name) {
         existing.required |= required;
         return None;
     }

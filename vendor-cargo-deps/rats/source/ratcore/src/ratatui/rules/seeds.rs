@@ -31,13 +31,13 @@ fn native_rows() -> Vec<super::types::FeaturePolicyRow> {
             crate_family: super::types::BACKEND_ADAPTER_FAMILY,
             feature_name: super::types::FEATURE_CROSSTERM,
             status: super::types::POLICY_APPROVED,
-            owner: "rat-keymap owners",
-            compatibility_scope: "native input adapter compatibility",
-            reason: "key event type compatibility currently requires Ratatui's crossterm feature",
-            fallback: "keep key parsing and formatting pure outside adapter-owned event types",
+            owner: "terminal adapter owners",
+            compatibility_scope: "named native terminal adapters only",
+            reason: "physical terminal event extraction may require an explicit Crossterm edge",
+            fallback: "normalize events to Ratcore logical strokes before reusable behavior",
         })
-        .with_evidence("subwayrat/crates/rat-keymap/Cargo.toml")
-        .with_evidence("docs/workspace-validation.md"),
+        .with_evidence("subwayrat/crates/rat-showcase/src/terminal/input.rs")
+        .with_evidence("docs/backend-neutral-input.md"),
     );
     rows.push(
         row(RowSeed {
@@ -51,16 +51,18 @@ fn native_rows() -> Vec<super::types::FeaturePolicyRow> {
         })
         .with_next_action("Open a focused Cairn if a reusable crate needs backend ownership."),
     );
-    rows.push(row(RowSeed {
-        crate_family: super::types::RATZILLA_WEB_FAMILY,
-        feature_name: super::types::FEATURE_CROSSTERM,
-        status: super::types::POLICY_FORBIDDEN,
-        owner: "rat-ratzilla owners",
-        compatibility_scope: "web-consumed wasm profile",
-        reason: "crossterm is a native terminal backend and is incompatible with the browser boundary",
-        fallback: "use Ratzilla/browser input adapters and Ratcore route normalization",
-    })
-    .with_next_action("Keep `subwayrat-web` profile reporting browser-boundary diagnostics."));
+    rows.push(
+        row(RowSeed {
+            crate_family: super::types::RATZILLA_WEB_FAMILY,
+            feature_name: super::types::FEATURE_CROSSTERM,
+            status: super::types::POLICY_FORBIDDEN,
+            owner: "rat-ratzilla owners",
+            compatibility_scope: "web-consumed wasm profile",
+            reason: "crossterm is a native terminal backend and is incompatible with the browser boundary",
+            fallback: "use Ratzilla/browser input adapters and Ratcore route normalization",
+        })
+        .with_next_action("Keep `subwayrat-web` profile reporting browser-boundary diagnostics."),
+    );
     debug_assert!(rows.len() <= rows.capacity());
     rows
 }
@@ -140,16 +142,18 @@ fn experimental_rows() -> Vec<super::types::FeaturePolicyRow> {
         .with_evidence("docs/ratatui-coverage.md")
         .with_evidence("cairn/changes/define-ratatui-feature-policy"),
     );
-    rows.push(row(RowSeed {
-        crate_family: super::types::WORKSPACE_POLICY_FAMILY,
-        feature_name: super::types::FEATURE_MACROS,
-        status: super::types::POLICY_REQUIRES_CHANGE,
-        owner: "workspace policy",
-        compatibility_scope: "unapproved public API surface",
-        reason: "macros add implicit API surface and need an owner decision before adoption",
-        fallback: "write explicit builders or local helper functions until a Cairn approves macros",
-    })
-    .with_next_action("Approve macro use through a focused Cairn with owner and tests."));
+    rows.push(
+        row(RowSeed {
+            crate_family: super::types::WORKSPACE_POLICY_FAMILY,
+            feature_name: super::types::FEATURE_MACROS,
+            status: super::types::POLICY_REQUIRES_CHANGE,
+            owner: "workspace policy",
+            compatibility_scope: "unapproved public API surface",
+            reason: "macros add implicit API surface and need an owner decision before adoption",
+            fallback: "write explicit builders or local helper functions until a Cairn approves macros",
+        })
+        .with_next_action("Approve macro use through a focused Cairn with owner and tests."),
+    );
     debug_assert!(rows.len() <= rows.capacity());
     rows
 }

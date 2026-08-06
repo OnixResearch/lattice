@@ -3,9 +3,7 @@ pub(super) fn required_text(
     value: Option<&str>,
 ) -> Result<super::Text, super::Error> {
     match value {
-        Some(text) => Ok(crate::validation::normalized_adapter_field(
-            field_name, text,
-        )?),
+        Some(text) => Ok(crate::validation::normalized_adapter_field(field_name, text)?),
         None => Err(crate::AdapterContractError::EmptyField {
             field: field_name.as_str(),
         }
@@ -44,9 +42,7 @@ pub(super) fn optional_collection(
     }
     let mut normalized = super::Collection::with_capacity(actual_items);
     for value in values {
-        normalized.push(crate::validation::normalized_adapter_field(
-            field_name, value,
-        )?);
+        normalized.push(crate::validation::normalized_adapter_field(field_name, value)?);
     }
     Ok(normalized)
 }

@@ -1,5 +1,4 @@
-const ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_assertion_id");
+const ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_assertion_id");
 const REDACTIONS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("dataspace_assertion_redactions");
 
@@ -28,10 +27,7 @@ impl Entry {
         let kind = super::Kind::parse(draft.kind)?;
         let status = super::Status::parse(draft.status)?;
         let redactions = collect_redactions(draft.redactions)?;
-        let content_hash = draft
-            .content_hash
-            .map(crate::effect::SafeHash::new)
-            .transpose()?;
+        let content_hash = draft.content_hash.map(crate::effect::SafeHash::new).transpose()?;
 
         Ok(Self {
             stable_id,
@@ -96,8 +92,7 @@ impl Entry {
     /// Returns whether the assertion is stale at the supplied deterministic tick.
     #[must_use]
     pub fn is_stale_at(&self, now: u64) -> bool {
-        self.lease_expires_at
-            .is_some_and(|expires_at| expires_at <= now)
+        self.lease_expires_at.is_some_and(|expires_at| expires_at <= now)
     }
 
     #[cfg(test)]
@@ -127,17 +122,12 @@ pub struct Draft<'a> {
     pub lease_expires_at: Option<u64>,
 }
 
-fn collect_redactions(
-    values: &[&str],
-) -> Result<alloc::vec::Vec<super::Redaction>, crate::AdapterContractError> {
+fn collect_redactions(values: &[&str]) -> Result<alloc::vec::Vec<super::Redaction>, crate::AdapterContractError> {
     if values.is_empty() {
         return Err(crate::AdapterContractError::EmptyCollection {
             field: REDACTIONS_FIELD.as_str(),
         });
     }
 
-    values
-        .iter()
-        .map(|value| super::Redaction::parse(value))
-        .collect()
+    values.iter().map(|value| super::Redaction::parse(value)).collect()
 }

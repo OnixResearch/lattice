@@ -6,16 +6,19 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::assignment::{
-    AgentRoleAssignment, AgentRoleCapabilityResolution, AgentRoleHandoff, AgentRolePlan,
-};
+use super::assignment::AgentRoleAssignment;
+use super::assignment::AgentRoleCapabilityResolution;
+use super::assignment::AgentRoleHandoff;
+use super::assignment::AgentRolePlan;
 use super::output::AgentRoleOutput;
 use super::separation::AgentRoleSeparationDecision;
-use super::types::{
-    AGENT_ROLE_RECEIPT_HASH_DOMAIN, AgentRoleClass, AgentRoleError, AgentRoleIssue,
-    AgentRoleProfile,
-};
-use super::validation::{error, hash_parts};
+use super::types::AGENT_ROLE_RECEIPT_HASH_DOMAIN;
+use super::types::AgentRoleClass;
+use super::types::AgentRoleError;
+use super::types::AgentRoleIssue;
+use super::types::AgentRoleProfile;
+use super::validation::error;
+use super::validation::hash_parts;
 
 const FIELD_RECEIPT: &str = "agent_role_receipt";
 const REDACTION_MARKER: &str = "raw-role-context-and-output-omitted";
@@ -183,48 +186,35 @@ pub fn project_agent_role_receipt(
 ) -> Result<AgentRoleReceipt, AgentRoleError> {
     reject_sensitive_receipt(sensitive)?;
     validate_receipt_sources(&input)?;
-    let capability_decision_hash = input
-        .capability_resolution
-        .map(|resolution| resolution.decision_hash().to_string());
+    let capability_decision_hash = input.capability_resolution.map(|resolution| resolution.decision_hash().to_string());
     let role_plan_hash = input.role_plan.map(|plan| plan.plan_hash().to_string());
-    let handoff_hash = input
-        .handoff
-        .map(|handoff| handoff.handoff_hash().to_string());
+    let handoff_hash = input.handoff.map(|handoff| handoff.handoff_hash().to_string());
     let output_hash = input.output.map(|output| output.output_hash().to_string());
     let (effective_capability_count, denied_capability_count) = receipt_capability_counts(&input)?;
     let separation_passed = input.separation.map(AgentRoleSeparationDecision::passed);
-    let receipt_hash = hash_parts(
-        AGENT_ROLE_RECEIPT_HASH_DOMAIN,
-        &[
-            input.kind.as_str().to_string(),
-            input.profile.role_id().to_string(),
-            input.profile.class().as_str().to_string(),
-            input.profile.profile_hash().to_string(),
-            input.assignment.assignment_hash().to_string(),
-            input.assignment.subject_hash().to_string(),
-            input.assignment.actor_hash().to_string(),
-            input.assignment.model_plan_hash().to_string(),
-            input.assignment.policy_hash().to_string(),
-            input.assignment.grant_set_hash().to_string(),
-            input.assignment.separation_hash().to_string(),
-            capability_decision_hash
-                .as_deref()
-                .unwrap_or("none")
-                .to_string(),
-            role_plan_hash.as_deref().unwrap_or("none").to_string(),
-            handoff_hash.as_deref().unwrap_or("none").to_string(),
-            output_hash.as_deref().unwrap_or("none").to_string(),
-            effective_capability_count.to_string(),
-            denied_capability_count.to_string(),
-            separation_passed.map_or("none".to_string(), |passed| passed.to_string()),
-            REDACTION_MARKER.to_string(),
-        ],
-    );
+    let receipt_hash = hash_parts(AGENT_ROLE_RECEIPT_HASH_DOMAIN, &[
+        input.kind.as_str().to_string(),
+        input.profile.role_id().to_string(),
+        input.profile.class().as_str().to_string(),
+        input.profile.profile_hash().to_string(),
+        input.assignment.assignment_hash().to_string(),
+        input.assignment.subject_hash().to_string(),
+        input.assignment.actor_hash().to_string(),
+        input.assignment.model_plan_hash().to_string(),
+        input.assignment.policy_hash().to_string(),
+        input.assignment.grant_set_hash().to_string(),
+        input.assignment.separation_hash().to_string(),
+        capability_decision_hash.as_deref().unwrap_or("none").to_string(),
+        role_plan_hash.as_deref().unwrap_or("none").to_string(),
+        handoff_hash.as_deref().unwrap_or("none").to_string(),
+        output_hash.as_deref().unwrap_or("none").to_string(),
+        effective_capability_count.to_string(),
+        denied_capability_count.to_string(),
+        separation_passed.map_or("none".to_string(), |passed| passed.to_string()),
+        REDACTION_MARKER.to_string(),
+    ]);
     debug_assert!(!receipt_hash.is_empty());
-    debug_assert_eq!(
-        input.assignment.role_profile_hash(),
-        input.profile.profile_hash()
-    );
+    debug_assert_eq!(input.assignment.role_profile_hash(), input.profile.profile_hash());
     Ok(AgentRoleReceipt {
         kind: input.kind,
         role_id: input.profile.role_id().to_string(),
@@ -249,19 +239,13 @@ pub fn project_agent_role_receipt(
     })
 }
 
-fn receipt_capability_counts(
-    input: &AgentRoleReceiptInput<'_>,
-) -> Result<(u32, u32), AgentRoleError> {
+fn receipt_capability_counts(input: &AgentRoleReceiptInput<'_>) -> Result<(u32, u32), AgentRoleError> {
     let effective_capability_count = fixed_width_capability_count(
-        input
-            .capability_resolution
-            .map_or(usize::default(), |resolution| resolution.effective().len()),
+        input.capability_resolution.map_or(usize::default(), |resolution| resolution.effective().len()),
         "effective capability count exceeds its fixed-width receipt bound",
     )?;
     let denied_capability_count = fixed_width_capability_count(
-        input
-            .capability_resolution
-            .map_or(usize::default(), |resolution| resolution.denied().len()),
+        input.capability_resolution.map_or(usize::default(), |resolution| resolution.denied().len()),
         "denied capability count exceeds its fixed-width receipt bound",
     )?;
     debug_assert!(input.capability_resolution.is_some() || effective_capability_count == 0);
@@ -269,22 +253,11 @@ fn receipt_capability_counts(
     Ok((effective_capability_count, denied_capability_count))
 }
 
-fn fixed_width_capability_count(
-    item_count: usize,
-    overflow_detail: &'static str,
-) -> Result<u32, AgentRoleError> {
-    u32::try_from(item_count).map_err(|_| {
-        error(
-            AgentRoleIssue::InvalidCollection,
-            FIELD_RECEIPT,
-            overflow_detail,
-        )
-    })
+fn fixed_width_capability_count(item_count: usize, overflow_detail: &'static str) -> Result<u32, AgentRoleError> {
+    u32::try_from(item_count).map_err(|_| error(AgentRoleIssue::InvalidCollection, FIELD_RECEIPT, overflow_detail))
 }
 
-fn reject_sensitive_receipt(
-    sensitive: AgentRoleReceiptSensitiveDraft<'_>,
-) -> Result<(), AgentRoleError> {
+fn reject_sensitive_receipt(sensitive: AgentRoleReceiptSensitiveDraft<'_>) -> Result<(), AgentRoleError> {
     let has_leak = [
         sensitive.raw_prompt_or_instruction,
         sensitive.hidden_reasoning,
@@ -321,18 +294,12 @@ fn validate_receipt_sources(input: &AgentRoleReceiptInput<'_>) -> Result<(), Age
         ));
     }
     let has_binding_mismatch = [
-        input.capability_resolution.is_some_and(|resolution| {
-            resolution.assignment_hash() != input.assignment.assignment_hash()
-        }),
         input
-            .role_plan
-            .is_some_and(|plan| plan.assignment_hash() != input.assignment.assignment_hash()),
-        input
-            .handoff
-            .is_some_and(|handoff| handoff.subject_hash() != input.assignment.subject_hash()),
-        input
-            .output
-            .is_some_and(|output| output.assignment_hash() != input.assignment.assignment_hash()),
+            .capability_resolution
+            .is_some_and(|resolution| resolution.assignment_hash() != input.assignment.assignment_hash()),
+        input.role_plan.is_some_and(|plan| plan.assignment_hash() != input.assignment.assignment_hash()),
+        input.handoff.is_some_and(|handoff| handoff.subject_hash() != input.assignment.subject_hash()),
+        input.output.is_some_and(|output| output.assignment_hash() != input.assignment.assignment_hash()),
     ]
     .into_iter()
     .any(|is_mismatch| is_mismatch);
@@ -359,9 +326,6 @@ fn validate_receipt_sources(input: &AgentRoleReceiptInput<'_>) -> Result<(), Age
         ));
     }
     debug_assert!(is_required_source_present);
-    debug_assert_eq!(
-        input.assignment.role_profile_hash(),
-        input.profile.profile_hash()
-    );
+    debug_assert_eq!(input.assignment.role_profile_hash(), input.profile.profile_hash());
     Ok(())
 }

@@ -210,9 +210,7 @@ fn row_issues(row: &CoverageRow) -> Vec<CoverageIssue> {
         ));
         return issues;
     }
-    if COMPLETE_STATUSES.contains(&status)
-        && row.evidence.iter().all(|entry| entry.trim().is_empty())
-    {
+    if COMPLETE_STATUSES.contains(&status) && row.evidence.iter().all(|entry| entry.trim().is_empty()) {
         issues.push(CoverageIssue::new(
             CoverageIssueCode::MissingEvidence,
             row.feature_id.clone(),

@@ -36,10 +36,7 @@ fn row(
 ) -> std::collections::BTreeMap<String, QueryValue> {
     let mut row = std::collections::BTreeMap::new();
     row.insert(FIELD_TITLE.to_string(), QueryValue::Text(title.to_string()));
-    row.insert(
-        FIELD_TAGS.to_string(),
-        QueryValue::Tags(tags.into_iter().map(ToOwned::to_owned).collect()),
-    );
+    row.insert(FIELD_TAGS.to_string(), QueryValue::Tags(tags.into_iter().map(ToOwned::to_owned).collect()));
     row.insert(FIELD_DATE.to_string(), QueryValue::DateOrdinal(date));
     row.insert(FIELD_PRIORITY.to_string(), QueryValue::Number(priority));
     row.insert(FIELD_DONE.to_string(), QueryValue::Bool(done));
@@ -48,27 +45,9 @@ fn row(
 
 fn records() -> Vec<std::collections::BTreeMap<String, QueryValue>> {
     vec![
-        row(
-            "Ship command palette",
-            vec![TAG_RUST, TAG_UI],
-            MIDDLE_DATE,
-            HIGH_PRIORITY,
-            false,
-        ),
-        row(
-            "Write docs",
-            vec![TAG_DOCS],
-            START_DATE,
-            LOW_PRIORITY,
-            false,
-        ),
-        row(
-            "Ship viewport docs",
-            vec![TAG_RUST, TAG_DOCS],
-            END_DATE,
-            MEDIUM_PRIORITY,
-            true,
-        ),
+        row("Ship command palette", vec![TAG_RUST, TAG_UI], MIDDLE_DATE, HIGH_PRIORITY, false),
+        row("Write docs", vec![TAG_DOCS], START_DATE, LOW_PRIORITY, false),
+        row("Ship viewport docs", vec![TAG_RUST, TAG_DOCS], END_DATE, MEDIUM_PRIORITY, true),
     ]
 }
 
@@ -76,26 +55,15 @@ fn records() -> Vec<std::collections::BTreeMap<String, QueryValue>> {
 fn evaluates_predicates_sorting_grouping_facets_and_search() {
     let query = Query::new()
         .with_predicate(Predicate::And(vec![
-            Predicate::field(
-                FIELD_TITLE,
-                QueryOperator::Contains,
-                QueryValue::Text(SEARCH_TERM.to_string()),
-            ),
+            Predicate::field(FIELD_TITLE, QueryOperator::Contains, QueryValue::Text(SEARCH_TERM.to_string())),
             Predicate::field(FIELD_DONE, QueryOperator::Equals, QueryValue::Bool(false)),
         ]))
-        .with_search(SearchTerm::new(
-            vec![FIELD_TITLE.to_string(), FIELD_TAGS.to_string()],
-            SEARCH_TERM,
-        ))
-        .with_date_range(DateRangeClause::new(
-            FIELD_DATE,
-            DateRange::new(START_DATE, END_DATE),
-        ))
+        .with_search(SearchTerm::new(vec![FIELD_TITLE.to_string(), FIELD_TAGS.to_string()], SEARCH_TERM))
+        .with_date_range(DateRangeClause::new(FIELD_DATE, DateRange::new(START_DATE, END_DATE)))
         .with_sort(SortKey::new(FIELD_PRIORITY, SortDirection::Descending))
         .with_group_by(FIELD_DONE)
         .with_facet(FIELD_TAGS);
-    let output =
-        evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap();
+    let output = evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap();
     assert_eq!(output.rows.len(), 1);
     assert_eq!(output.rows[0].index, FIRST_INDEX);
     assert_eq!(output.rows[0].score, FIELD_MATCH_SCORE);
@@ -110,25 +78,12 @@ fn evaluates_predicates_sorting_grouping_facets_and_search() {
 fn compound_or_and_not_predicates_work() {
     let query = Query::new().with_predicate(Predicate::And(vec![
         Predicate::Or(vec![
-            Predicate::field(
-                FIELD_TAGS,
-                QueryOperator::Contains,
-                QueryValue::Tags(vec![TAG_DOCS.to_string()]),
-            ),
-            Predicate::field(
-                FIELD_PRIORITY,
-                QueryOperator::GreaterThan,
-                QueryValue::Number(MEDIUM_PRIORITY),
-            ),
+            Predicate::field(FIELD_TAGS, QueryOperator::Contains, QueryValue::Tags(vec![TAG_DOCS.to_string()])),
+            Predicate::field(FIELD_PRIORITY, QueryOperator::GreaterThan, QueryValue::Number(MEDIUM_PRIORITY)),
         ]),
-        Predicate::Not(Box::new(Predicate::field(
-            FIELD_DONE,
-            QueryOperator::Equals,
-            QueryValue::Bool(true),
-        ))),
+        Predicate::Not(Box::new(Predicate::field(FIELD_DONE, QueryOperator::Equals, QueryValue::Bool(true)))),
     ]));
-    let output =
-        evaluate_records(&surface_schema(QuerySurface::Table), &query, &records()).unwrap();
+    let output = evaluate_records(&surface_schema(QuerySurface::Table), &query, &records()).unwrap();
     assert_eq!(output.rows.len(), 2);
     assert_eq!(output.rows[0].index, FIRST_INDEX);
     assert_eq!(output.rows[1].index, SECOND_INDEX);
@@ -141,8 +96,7 @@ fn adapter_schemas_share_predicate_semantics() {
         QueryOperator::Contains,
         QueryValue::Tags(vec![TAG_DOCS.to_string()]),
     ));
-    let agenda =
-        evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap();
+    let agenda = evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap();
     let table = evaluate_records(&surface_schema(QuerySurface::Table), &query, &records()).unwrap();
     assert_eq!(agenda.rows, table.rows);
     assert_eq!(agenda.rows.len(), 2);
@@ -157,19 +111,15 @@ fn unknown_field_is_rejected() {
         QueryOperator::Equals,
         QueryValue::Text("x".to_string()),
     ));
-    let error =
-        evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap_err();
+    let error = evaluate_records(&surface_schema(QuerySurface::Agenda), &query, &records()).unwrap_err();
     assert_eq!(error.code, QueryErrorCode::UnknownField);
     assert_eq!(error.field, UNKNOWN_FIELD);
 }
 
 #[test]
 fn unsupported_operator_is_rejected() {
-    let query = Query::new().with_predicate(Predicate::field(
-        FIELD_DONE,
-        QueryOperator::Contains,
-        QueryValue::Bool(false),
-    ));
+    let query =
+        Query::new().with_predicate(Predicate::field(FIELD_DONE, QueryOperator::Contains, QueryValue::Bool(false)));
     let error = validate_query(&surface_schema(QuerySurface::Agenda), &query).unwrap_err();
     assert_eq!(error.code, QueryErrorCode::UnsupportedOperator);
     assert_eq!(error.field, FIELD_DONE);
@@ -189,10 +139,7 @@ fn type_mismatch_is_rejected() {
 
 #[test]
 fn invalid_date_range_is_rejected() {
-    let query = Query::new().with_date_range(DateRangeClause::new(
-        FIELD_DATE,
-        DateRange::new(END_DATE, START_DATE),
-    ));
+    let query = Query::new().with_date_range(DateRangeClause::new(FIELD_DATE, DateRange::new(END_DATE, START_DATE)));
     let error = validate_query(&surface_schema(QuerySurface::Agenda), &query).unwrap_err();
     assert_eq!(error.code, QueryErrorCode::InvalidRange);
     assert_eq!(error.field, FIELD_DATE);

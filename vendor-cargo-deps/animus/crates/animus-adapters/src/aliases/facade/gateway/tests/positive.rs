@@ -2,8 +2,7 @@ use super::support::*;
 
 #[test]
 fn authorized_prompt_admission_records_safe_receipt_without_prompt_body() {
-    let request = request_with(Some(credential(VALID_CREDENTIAL)), Some(HASH_B))
-        .expect("request should validate");
+    let request = request_with(Some(credential(VALID_CREDENTIAL)), Some(HASH_B)).expect("request should validate");
 
     let decision = super::super::admit(&request).expect("decision should evaluate");
     let receipt_text = decision.receipt().render_safe_text();
@@ -11,13 +10,7 @@ fn authorized_prompt_admission_records_safe_receipt_without_prompt_body() {
     assert!(decision.is_allowed());
     assert_eq!(decision.verdict(), super::super::AdmissionVerdict::Allow);
     assert_eq!(decision.reason(), None);
-    assert_eq!(
-        decision
-            .receipt()
-            .credential_hash()
-            .map(crate::ArtifactHash::as_str),
-        Some(HASH_A)
-    );
+    assert_eq!(decision.receipt().credential_hash().map(crate::ArtifactHash::as_str), Some(HASH_A));
     assert!(!receipt_text.contains(ACTOR));
     assert!(!receipt_text.contains(AUDIENCE));
     assert!(!receipt_text.contains(PROMPT_BODY));
@@ -26,15 +19,11 @@ fn authorized_prompt_admission_records_safe_receipt_without_prompt_body() {
 
 #[test]
 fn host_owned_boundaries_are_supplied_hashes_only() {
-    let request = request_with(Some(credential(VALID_CREDENTIAL)), Some(HASH_B))
-        .expect("request should validate");
+    let request = request_with(Some(credential(VALID_CREDENTIAL)), Some(HASH_B)).expect("request should validate");
     let credential = request.credential().expect("credential should exist");
 
     assert_eq!(credential.credential_hash().as_str(), HASH_A);
-    assert_eq!(
-        request.policy_hash().map(crate::ArtifactHash::as_str),
-        Some(HASH_B)
-    );
+    assert_eq!(request.policy_hash().map(crate::ArtifactHash::as_str), Some(HASH_B));
 }
 
 #[test]
@@ -46,15 +35,11 @@ fn pinned_https_remote_server_admission_records_safe_receipt() {
     let handshake = remote_handshake().expect("handshake should validate");
     let policy = remote_policy().expect("policy should validate");
 
-    let decision =
-        remote_decision(&descriptor, Some(&handshake), &policy).expect("admission should evaluate");
+    let decision = remote_decision(&descriptor, Some(&handshake), &policy).expect("admission should evaluate");
     let receipt_text = decision.receipt().render_safe_text();
 
     assert!(decision.is_admitted());
-    assert_eq!(
-        decision.outcome(),
-        super::super::RemoteServerAdmissionOutcome::Admitted
-    );
+    assert_eq!(decision.outcome(), super::super::RemoteServerAdmissionOutcome::Admitted);
     assert_eq!(decision.reason(), None);
     assert_eq!(decision.receipt().endpoint_identity_hash().as_str(), HASH_C);
     assert_eq!(decision.receipt().policy_hash().as_str(), HASH_B);
@@ -86,12 +71,8 @@ fn approved_tofu_remote_server_admission_is_explicit() {
     })
     .expect("policy should validate");
 
-    let decision =
-        remote_decision(&descriptor, Some(&handshake), &policy).expect("admission should evaluate");
+    let decision = remote_decision(&descriptor, Some(&handshake), &policy).expect("admission should evaluate");
 
     assert!(decision.is_admitted());
-    assert_eq!(
-        decision.receipt().fingerprint_status(),
-        super::super::RemoteServerFingerprintStatus::TofuPending
-    );
+    assert_eq!(decision.receipt().fingerprint_status(), super::super::RemoteServerFingerprintStatus::TofuPending);
 }

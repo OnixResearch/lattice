@@ -1,228 +1,326 @@
-//! Path completion utilities for filesystem tab completion.
+//! Pure completion projection over caller-supplied resource facts.
 
-use std::fs;
-use std::path::Path;
+/// Maximum entries accepted in one immutable snapshot.
+pub const MAX_COMPLETION_ENTRIES: usize = 4_096;
+/// Maximum candidates returned by one projection.
+pub const MAX_COMPLETION_RESULTS: usize = 256;
+/// Maximum UTF-8 bytes accepted in query and entry presentation fields.
+pub const MAX_COMPLETION_TEXT_BYTES: usize = 4_096;
 
-/// Filesystem tab completion function.
-///
-/// Returns a list of matching filesystem paths based on the input:
-/// - If input ends with '/', completes entries in that directory
-/// - Otherwise, completes entries in parent directory that start with the filename prefix
-/// - Directory entries get '/' appended
-/// - Empty input completes from current directory
-/// - Non-existent parent directory returns empty vec
-pub fn path_completer(input: &str) -> Vec<String> {
-    if input.is_empty() {
-        return complete_directory(".", "");
+/// Opaque application lookup token. Display equality does not merge identities.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CompletionEntryId(String);
+
+impl CompletionEntryId {
+    pub fn try_new(value: impl Into<String>) -> Result<Self, CompletionInputError> {
+        let value = value.into();
+        if value.is_empty() || value.len() > MAX_COMPLETION_TEXT_BYTES {
+            return Err(CompletionInputError::InvalidIdentity);
+        }
+        Ok(Self(value))
     }
 
-    let (dir, prefix) = if input.ends_with('/') {
-        // Input like "/tmp/" - complete all entries in that directory
-        (input, "")
-    } else {
-        // Input like "/tmp/fo" - complete entries in /tmp/ that start with "fo"
-        let path = Path::new(input);
-        match path.parent() {
-            Some(parent) => {
-                let parent_str = if parent == Path::new("") {
-                    "."
-                } else {
-                    parent.to_str().unwrap_or(".")
-                };
-                let prefix = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-                (parent_str, prefix)
-            }
-            None => (".", input),
-        }
-    };
-
-    complete_directory(dir, prefix)
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
-fn complete_directory(dir_str: &str, prefix: &str) -> Vec<String> {
-    let dir_path = Path::new(dir_str);
+/// Explicit matching policy chosen by the application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionCasePolicy {
+    Sensitive,
+    Insensitive,
+}
 
-    let Ok(entries) = fs::read_dir(dir_path) else {
-        return Vec::new();
+/// Entry eligibility supplied by the resource-owning adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionEntryEligibility {
+    Eligible,
+    Ineligible,
+    Unrepresentable,
+}
+
+/// One caller-parsed entry. Insertion and display text are never fabricated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionEntrySnapshot {
+    pub id: CompletionEntryId,
+    pub match_text: String,
+    pub display_text: String,
+    pub insertion_text: String,
+    pub is_container: bool,
+    pub eligibility: CompletionEntryEligibility,
+}
+
+impl CompletionEntrySnapshot {
+    pub fn try_new(
+        id: CompletionEntryId,
+        match_text: impl Into<String>,
+        display_text: impl Into<String>,
+        insertion_text: impl Into<String>,
+        is_container: bool,
+        eligibility: CompletionEntryEligibility,
+    ) -> Result<Self, CompletionInputError> {
+        let match_text = match_text.into();
+        let display_text = display_text.into();
+        let insertion_text = insertion_text.into();
+        if [&match_text, &display_text, &insertion_text]
+            .iter()
+            .any(|value| value.len() > MAX_COMPLETION_TEXT_BYTES)
+        {
+            return Err(CompletionInputError::TextCapacityExceeded);
+        }
+        Ok(Self {
+            id,
+            match_text,
+            display_text,
+            insertion_text,
+            is_container,
+            eligibility,
+        })
+    }
+}
+
+/// Caller-parsed query for one immutable resource generation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionQuery {
+    pub generation: u64,
+    pub prefix: String,
+    pub case_policy: CompletionCasePolicy,
+    pub result_limit: usize,
+}
+
+impl CompletionQuery {
+    pub fn try_new(
+        generation: u64,
+        prefix: impl Into<String>,
+        case_policy: CompletionCasePolicy,
+        result_limit: usize,
+    ) -> Result<Self, CompletionInputError> {
+        let prefix = prefix.into();
+        if prefix.len() > MAX_COMPLETION_TEXT_BYTES {
+            return Err(CompletionInputError::TextCapacityExceeded);
+        }
+        if result_limit == 0 || result_limit > MAX_COMPLETION_RESULTS {
+            return Err(CompletionInputError::InvalidResultLimit);
+        }
+        Ok(Self {
+            generation,
+            prefix,
+            case_policy,
+            result_limit,
+        })
+    }
+}
+
+/// Availability of a caller-owned resource snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionSnapshotState {
+    Ready(Vec<CompletionEntrySnapshot>),
+    Missing,
+    Denied,
+    Failed,
+}
+
+/// Immutable directory/virtual-resource facts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionSnapshot {
+    pub generation: u64,
+    pub state: CompletionSnapshotState,
+}
+
+impl CompletionSnapshot {
+    pub fn try_ready(generation: u64, entries: Vec<CompletionEntrySnapshot>) -> Result<Self, CompletionInputError> {
+        if entries.len() > MAX_COMPLETION_ENTRIES {
+            return Err(CompletionInputError::EntryCapacityExceeded);
+        }
+        Ok(Self {
+            generation,
+            state: CompletionSnapshotState::Ready(entries),
+        })
+    }
+}
+
+/// Content-free projection diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionDiagnostic {
+    StaleSnapshot,
+    ResourceMissing,
+    PolicyDenied,
+    SnapshotFailed,
+}
+
+/// Validated input failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionInputError {
+    InvalidIdentity,
+    TextCapacityExceeded,
+    InvalidResultLimit,
+    EntryCapacityExceeded,
+}
+
+/// Candidate retaining application identity and exact supplied presentation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionCandidate {
+    pub id: CompletionEntryId,
+    pub display_text: String,
+    pub insertion_text: String,
+    pub is_container: bool,
+}
+
+/// Deterministic completion result. Rejections contain no partial candidates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionProjection {
+    Candidates(Vec<CompletionCandidate>),
+    Rejected(CompletionDiagnostic),
+}
+
+/// Filters an immutable snapshot without parsing paths or acquiring resources.
+pub fn project_path_completions(query: &CompletionQuery, snapshot: &CompletionSnapshot) -> CompletionProjection {
+    if query.generation != snapshot.generation {
+        return CompletionProjection::Rejected(CompletionDiagnostic::StaleSnapshot);
+    }
+    let entries = match &snapshot.state {
+        CompletionSnapshotState::Ready(entries) => entries,
+        CompletionSnapshotState::Missing => {
+            return CompletionProjection::Rejected(CompletionDiagnostic::ResourceMissing);
+        }
+        CompletionSnapshotState::Denied => {
+            return CompletionProjection::Rejected(CompletionDiagnostic::PolicyDenied);
+        }
+        CompletionSnapshotState::Failed => {
+            return CompletionProjection::Rejected(CompletionDiagnostic::SnapshotFailed);
+        }
     };
 
-    let mut matches = Vec::new();
-    let prefix_lower = prefix.to_lowercase();
+    let normalized_prefix = normalize_for_case(&query.prefix, query.case_policy);
+    let mut matches: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry.eligibility == CompletionEntryEligibility::Eligible)
+        .filter(|entry| normalize_for_case(&entry.match_text, query.case_policy).starts_with(&normalized_prefix))
+        .map(|entry| CompletionCandidate {
+            id: entry.id.clone(),
+            display_text: entry.display_text.clone(),
+            insertion_text: entry.insertion_text.clone(),
+            is_container: entry.is_container,
+        })
+        .collect();
+    matches.sort_by(|left, right| {
+        left.display_text
+            .cmp(&right.display_text)
+            .then(left.insertion_text.cmp(&right.insertion_text))
+            .then(left.id.cmp(&right.id))
+    });
+    matches.truncate(query.result_limit);
+    CompletionProjection::Candidates(matches)
+}
 
-    for entry in entries {
-        let Ok(entry) = entry else { continue };
-        let file_name = entry.file_name();
-        let Some(name_str) = file_name.to_str() else {
-            continue;
-        };
-
-        // Case-insensitive prefix matching
-        if name_str.to_lowercase().starts_with(&prefix_lower) {
-            let mut result = if dir_str == "." {
-                name_str.to_string()
-            } else if dir_str.ends_with('/') {
-                format!("{}{}", dir_str, name_str)
-            } else {
-                format!("{}/{}", dir_str, name_str)
-            };
-
-            // Append '/' to directories
-            if entry.file_type().is_ok_and(|ft| ft.is_dir()) {
-                result.push('/');
-            }
-
-            matches.push(result);
-        }
+fn normalize_for_case(value: &str, policy: CompletionCasePolicy) -> String {
+    match policy {
+        CompletionCasePolicy::Sensitive => value.to_string(),
+        CompletionCasePolicy::Insensitive => value.to_lowercase(),
     }
-
-    matches.sort();
-    matches
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use tempfile::tempdir;
 
-    #[test]
-    fn empty_input_completes_current_dir() {
-        let _results = path_completer("");
-        // Should return some entries from current directory
-        // We can't predict exactly what, but it shouldn't be empty in a real filesystem
-        // For the test, we just check it doesn't panic
+    fn entry(
+        id: &str,
+        match_text: &str,
+        display: &str,
+        insertion: &str,
+        is_container: bool,
+    ) -> CompletionEntrySnapshot {
+        CompletionEntrySnapshot::try_new(
+            CompletionEntryId::try_new(id).unwrap(),
+            match_text,
+            display,
+            insertion,
+            is_container,
+            CompletionEntryEligibility::Eligible,
+        )
+        .unwrap()
     }
 
     #[test]
-    fn nonexistent_dir_returns_empty() {
-        let results = path_completer("/this/path/definitely/does/not/exist/");
-        assert!(results.is_empty());
+    fn supplied_unix_windows_virtual_and_opaque_insertions_are_preserved() {
+        let entries = vec![
+            entry("unix", "app", "Unix app", "/srv/app/", true),
+            entry("windows", "app", "Windows app", r"C:\srv\app\", true),
+            entry("browser", "app", "Browser app", "vfs:app", true),
+            entry("remote", "app", "Remote app", "resource://node/7", false),
+        ];
+        let snapshot = CompletionSnapshot::try_ready(3, entries).unwrap();
+        let query = CompletionQuery::try_new(3, "app", CompletionCasePolicy::Sensitive, 10).unwrap();
+        let CompletionProjection::Candidates(candidates) = project_path_completions(&query, &snapshot) else {
+            panic!("supplied entries must project");
+        };
+
+        assert_eq!(candidates.len(), 4);
+        assert!(candidates.iter().any(|item| item.insertion_text == "/srv/app/"));
+        assert!(candidates.iter().any(|item| item.insertion_text == r"C:\srv\app\"));
+        assert!(candidates.iter().any(|item| item.insertion_text == "vfs:app"));
+        assert!(candidates.iter().any(|item| item.insertion_text == "resource://node/7"));
     }
 
     #[test]
-    fn nonexistent_parent_returns_empty() {
-        let results = path_completer("/this/path/does/not/exist/foo");
-        assert!(results.is_empty());
+    fn case_policy_order_limit_and_opaque_identity_are_deterministic() {
+        let snapshot = CompletionSnapshot::try_ready(8, vec![
+            entry("b", "Apple", "same", "second", false),
+            entry("a", "apple", "same", "first", false),
+            entry("c", "banana", "banana", "banana", false),
+        ])
+        .unwrap();
+        let insensitive = CompletionQuery::try_new(8, "APP", CompletionCasePolicy::Insensitive, 2).unwrap();
+        let sensitive = CompletionQuery::try_new(8, "APP", CompletionCasePolicy::Sensitive, 2).unwrap();
+
+        let CompletionProjection::Candidates(first) = project_path_completions(&insensitive, &snapshot) else {
+            panic!("ready snapshot must project");
+        };
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].id.as_str(), "a");
+        assert_eq!(first[1].id.as_str(), "b");
+        assert_eq!(project_path_completions(&insensitive, &snapshot), CompletionProjection::Candidates(first));
+        assert_eq!(project_path_completions(&sensitive, &snapshot), CompletionProjection::Candidates(Vec::new()));
     }
 
     #[test]
-    fn directory_completion() {
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path();
+    fn denied_stale_failed_and_unrepresentable_facts_fail_closed() {
+        let query = CompletionQuery::try_new(5, "", CompletionCasePolicy::Sensitive, 4).unwrap();
+        let denied = CompletionSnapshot {
+            generation: 5,
+            state: CompletionSnapshotState::Denied,
+        };
+        let missing = CompletionSnapshot {
+            generation: 5,
+            state: CompletionSnapshotState::Missing,
+        };
+        let failed = CompletionSnapshot {
+            generation: 5,
+            state: CompletionSnapshotState::Failed,
+        };
+        let mut hidden = entry("bytes", "", "", "", false);
+        hidden.eligibility = CompletionEntryEligibility::Unrepresentable;
+        let ready = CompletionSnapshot::try_ready(4, vec![hidden.clone()]).unwrap();
 
-        // Create test files and directories
-        fs::write(temp_path.join("file1.txt"), "").unwrap();
-        fs::write(temp_path.join("file2.log"), "").unwrap();
-        fs::create_dir(temp_path.join("subdir1")).unwrap();
-        fs::create_dir(temp_path.join("subdir2")).unwrap();
-
-        let input = format!("{}/", temp_path.display());
-        let results = path_completer(&input);
-
-        assert!(results.len() >= 4);
-
-        // Check that directories have trailing slashes
-        let subdir1_path = format!("{}/subdir1/", temp_path.display());
-        let subdir2_path = format!("{}/subdir2/", temp_path.display());
-        assert!(results.contains(&subdir1_path));
-        assert!(results.contains(&subdir2_path));
-
-        // Check that files don't have trailing slashes
-        let file1_path = format!("{}/file1.txt", temp_path.display());
-        let file2_path = format!("{}/file2.log", temp_path.display());
-        assert!(results.contains(&file1_path));
-        assert!(results.contains(&file2_path));
-    }
-
-    #[test]
-    fn prefix_filtering() {
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path();
-
-        // Create test files with different prefixes
-        fs::write(temp_path.join("apple.txt"), "").unwrap();
-        fs::write(temp_path.join("application.log"), "").unwrap();
-        fs::write(temp_path.join("banana.txt"), "").unwrap();
-        fs::create_dir(temp_path.join("apps")).unwrap();
-
-        let input = format!("{}/app", temp_path.display());
-        let results = path_completer(&input);
-
-        // Should match "apple.txt", "application.log", and "apps/"
-        assert_eq!(results.len(), 3);
-
-        let expected_apple = format!("{}/apple.txt", temp_path.display());
-        let expected_app = format!("{}/application.log", temp_path.display());
-        let expected_apps = format!("{}/apps/", temp_path.display());
-
-        assert!(results.contains(&expected_apple));
-        assert!(results.contains(&expected_app));
-        assert!(results.contains(&expected_apps));
-
-        // Should not match "banana.txt"
-        let not_expected = format!("{}/banana.txt", temp_path.display());
-        assert!(!results.contains(&not_expected));
-    }
-
-    #[test]
-    fn case_insensitive_matching() {
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path();
-
-        // Create files with mixed case
-        fs::write(temp_path.join("FileA.txt"), "").unwrap();
-        fs::write(temp_path.join("fileb.txt"), "").unwrap();
-        fs::create_dir(temp_path.join("FolderC")).unwrap();
-
-        let input = format!("{}/fil", temp_path.display());
-        let results = path_completer(&input);
-
-        // Should match "FileA.txt" and "fileb.txt" (case-insensitive "fil" prefix)
-        // "FolderC" does NOT match "fil"
-        assert_eq!(results.len(), 2);
-
-        let expected_a = format!("{}/FileA.txt", temp_path.display());
-        let expected_b = format!("{}/fileb.txt", temp_path.display());
-
-        assert!(results.contains(&expected_a));
-        assert!(results.contains(&expected_b));
-    }
-
-    #[test]
-    fn current_directory_shorthand() {
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path();
-
-        // Create a test file
-        fs::write(temp_path.join("test.txt"), "").unwrap();
-
-        // Change to temp directory and test
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(temp_path).unwrap();
-
-        let results = path_completer("test");
-
-        // Restore original directory
-        std::env::set_current_dir(original_dir).unwrap();
-
-        assert!(results.contains(&"test.txt".to_string()));
-    }
-
-    #[test]
-    fn root_directory_completion() {
-        // Test completing from root (might not work on all systems, so make it conditional)
-        if cfg!(unix) {
-            let results = path_completer("/");
-            // Should contain typical Unix directories
-            // We can't guarantee specific contents, but it shouldn't be empty
-            // and entries should start with "/"
-            for result in &results {
-                assert!(result.starts_with("/"));
-                if result.len() > 1 {
-                    // Directories should end with /
-                    assert!(result.ends_with("/") || !result[1..].contains("/"));
-                }
-            }
-        }
+        assert_eq!(
+            project_path_completions(&query, &denied),
+            CompletionProjection::Rejected(CompletionDiagnostic::PolicyDenied)
+        );
+        assert_eq!(
+            project_path_completions(&query, &missing),
+            CompletionProjection::Rejected(CompletionDiagnostic::ResourceMissing)
+        );
+        assert_eq!(
+            project_path_completions(&query, &failed),
+            CompletionProjection::Rejected(CompletionDiagnostic::SnapshotFailed)
+        );
+        assert_eq!(
+            project_path_completions(&query, &ready),
+            CompletionProjection::Rejected(CompletionDiagnostic::StaleSnapshot)
+        );
+        let current = CompletionSnapshot::try_ready(5, vec![hidden]).unwrap();
+        assert_eq!(project_path_completions(&query, &current), CompletionProjection::Candidates(Vec::new()));
     }
 }

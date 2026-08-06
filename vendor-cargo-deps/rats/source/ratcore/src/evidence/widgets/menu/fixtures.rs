@@ -25,44 +25,31 @@ pub fn leader_key_positive_replay_script() -> ReplayScript {
         target: TARGET_LEADER_KEY.to_string(),
         key: KEY_SAVE.to_string(),
     })
-    .with_assertion(ReplayAssertion::new(
-        "selected_action",
-        ACTION_WORKSPACE_SAVE,
-    ))
+    .with_assertion(ReplayAssertion::new("selected_action", ACTION_WORKSPACE_SAVE))
     .with_assertion(ReplayAssertion::new("visible", false.to_string()))
-    .with_snapshot(ReplaySnapshotExpectation::new(
-        "state",
-        state_snapshot_hash(&accepted_positive_state()),
-    ))
+    .with_snapshot(ReplaySnapshotExpectation::new("state", state_snapshot_hash(&accepted_positive_state())))
 }
 
 /// Returns the committed leader-key negative replay fixture.
 #[must_use]
 pub fn leader_key_negative_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        NEGATIVE_FIXTURE_ID,
-        "Leader-key invalid input baseline",
-        TARGET_LEADER_KEY,
-    ))
-    .with_event(ReplayEvent::Key {
-        target: TARGET_LEADER_KEY.to_string(),
-        key: KEY_DISABLED.to_string(),
-    })
-    .with_event(ReplayEvent::Key {
-        target: TARGET_STALE_LEADER_KEY.to_string(),
-        key: KEY_UNKNOWN.to_string(),
-    })
-    .with_event(ReplayEvent::Key {
-        target: TARGET_LEADER_KEY.to_string(),
-        key: KEY_UNKNOWN.to_string(),
-    })
-    .with_assertion(ReplayAssertion::new("current_menu", MENU_ROOT))
-    .with_assertion(ReplayAssertion::new("selected_action", EMPTY_MARKER))
-    .with_assertion(ReplayAssertion::new("visible", true.to_string()))
-    .with_snapshot(ReplaySnapshotExpectation::new(
-        "state",
-        state_snapshot_hash(&accepted_negative_state()),
-    ))
+    ReplayScript::new(ReplayMetadata::new(NEGATIVE_FIXTURE_ID, "Leader-key invalid input baseline", TARGET_LEADER_KEY))
+        .with_event(ReplayEvent::Key {
+            target: TARGET_LEADER_KEY.to_string(),
+            key: KEY_DISABLED.to_string(),
+        })
+        .with_event(ReplayEvent::Key {
+            target: TARGET_STALE_LEADER_KEY.to_string(),
+            key: KEY_UNKNOWN.to_string(),
+        })
+        .with_event(ReplayEvent::Key {
+            target: TARGET_LEADER_KEY.to_string(),
+            key: KEY_UNKNOWN.to_string(),
+        })
+        .with_assertion(ReplayAssertion::new("current_menu", MENU_ROOT))
+        .with_assertion(ReplayAssertion::new("selected_action", EMPTY_MARKER))
+        .with_assertion(ReplayAssertion::new("visible", true.to_string()))
+        .with_snapshot(ReplaySnapshotExpectation::new("state", state_snapshot_hash(&accepted_negative_state())))
 }
 
 /// Leader-key replay summary row.
@@ -112,12 +99,7 @@ fn run_leader_fixture(script: ReplayScript) -> LeaderReplayRow {
         fixture_id,
         scenario,
         state_hash: report.state_hash,
-        diagnostics: join_ids(
-            report
-                .issues
-                .iter()
-                .map(|issue| format!("{:?}", issue.code)),
-        ),
+        diagnostics: join_ids(report.issues.iter().map(|issue| format!("{:?}", issue.code))),
     }
 }
 
@@ -166,10 +148,7 @@ fn accepted_positive_state() -> std::collections::BTreeMap<String, String> {
         ("current_items".to_string(), EMPTY_MARKER.to_string()),
         ("current_menu".to_string(), EMPTY_MARKER.to_string()),
         ("depth".to_string(), "0".to_string()),
-        (
-            "selected_action".to_string(),
-            ACTION_WORKSPACE_SAVE.to_string(),
-        ),
+        ("selected_action".to_string(), ACTION_WORKSPACE_SAVE.to_string()),
         ("surface".to_string(), TARGET_LEADER_KEY.to_string()),
         ("visible".to_string(), false.to_string()),
     ])
@@ -178,10 +157,7 @@ fn accepted_positive_state() -> std::collections::BTreeMap<String, String> {
 fn accepted_negative_state() -> std::collections::BTreeMap<String, String> {
     std::collections::BTreeMap::from([
         ("breadcrumb".to_string(), EMPTY_MARKER.to_string()),
-        (
-            "current_items".to_string(),
-            "d:Publish docs,w:Workspace".to_string(),
-        ),
+        ("current_items".to_string(), "d:Publish docs,w:Workspace".to_string()),
         ("current_menu".to_string(), MENU_ROOT.to_string()),
         ("depth".to_string(), "0".to_string()),
         ("selected_action".to_string(), EMPTY_MARKER.to_string()),

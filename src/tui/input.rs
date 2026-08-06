@@ -559,12 +559,12 @@ fn port_snap_target(graph: &Graph, cursor: CanvasPosition) -> Option<PortSnapTar
         for (index, _) in node.input_ports.iter().enumerate() {
             let port_index = i32::try_from(index).expect("port index fits in canvas coordinates");
             let marker = CanvasPosition {
-                x: bounds.x + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
-                y: bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
+                x: bounds.x.get() + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
+                y: bounds.y.get() + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
             };
             let hit = CanvasPosition {
-                x: bounds.x,
-                y: bounds.y + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
+                x: bounds.x.get(),
+                y: bounds.y.get() + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
             };
             nearest = nearest_port_snap_target(nearest, cursor, marker, hit);
         }
@@ -572,12 +572,12 @@ fn port_snap_target(graph: &Graph, cursor: CanvasPosition) -> Option<PortSnapTar
         for (index, _) in node.output_ports.iter().enumerate() {
             let port_index = i32::try_from(index).expect("port index fits in canvas coordinates");
             let marker = CanvasPosition {
-                x: bounds.x + i32::from(bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
-                y: bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
+                x: bounds.x.get() + i32::from(bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
+                y: bounds.y.get() + PORT_MARKER_ROW_FROM_NODE_TOP + port_index,
             };
             let hit = CanvasPosition {
-                x: bounds.x + i32::from(bounds.width) - OUTPUT_PORT_HIT_RIGHT_INSET,
-                y: bounds.y + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
+                x: bounds.x.get() + i32::from(bounds.width) - OUTPUT_PORT_HIT_RIGHT_INSET,
+                y: bounds.y.get() + PORT_HIT_ROW_FROM_NODE_TOP + port_index,
             };
             nearest = nearest_port_snap_target(nearest, cursor, marker, hit);
         }
@@ -685,8 +685,8 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
             if matches!(app.graph_state.mode, InteractionMode::Wiring { .. }) {
                 let snapped_pos = snapped_wiring_canvas_position(app, mouse);
                 if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                    *cursor_x = snapped_pos.x;
-                    *cursor_y = snapped_pos.y;
+                    *cursor_x = rat_nodegraph::view::CanvasX::from_scaled(snapped_pos.x);
+                    *cursor_y = rat_nodegraph::view::CanvasY::from_scaled(snapped_pos.y);
                 }
             } else {
                 // Compute drag delta from last canvas position.
@@ -712,8 +712,8 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
             // Update wiring preview cursor on mouse movement.
             let canvas_pos = snapped_wiring_canvas_position(app, mouse);
             if let InteractionMode::Wiring { cursor_x, cursor_y, .. } = &mut app.graph_state.mode {
-                *cursor_x = canvas_pos.x;
-                *cursor_y = canvas_pos.y;
+                *cursor_x = rat_nodegraph::view::CanvasX::from_scaled(canvas_pos.x);
+                *cursor_y = rat_nodegraph::view::CanvasY::from_scaled(canvas_pos.y);
             }
         }
         MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
@@ -858,15 +858,16 @@ mod tests {
         let target_bounds = node_bounds(&app.graph_state.graph, target_id).expect("target bounds");
         let source_output = canvas_to_screen(
             app,
-            source_bounds.x + i32::from(source_bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
-            source_bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP,
+            source_bounds.x.get() + i32::from(source_bounds.width) - OUTPUT_PORT_MARKER_RIGHT_INSET,
+            source_bounds.y.get() + PORT_MARKER_ROW_FROM_NODE_TOP,
         );
         let target_input = canvas_to_screen(
             app,
-            target_bounds.x + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
-            target_bounds.y + PORT_MARKER_ROW_FROM_NODE_TOP,
+            target_bounds.x.get() + INPUT_PORT_MARKER_X_FROM_NODE_LEFT,
+            target_bounds.y.get() + PORT_MARKER_ROW_FROM_NODE_TOP,
         );
-        let target_body = canvas_to_screen(app, target_bounds.x + NODE_BODY_INSET, target_bounds.y + NODE_BODY_INSET);
+        let target_body =
+            canvas_to_screen(app, target_bounds.x.get() + NODE_BODY_INSET, target_bounds.y.get() + NODE_BODY_INSET);
         (source_output, target_input, target_body)
     }
 
@@ -1068,7 +1069,7 @@ mod tests {
             matches!(
                 &app.graph_state.mode,
                 InteractionMode::Wiring { cursor_x, cursor_y, .. }
-                    if *cursor_x == target_canvas.x && *cursor_y == target_canvas.y
+                    if cursor_x.get() == target_canvas.x && cursor_y.get() == target_canvas.y
             ),
             "wiring preview should snap to the visible input dot",
         );

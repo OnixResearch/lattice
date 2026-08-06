@@ -5,33 +5,30 @@ mod data;
 mod matrix;
 mod norm;
 
-pub use data::{
-    Descriptor, DescriptorDraft, LifecyclePolicy, PolicyAdmission, PolicyAdmissionDraft, SizePolicy,
-};
-pub use matrix::{
-    AdoptionDecision, Evaluation, EvaluationAxis, EvaluationError, MCP_APP_EVALUATION_AXES,
-    RiskReason,
-};
+pub use data::Descriptor;
+pub use data::DescriptorDraft;
+pub use data::LifecyclePolicy;
+pub use data::PolicyAdmission;
+pub use data::PolicyAdmissionDraft;
+pub use data::SizePolicy;
+pub use matrix::AdoptionDecision;
+pub use matrix::Evaluation;
+pub use matrix::EvaluationAxis;
+pub use matrix::EvaluationError;
+pub use matrix::MCP_APP_EVALUATION_AXES;
+pub use matrix::RiskReason;
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
-const RESOURCE_URI_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_resource_uri");
-const MIME_PROFILE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_mime_profile");
-const TITLE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_title");
-const CSP_DOMAIN_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_csp_domain");
-const PERMISSION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_permission");
-const HOST_CONTEXT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_host_context");
-const CALLBACK_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_callback");
-const SIZE_POLICY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("mcp_app_size_policy");
+const RESOURCE_URI_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_resource_uri");
+const MIME_PROFILE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_mime_profile");
+const TITLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_title");
+const CSP_DOMAIN_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_csp_domain");
+const PERMISSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_permission");
+const HOST_CONTEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_host_context");
+const CALLBACK_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_callback");
+const SIZE_POLICY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_app_size_policy");
 const LIFECYCLE_POLICY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("mcp_app_lifecycle_policy");
 

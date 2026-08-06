@@ -32,16 +32,13 @@ impl Receipt {
     pub fn new(draft: ReceiptDraft<'_>) -> Result<Self, crate::ValidationError> {
         let recipe_id = crate::normalized_adapter_field(RECIPE_ID_FIELD, draft.recipe_id)?;
         let signal_buckets = collect_labels(EMPTY_BUCKETS_FIELD, TASK_FIELD, draft.signal_buckets)?;
-        let selected_models =
-            collect_labels(EMPTY_MODELS_FIELD, MODEL_LABEL_FIELD, draft.selected_models)?;
-        let quorum_class = super::QuorumClass::parse(draft.quorum_class)
-            .map_err(crate::ValidationError::Contract)?;
-        let fallback_policy = crate::FallbackPolicy::parse(draft.fallback_policy)
-            .map_err(crate::ValidationError::Contract)?;
-        let policy_hash =
-            crate::SafeHash::new(draft.policy_hash).map_err(crate::ValidationError::Contract)?;
-        let observed_bucket = super::DurationBucket::parse(draft.duration_bucket)
-            .map_err(crate::ValidationError::Contract)?;
+        let selected_models = collect_labels(EMPTY_MODELS_FIELD, MODEL_LABEL_FIELD, draft.selected_models)?;
+        let quorum_class = super::QuorumClass::parse(draft.quorum_class).map_err(crate::ValidationError::Contract)?;
+        let fallback_policy =
+            crate::FallbackPolicy::parse(draft.fallback_policy).map_err(crate::ValidationError::Contract)?;
+        let policy_hash = crate::SafeHash::new(draft.policy_hash).map_err(crate::ValidationError::Contract)?;
+        let observed_bucket =
+            super::DurationBucket::parse(draft.duration_bucket).map_err(crate::ValidationError::Contract)?;
         let redactions = collect_redactions(draft.redactions)?;
         let identity_hash = crate::hash_parts(&[
             HASH_SCHEMA,
@@ -137,9 +134,7 @@ fn collect_labels(
         .map_err(crate::ValidationError::Contract)
 }
 
-fn collect_redactions(
-    values: &[&str],
-) -> Result<alloc::vec::Vec<super::Redaction>, crate::ValidationError> {
+fn collect_redactions(values: &[&str]) -> Result<alloc::vec::Vec<super::Redaction>, crate::ValidationError> {
     if values.is_empty() {
         return Err(crate::AdapterContractError::EmptyCollection {
             field: EMPTY_REDACTIONS_FIELD,
@@ -193,26 +188,14 @@ pub enum ReceiptLeak {
 ///
 /// Panics only if built-in leak sentinel tables are accidentally emptied.
 pub fn validate_receipt_text(text: &str) -> Result<(), ReceiptLeak> {
-    assert!(
-        !RAW_PROMPT_SENTINELS.is_empty(),
-        "raw prompt sentinels must be configured"
-    );
-    assert!(
-        !TRACE_SENTINELS.is_empty(),
-        "trace sentinels must be configured"
-    );
+    assert!(!RAW_PROMPT_SENTINELS.is_empty(), "raw prompt sentinels must be configured");
+    assert!(!TRACE_SENTINELS.is_empty(), "trace sentinels must be configured");
     leak_for_text(text).map_or(Ok(()), Err)
 }
 
 fn leak_for_text(text: &str) -> Option<ReceiptLeak> {
-    assert!(
-        !PROVIDER_SENTINELS.is_empty(),
-        "provider sentinels must be configured"
-    );
-    assert!(
-        !CREDENTIAL_SENTINELS.is_empty(),
-        "credential sentinels must be configured"
-    );
+    assert!(!PROVIDER_SENTINELS.is_empty(), "provider sentinels must be configured");
+    assert!(!CREDENTIAL_SENTINELS.is_empty(), "credential sentinels must be configured");
     let lower = text.to_ascii_lowercase();
     if contains_any(&lower, RAW_PROMPT_SENTINELS) {
         return Some(ReceiptLeak::RawPrompt);

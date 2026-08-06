@@ -75,10 +75,7 @@ pub enum SignalBand {
 }
 
 impl SignalBand {
-    pub(crate) fn parse(
-        field: crate::FieldName,
-        value: &str,
-    ) -> Result<Self, crate::AdapterContractError> {
+    pub(crate) fn parse(field: crate::FieldName, value: &str) -> Result<Self, crate::AdapterContractError> {
         crate::parse_value(field, value, |normalized| match normalized {
             BAND_LOW => Some(Self::Low),
             BAND_MEDIUM => Some(Self::Medium),

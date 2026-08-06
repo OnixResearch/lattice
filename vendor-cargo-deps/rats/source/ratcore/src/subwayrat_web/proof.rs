@@ -89,11 +89,7 @@ pub fn build_subwayrat_web_renderer_evidence(
     mut rendered_widget_ids: Vec<String>,
     mut unsupported_native_paths: Vec<String>,
 ) -> SubwayratWebRendererEvidence {
-    checks.sort_by(|left, right| {
-        left.package
-            .cmp(&right.package)
-            .then(left.command.cmp(&right.command))
-    });
+    checks.sort_by(|left, right| left.package.cmp(&right.package).then(left.command.cmp(&right.command)));
     rendered_widget_ids.sort();
     unsupported_native_paths.sort();
     let evidence_hash = hash_evidence(&checks, &rendered_widget_ids, &unsupported_native_paths);
@@ -105,11 +101,7 @@ pub fn build_subwayrat_web_renderer_evidence(
     }
 }
 
-fn hash_evidence(
-    checks: &[WebRendererCheck],
-    widget_ids: &[String],
-    unsupported_paths: &[String],
-) -> String {
+fn hash_evidence(checks: &[WebRendererCheck], widget_ids: &[String], unsupported_paths: &[String]) -> String {
     let mut material = String::new();
     for check in checks {
         material.push_str(&format!(
@@ -154,12 +146,7 @@ mod tests {
             vec!["native.raw-mode".to_string()],
         );
 
-        assert!(
-            evidence
-                .checks
-                .iter()
-                .any(|check| check.status == WebRendererCheckStatus::Failed)
-        );
+        assert!(evidence.checks.iter().any(|check| check.status == WebRendererCheckStatus::Failed));
         assert_eq!(evidence.rendered_widget_ids[0], "spinner.basic");
         assert!(!evidence.evidence_hash.is_empty());
     }

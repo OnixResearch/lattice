@@ -4,16 +4,25 @@ mod gate;
 type Reason = super::Reason;
 type ServiceOutcome<T> = super::ServiceOutcome<T>;
 
-pub use envelope::{
-    ConfirmationBinding, ConfirmationBindingDraft, ConfirmationRequest, ConfirmationRequestDraft,
-};
-pub use gate::{
-    ConfirmationActionKind, ConfirmationBrokerClass, ConfirmationExpiry, ConfirmationExpiryClass,
-    ConfirmationIssue, ConfirmationLevel, ConfirmationReceipt, ConfirmationReceiptDraft,
-    ConfirmationReceiptLeak, ConfirmationStatus, ConfirmationTick, ConfirmationTimingClass,
-    evaluate_confirmation_decision, evaluate_confirmation_outcome,
-    validate_confirmation_receipt_text,
-};
+pub use envelope::ConfirmationBinding;
+pub use envelope::ConfirmationBindingDraft;
+pub use envelope::ConfirmationRequest;
+pub use envelope::ConfirmationRequestDraft;
+pub use gate::ConfirmationActionKind;
+pub use gate::ConfirmationBrokerClass;
+pub use gate::ConfirmationExpiry;
+pub use gate::ConfirmationExpiryClass;
+pub use gate::ConfirmationIssue;
+pub use gate::ConfirmationLevel;
+pub use gate::ConfirmationReceipt;
+pub use gate::ConfirmationReceiptDraft;
+pub use gate::ConfirmationReceiptLeak;
+pub use gate::ConfirmationStatus;
+pub use gate::ConfirmationTick;
+pub use gate::ConfirmationTimingClass;
+pub use gate::evaluate_confirmation_decision;
+pub use gate::evaluate_confirmation_outcome;
+pub use gate::validate_confirmation_receipt_text;
 
 /// Decision returned by an injected confirmation broker.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,8 +65,7 @@ impl ConfirmationEvaluation {
     /// Returns true only when the protected action may dispatch.
     #[must_use]
     pub const fn dispatch_allowed(&self) -> bool {
-        matches!(self.status, ConfirmationStatus::Approved)
-            && matches!(self.issue, ConfirmationIssue::None)
+        matches!(self.status, ConfirmationStatus::Approved) && matches!(self.issue, ConfirmationIssue::None)
     }
 
     /// Returns the safe confirmation receipt.

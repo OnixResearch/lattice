@@ -33,7 +33,8 @@ pub struct ContractCandidate {
     pub meteorite_status: String,
     /// Proposed Ratcore owner, or an explicit renderer-owned decision.
     pub proposed_owner: String,
-    /// Extraction status: `extract-now`, `extracted`, `renderer-owned`, `blocked`, `intentionally-divergent`, or `needs-evidence`.
+    /// Extraction status: `extract-now`, `extracted`, `renderer-owned`, `blocked`,
+    /// `intentionally-divergent`, or `needs-evidence`.
     pub extraction_status: String,
     /// Evidence links, commands, or source modules supporting the decision.
     pub evidence: Vec<String>,
@@ -221,9 +222,7 @@ fn extracted_issues(row: &ContractCandidate, status: &str) -> Vec<super::Issue> 
 
 fn reason_issues(row: &ContractCandidate, status: &str) -> Vec<super::Issue> {
     let mut issues = Vec::with_capacity(SINGLE_ISSUE_BOUND);
-    if REASON_STATUSES.contains(&status)
-        && row.reason.as_deref().unwrap_or_default().trim().is_empty()
-    {
+    if REASON_STATUSES.contains(&status) && row.reason.as_deref().unwrap_or_default().trim().is_empty() {
         issues.push(super::Issue::new(
             super::IssueCode::MissingReason,
             row.feature_id.clone(),

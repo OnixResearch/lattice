@@ -1,250 +1,199 @@
-//! Key combination parsing and formatting.
+//! Logical key-combination parsing and formatting.
+
+use ratcore::action_registry::KeyModifier;
+use ratcore::action_registry::LogicalKey;
+use ratcore::action_registry::LogicalKeystroke;
 
 const MIN_FUNCTION_KEY_NUMBER: u8 = 1;
 const MAX_FUNCTION_KEY_NUMBER: u8 = 12;
-const MODIFIER_PART_OFFSET: usize = 1;
-const MAX_FORMATTED_MODIFIERS: usize = 3;
 
-pub type Code = ratatui::crossterm::event::KeyCode;
-pub type Event = ratatui::crossterm::event::KeyEvent;
-pub type Modifiers = ratatui::crossterm::event::KeyModifiers;
+/// Compatibility name for one validated logical keystroke.
+pub type Chord = LogicalKeystroke;
 
-/// A single key combination (e.g. `Ctrl+Shift+K`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Chord {
-    pub code: Code,
-    pub ctrl: bool,
-    pub alt: bool,
-    pub shift: bool,
+/// Constructs one validated logical key combination using the legacy boolean
+/// modifier order. Backend events are intentionally not accepted here.
+///
+/// # Errors
+///
+/// Returns Ratcore logical-key diagnostics when the key is malformed or unsupported.
+pub fn try_chord(
+    key: LogicalKey,
+    ctrl: bool,
+    alt: bool,
+    shift: bool,
+) -> Result<Chord, Vec<ratcore::action_registry::KeySequenceDiagnostic>> {
+    let mut modifiers = Vec::new();
+    if ctrl {
+        modifiers.push(KeyModifier::Control);
+    }
+    if alt {
+        modifiers.push(KeyModifier::Alt);
+    }
+    if shift {
+        modifiers.push(KeyModifier::Shift);
+    }
+    LogicalKeystroke::try_new(key, modifiers)
 }
 
-impl Chord {
-    /// Create a new key combo.
-    pub fn new(code: Code, ctrl: bool, alt: bool, shift: bool) -> Self {
-        Self {
-            code,
-            ctrl,
-            alt,
-            shift,
-        }
+/// Parses a human-readable logical key such as `Ctrl+k`, `Alt+Enter`, or `e`.
+///
+/// Modifier names are explicit policy. Unknown, duplicate, or empty parts are
+/// rejected rather than ignored.
+#[must_use]
+pub fn parse_key_string(value: &str) -> Option<Chord> {
+    let parts = value.split('+').map(str::trim).collect::<Vec<_>>();
+    let (key_part, modifier_parts) = parts.split_last()?;
+    if key_part.is_empty() || modifier_parts.iter().any(|part| part.is_empty()) {
+        return None;
     }
 
-    /// Create a key combo from a crossterm key event.
-    pub fn from_event(event: &Event) -> Self {
-        Self {
-            code: event.code,
-            ctrl: event.modifiers.contains(Modifiers::CONTROL),
-            alt: event.modifiers.contains(Modifiers::ALT),
-            shift: event.modifiers.contains(Modifiers::SHIFT),
+    let mut modifiers = Vec::with_capacity(modifier_parts.len());
+    for part in modifier_parts {
+        let modifier = match part.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => KeyModifier::Control,
+            "alt" | "option" => KeyModifier::Alt,
+            "shift" => KeyModifier::Shift,
+            "meta" => KeyModifier::Meta,
+            "super" | "cmd" | "command" | "win" => KeyModifier::Super,
+            _ => return None,
+        };
+        if modifiers.contains(&modifier) {
+            return None;
         }
+        modifiers.push(modifier);
     }
+
+    LogicalKeystroke::try_new(parse_key(key_part)?, modifiers).ok()
 }
 
-// Key string parser lookup table.
-const KEY_CODE_NAMES: &[(&str, Code)] = &[
-    ("enter", Code::Enter),
-    ("return", Code::Enter),
-    ("cr", Code::Enter),
-    ("esc", Code::Esc),
-    ("escape", Code::Esc),
-    ("tab", Code::Tab),
-    ("backspace", Code::Backspace),
-    ("bs", Code::Backspace),
-    ("delete", Code::Delete),
-    ("del", Code::Delete),
-    ("up", Code::Up),
-    ("down", Code::Down),
-    ("left", Code::Left),
-    ("right", Code::Right),
-    ("home", Code::Home),
-    ("end", Code::End),
-    ("pageup", Code::PageUp),
-    ("pgup", Code::PageUp),
-    ("pagedown", Code::PageDown),
-    ("pgdn", Code::PageDown),
-    ("space", Code::Char(' ')),
-    ("spc", Code::Char(' ')),
-    ("/", Code::Char('/')),
-];
+fn parse_key(value: &str) -> Option<LogicalKey> {
+    let normalized = value.to_ascii_lowercase();
+    let key = match normalized.as_str() {
+        "enter" | "return" | "cr" => LogicalKey::Enter,
+        "esc" | "escape" => LogicalKey::Escape,
+        "tab" => LogicalKey::Tab,
+        "backspace" | "bs" => LogicalKey::Backspace,
+        "delete" | "del" => LogicalKey::Delete,
+        "insert" | "ins" => LogicalKey::Insert,
+        "up" | "arrowup" => LogicalKey::ArrowUp,
+        "down" | "arrowdown" => LogicalKey::ArrowDown,
+        "left" | "arrowleft" => LogicalKey::ArrowLeft,
+        "right" | "arrowright" => LogicalKey::ArrowRight,
+        "home" => LogicalKey::Home,
+        "end" => LogicalKey::End,
+        "pageup" | "pgup" => LogicalKey::PageUp,
+        "pagedown" | "pgdn" => LogicalKey::PageDown,
+        "space" | "spc" | " " => LogicalKey::Space,
+        _ => return parse_literal_key(value),
+    };
+    Some(key)
+}
 
-/// Parse a human-readable key string like `"Ctrl+K"`, `"Alt+Enter"`, `"e"`.
-pub fn parse_key_string(s: &str) -> Option<Chord> {
-    let parts: Vec<&str> = s.split('+').map(str::trim).collect();
-    debug_assert!(!parts.is_empty(), "split always yields at least one part");
-    debug_assert!(
-        parts.len() >= MODIFIER_PART_OFFSET,
-        "at least one key part must exist"
-    );
-
-    let key_str = parts.last()?;
-    let modifier_end = parts.len().saturating_sub(MODIFIER_PART_OFFSET);
-
-    let mut has_ctrl = false;
-    let mut has_alt = false;
-    let mut has_shift = false;
-
-    for part in &parts[..modifier_end] {
-        match part.to_lowercase().as_str() {
-            "ctrl" => has_ctrl = true,
-            "alt" => has_alt = true,
-            "shift" => has_shift = true,
-            _ => {}
-        }
+fn parse_literal_key(value: &str) -> Option<LogicalKey> {
+    let mut characters = value.chars();
+    if let (Some(character), None) = (characters.next(), characters.next()) {
+        return Some(LogicalKey::Character(character));
     }
 
-    let key_lower = key_str.to_lowercase();
-    let code = KEY_CODE_NAMES
+    let number = value.strip_prefix(['f', 'F'])?.parse::<u8>().ok()?;
+    (MIN_FUNCTION_KEY_NUMBER..=MAX_FUNCTION_KEY_NUMBER)
+        .contains(&number)
+        .then_some(LogicalKey::Function(number))
+}
+
+/// Formats a logical key combination using deterministic compatibility labels.
+#[must_use]
+pub fn format(stroke: &Chord) -> String {
+    let mut parts = stroke
+        .modifiers()
         .iter()
-        .find(|(name, _)| *name == key_lower)
-        .map(|(_, code)| *code)
-        .or_else(|| parse_literal_key_code(key_str))?;
-
-    Some(Chord {
-        code,
-        ctrl: has_ctrl,
-        alt: has_alt,
-        shift: has_shift,
-    })
-}
-
-fn parse_literal_key_code(key_str: &str) -> Option<Code> {
-    if key_str.len() == MODIFIER_PART_OFFSET {
-        return key_str.chars().next().map(Code::Char);
-    }
-
-    if !key_str.to_lowercase().starts_with('f') || key_str.len() <= MODIFIER_PART_OFFSET {
-        return None;
-    }
-
-    let key_number = key_str[MODIFIER_PART_OFFSET..].parse::<u8>().ok()?;
-    if !(MIN_FUNCTION_KEY_NUMBER..=MAX_FUNCTION_KEY_NUMBER).contains(&key_number) {
-        return None;
-    }
-
-    Some(Code::F(key_number))
-}
-
-/// Format a key combo into a human-readable string.
-pub fn format(k: &Chord) -> String {
-    let mut parts = Vec::new();
-    debug_assert!(parts.is_empty(), "formatter starts with no modifier parts");
-
-    if k.ctrl {
-        parts.push("Ctrl".to_string());
-    }
-    if k.alt {
-        parts.push("Alt".to_string());
-    }
-    if k.shift {
-        parts.push("Shift".to_string());
-    }
-    debug_assert!(
-        parts.len() <= MAX_FORMATTED_MODIFIERS,
-        "only supported modifiers are formatted"
-    );
-
-    parts.push(format_code(k.code));
+        .map(|modifier| match modifier {
+            KeyModifier::Control => "Ctrl".to_string(),
+            KeyModifier::Alt => "Alt".to_string(),
+            KeyModifier::Shift => "Shift".to_string(),
+            KeyModifier::Meta => "Meta".to_string(),
+            KeyModifier::Super => "Super".to_string(),
+            KeyModifier::Unsupported(value) => value.clone(),
+        })
+        .collect::<Vec<_>>();
+    parts.push(format_key(stroke.key(), stroke.modifiers().contains(&KeyModifier::Shift)));
     parts.join("+")
 }
 
-fn format_code(code: Code) -> String {
-    match code {
-        Code::Char(' ') => "Space".to_string(),
-        Code::Char(c) => c.to_string(),
-        Code::Enter => "Enter".to_string(),
-        Code::Esc => "Esc".to_string(),
-        Code::Tab => "Tab".to_string(),
-        Code::Backspace => "Backspace".to_string(),
-        Code::Delete => "Delete".to_string(),
-        Code::Up => "Up".to_string(),
-        Code::Down => "Down".to_string(),
-        Code::Left => "Left".to_string(),
-        Code::Right => "Right".to_string(),
-        Code::Home => "Home".to_string(),
-        Code::End => "End".to_string(),
-        Code::PageUp => "PageUp".to_string(),
-        Code::PageDown => "PageDown".to_string(),
-        Code::F(n) => format!("F{}", n),
-        other => format!("{:?}", other),
+fn format_key(key: &LogicalKey, shifted: bool) -> String {
+    match key {
+        LogicalKey::Character(value) if shifted && value.is_ascii_lowercase() => value.to_ascii_uppercase().to_string(),
+        LogicalKey::Character(value) => value.to_string(),
+        LogicalKey::Space => "Space".to_string(),
+        LogicalKey::Enter => "Enter".to_string(),
+        LogicalKey::Escape => "Esc".to_string(),
+        LogicalKey::Tab => "Tab".to_string(),
+        LogicalKey::Backspace => "Backspace".to_string(),
+        LogicalKey::Delete => "Delete".to_string(),
+        LogicalKey::Insert => "Insert".to_string(),
+        LogicalKey::ArrowUp => "Up".to_string(),
+        LogicalKey::ArrowDown => "Down".to_string(),
+        LogicalKey::ArrowLeft => "Left".to_string(),
+        LogicalKey::ArrowRight => "Right".to_string(),
+        LogicalKey::Home => "Home".to_string(),
+        LogicalKey::End => "End".to_string(),
+        LogicalKey::PageUp => "PageUp".to_string(),
+        LogicalKey::PageDown => "PageDown".to_string(),
+        LogicalKey::Function(number) => format!("F{number}"),
+        LogicalKey::Unsupported(value) | LogicalKey::Composition(value) => value.clone(),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use ratcore::action_registry::KeySequenceDiagnosticCode;
+
     use super::*;
 
-    const FIRST_FUNCTION_KEY: u8 = 1;
-    const OUT_OF_RANGE_FUNCTION_KEY: &str = "F13";
-
     #[test]
-    fn parse_simple_key() {
-        let combo = parse_key_string("k").unwrap();
-        assert_eq!(combo.code, Code::Char('k'));
-        assert!(!combo.ctrl);
-        assert!(!combo.alt);
-        assert!(!combo.shift);
+    fn accepted_compatibility_strings_are_logical_and_deterministic() {
+        let plain = parse_key_string("k").expect("plain key");
+        let ctrl = parse_key_string("Ctrl+c").expect("control key");
+        let function = parse_key_string("Shift+Ctrl+F1").expect("function key");
+
+        assert_eq!(plain.key(), &LogicalKey::Character('k'));
+        assert_eq!(format(&plain), "k");
+        assert_eq!(format(&ctrl), "Ctrl+c");
+        assert_eq!(format(&function), "Ctrl+Shift+F1");
+        assert_eq!(format(&parse_key_string("escape").expect("escape")), "Esc");
+        assert_eq!(format(&parse_key_string("space").expect("space")), "Space");
     }
 
     #[test]
-    fn parse_ctrl_key() {
-        let combo = parse_key_string("Ctrl+c").unwrap();
-        assert_eq!(combo.code, Code::Char('c'));
-        assert!(combo.ctrl);
-        assert!(!combo.alt);
-        assert!(!combo.shift);
+    fn malformed_unknown_duplicate_and_unsupported_values_are_rejected() {
+        assert!(parse_key_string("definitely-not-a-key").is_none());
+        assert!(parse_key_string("F13").is_none());
+        assert!(parse_key_string("Hyper+k").is_none());
+        assert!(parse_key_string("Ctrl+Control+k").is_none());
+        assert!(parse_key_string("Ctrl++k").is_none());
+
+        let issues = LogicalKeystroke::try_new(LogicalKey::Composition("é".to_string()), Vec::new())
+            .expect_err("composition cannot become a shortcut");
+        assert_eq!(issues[0].code, KeySequenceDiagnosticCode::CompositionExcluded);
     }
 
     #[test]
-    fn parse_ctrl_shift_function_key() {
-        let combo = parse_key_string("Ctrl+Shift+F1").unwrap();
-        assert_eq!(combo.code, Code::F(FIRST_FUNCTION_KEY));
-        assert!(combo.ctrl);
-        assert!(!combo.alt);
-        assert!(combo.shift);
-    }
+    fn construction_canonicalizes_modifiers_and_nominal_key_identity() {
+        let first =
+            LogicalKeystroke::try_new(LogicalKey::Character('K'), vec![KeyModifier::Shift, KeyModifier::Control])
+                .expect("valid stroke");
+        let second =
+            LogicalKeystroke::try_new(LogicalKey::Character('k'), vec![KeyModifier::Control, KeyModifier::Shift])
+                .expect("valid stroke");
 
-    #[test]
-    fn parse_special_keys() {
-        assert_eq!(parse_key_string("enter").unwrap().code, Code::Enter);
-        assert_eq!(parse_key_string("esc").unwrap().code, Code::Esc);
-        assert_eq!(parse_key_string("space").unwrap().code, Code::Char(' '));
-    }
+        let control = parse_key_string("Control+s").expect("control profile");
+        let meta = parse_key_string("Meta+s").expect("meta profile");
 
-    #[test]
-    fn parse_rejects_unknown_key_name() {
-        assert_eq!(parse_key_string("definitely-not-a-key"), None);
-    }
-
-    #[test]
-    fn parse_rejects_out_of_range_function_key() {
-        assert_eq!(parse_key_string(OUT_OF_RANGE_FUNCTION_KEY), None);
-    }
-
-    #[test]
-    fn format_simple_key() {
-        let combo = Chord::new(Code::Char('q'), false, false, false);
-        assert_eq!(format(&combo), "q");
-    }
-
-    #[test]
-    fn format_ctrl_key() {
-        let combo = Chord::new(Code::Char('c'), true, false, false);
-        assert_eq!(format(&combo), "Ctrl+c");
-    }
-
-    #[test]
-    fn format_ctrl_shift_function_key() {
-        let combo = Chord::new(Code::F(FIRST_FUNCTION_KEY), true, false, true);
-        assert_eq!(format(&combo), "Ctrl+Shift+F1");
-    }
-
-    #[test]
-    fn from_event() {
-        let event = Event::new(Code::Char('k'), Modifiers::CONTROL);
-        let combo = Chord::from_event(&event);
-        assert_eq!(combo.code, Code::Char('k'));
-        assert!(combo.ctrl);
-        assert!(!combo.alt);
-        assert!(!combo.shift);
+        assert_eq!(first, second);
+        assert_eq!(format(&first), "Ctrl+Shift+K");
+        assert_ne!(first.key(), &LogicalKey::Unsupported("k".to_string()));
+        assert_ne!(control, meta);
+        assert_eq!(format(&control), "Ctrl+s");
+        assert_eq!(format(&meta), "Meta+s");
     }
 }

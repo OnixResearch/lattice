@@ -6,9 +6,13 @@
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
-use ratatui::widgets::{Block, Borders, Clear};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
+use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 const MIN_TOOLTIP_CONTENT_WIDTH: u16 = 1;
 const DEFAULT_TOOLTIP_MAX_WIDTH: u16 = 40;
@@ -160,10 +164,7 @@ pub fn compute_tooltip_layout(viewport: Rect, tooltip: &Tooltip) -> TooltipLayou
         return TooltipLayout::default();
     }
 
-    let lines = wrap_tooltip_content(
-        &tooltip.content,
-        tooltip.max_width.max(MIN_TOOLTIP_CONTENT_WIDTH),
-    );
+    let lines = wrap_tooltip_content(&tooltip.content, tooltip.max_width.max(MIN_TOOLTIP_CONTENT_WIDTH));
     let content_width = lines
         .iter()
         .map(|line| text_width_u16(line))
@@ -173,15 +174,9 @@ pub fn compute_tooltip_layout(viewport: Rect, tooltip: &Tooltip) -> TooltipLayou
         .min(viewport.width);
     let content_height = usize_to_u16(lines.len()).max(1).min(viewport.height);
     let border_size = tooltip_border_size(tooltip.border);
-    let outer_width = content_width
-        .saturating_add(border_size)
-        .min(viewport.width);
-    let outer_height = content_height
-        .saturating_add(border_size)
-        .min(viewport.height);
-    let max_x = rect_right(viewport)
-        .saturating_sub(outer_width)
-        .max(viewport.x);
+    let outer_width = content_width.saturating_add(border_size).min(viewport.width);
+    let outer_height = content_height.saturating_add(border_size).min(viewport.height);
+    let max_x = rect_right(viewport).saturating_sub(outer_width).max(viewport.x);
     let x = tooltip.anchor.x.clamp(viewport.x, max_x);
     let below_y = tooltip.anchor.y.saturating_add(ANCHOR_BELOW_OFFSET);
     let below_bottom = below_y.saturating_add(outer_height);
@@ -190,10 +185,7 @@ pub fn compute_tooltip_layout(viewport: Rect, tooltip: &Tooltip) -> TooltipLayou
     let y = if should_flip {
         tooltip.anchor.y.saturating_sub(outer_height)
     } else {
-        below_y.clamp(
-            viewport.y,
-            viewport_bottom.saturating_sub(outer_height).max(viewport.y),
-        )
+        below_y.clamp(viewport.y, viewport_bottom.saturating_sub(outer_height).max(viewport.y))
     };
     let outer = Rect::new(x, y, outer_width, outer_height);
     let inner = tooltip_inner_rect(outer, tooltip.border);
@@ -207,12 +199,7 @@ pub fn compute_tooltip_layout(viewport: Rect, tooltip: &Tooltip) -> TooltipLayou
 }
 
 /// Render a tooltip and return its computed layout.
-pub fn render_tooltip(
-    frame: &mut Frame,
-    viewport: Rect,
-    tooltip: &Tooltip,
-    style: &TooltipStyle,
-) -> TooltipLayout {
+pub fn render_tooltip(frame: &mut Frame, viewport: Rect, tooltip: &Tooltip, style: &TooltipStyle) -> TooltipLayout {
     let layout = compute_tooltip_layout(viewport, tooltip);
 
     if layout.outer.width == 0 || layout.outer.height == 0 {
@@ -223,17 +210,11 @@ pub fn render_tooltip(
     fill_area(frame.buffer_mut(), layout.outer, style.background);
 
     if tooltip.border == TooltipBorder::Plain {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(style.border);
+        let block = Block::default().borders(Borders::ALL).border_style(style.border);
         frame.render_widget(block, layout.outer);
     }
 
-    render_tooltip_lines(
-        frame.buffer_mut(),
-        &layout,
-        style.text.patch(style.background),
-    );
+    render_tooltip_lines(frame.buffer_mut(), &layout, style.text.patch(style.background));
 
     layout
 }
@@ -354,9 +335,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const VIEWPORT_X: u16 = 0;
     const VIEWPORT_Y: u16 = 0;
@@ -403,9 +385,7 @@ mod tests {
 
     #[test]
     fn wraps_content_at_max_width() {
-        let tooltip = Tooltip::new("abcdef")
-            .with_border(TooltipBorder::None)
-            .with_max_width(WRAP_WIDTH);
+        let tooltip = Tooltip::new("abcdef").with_border(TooltipBorder::None).with_max_width(WRAP_WIDTH);
 
         let layout = compute_tooltip_layout(test_viewport(), &tooltip);
 

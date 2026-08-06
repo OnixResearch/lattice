@@ -1,0 +1,13 @@
+capability_id	owner	status	evidence_grade	reason	next_action
+composition.commit	dom-composition	partial	mounted-direct	composition event commit is mounted but IME correctness is unclaimed	add physical IME evidence before promotion
+drag.capture	dom-pointer	partial	simulated-fallback	capture transitions are modeled but trusted mounted capture is not proven	add trusted pointer capture evidence
+focus.surface	dom-focus	complete	mounted-direct	focus transfer and blur are mounted	retain detached-host negative
+keyboard.basic	ratzilla	complete	mounted-direct	Enter and Escape accepted state is mounted	keep exact-browser regression
+keyboard.location	ratzilla	unsupported	missing	Ratzilla 0.3.1 drops physical location	adopt only when the backend exposes location
+keyboard.repeat	dom-key-capture	complete	mounted-direct	repeat is mounted and deterministically rejected	keep repeat non-activation evidence
+modifier.meta-key	dom-key-capture	complete	mounted-direct	Ratzilla drops Meta and capture-phase key ownership is mounted	keep duplicate route counter at one
+modifier.meta-pointer	dom-mouse-capture	partial	simulated-fallback	synthetic Meta pointer evidence cannot prove compatibility mouse suppression	add trusted Meta pointer evidence
+pointer.primary	ratzilla	complete	mounted-direct	measured primary click route is mounted	keep measured hit geometry current
+resize.measured	dom-resize	complete	mounted-direct	host and cell geometry redraw is mounted	keep generation and cleanup negative
+touch.single	dom-touch	partial	simulated-fallback	single-touch normalization is pure and synthetic only	add a stable trusted touch runner
+wheel.vertical	dom-wheel	complete	mounted-direct	Ratzilla omits wheel and the bounded DOM owner is mounted	add horizontal policy only with a consumer

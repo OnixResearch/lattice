@@ -77,12 +77,10 @@ fn validate_event_against_target<T: ReplayTarget>(
 ) -> Vec<ReplayIssue> {
     match event {
         ReplayEvent::Key {
-            target: event_target,
-            ..
+            target: event_target, ..
         }
         | ReplayEvent::Text {
-            target: event_target,
-            ..
+            target: event_target, ..
         } => validate_focused_target(event_target, target, event_step),
         ReplayEvent::Mouse {
             target: event_target,
@@ -95,24 +93,18 @@ fn validate_event_against_target<T: ReplayTarget>(
                 issues.push(ReplayIssue::new(
                     ReplayIssueCode::OutOfBoundsMouse,
                     event_field(event_step, FIELD_MOUSE_BOUNDS),
-                    format!(
-                        "step {event_step}: mouse coordinates ({x}, {y}) exceed bounds {width}x{height}"
-                    ),
+                    format!("step {event_step}: mouse coordinates ({x}, {y}) exceed bounds {width}x{height}"),
                 ));
             }
             issues
         }
         ReplayEvent::Command { action_id } => {
-            let surface = target
-                .focused_target()
-                .unwrap_or_else(|| "unfocused".to_string());
+            let surface = target.focused_target().unwrap_or_else(|| "unfocused".to_string());
             if !target.action_known(action_id) {
                 vec![ReplayIssue::new(
                     ReplayIssueCode::UnknownCommand,
                     event_field(event_step, FIELD_ACTION),
-                    format!(
-                        "step {event_step}: action `{action_id}` is unknown for surface `{surface}`"
-                    ),
+                    format!("step {event_step}: action `{action_id}` is unknown for surface `{surface}`"),
                 )]
             } else if target.action_enabled(action_id) {
                 Vec::new()
@@ -131,11 +123,7 @@ fn validate_event_against_target<T: ReplayTarget>(
     }
 }
 
-fn validate_focused_target<T: ReplayTarget>(
-    event_target: &str,
-    target: &T,
-    event_step: usize,
-) -> Vec<ReplayIssue> {
+fn validate_focused_target<T: ReplayTarget>(event_target: &str, target: &T, event_step: usize) -> Vec<ReplayIssue> {
     if !target.focus_targets().contains(event_target) {
         return vec![ReplayIssue::new(
             ReplayIssueCode::StaleFocus,
@@ -167,21 +155,15 @@ fn validate_wait_condition<T: ReplayTarget>(
         )];
     }
     match &condition.predicate {
-        ReplayWaitPredicate::StateEquals { key, expected } => {
-            validate_state_equals(target, event_step, key, expected)
-        }
-        ReplayWaitPredicate::StateContains { key, needle } => {
-            validate_state_contains(target, event_step, key, needle)
-        }
+        ReplayWaitPredicate::StateEquals { key, expected } => validate_state_equals(target, event_step, key, expected),
+        ReplayWaitPredicate::StateContains { key, needle } => validate_state_contains(target, event_step, key, needle),
         ReplayWaitPredicate::SnapshotContains { label, needle } => {
             validate_snapshot_contains(target, event_step, label, needle)
         }
-        ReplayWaitPredicate::FocusTarget {
-            target: focus_target,
-        } => validate_wait_focus_target(target, event_step, focus_target),
-        ReplayWaitPredicate::DiagnosticPresent { code } => {
-            validate_diagnostic_present(target, event_step, code)
+        ReplayWaitPredicate::FocusTarget { target: focus_target } => {
+            validate_wait_focus_target(target, event_step, focus_target)
         }
+        ReplayWaitPredicate::DiagnosticPresent { code } => validate_diagnostic_present(target, event_step, code),
         ReplayWaitPredicate::Unsupported { predicate } => vec![ReplayIssue::new(
             ReplayIssueCode::UnsupportedWaitPredicate,
             event_field(event_step, FIELD_WAIT),
@@ -259,11 +241,7 @@ fn validate_snapshot_contains<T: ReplayTarget>(
     }
 }
 
-fn validate_wait_focus_target<T: ReplayTarget>(
-    target: &T,
-    event_step: usize,
-    focus_target: &str,
-) -> Vec<ReplayIssue> {
+fn validate_wait_focus_target<T: ReplayTarget>(target: &T, event_step: usize, focus_target: &str) -> Vec<ReplayIssue> {
     if !target.focus_targets().contains(focus_target) {
         return vec![missing_wait_target(event_step, focus_target)];
     }
@@ -278,11 +256,7 @@ fn validate_wait_focus_target<T: ReplayTarget>(
     }
 }
 
-fn validate_diagnostic_present<T: ReplayTarget>(
-    target: &T,
-    event_step: usize,
-    code: &str,
-) -> Vec<ReplayIssue> {
+fn validate_diagnostic_present<T: ReplayTarget>(target: &T, event_step: usize, code: &str) -> Vec<ReplayIssue> {
     if target.diagnostic_events().contains(code) {
         Vec::new()
     } else {
@@ -308,10 +282,7 @@ fn validate_assertions(
             issues.push(ReplayIssue::new(
                 ReplayIssueCode::AssertionMismatch,
                 FIELD_ASSERTION,
-                format!(
-                    "expected `{}` to be `{}`",
-                    assertion.key, assertion.expected
-                ),
+                format!("expected `{}` to be `{}`", assertion.key, assertion.expected),
             ));
         }
     }
@@ -331,10 +302,7 @@ fn snapshot_hashes<T: ReplayTarget>(
             continue;
         }
         if let Some(bytes) = target.snapshot_bytes(&expectation.label) {
-            snapshots.push(ReplaySnapshotExpectation::new(
-                expectation.label.clone(),
-                blake3_hex(&bytes),
-            ));
+            snapshots.push(ReplaySnapshotExpectation::new(expectation.label.clone(), blake3_hex(&bytes)));
         }
     }
     snapshots
@@ -366,11 +334,7 @@ fn validate_snapshots(
 pub fn state_snapshot_hash(state: &std::collections::BTreeMap<String, String>) -> String {
     let byte_capacity_bytes = state
         .iter()
-        .map(|(key, value)| {
-            key.len()
-                .saturating_add(value.len())
-                .saturating_add(STATE_ENTRY_SEPARATOR_BYTES)
-        })
+        .map(|(key, value)| key.len().saturating_add(value.len()).saturating_add(STATE_ENTRY_SEPARATOR_BYTES))
         .sum();
     let mut bytes = Vec::with_capacity(byte_capacity_bytes);
     for (key, value) in state {

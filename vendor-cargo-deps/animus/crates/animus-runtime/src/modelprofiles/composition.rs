@@ -6,13 +6,22 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::types::{
-    MODEL_INVOCATION_PLAN_HASH_DOMAIN, ModelMemoryAccessMode, ModelNamedResourceReference,
-    ModelPromptSourceReference, ModelRuntimeProfileError, ModelRuntimeProfileIssue,
-    ModelRuntimeTarget, ModelSkillReference, ModelSkillResourcePosture, NativeToolCallingMode,
-    ResolvedModelRuntimeProfile,
-};
-use super::validation::{ModelProfileField, blake3_parts, error, lowercase_blake3, safe_label};
+use super::types::MODEL_INVOCATION_PLAN_HASH_DOMAIN;
+use super::types::ModelMemoryAccessMode;
+use super::types::ModelNamedResourceReference;
+use super::types::ModelPromptSourceReference;
+use super::types::ModelRuntimeProfileError;
+use super::types::ModelRuntimeProfileIssue;
+use super::types::ModelRuntimeTarget;
+use super::types::ModelSkillReference;
+use super::types::ModelSkillResourcePosture;
+use super::types::NativeToolCallingMode;
+use super::types::ResolvedModelRuntimeProfile;
+use super::validation::ModelProfileField;
+use super::validation::blake3_parts;
+use super::validation::error;
+use super::validation::lowercase_blake3;
+use super::validation::safe_label;
 
 const CAPABILITY_PLAN_HASH_DOMAIN: &str = "animus.model-capability-plan.v1";
 const MEMORY_PLAN_HASH_DOMAIN: &str = "animus.model-memory-plan.v1";
@@ -522,17 +531,9 @@ pub fn compose_model_invocation_plan(
     Ok(plan)
 }
 
-fn validate_composition_boundary(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<(), ModelRuntimeProfileError> {
-    lowercase_blake3(
-        ModelProfileField(FIELD_CATALOG_IDENTITY),
-        input.tool_catalog_identity,
-    )?;
-    lowercase_blake3(
-        ModelProfileField("authority_policy_hash"),
-        input.authority.policy_hash,
-    )?;
+fn validate_composition_boundary(input: &ModelInvocationCompositionInput<'_>) -> Result<(), ModelRuntimeProfileError> {
+    lowercase_blake3(ModelProfileField(FIELD_CATALOG_IDENTITY), input.tool_catalog_identity)?;
+    lowercase_blake3(ModelProfileField("authority_policy_hash"), input.authority.policy_hash)?;
     if input.authority.ceilings.is_empty() {
         return Err(error(
             ModelRuntimeProfileIssue::AuthorityDenied,
@@ -557,9 +558,7 @@ fn validate_composition_boundary(
     Ok(())
 }
 
-fn validate_ceiling_labels(
-    ceilings: &[ModelResourceCeiling<'_>],
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_ceiling_labels(ceilings: &[ModelResourceCeiling<'_>]) -> Result<(), ModelRuntimeProfileError> {
     for ceiling in ceilings {
         safe_label(ModelProfileField("ceiling_label"), ceiling.ceiling_label)?;
         for policy_hash in ceiling.memory_policy_hashes {
@@ -569,9 +568,7 @@ fn validate_ceiling_labels(
     Ok(())
 }
 
-fn validate_target_capability(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_target_capability(input: &ModelInvocationCompositionInput<'_>) -> Result<(), ModelRuntimeProfileError> {
     let target = input.resolved.target();
     let matrix = input.capabilities;
     let decision = input.capability_decision;
@@ -581,8 +578,7 @@ fn validate_target_capability(
         && decision.model_id == target.model_id();
     let is_capability_admitted = matches!(
         decision.status,
-        crate::ModelCapabilityDecisionStatus::Admitted
-            | crate::ModelCapabilityDecisionStatus::Downgraded
+        crate::ModelCapabilityDecisionStatus::Admitted | crate::ModelCapabilityDecisionStatus::Downgraded
     );
     if !is_target_exact || !is_capability_admitted {
         return Err(error(
@@ -603,19 +599,9 @@ fn validate_target_capability(
     Ok(())
 }
 
-fn validate_target_authority(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<(), ModelRuntimeProfileError> {
-    let target_label = format!(
-        "{}:{}",
-        input.resolved.target().provider_id(),
-        input.resolved.target().model_id()
-    );
-    if !allowed_in_all(
-        input.authority.ceilings,
-        |ceiling| ceiling.model_targets,
-        &target_label,
-    ) {
+fn validate_target_authority(input: &ModelInvocationCompositionInput<'_>) -> Result<(), ModelRuntimeProfileError> {
+    let target_label = format!("{}:{}", input.resolved.target().provider_id(), input.resolved.target().model_id());
+    if !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.model_targets, &target_label) {
         return Err(error(
             ModelRuntimeProfileIssue::AuthorityDenied,
             FIELD_AUTHORITY,
@@ -625,15 +611,9 @@ fn validate_target_authority(
     Ok(())
 }
 
-fn validate_prompt_mode_authority(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_prompt_mode_authority(input: &ModelInvocationCompositionInput<'_>) -> Result<(), ModelRuntimeProfileError> {
     let mode = input.resolved.profile().prompt_mode_ref();
-    if !allowed_in_all(
-        input.authority.ceilings,
-        |ceiling| ceiling.prompt_modes,
-        mode,
-    ) {
+    if !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.prompt_modes, mode) {
         return Err(error(
             ModelRuntimeProfileIssue::AuthorityDenied,
             FIELD_PROMPT,
@@ -643,17 +623,11 @@ fn validate_prompt_mode_authority(
     Ok(())
 }
 
-fn compose_prompts(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<PromptComposition, ModelRuntimeProfileError> {
+fn compose_prompts(input: &ModelInvocationCompositionInput<'_>) -> Result<PromptComposition, ModelRuntimeProfileError> {
     validate_host_prompt_labels(input.prompt_sources)?;
     let mut selected = Vec::with_capacity(input.prompt_sources.len());
-    let mut diagnostics = Vec::with_capacity(
-        input
-            .prompt_sources
-            .len()
-            .saturating_add(input.resolved.profile().prompt_sources().len()),
-    );
+    let mut diagnostics =
+        Vec::with_capacity(input.prompt_sources.len().saturating_add(input.resolved.profile().prompt_sources().len()));
     for source in input.prompt_sources {
         let profile_ref = input
             .resolved
@@ -661,18 +635,12 @@ fn compose_prompts(
             .prompt_sources()
             .iter()
             .find(|reference| reference.label() == source.label());
-        let is_mandatory =
-            source.requirement() == animus_adapters::PromptSourceRequirement::Required;
+        let is_mandatory = source.requirement() == animus_adapters::PromptSourceRequirement::Required;
         if profile_ref.is_none() && !is_mandatory {
             continue;
         }
-        let is_allowed = allowed_in_all(
-            input.authority.ceilings,
-            |ceiling| ceiling.prompt_sources,
-            source.label(),
-        );
-        let is_required =
-            is_mandatory || profile_ref.is_some_and(ModelPromptSourceReference::required);
+        let is_allowed = allowed_in_all(input.authority.ceilings, |ceiling| ceiling.prompt_sources, source.label());
+        let is_required = is_mandatory || profile_ref.is_some_and(ModelPromptSourceReference::required);
         if !is_allowed {
             if is_required {
                 return Err(error(
@@ -692,14 +660,13 @@ fn compose_prompts(
     }
     diagnostics.extend(record_missing_prompt_refs(input)?);
     let assembly =
-        animus_adapters::assemble_prompt_sources(selected.as_slice(), input.prompt_policy)
-            .map_err(|_| {
-                error(
-                    ModelRuntimeProfileIssue::PromptDenied,
-                    FIELD_PROMPT,
-                    "existing prompt assembly rejected selected sources",
-                )
-            })?;
+        animus_adapters::assemble_prompt_sources(selected.as_slice(), input.prompt_policy).map_err(|_| {
+            error(
+                ModelRuntimeProfileIssue::PromptDenied,
+                FIELD_PROMPT,
+                "existing prompt assembly rejected selected sources",
+            )
+        })?;
     validate_required_prompt_outcomes(input, &assembly)?;
     validate_prompt_budget(input.resolved, &assembly)?;
     let plan_hash = prompt_plan_hash(&assembly, input.resolved.profile().prompt_mode_ref());
@@ -712,14 +679,9 @@ fn compose_prompts(
     })
 }
 
-fn validate_host_prompt_labels(
-    sources: &[animus_adapters::PromptSource],
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_host_prompt_labels(sources: &[animus_adapters::PromptSource]) -> Result<(), ModelRuntimeProfileError> {
     for (index, source) in sources.iter().enumerate() {
-        if sources[..index]
-            .iter()
-            .any(|prior| prior.label() == source.label())
-        {
+        if sources[..index].iter().any(|prior| prior.label() == source.label()) {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_PROMPT,
@@ -736,11 +698,7 @@ fn record_missing_prompt_refs(
     let profile_prompt_sources = input.resolved.profile().prompt_sources();
     let mut diagnostics = Vec::with_capacity(profile_prompt_sources.len());
     for reference in profile_prompt_sources {
-        if input
-            .prompt_sources
-            .iter()
-            .any(|source| source.label() == reference.label())
-        {
+        if input.prompt_sources.iter().any(|source| source.label() == reference.label()) {
             continue;
         }
         if reference.required() {
@@ -757,11 +715,7 @@ fn record_missing_prompt_refs(
         }));
     }
     assert!(diagnostics.len() <= profile_prompt_sources.len());
-    assert!(
-        diagnostics
-            .iter()
-            .all(|entry| entry.class() == ModelInvocationOmissionClass::Prompt)
-    );
+    assert!(diagnostics.iter().all(|entry| entry.class() == ModelInvocationOmissionClass::Prompt));
     Ok(diagnostics)
 }
 
@@ -777,9 +731,8 @@ fn validate_required_prompt_outcomes(
             .iter()
             .find(|reference| reference.label() == source.label())
             .is_some_and(ModelPromptSourceReference::required);
-        let is_source_required = source.requirement()
-            == animus_adapters::PromptSourceRequirement::Required
-            || is_profile_required;
+        let is_source_required =
+            source.requirement() == animus_adapters::PromptSourceRequirement::Required || is_profile_required;
         if !is_source_required {
             continue;
         }
@@ -796,12 +749,7 @@ fn validate_required_prompt_outcomes(
         }
     }
     assert!(assembly.ledger().len() <= input.prompt_sources.len());
-    assert!(
-        assembly
-            .ledger()
-            .iter()
-            .all(|entry| !entry.source_label().is_empty())
-    );
+    assert!(assembly.ledger().iter().all(|entry| !entry.source_label().is_empty()));
     Ok(())
 }
 
@@ -812,9 +760,7 @@ fn validate_prompt_budget(
     let consumed_units = assembly
         .ledger()
         .iter()
-        .fold(u32::default(), |total, entry| {
-            total.saturating_add(entry.consumed_units())
-        });
+        .fold(u32::default(), |total, entry| total.saturating_add(entry.consumed_units()));
     if consumed_units > resolved.context_budget().max_context_units() {
         return Err(error(
             ModelRuntimeProfileIssue::InvalidBudget,
@@ -825,9 +771,7 @@ fn validate_prompt_budget(
     Ok(())
 }
 
-fn compose_memory(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<MemoryComposition, ModelRuntimeProfileError> {
+fn compose_memory(input: &ModelInvocationCompositionInput<'_>) -> Result<MemoryComposition, ModelRuntimeProfileError> {
     let profile = input.resolved.profile();
     let access_mode = profile.memory_access_mode();
     let policy_hash = profile.memory_policy_hash();
@@ -858,11 +802,7 @@ fn compose_memory(
                     "selected memory policy identity differs from the profile binding",
                 ));
             }
-            if !allowed_in_all(
-                input.authority.ceilings,
-                |ceiling| ceiling.memory_policy_hashes,
-                policy_hash,
-            ) {
+            if !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.memory_policy_hashes, policy_hash) {
                 return Err(error(
                     ModelRuntimeProfileIssue::MemoryDenied,
                     FIELD_MEMORY,
@@ -897,15 +837,12 @@ fn compose_memory(
 fn memory_composition(input: MemoryCompositionInput<'_>) -> MemoryComposition {
     assert!(!input.policy_hash.is_empty());
     assert!(!input.access_mode.as_str().is_empty());
-    let plan_hash = blake3_parts(
-        MEMORY_PLAN_HASH_DOMAIN,
-        &[
-            input.access_mode.as_str().to_string(),
-            input.policy_hash.to_string(),
-            input.is_use_enabled.to_string(),
-            input.is_generation_enabled.to_string(),
-        ],
-    );
+    let plan_hash = blake3_parts(MEMORY_PLAN_HASH_DOMAIN, &[
+        input.access_mode.as_str().to_string(),
+        input.policy_hash.to_string(),
+        input.is_use_enabled.to_string(),
+        input.is_generation_enabled.to_string(),
+    ]);
     MemoryComposition {
         access_mode: input.access_mode,
         policy_hash: input.policy_hash.to_string(),
@@ -915,29 +852,19 @@ fn memory_composition(input: MemoryCompositionInput<'_>) -> MemoryComposition {
     }
 }
 
-fn compose_skills(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<SkillComposition, ModelRuntimeProfileError> {
+fn compose_skills(input: &ModelInvocationCompositionInput<'_>) -> Result<SkillComposition, ModelRuntimeProfileError> {
     validate_host_skill_names(input.skills)?;
     let profile_skills = input.resolved.profile().skills();
     let mut entries = Vec::with_capacity(profile_skills.len());
     let mut diagnostics = Vec::with_capacity(profile_skills.len());
     for reference in profile_skills {
-        let Some(resource) = input
-            .skills
-            .iter()
-            .find(|resource| resource.manifest.name() == reference.name())
-        else {
+        let Some(resource) = input.skills.iter().find(|resource| resource.manifest.name() == reference.name()) else {
             if let Some(entry) = handle_missing_skill(reference)? {
                 diagnostics.push(entry);
             }
             continue;
         };
-        if !allowed_in_all(
-            input.authority.ceilings,
-            |ceiling| ceiling.skills,
-            reference.name(),
-        ) {
+        if !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.skills, reference.name()) {
             if let Some(entry) = handle_denied_skill(reference, "authority_denied")? {
                 diagnostics.push(entry);
             }
@@ -972,14 +899,9 @@ fn compose_skills(
     })
 }
 
-fn validate_host_skill_names(
-    resources: &[ModelSkillCompositionResource<'_>],
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_host_skill_names(resources: &[ModelSkillCompositionResource<'_>]) -> Result<(), ModelRuntimeProfileError> {
     for (index, resource) in resources.iter().enumerate() {
-        if resources[..index]
-            .iter()
-            .any(|prior| prior.manifest.name() == resource.manifest.name())
-        {
+        if resources[..index].iter().any(|prior| prior.manifest.name() == resource.manifest.name()) {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_SKILL,
@@ -994,11 +916,7 @@ fn handle_missing_skill(
     reference: &ModelSkillReference,
 ) -> Result<Option<ModelInvocationDiagnostic>, ModelRuntimeProfileError> {
     if reference.posture() == ModelSkillResourcePosture::RequiredSelected {
-        return Err(error(
-            ModelRuntimeProfileIssue::SkillDenied,
-            FIELD_SKILL,
-            "required selected skill is missing",
-        ));
+        return Err(error(ModelRuntimeProfileIssue::SkillDenied, FIELD_SKILL, "required selected skill is missing"));
     }
     Ok(Some(diagnostic(ModelInvocationDiagnosticDraft {
         class: ModelInvocationOmissionClass::Skill,
@@ -1053,9 +971,7 @@ fn selected_skill_body(
     })
 }
 
-fn missing_selected_body(
-    reference: &ModelSkillReference,
-) -> Result<SkillBodySelection, ModelRuntimeProfileError> {
+fn missing_selected_body(reference: &ModelSkillReference) -> Result<SkillBodySelection, ModelRuntimeProfileError> {
     if reference.posture() == ModelSkillResourcePosture::RequiredSelected {
         return Err(error(
             ModelRuntimeProfileIssue::SkillDenied,
@@ -1073,9 +989,7 @@ fn missing_selected_body(
     })
 }
 
-fn denied_selected_body(
-    reference: &ModelSkillReference,
-) -> Result<SkillBodySelection, ModelRuntimeProfileError> {
+fn denied_selected_body(reference: &ModelSkillReference) -> Result<SkillBodySelection, ModelRuntimeProfileError> {
     if reference.posture() == ModelSkillResourcePosture::RequiredSelected {
         return Err(error(
             ModelRuntimeProfileIssue::SkillDenied,
@@ -1098,10 +1012,9 @@ fn validate_selected_body_binding(
     resource: &ModelSkillCompositionResource<'_>,
     body: &animus_adapters::SkillLoadedBody,
 ) -> Result<(), ModelRuntimeProfileError> {
-    let is_identity_exact = body.name() == resource.manifest.name()
-        && body.content_identity() == resource.manifest.content_identity();
-    let is_plan_binding_exact = resource.selection_profile_hash
-        == Some(resolved.profile().profile_hash())
+    let is_identity_exact =
+        body.name() == resource.manifest.name() && body.content_identity() == resource.manifest.content_identity();
+    let is_plan_binding_exact = resource.selection_profile_hash == Some(resolved.profile().profile_hash())
         && resource.selection_target_hash == Some(resolved.target().target_hash());
     if !is_identity_exact || !is_plan_binding_exact {
         return Err(error(
@@ -1115,9 +1028,7 @@ fn validate_selected_body_binding(
     Ok(())
 }
 
-fn compose_tools(
-    input: &ModelInvocationCompositionInput<'_>,
-) -> Result<ToolComposition, ModelRuntimeProfileError> {
+fn compose_tools(input: &ModelInvocationCompositionInput<'_>) -> Result<ToolComposition, ModelRuntimeProfileError> {
     assert!(!input.resolved.profile().profile_hash().is_empty());
     assert!(!input.tool_catalog_identity.is_empty());
     let mode = input.resolved.profile().tool_calling_mode();
@@ -1129,11 +1040,8 @@ fn compose_tools(
         });
     }
     if !input.capabilities.tool_calls {
-        let is_required_tool_requested = input
-            .resolved
-            .expanded_tools()
-            .iter()
-            .any(ModelNamedResourceReference::required);
+        let is_required_tool_requested =
+            input.resolved.expanded_tools().iter().any(ModelNamedResourceReference::required);
         if mode == NativeToolCallingMode::CapabilityRequired || is_required_tool_requested {
             return Err(error(
                 ModelRuntimeProfileIssue::ToolDenied,
@@ -1212,25 +1120,12 @@ fn tool_denial_reason(
     if definition.metadata().status() != animus_adapters::tool::DefinitionStatus::Active {
         return Some("inactive_or_untrusted_tool");
     }
-    if !allowed_in_all(
-        input.authority.ceilings,
-        |ceiling| ceiling.tools,
-        definition.metadata().name(),
-    ) {
+    if !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.tools, definition.metadata().name()) {
         return Some("tool_authority_denied");
     }
-    if definition
-        .metadata()
-        .capability_labels()
-        .iter()
-        .any(|capability| {
-            !allowed_in_all(
-                input.authority.ceilings,
-                |ceiling| ceiling.tool_capabilities,
-                capability.as_str(),
-            )
-        })
-    {
+    if definition.metadata().capability_labels().iter().any(|capability| {
+        !allowed_in_all(input.authority.ceilings, |ceiling| ceiling.tool_capabilities, capability.as_str())
+    }) {
         return Some("capability_authority_denied");
     }
     if !executor_is_ready(input, definition.executor_binding()) {
@@ -1238,19 +1133,16 @@ fn tool_denial_reason(
     }
     match definition.approval_posture() {
         animus_adapters::tool::ApprovalPosture::PreApproved => None,
-        animus_adapters::tool::ApprovalPosture::RequiresApproval => (!input
-            .authority
-            .approved_tools
-            .contains(&definition.metadata().name()))
-        .then_some("approval_missing"),
+        animus_adapters::tool::ApprovalPosture::RequiresApproval => {
+            (!input.authority.approved_tools.contains(&definition.metadata().name())).then_some("approval_missing")
+        }
         animus_adapters::tool::ApprovalPosture::Denied => Some("approval_denied"),
     }
 }
 
 fn executor_is_ready(input: &ModelInvocationCompositionInput<'_>, binding: &str) -> bool {
     input.executor_bindings.iter().any(|candidate| {
-        candidate.label() == binding
-            && candidate.readiness() == crate::tool_executor_kit::ToolExecutorReadiness::Ready
+        candidate.label() == binding && candidate.readiness() == crate::tool_executor_kit::ToolExecutorReadiness::Ready
     })
 }
 
@@ -1273,12 +1165,8 @@ fn handle_denied_tool(
 }
 
 fn allowed_in_all<'a, F>(ceilings: &'a [ModelResourceCeiling<'a>], select: F, value: &str) -> bool
-where
-    F: Fn(&ModelResourceCeiling<'a>) -> &'a [&'a str],
-{
-    ceilings
-        .iter()
-        .all(|ceiling| select(ceiling).contains(&value))
+where F: Fn(&ModelResourceCeiling<'a>) -> &'a [&'a str] {
+    ceilings.iter().all(|ceiling| select(ceiling).contains(&value))
 }
 
 fn diagnostic(draft: ModelInvocationDiagnosticDraft<'_>) -> ModelInvocationDiagnostic {
@@ -1295,22 +1183,16 @@ fn capability_plan_hash(input: &ModelInvocationCompositionInput<'_>) -> String {
         crate::ModelCapabilityDecisionStatus::Downgraded => "downgraded",
         crate::ModelCapabilityDecisionStatus::Denied => "denied",
     };
-    blake3_parts(
-        CAPABILITY_PLAN_HASH_DOMAIN,
-        &[
-            input.resolved.target().target_hash().to_string(),
-            input.resolved.target().capability_identity().to_string(),
-            input.capabilities.schema_identity.clone(),
-            status.to_string(),
-        ],
-    )
+    blake3_parts(CAPABILITY_PLAN_HASH_DOMAIN, &[
+        input.resolved.target().target_hash().to_string(),
+        input.resolved.target().capability_identity().to_string(),
+        input.capabilities.schema_identity.clone(),
+        status.to_string(),
+    ])
 }
 
 fn prompt_plan_hash(assembly: &animus_adapters::PromptAssembly, prompt_mode_ref: &str) -> String {
-    let mut parts = vec![
-        prompt_mode_ref.to_string(),
-        assembly.policy_hash().as_str().to_string(),
-    ];
+    let mut parts = vec![prompt_mode_ref.to_string(), assembly.policy_hash().as_str().to_string()];
     for entry in assembly.ledger() {
         parts.push(format!(
             "{}:{}:{}:{}:{}",
@@ -1342,16 +1224,10 @@ fn prompt_reason_label(reason: animus_adapters::PromptAssemblyLedgerReason) -> &
         animus_adapters::PromptAssemblyLedgerReason::RedactedByPolicy => "redacted_by_policy",
         animus_adapters::PromptAssemblyLedgerReason::UntrustedSource => "untrusted_source",
         animus_adapters::PromptAssemblyLedgerReason::DeniedByAdmission => "denied_by_admission",
-        animus_adapters::PromptAssemblyLedgerReason::RequiredSourceUnavailable => {
-            "required_source_unavailable"
-        }
+        animus_adapters::PromptAssemblyLedgerReason::RequiredSourceUnavailable => "required_source_unavailable",
         animus_adapters::PromptAssemblyLedgerReason::SourceConflict => "source_conflict",
-        animus_adapters::PromptAssemblyLedgerReason::DiscoveryUnavailable => {
-            "discovery_unavailable"
-        }
-        animus_adapters::PromptAssemblyLedgerReason::UnsupportedSourceKind => {
-            "unsupported_source_kind"
-        }
+        animus_adapters::PromptAssemblyLedgerReason::DiscoveryUnavailable => "discovery_unavailable",
+        animus_adapters::PromptAssemblyLedgerReason::UnsupportedSourceKind => "unsupported_source_kind",
     }
 }
 
@@ -1371,20 +1247,11 @@ fn skill_plan_hash(entries: &[ModelSkillPlanEntry]) -> String {
 
 fn tool_plan_hash(catalog_identity: &str, declarations: &[ModelToolDeclaration]) -> String {
     assert!(!catalog_identity.is_empty());
-    assert!(
-        declarations
-            .iter()
-            .all(|declaration| !declaration.definition.name().is_empty())
-    );
+    assert!(declarations.iter().all(|declaration| !declaration.definition.name().is_empty()));
     let mut parts = vec![catalog_identity.to_string()];
     for declaration in declarations {
-        let capabilities = declaration
-            .definition
-            .capability_labels()
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-            .join(",");
+        let capabilities =
+            declaration.definition.capability_labels().iter().map(String::as_str).collect::<Vec<_>>().join(",");
         parts.push(format!(
             "{}:{}:{}:{}",
             declaration.definition.name(),
@@ -1409,19 +1276,16 @@ struct InvocationPlanHashInput<'a> {
 }
 
 fn invocation_plan_hash(input: InvocationPlanHashInput<'_>) -> String {
-    blake3_parts(
-        MODEL_INVOCATION_PLAN_HASH_DOMAIN,
-        &[
-            input.resolved.resolution_hash().to_string(),
-            input.resolved.target().target_hash().to_string(),
-            input.resolved.profile().profile_hash().to_string(),
-            input.prompt_plan_hash.to_string(),
-            input.skill_plan_hash.to_string(),
-            input.memory_plan_hash.to_string(),
-            input.capability_plan_hash.to_string(),
-            input.tool_plan_hash.to_string(),
-            input.tool_catalog_identity.to_string(),
-            input.policy_hash.to_string(),
-        ],
-    )
+    blake3_parts(MODEL_INVOCATION_PLAN_HASH_DOMAIN, &[
+        input.resolved.resolution_hash().to_string(),
+        input.resolved.target().target_hash().to_string(),
+        input.resolved.profile().profile_hash().to_string(),
+        input.prompt_plan_hash.to_string(),
+        input.skill_plan_hash.to_string(),
+        input.memory_plan_hash.to_string(),
+        input.capability_plan_hash.to_string(),
+        input.tool_plan_hash.to_string(),
+        input.tool_catalog_identity.to_string(),
+        input.policy_hash.to_string(),
+    ])
 }

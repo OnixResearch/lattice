@@ -81,28 +81,18 @@ fn current_trusted_lifecycle_report_suppresses_heuristic_fallback() {
         source_id: HEURISTIC_SOURCE,
     }));
 
-    let selection =
-        crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[lifecycle, heuristic]);
+    let selection = crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[lifecycle, heuristic]);
 
-    assert_eq!(
-        selection.semantic_state(),
-        animus_adapters::SemanticAgentState::Working
-    );
+    assert_eq!(selection.semantic_state(), animus_adapters::SemanticAgentState::Working);
     assert_eq!(selection.message(), Some("bounded status"));
-    assert_eq!(
-        selection.presentation().custom_state_label(),
-        Some("needs input")
-    );
+    assert_eq!(selection.presentation().custom_state_label(), Some("needs input"));
     assert_ne!(selection.semantic_state().as_str(), "needs input");
     let explanation = selection.explanation();
     assert_eq!(explanation.freshness(), crate::StatusFreshness::Current);
     assert_eq!(explanation.fallback_reason(), None);
     assert_eq!(explanation.evidence_hashes(), &[String::from(VALID_HASH)]);
     assert_eq!(
-        explanation
-            .selected_authority()
-            .expect("trusted authority should be selected")
-            .source_id(),
+        explanation.selected_authority().expect("trusted authority should be selected").source_id(),
         LIFECYCLE_SOURCE
     );
     assert!(explanation.rejected_candidates().iter().any(|candidate| {
@@ -127,27 +117,14 @@ fn stale_lifecycle_degrades_to_current_heuristic_fallback() {
         source_id: HEURISTIC_SOURCE,
     }));
 
-    let selection =
-        crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[stale_lifecycle, heuristic]);
+    let selection = crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[stale_lifecycle, heuristic]);
 
-    assert_eq!(
-        selection.semantic_state(),
-        animus_adapters::SemanticAgentState::Idle
-    );
-    assert_eq!(
-        selection.explanation().fallback_reason(),
-        Some(crate::StatusFallbackReason::StaleLifecycle)
-    );
-    assert!(
-        selection
-            .explanation()
-            .rejected_candidates()
-            .iter()
-            .any(|candidate| {
-                candidate.authority().source_id() == LIFECYCLE_SOURCE
-                    && candidate.reason() == crate::RejectedStatusReason::Stale
-            })
-    );
+    assert_eq!(selection.semantic_state(), animus_adapters::SemanticAgentState::Idle);
+    assert_eq!(selection.explanation().fallback_reason(), Some(crate::StatusFallbackReason::StaleLifecycle));
+    assert!(selection.explanation().rejected_candidates().iter().any(|candidate| {
+        candidate.authority().source_id() == LIFECYCLE_SOURCE
+            && candidate.reason() == crate::RejectedStatusReason::Stale
+    }));
 }
 
 #[test]
@@ -160,18 +137,9 @@ fn untrusted_lifecycle_without_fallback_fails_closed_to_unknown() {
 
     let selection = crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[untrusted]);
 
-    assert_eq!(
-        selection.semantic_state(),
-        animus_adapters::SemanticAgentState::Unknown
-    );
-    assert_eq!(
-        selection.explanation().freshness(),
-        crate::StatusFreshness::Missing
-    );
-    assert_eq!(
-        selection.explanation().fallback_reason(),
-        Some(crate::StatusFallbackReason::UntrustedLifecycle)
-    );
+    assert_eq!(selection.semantic_state(), animus_adapters::SemanticAgentState::Unknown);
+    assert_eq!(selection.explanation().freshness(), crate::StatusFreshness::Missing);
+    assert_eq!(selection.explanation().fallback_reason(), Some(crate::StatusFallbackReason::UntrustedLifecycle));
 }
 
 #[test]
@@ -192,17 +160,10 @@ fn conflicting_current_lifecycle_authorities_fail_closed_to_unknown() {
         source_id: HEURISTIC_SOURCE,
     }));
 
-    let selection =
-        crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[working, blocked, heuristic]);
+    let selection = crate::select_agent_status(&request(), CURRENT_SEQUENCE, &[working, blocked, heuristic]);
 
-    assert_eq!(
-        selection.semantic_state(),
-        animus_adapters::SemanticAgentState::Unknown
-    );
-    assert_eq!(
-        selection.explanation().freshness(),
-        crate::StatusFreshness::Conflicting
-    );
+    assert_eq!(selection.semantic_state(), animus_adapters::SemanticAgentState::Unknown);
+    assert_eq!(selection.explanation().freshness(), crate::StatusFreshness::Conflicting);
     assert_eq!(
         selection.explanation().fallback_reason(),
         Some(crate::StatusFallbackReason::ConflictingLifecycleAuthority)
@@ -212,42 +173,24 @@ fn conflicting_current_lifecycle_authorities_fail_closed_to_unknown() {
             .explanation()
             .rejected_candidates()
             .iter()
-            .any(|candidate| {
-                candidate.reason() == crate::RejectedStatusReason::ConflictingLifecycleAuthority
-            })
+            .any(|candidate| { candidate.reason() == crate::RejectedStatusReason::ConflictingLifecycleAuthority })
     );
 }
 
 #[test]
 fn explanation_rejects_raw_evidence_leak_fixtures() {
     let fixtures = [
-        (
-            "RAW_PROMPT: summarize credentials",
-            super::safe::RAW_PROMPT_MARKER,
-        ),
-        (
-            "TERMINAL_SNAPSHOT: full pane text",
-            super::safe::TERMINAL_SNAPSHOT_MARKER,
-        ),
-        (
-            "PROVIDER_PAYLOAD: {json}",
-            super::safe::PROVIDER_PAYLOAD_MARKER,
-        ),
+        ("RAW_PROMPT: summarize credentials", super::safe::RAW_PROMPT_MARKER),
+        ("TERMINAL_SNAPSHOT: full pane text", super::safe::TERMINAL_SNAPSHOT_MARKER),
+        ("PROVIDER_PAYLOAD: {json}", super::safe::PROVIDER_PAYLOAD_MARKER),
         ("API_KEY=secret", super::safe::API_KEY_MARKER),
-        (
-            "UNBOUNDED_DETECTOR_EVIDENCE: transcript",
-            super::safe::UNBOUNDED_DETECTOR_MARKER,
-        ),
+        ("UNBOUNDED_DETECTOR_EVIDENCE: transcript", super::safe::UNBOUNDED_DETECTOR_MARKER),
     ];
     assert_eq!(fixtures.len(), UNSAFE_FIXTURE_COUNT);
 
     for (summary, marker) in fixtures {
-        let error = crate::StatusEvidenceSummary::new(summary)
-            .expect_err("unsafe evidence should be rejected");
-        assert_eq!(
-            error,
-            crate::StatusEvidenceError::UnsafeEvidenceMarker { marker }
-        );
+        let error = crate::StatusEvidenceSummary::new(summary).expect_err("unsafe evidence should be rejected");
+        assert_eq!(error, crate::StatusEvidenceError::UnsafeEvidenceMarker { marker });
     }
 }
 
@@ -272,10 +215,7 @@ fn selection_consumes_typed_observations_without_ambient_inputs() {
     let second_selection = crate::select_agent_status(&request(), CURRENT_SEQUENCE, &observations);
 
     assert_eq!(first_selection, second_selection);
-    assert_eq!(
-        first_selection.semantic_state(),
-        animus_adapters::SemanticAgentState::Idle
-    );
+    assert_eq!(first_selection.semantic_state(), animus_adapters::SemanticAgentState::Idle);
     assert!(
         first_selection
             .explanation()

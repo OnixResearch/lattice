@@ -105,11 +105,9 @@ pub trait ImagePayloadService {
     ///
     /// # Errors
     ///
-    /// Returns [`ImagePayloadError`] when the service is unavailable, would require a live call, or cannot return safe metadata.
-    fn resolve_image_payload(
-        &self,
-        image: &super::ImagePart,
-    ) -> Result<ImagePayloadHandle, ImagePayloadError>;
+    /// Returns [`ImagePayloadError`] when the service is unavailable, would require a live call, or
+    /// cannot return safe metadata.
+    fn resolve_image_payload(&self, image: &super::ImagePart) -> Result<ImagePayloadHandle, ImagePayloadError>;
 }
 
 fn safe_handle_text(raw: &str) -> Result<alloc::string::String, super::Error> {

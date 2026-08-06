@@ -1,0 +1,6 @@
+revision=ab4a6a6786ed0c480585676cba7dc785f103f4fc
+source_hash=489bac9cb2353290f2fd95ecd08bf222709c3808
+required_grades=30
+required_cells=15
+supported_cells=9
+verdict=BLOCKED

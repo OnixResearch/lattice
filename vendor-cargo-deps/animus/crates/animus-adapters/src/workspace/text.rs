@@ -4,11 +4,9 @@ pub(super) fn parse_value<T>(
     parser: impl FnOnce(&str) -> Option<T>,
 ) -> Result<T, crate::AdapterContractError> {
     let normalized = crate::validation::normalized_adapter_field(field_name, value)?;
-    parser(normalized.as_str()).ok_or_else(|| {
-        crate::AdapterContractError::UnsupportedWorkspaceValue {
-            field: field_name.as_str(),
-            value: normalized,
-        }
+    parser(normalized.as_str()).ok_or_else(|| crate::AdapterContractError::UnsupportedWorkspaceValue {
+        field: field_name.as_str(),
+        value: normalized,
     })
 }
 
@@ -16,9 +14,7 @@ pub(super) fn optional_field(
     field_name: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<alloc::string::String>, crate::AdapterContractError> {
-    value
-        .map(|text| crate::validation::normalized_adapter_field(field_name, text))
-        .transpose()
+    value.map(|text| crate::validation::normalized_adapter_field(field_name, text)).transpose()
 }
 
 pub(super) fn required_texts(
@@ -32,10 +28,7 @@ pub(super) fn required_texts(
         });
     }
 
-    values
-        .iter()
-        .map(|value| crate::validation::normalized_adapter_field(item_field, value))
-        .collect()
+    values.iter().map(|value| crate::validation::normalized_adapter_field(item_field, value)).collect()
 }
 
 pub(super) fn collect_capabilities(

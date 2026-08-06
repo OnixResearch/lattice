@@ -13,11 +13,7 @@ pub fn backdrop(
     }
 }
 
-pub fn rect(
-    buf: &mut ratatui::buffer::Buffer,
-    area: ratatui::layout::Rect,
-    style: ratatui::style::Style,
-) {
+pub fn rect(buf: &mut ratatui::buffer::Buffer, area: ratatui::layout::Rect, style: ratatui::style::Style) {
     for y in area.y..bottom(area) {
         for x in area.x..right(area) {
             buf[(x, y)].set_style(style);

@@ -115,14 +115,8 @@ pub enum PromptStatus {
 /// Resolves local permission mode after authority checks.
 #[must_use]
 pub fn resolve(request: ResolutionRequest<'_>) -> Resolution {
-    assert!(
-        request.resource_label.len() <= crate::MAX_ADAPTER_FIELD_CHARS,
-        "resource label stays bounded"
-    );
-    assert!(
-        request.session_label.len() <= crate::MAX_ADAPTER_FIELD_CHARS,
-        "session label stays bounded"
-    );
+    assert!(request.resource_label.len() <= crate::MAX_ADAPTER_FIELD_CHARS, "resource label stays bounded");
+    assert!(request.session_label.len() <= crate::MAX_ADAPTER_FIELD_CHARS, "session label stays bounded");
     if request.authority_status == super::super::AuthorizationStatus::Denied {
         return missing_authority(request.policy);
     }
@@ -156,15 +150,8 @@ fn resolve_policy(request: ResolutionRequest<'_>, policy: &super::Policy) -> Res
 }
 
 fn resolve_ask_policy(request: ResolutionRequest<'_>, policy: &super::Policy) -> Resolution {
-    assert_eq!(
-        policy.outcome(),
-        super::Outcome::Ask,
-        "ask helper gets ask policy"
-    );
-    assert!(
-        !request.redacted_summary.is_empty(),
-        "ask prompts require a redacted summary"
-    );
+    assert_eq!(policy.outcome(), super::Outcome::Ask, "ask helper gets ask policy");
+    assert!(!request.redacted_summary.is_empty(), "ask prompts require a redacted summary");
     let Ok(prompt_request) = super::PromptRequest::new(super::PromptRequestDraft {
         action: request.action,
         resource_label: request.resource_label,
@@ -177,10 +164,7 @@ fn resolve_ask_policy(request: ResolutionRequest<'_>, policy: &super::Policy) ->
     continue_ask(request.prompt_decision, prompt_request)
 }
 
-fn continue_ask(
-    decision: Option<&super::Decision>,
-    prompt_request: super::PromptRequest,
-) -> Resolution {
+fn continue_ask(decision: Option<&super::Decision>, prompt_request: super::PromptRequest) -> Resolution {
     let Some(decision) = decision else {
         return parts(
             DecisionStatus::PromptRequired,

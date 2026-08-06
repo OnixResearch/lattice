@@ -1,21 +1,16 @@
-/// Renderer label supported by shared showcase fixtures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ShowcaseRenderer {
-    /// Subwayrat terminal renderer.
-    Subwayrat,
-    /// Meteorite web renderer.
-    Meteorite,
+semantic_string_id! {
+    /// Stable identity for a shared showcase fixture.
+    pub struct FixtureId;
 }
 
-impl ShowcaseRenderer {
-    /// Stable renderer label.
-    #[must_use]
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Subwayrat => "subwayrat",
-            Self::Meteorite => "meteorite",
-        }
-    }
+semantic_string_id! {
+    /// Stable identity for a state within a showcase fixture.
+    pub struct FixtureStateId;
+}
+
+semantic_string_id! {
+    /// Stable identity for an interaction control within a showcase fixture.
+    pub struct FixtureControlId;
 }
 
 /// Input data or prop key/value for a fixture state.
@@ -42,7 +37,7 @@ impl FixtureDatum {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixtureControl {
     /// Stable control ID.
-    pub id: String,
+    pub id: FixtureControlId,
     /// Human-readable label.
     pub label: String,
 }
@@ -50,7 +45,7 @@ pub struct FixtureControl {
 impl FixtureControl {
     /// Creates a fixture control.
     #[must_use]
-    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<FixtureControlId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -62,7 +57,7 @@ impl FixtureControl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixtureState {
     /// Stable state ID.
-    pub id: String,
+    pub id: FixtureStateId,
     /// Human-readable label.
     pub label: String,
     /// Input data for this state.
@@ -72,7 +67,7 @@ pub struct FixtureState {
 impl FixtureState {
     /// Creates a fixture state.
     #[must_use]
-    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<FixtureStateId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -88,44 +83,11 @@ impl FixtureState {
     }
 }
 
-/// Renderer support metadata for one fixture.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RendererSupport {
-    /// Renderer label.
-    pub renderer: ShowcaseRenderer,
-    /// Whether the renderer supports this fixture.
-    pub supported: bool,
-    /// Optional reason when unsupported.
-    pub reason: Option<String>,
-}
-
-impl RendererSupport {
-    /// Marks a renderer as supported.
-    #[must_use]
-    pub fn supported(renderer: ShowcaseRenderer) -> Self {
-        Self {
-            renderer,
-            supported: true,
-            reason: None,
-        }
-    }
-
-    /// Marks a renderer as unsupported with a reason.
-    #[must_use]
-    pub fn unsupported(renderer: ShowcaseRenderer, reason: impl Into<String>) -> Self {
-        Self {
-            renderer,
-            supported: false,
-            reason: Some(reason.into()),
-        }
-    }
-}
-
 /// Renderer-neutral showcase fixture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShowcaseFixture {
     /// Stable fixture ID.
-    pub id: String,
+    pub id: FixtureId,
     /// Component family label.
     pub family: String,
     /// Human-readable title.
@@ -134,14 +96,16 @@ pub struct ShowcaseFixture {
     pub states: Vec<FixtureState>,
     /// Interaction controls.
     pub controls: Vec<FixtureControl>,
-    /// Renderer support metadata.
+    /// Compatibility renderer support metadata for the default two-family view.
     pub renderers: Vec<RendererSupport>,
+    /// Typed ordered renderer cells used by scoped validation.
+    pub renderer_cells: Vec<FixtureRendererCell>,
 }
 
 impl ShowcaseFixture {
     /// Creates a fixture.
     #[must_use]
-    pub fn new(id: impl Into<String>, family: impl Into<String>, title: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<FixtureId>, family: impl Into<String>, title: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             family: family.into(),
@@ -149,6 +113,7 @@ impl ShowcaseFixture {
             states: Vec::new(),
             controls: Vec::new(),
             renderers: Vec::new(),
+            renderer_cells: Vec::new(),
         }
     }
 
@@ -169,7 +134,15 @@ impl ShowcaseFixture {
     /// Adds renderer support metadata.
     #[must_use]
     pub fn with_renderer(mut self, support: RendererSupport) -> Self {
+        self.renderer_cells.push(FixtureRendererCell::from(&support));
         self.renderers.push(support);
+        self
+    }
+
+    /// Adds a typed renderer cell without extending the two-family compatibility view.
+    #[must_use]
+    pub fn with_renderer_cell(mut self, cell: FixtureRendererCell) -> Self {
+        self.renderer_cells.push(cell);
         self
     }
 }
@@ -189,6 +162,12 @@ pub enum FixtureIssueCode {
     InvalidStateData,
     /// Renderer metadata is missing or duplicated.
     UnsupportedRenderer,
+    /// Renderer scope or registry policy is invalid.
+    InvalidRendererPolicy,
+    /// A required scoped renderer cell is missing.
+    MissingRendererCell,
+    /// A scoped renderer cell is duplicated, unknown, or out of scope.
+    InvalidRendererCell,
     /// Parity baseline row is duplicated.
     ParityDuplicateRow,
     /// Parity baseline row is missing required renderer metadata.
@@ -217,14 +196,10 @@ pub struct FixtureIssue {
 }
 
 impl FixtureIssue {
-    pub(super) fn new(
-        code: FixtureIssueCode,
-        subject: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub(super) fn new(code: FixtureIssueCode, subject: impl ToString, message: impl Into<String>) -> Self {
         Self {
             code,
-            subject: subject.into(),
+            subject: subject.to_string(),
             message: message.into(),
         }
     }
@@ -243,15 +218,28 @@ pub enum FixtureCoverageKind {
     Unsupported,
 }
 
+/// One ordered scoped fixture coverage cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixtureCoverageCell {
+    /// Nominal renderer family identity.
+    pub family: crate::targeting_core::RendererFamilyId,
+    /// `Some(true)` for supported, `Some(false)` for unsupported, and `None` for missing.
+    pub supported: Option<bool>,
+    /// Unsupported or missing reason.
+    pub reason: Option<String>,
+}
+
 /// Coverage entry for one fixture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixtureCoverageEntry {
     /// Fixture ID.
-    pub fixture_id: String,
-    /// Coverage bucket.
+    pub fixture_id: FixtureId,
+    /// Compatibility coverage bucket for Subwayrat and Meteorite.
     pub kind: FixtureCoverageKind,
     /// Missing renderer labels or unsupported reasons.
     pub gaps: Vec<String>,
+    /// Ordered source-of-truth cells from the active renderer scope.
+    pub cells: Vec<FixtureCoverageCell>,
 }
 
 /// Validation and coverage result for a fixture set.
@@ -294,6 +282,9 @@ pub struct FixtureParityRenderer {
     /// Required reason when unsupported.
     pub unsupported_reason: Option<String>,
 }
+
+mod targets;
+pub use targets::*;
 
 mod release;
 pub use release::*;

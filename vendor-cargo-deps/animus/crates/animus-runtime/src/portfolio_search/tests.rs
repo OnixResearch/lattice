@@ -30,10 +30,7 @@ fn contract() -> PortfolioContract {
             "equivalent-helper-restatement".to_string(),
             "unchecked-model-consensus".to_string(),
         ],
-        required_audit_risks: vec![
-            PortfolioAuditRisk::Preconditions,
-            PortfolioAuditRisk::TrustBoundary,
-        ],
+        required_audit_risks: vec![PortfolioAuditRisk::Preconditions, PortfolioAuditRisk::TrustBoundary],
         source_policy: fingerprint("source-policy"),
         validator_policy: fingerprint("validator-policy"),
         budget: PortfolioBudget {
@@ -121,8 +118,7 @@ fn pass_audit(approach_id: &str) -> PortfolioAudit {
 fn state_with_audited_candidate() -> PortfolioState {
     let framed = initialize_portfolio(&contract()).expect("valid contract");
     let exploring = begin_independent_exploration(&framed).expect("start exploration");
-    let dispatched =
-        record_portfolio_dispatch(&exploring, &dispatch(Vec::new())).expect("record dispatch");
+    let dispatched = record_portfolio_dispatch(&exploring, &dispatch(Vec::new())).expect("record dispatch");
     let registered = register_approach(
         &dispatched,
         active_approach(ApproachFixture {
@@ -134,10 +130,9 @@ fn state_with_audited_candidate() -> PortfolioState {
     )
     .expect("register candidate");
     let synthesis = begin_synthesis(&registered).expect("begin synthesis");
-    let auditing =
-        begin_adversarial_audit(&synthesis, "approach.algebraic").expect("select audit candidate");
-    let audited = record_adversarial_audit(&auditing, &pass_audit("approach.algebraic"))
-        .expect("record complete audit");
+    let auditing = begin_adversarial_audit(&synthesis, "approach.algebraic").expect("select audit candidate");
+    let audited =
+        record_adversarial_audit(&auditing, &pass_audit("approach.algebraic")).expect("record complete audit");
     assert_eq!(audited.phase, PortfolioPhase::AdversarialAudit);
     assert!(audited.audit.is_some());
     audited
@@ -148,8 +143,7 @@ fn state_with_independent_routes() -> PortfolioState {
     assert_eq!(framed.phase, PortfolioPhase::Framing);
     assert!(framed.approaches.is_empty());
     let exploring = begin_independent_exploration(&framed).expect("start exploration");
-    let dispatched =
-        record_portfolio_dispatch(&exploring, &dispatch(Vec::new())).expect("record dispatch");
+    let dispatched = record_portfolio_dispatch(&exploring, &dispatch(Vec::new())).expect("record dispatch");
     assert_eq!(dispatched.usage.rounds, 1);
     assert_eq!(dispatched.usage.tool_calls, DISPATCH_TOOL_CALLS);
     assert_eq!(dispatched.usage.tokens, DISPATCH_TOKENS);
@@ -186,21 +180,11 @@ fn validated_result_requires_independence_audit_and_matching_receipt() {
     let second = state_with_independent_routes();
 
     let synthesis = begin_synthesis(&second).expect("begin synthesis");
-    assert!(
-        synthesis
-            .approaches
-            .values()
-            .all(|approach| approach.state == ApproachState::Active)
-    );
-    let auditing =
-        begin_adversarial_audit(&synthesis, "approach.algebraic").expect("select audit candidate");
-    let audited = record_adversarial_audit(&auditing, &pass_audit("approach.algebraic"))
-        .expect("record audit");
+    assert!(synthesis.approaches.values().all(|approach| approach.state == ApproachState::Active));
+    let auditing = begin_adversarial_audit(&synthesis, "approach.algebraic").expect("select audit candidate");
+    let audited = record_adversarial_audit(&auditing, &pass_audit("approach.algebraic")).expect("record audit");
     let validating = begin_validation(&audited).expect("audit passes");
-    let candidate = validating
-        .approaches
-        .get("approach.algebraic")
-        .expect("selected candidate");
+    let candidate = validating.approaches.get("approach.algebraic").expect("selected candidate");
     let audit = validating.audit.as_ref().expect("audit retained");
     let receipt = PortfolioValidationReceipt {
         contract: portfolio_contract_fingerprint(&validating.contract),
@@ -213,20 +197,13 @@ fn validated_result_requires_independence_audit_and_matching_receipt() {
     let validated = validate_portfolio_result(&validating, &receipt).expect("matching receipt");
     assert_eq!(validated.phase, PortfolioPhase::Validated);
     assert_eq!(
-        validated
-            .approaches
-            .get("approach.algebraic")
-            .expect("selected route")
-            .state,
+        validated.approaches.get("approach.algebraic").expect("selected route").state,
         ApproachState::Validated
     );
 
     let projected = project_portfolio_receipt(&validated).expect("safe terminal receipt");
     assert_eq!(projected.phase, PortfolioPhase::Validated);
-    assert_eq!(
-        projected.selected_approach.as_deref(),
-        Some("approach.algebraic")
-    );
+    assert_eq!(projected.selected_approach.as_deref(), Some("approach.algebraic"));
     assert!(projected.blocker.is_none());
     assert!(validate_portfolio_receipt(&projected).is_ok());
 }
@@ -268,10 +245,7 @@ fn underexplored_selection_is_dynamic_and_lexically_deterministic() {
     .expect("third route");
 
     assert_eq!(three.approaches.len(), EXPECTED_THREE_ROUTES);
-    assert_eq!(
-        underexplored_live_families(&three).expect("valid registry"),
-        vec!["induction".to_string()]
-    );
+    assert_eq!(underexplored_live_families(&three).expect("valid registry"), vec!["induction".to_string()]);
 }
 
 #[test]
@@ -280,11 +254,8 @@ fn equivalent_gap_stays_blocked_until_real_novelty_reclassifies_it() {
     // r[agent_harness_runtime.portfolio_search.redirection.no_novelty]
     let framed = initialize_portfolio(&contract()).expect("valid contract");
     let exploring = begin_independent_exploration(&framed).expect("start exploration");
-    let registered = register_approach(
-        &exploring,
-        equivalent_blocked_approach("approach.equivalent"),
-    )
-    .expect("register honestly blocked route");
+    let registered = register_approach(&exploring, equivalent_blocked_approach("approach.equivalent"))
+        .expect("register honestly blocked route");
     let synthesis = begin_synthesis(&registered).expect("synthesis keeps blocker");
     let targeted = begin_targeted_redirection(&synthesis).expect("target redirection");
 
@@ -294,17 +265,10 @@ fn equivalent_gap_stays_blocked_until_real_novelty_reclassifies_it() {
         gap_strength: GapStrength::Simpler,
         next_check: "retry same helper".to_string(),
     };
-    let error = reopen_approach(&targeted, "approach.equivalent", &no_novelty)
-        .expect_err("rephrasing must not reopen route");
+    let error =
+        reopen_approach(&targeted, "approach.equivalent", &no_novelty).expect_err("rephrasing must not reopen route");
     assert_eq!(error.kind, PortfolioErrorKind::MissingNovelty);
-    assert_eq!(
-        targeted
-            .approaches
-            .get("approach.equivalent")
-            .expect("blocked route")
-            .state,
-        ApproachState::Blocked
-    );
+    assert_eq!(targeted.approaches.get("approach.equivalent").expect("blocked route").state, ApproachState::Blocked);
 
     let novelty = ReopenNovelty {
         mechanism: Some(fingerprint("mechanism.strictly-smaller")),
@@ -312,12 +276,9 @@ fn equivalent_gap_stays_blocked_until_real_novelty_reclassifies_it() {
         gap_strength: GapStrength::Simpler,
         next_check: "verify strictly smaller induction lemma".to_string(),
     };
-    let reopened = reopen_approach(&targeted, "approach.equivalent", &novelty)
-        .expect("new mechanism and evidence reopen route");
-    let route = reopened
-        .approaches
-        .get("approach.equivalent")
-        .expect("reopened route");
+    let reopened =
+        reopen_approach(&targeted, "approach.equivalent", &novelty).expect("new mechanism and evidence reopen route");
+    let route = reopened.approaches.get("approach.equivalent").expect("reopened route");
     assert_eq!(route.state, ApproachState::Active);
     assert_eq!(route.gap_strength, GapStrength::Simpler);
     assert!(route.blocker.is_none());
@@ -338,9 +299,8 @@ fn contracts_phases_and_independence_fail_closed() {
     assert_eq!(error.kind, PortfolioErrorKind::IllegalPhase);
 
     let exploring = begin_independent_exploration(&framed).expect("start exploration");
-    let error =
-        validate_portfolio_dispatch(&exploring, &dispatch(vec!["approach.favored".to_string()]))
-            .expect_err("independent worker must not see favored route");
+    let error = validate_portfolio_dispatch(&exploring, &dispatch(vec!["approach.favored".to_string()]))
+        .expect_err("independent worker must not see favored route");
     assert_eq!(error.kind, PortfolioErrorKind::CrossPollination);
 }
 
@@ -377,8 +337,8 @@ fn duplicate_mechanisms_and_active_equivalent_gaps_are_rejected() {
         state: ApproachState::Independent,
     });
     reduction_theater.gap_strength = GapStrength::Equivalent;
-    let error = validate_approach_record(&reduction_theater)
-        .expect_err("equivalent gap cannot remain independently active");
+    let error =
+        validate_approach_record(&reduction_theater).expect_err("equivalent gap cannot remain independently active");
     assert_eq!(error.kind, PortfolioErrorKind::BlockerMismatch);
 }
 
@@ -402,45 +362,30 @@ fn incomplete_failed_and_stale_audits_cannot_validate() {
     let auditing = begin_adversarial_audit(&synthesis, "approach.algebraic").expect("begin audit");
 
     let mut incomplete = pass_audit("approach.algebraic");
-    incomplete
-        .findings
-        .remove(&PortfolioAuditRisk::TrustBoundary);
-    let error = record_adversarial_audit(&auditing, &incomplete)
-        .expect_err("missing required risk rejected");
+    incomplete.findings.remove(&PortfolioAuditRisk::TrustBoundary);
+    let error = record_adversarial_audit(&auditing, &incomplete).expect_err("missing required risk rejected");
     assert_eq!(error.kind, PortfolioErrorKind::AuditIncomplete);
 
     let mut failed = pass_audit("approach.algebraic");
-    failed
-        .findings
-        .get_mut(&PortfolioAuditRisk::TrustBoundary)
-        .expect("required finding")
-        .outcome = AuditOutcome::Fail;
+    failed.findings.get_mut(&PortfolioAuditRisk::TrustBoundary).expect("required finding").outcome = AuditOutcome::Fail;
     let audited = record_adversarial_audit(&auditing, &failed).expect("record failed audit");
     let error = begin_validation(&audited).expect_err("failed audit cannot validate");
     assert_eq!(error.kind, PortfolioErrorKind::AuditFailed);
 
-    let audited = record_adversarial_audit(&auditing, &pass_audit("approach.algebraic"))
-        .expect("record passing audit");
+    let audited = record_adversarial_audit(&auditing, &pass_audit("approach.algebraic")).expect("record passing audit");
     let validating = begin_validation(&audited).expect("enter validation");
-    let candidate = validating
-        .approaches
-        .get("approach.algebraic")
-        .expect("candidate");
+    let candidate = validating.approaches.get("approach.algebraic").expect("candidate");
     let matching = PortfolioValidationReceipt {
         contract: portfolio_contract_fingerprint(&validating.contract),
         approach_id: candidate.approach_id.clone(),
         mechanism: candidate.mechanism.clone(),
-        evidence: portfolio_evidence_fingerprint(
-            candidate,
-            validating.audit.as_ref().expect("audit"),
-        ),
+        evidence: portfolio_evidence_fingerprint(candidate, validating.audit.as_ref().expect("audit")),
         validator_policy: validating.contract.validator_policy.clone(),
         status: PortfolioValidationStatus::Passed,
     };
     let mut stale = matching.clone();
     stale.contract = fingerprint("stale-contract");
-    let error =
-        validate_portfolio_result(&validating, &stale).expect_err("stale contract cannot validate");
+    let error = validate_portfolio_result(&validating, &stale).expect_err("stale contract cannot validate");
     assert_eq!(error.kind, PortfolioErrorKind::ReceiptMismatch);
 
     let mut unadmitted_policy = matching;
@@ -459,11 +404,8 @@ fn exhaustion_and_blocking_are_honest_safe_terminal_states() {
     bounded_contract.budget.approach_capacity = ONE_APPROACH_LIMIT;
     let framed = initialize_portfolio(&bounded_contract).expect("valid bounded contract");
     let exploring = begin_independent_exploration(&framed).expect("start exploration");
-    let registered = register_approach(
-        &exploring,
-        equivalent_blocked_approach("approach.equivalent"),
-    )
-    .expect("register one blocked route");
+    let registered = register_approach(&exploring, equivalent_blocked_approach("approach.equivalent"))
+        .expect("register one blocked route");
     assert!(is_portfolio_budget_exhausted(&registered));
     let exhausted = exhaust_portfolio(&registered).expect("record honest exhaustion");
     assert_eq!(exhausted.phase, PortfolioPhase::Exhausted);
@@ -472,34 +414,24 @@ fn exhaustion_and_blocking_are_honest_safe_terminal_states() {
     assert_eq!(receipt.phase, PortfolioPhase::Exhausted);
     assert!(receipt.blocker.is_none());
 
-    let error = begin_independent_exploration(&exhausted)
-        .expect_err("terminal exhaustion cannot resume implicitly");
+    let error = begin_independent_exploration(&exhausted).expect_err("terminal exhaustion cannot resume implicitly");
     assert_eq!(error.kind, PortfolioErrorKind::TerminalState);
 
     let mut unsafe_receipt = receipt.clone();
-    unsafe_receipt
-        .evidence_refs
-        .push("/home/operator/raw prompt".to_string());
-    let error = validate_portfolio_receipt(&unsafe_receipt)
-        .expect_err("raw path and prompt marker rejected");
+    unsafe_receipt.evidence_refs.push("/home/operator/raw prompt".to_string());
+    let error = validate_portfolio_receipt(&unsafe_receipt).expect_err("raw path and prompt marker rejected");
     assert_eq!(error.kind, PortfolioErrorKind::UnsafeMetadata);
 
-    let blocked = block_portfolio(
-        &exploring,
-        PortfolioBlocker {
-            class: PortfolioBlockerClass::UserDecisionRequired,
-            detail: "choose between incompatible public contracts".to_string(),
-            evidence_ref: Some("decision.contract-shape".to_string()),
-        },
-    )
+    let blocked = block_portfolio(&exploring, PortfolioBlocker {
+        class: PortfolioBlockerClass::UserDecisionRequired,
+        detail: "choose between incompatible public contracts".to_string(),
+        evidence_ref: Some("decision.contract-shape".to_string()),
+    })
     .expect("record exact user blocker");
     let blocked_receipt = project_portfolio_receipt(&blocked).expect("blocked receipt");
     assert_eq!(blocked_receipt.phase, PortfolioPhase::Blocked);
     assert_eq!(
-        blocked_receipt
-            .blocker
-            .as_ref()
-            .map(|blocker| blocker.class),
+        blocked_receipt.blocker.as_ref().map(|blocker| blocker.class),
         Some(PortfolioBlockerClass::UserDecisionRequired)
     );
 }
@@ -509,31 +441,19 @@ fn receipt_identity_detects_field_tampering() {
     // r[agent_harness_runtime.portfolio_search.receipts]
     let audited = state_with_audited_candidate();
     let validating = begin_validation(&audited).expect("enter validation");
-    let candidate = validating
-        .approaches
-        .get("approach.algebraic")
-        .expect("candidate");
+    let candidate = validating.approaches.get("approach.algebraic").expect("candidate");
     let validation_receipt = PortfolioValidationReceipt {
         contract: portfolio_contract_fingerprint(&validating.contract),
         approach_id: candidate.approach_id.clone(),
         mechanism: candidate.mechanism.clone(),
-        evidence: portfolio_evidence_fingerprint(
-            candidate,
-            validating.audit.as_ref().expect("audit"),
-        ),
+        evidence: portfolio_evidence_fingerprint(candidate, validating.audit.as_ref().expect("audit")),
         validator_policy: validating.contract.validator_policy.clone(),
         status: PortfolioValidationStatus::Passed,
     };
-    let validated =
-        validate_portfolio_result(&validating, &validation_receipt).expect("validate result");
+    let validated = validate_portfolio_result(&validating, &validation_receipt).expect("validate result");
     let mut projected = project_portfolio_receipt(&validated).expect("project receipt");
-    projected
-        .evidence_refs
-        .push("evidence.tampered".to_string());
-    assert_eq!(
-        projected.evidence_refs.last().map(String::as_str),
-        Some("evidence.tampered")
-    );
+    projected.evidence_refs.push("evidence.tampered".to_string());
+    assert_eq!(projected.evidence_refs.last().map(String::as_str), Some("evidence.tampered"));
     let error = validate_portfolio_receipt(&projected).expect_err("identity must detect mutation");
     assert_eq!(error.kind, PortfolioErrorKind::ReceiptMismatch);
 }

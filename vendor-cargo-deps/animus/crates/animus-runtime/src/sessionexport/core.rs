@@ -21,11 +21,9 @@ const MAX_ENTRY_COUNT: u32 = super::data::MAX_ENTRY_COUNT;
 const MAX_RECEIPT_REFERENCE_COUNT: u32 = super::data::MAX_RECEIPT_REFERENCE_COUNT;
 const MAX_SUMMARY_CHARS: u32 = super::data::MAX_SUMMARY_CHARS;
 const MIN_COUNT: u32 = super::data::MIN_COUNT;
-const SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN: &str =
-    super::data::SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN;
+const SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN: &str = super::data::SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN;
 const SESSION_TREE_EXPORT_POLICY_SCHEMA: &str = super::data::SESSION_TREE_EXPORT_POLICY_SCHEMA;
-const SESSION_TREE_EXPORT_SOURCE_HASH_DOMAIN: &str =
-    super::data::SESSION_TREE_EXPORT_SOURCE_HASH_DOMAIN;
+const SESSION_TREE_EXPORT_SOURCE_HASH_DOMAIN: &str = super::data::SESSION_TREE_EXPORT_SOURCE_HASH_DOMAIN;
 
 #[derive(Clone, Copy)]
 pub(super) struct ExportField(pub(super) &'static str);
@@ -158,16 +156,9 @@ pub fn project_session_tree_export(
     let entries_by_id = validate_entries(policy, source.entries.as_slice())?;
     validate_parent_references(&entries_by_id)?;
     if !entries_by_id.contains_key(source.active_leaf_id.as_str()) {
-        return Err(error(
-            SessionTreeExportIssue::StaleActiveLeaf,
-            FIELD_ACTIVE_LEAF,
-        ));
+        return Err(error(SessionTreeExportIssue::StaleActiveLeaf, FIELD_ACTIVE_LEAF));
     }
-    let active_path = parent_chain(
-        source.active_leaf_id.as_str(),
-        &entries_by_id,
-        policy.max_depth,
-    )?;
+    let active_path = parent_chain(source.active_leaf_id.as_str(), &entries_by_id, policy.max_depth)?;
     let child_counts = child_counts(&entries_by_id)?;
     let projected_entries = project_entries(&EntryProjectionInput {
         policy,
@@ -215,18 +206,12 @@ struct ProjectedEntries {
     omission_count: u32,
 }
 
-fn project_entries(
-    input: &EntryProjectionInput<'_>,
-) -> Result<ProjectedEntries, SessionTreeExportError> {
+fn project_entries(input: &EntryProjectionInput<'_>) -> Result<ProjectedEntries, SessionTreeExportError> {
     let mut entries = Vec::with_capacity(input.source.entries.len());
     let mut branch_point_count = 0_u32;
     let mut omission_count = 0_u32;
     for entry in &input.source.entries {
-        let depth = entry_depth(
-            entry.entry_id.as_str(),
-            input.entries_by_id,
-            input.policy.max_depth,
-        )?;
+        let depth = entry_depth(entry.entry_id.as_str(), input.entries_by_id, input.policy.max_depth)?;
         let child_count = match input.child_counts.get(entry.entry_id.as_str()) {
             Some(count) => *count,
             None => 0_u32,
@@ -265,9 +250,7 @@ fn project_entries(
     })
 }
 
-fn validate_policy_shape(
-    input: &SessionTreeExportPolicyInput,
-) -> Result<(), SessionTreeExportError> {
+fn validate_policy_shape(input: &SessionTreeExportPolicyInput) -> Result<(), SessionTreeExportError> {
     let has_required_postures = input.schema == SESSION_TREE_EXPORT_POLICY_SCHEMA
         && input.content_posture == REQUIRED_CONTENT_POSTURE
         && input.path_posture == REQUIRED_PATH_POSTURE;
@@ -289,10 +272,7 @@ fn validate_policy_shape(
 
 fn validate_receipt_fields(fields: &[String]) -> Result<(), SessionTreeExportError> {
     let has_exact_fields = fields.len() == REQUIRED_RECEIPT_FIELDS.len()
-        && fields
-            .iter()
-            .map(String::as_str)
-            .eq(REQUIRED_RECEIPT_FIELDS.iter().copied());
+        && fields.iter().map(String::as_str).eq(REQUIRED_RECEIPT_FIELDS.iter().copied());
     if !has_exact_fields {
         return Err(error(SessionTreeExportIssue::InvalidPolicy, FIELD_POLICY));
     }
@@ -301,14 +281,10 @@ fn validate_receipt_fields(fields: &[String]) -> Result<(), SessionTreeExportErr
     Ok(())
 }
 
-fn validate_policy_bounds(
-    input: &SessionTreeExportPolicyInput,
-) -> Result<(), SessionTreeExportError> {
-    let is_entry_bound_invalid =
-        input.max_entries < MIN_COUNT || input.max_entries > MAX_ENTRY_COUNT;
+fn validate_policy_bounds(input: &SessionTreeExportPolicyInput) -> Result<(), SessionTreeExportError> {
+    let is_entry_bound_invalid = input.max_entries < MIN_COUNT || input.max_entries > MAX_ENTRY_COUNT;
     let is_depth_bound_invalid = input.max_depth < MIN_COUNT || input.max_depth > MAX_DEPTH;
-    let is_summary_bound_invalid =
-        input.max_summary_chars < MIN_COUNT || input.max_summary_chars > MAX_SUMMARY_CHARS;
+    let is_summary_bound_invalid = input.max_summary_chars < MIN_COUNT || input.max_summary_chars > MAX_SUMMARY_CHARS;
     if is_entry_bound_invalid || is_depth_bound_invalid {
         return Err(error(SessionTreeExportIssue::InvalidPolicy, FIELD_POLICY));
     }
@@ -327,9 +303,7 @@ fn validate_artifact_bound(max_bytes: u32) -> Result<(), SessionTreeExportError>
     }
 }
 
-fn parse_entry_kinds(
-    labels: &[String],
-) -> Result<Vec<SessionTreeExportEntryKind>, SessionTreeExportError> {
+fn parse_entry_kinds(labels: &[String]) -> Result<Vec<SessionTreeExportEntryKind>, SessionTreeExportError> {
     if labels.is_empty() {
         return Err(error(SessionTreeExportIssue::InvalidPolicy, FIELD_POLICY));
     }
@@ -347,9 +321,7 @@ fn parse_entry_kinds(
     Ok(kinds)
 }
 
-fn parse_formats(
-    labels: &[String],
-) -> Result<Vec<SessionTreeExportFormat>, SessionTreeExportError> {
+fn parse_formats(labels: &[String]) -> Result<Vec<SessionTreeExportFormat>, SessionTreeExportError> {
     if labels.is_empty() {
         return Err(error(SessionTreeExportIssue::InvalidPolicy, FIELD_POLICY));
     }
@@ -452,10 +424,7 @@ fn validate_entry(
 fn validate_parent_references(
     entries: &OrderedMap<&str, &SessionTreeExportEntryInput>,
 ) -> Result<(), SessionTreeExportError> {
-    let root_count = entries
-        .values()
-        .filter(|entry| entry.parent_id.is_none())
-        .count();
+    let root_count = entries.values().filter(|entry| entry.parent_id.is_none()).count();
     if root_count != 1 {
         return Err(error(SessionTreeExportIssue::InvalidSource, FIELD_TOPOLOGY));
     }
@@ -491,10 +460,7 @@ fn validate_repair_target(
         .and_then(|target_id| entries.get(target_id).copied())
         .ok_or_else(|| error(SessionTreeExportIssue::StaleRepairTarget, FIELD_ENTRY))?;
     if target.entry_id == entry.entry_id || target.storage_sequence >= entry.storage_sequence {
-        return Err(error(
-            SessionTreeExportIssue::StaleRepairTarget,
-            FIELD_ENTRY,
-        ));
+        return Err(error(SessionTreeExportIssue::StaleRepairTarget, FIELD_ENTRY));
     }
     debug_assert!(target.storage_sequence < entry.storage_sequence);
     Ok(())
@@ -519,9 +485,8 @@ fn parent_chain(
         if depth > max_depth {
             return Err(error(SessionTreeExportIssue::BoundExceeded, FIELD_TOPOLOGY));
         }
-        let entry = entries
-            .get(entry_id)
-            .ok_or_else(|| error(SessionTreeExportIssue::MissingParent, FIELD_TOPOLOGY))?;
+        let entry =
+            entries.get(entry_id).ok_or_else(|| error(SessionTreeExportIssue::MissingParent, FIELD_TOPOLOGY))?;
         current = entry.parent_id.as_deref();
     }
     debug_assert!(!path.is_empty());
@@ -535,8 +500,8 @@ fn entry_depth(
     max_depth: u32,
 ) -> Result<u32, SessionTreeExportError> {
     let path = parent_chain(entry_id, entries, max_depth)?;
-    let count = u32::try_from(path.len())
-        .map_err(|_error| error(SessionTreeExportIssue::BoundExceeded, FIELD_TOPOLOGY))?;
+    let count =
+        u32::try_from(path.len()).map_err(|_error| error(SessionTreeExportIssue::BoundExceeded, FIELD_TOPOLOGY))?;
     count
         .checked_sub(MIN_COUNT)
         .ok_or_else(|| error(SessionTreeExportIssue::InvalidSource, FIELD_TOPOLOGY))
@@ -545,8 +510,7 @@ fn entry_depth(
 fn child_counts<'a>(
     entries: &OrderedMap<&'a str, &'a SessionTreeExportEntryInput>,
 ) -> Result<OrderedMap<&'a str, u32>, SessionTreeExportError> {
-    let mut counts: OrderedMap<&str, u32> =
-        entries.keys().map(|entry_id| (*entry_id, 0_u32)).collect();
+    let mut counts: OrderedMap<&str, u32> = entries.keys().map(|entry_id| (*entry_id, 0_u32)).collect();
     for entry in entries.values() {
         if let Some(parent_id) = &entry.parent_id {
             let count = counts
@@ -624,10 +588,7 @@ fn projection_hash(input: &ProjectionHashInput<'_>) -> String {
         owned.push(entry.is_active_path.to_string());
     }
     let parts: Vec<&str> = owned.iter().map(String::as_str).collect();
-    hash_parts(
-        super::data::SESSION_TREE_EXPORT_PROJECTION_HASH_DOMAIN,
-        parts.as_slice(),
-    )
+    hash_parts(super::data::SESSION_TREE_EXPORT_PROJECTION_HASH_DOMAIN, parts.as_slice())
 }
 
 pub(super) fn hash_parts(domain: &str, parts: &[&str]) -> String {
@@ -644,12 +605,12 @@ pub(super) fn hash_parts(domain: &str, parts: &[&str]) -> String {
 }
 
 pub(super) fn safe_label(value: &str, field: ExportField) -> Result<(), SessionTreeExportError> {
-    let character_count = u32::try_from(value.chars().count())
-        .map_err(|_error| error(SessionTreeExportIssue::BoundExceeded, field))?;
+    let character_count =
+        u32::try_from(value.chars().count()).map_err(|_error| error(SessionTreeExportIssue::BoundExceeded, field))?;
     let is_label_bounded = !value.is_empty() && character_count <= MAX_SUMMARY_CHARS;
-    let has_safe_chars = value.chars().all(|character| {
-        character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | ':' | '-')
-    });
+    let has_safe_chars = value
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | ':' | '-'));
     if !is_label_bounded || !has_safe_chars {
         Err(error(SessionTreeExportIssue::InvalidSource, field))
     } else {
@@ -657,14 +618,9 @@ pub(super) fn safe_label(value: &str, field: ExportField) -> Result<(), SessionT
     }
 }
 
-pub(super) fn lowercase_blake3(
-    value: &str,
-    field: ExportField,
-) -> Result<(), SessionTreeExportError> {
+pub(super) fn lowercase_blake3(value: &str, field: ExportField) -> Result<(), SessionTreeExportError> {
     let is_hash_width_valid = value.len() == BLAKE3_HEX_CHARS;
-    let is_lowercase_hex = value
-        .bytes()
-        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    let is_lowercase_hex = value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !is_hash_width_valid || !is_lowercase_hex {
         Err(error(SessionTreeExportIssue::InvalidSource, field))
     } else {
@@ -680,11 +636,9 @@ fn optional_text(value: Option<&str>) -> String {
 }
 
 fn contains_private_marker(value: &str) -> bool {
-    PRIVATE_MARKERS.iter().any(|marker| {
-        value
-            .to_ascii_lowercase()
-            .contains(&marker.to_ascii_lowercase())
-    })
+    PRIVATE_MARKERS
+        .iter()
+        .any(|marker| value.to_ascii_lowercase().contains(&marker.to_ascii_lowercase()))
 }
 
 fn checked_add(input: CheckedAddInput) -> Result<u32, SessionTreeExportError> {

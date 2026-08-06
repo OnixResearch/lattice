@@ -27,11 +27,7 @@ const UNSAFE_RECORD: &str = "req-4|prompt|new_turn|RAW_PROMPT: secret=abc";
 
 #[test]
 fn prompt_acknowledgement_preserves_request_id_and_events_stream_separately() {
-    let command = command(
-        HeadlessCommandKind::Prompt,
-        Some(HeadlessQueueing::NewTurn),
-        PROMPT_PAYLOAD,
-    );
+    let command = command(HeadlessCommandKind::Prompt, Some(HeadlessQueueing::NewTurn), PROMPT_PAYLOAD);
     let response = acknowledge_headless_command(&command, HeadlessRuntimePhase::Idle);
     let events = map_runtime_events_to_headless(&[crate::RuntimeEvent::TurnStarted {
         turn_index: FIRST_TURN_INDEX,
@@ -47,9 +43,7 @@ fn prompt_acknowledgement_preserves_request_id_and_events_stream_separately() {
 
 #[test]
 fn lf_framing_tolerates_crlf_and_preserves_unicode_separators() {
-    let input = format!(
-        "{FIRST_RECORD}\r\n{SECOND_RECORD_PREFIX}{UNICODE_SEPARATOR}still-payload\n{TRUNCATED_RECORD}"
-    );
+    let input = format!("{FIRST_RECORD}\r\n{SECOND_RECORD_PREFIX}{UNICODE_SEPARATOR}still-payload\n{TRUNCATED_RECORD}");
     let batch = split_lf_records(input.as_str());
 
     assert_eq!(batch.records().len(), EXPECTED_COMPLETE_RECORDS);
@@ -65,18 +59,11 @@ fn lf_framing_tolerates_crlf_and_preserves_unicode_separators() {
 fn active_turn_prompt_requires_explicit_steer_or_follow_up_semantics() {
     let ambiguous = command(HeadlessCommandKind::Prompt, None, PROMPT_PAYLOAD);
     let rejected = acknowledge_headless_command(&ambiguous, HeadlessRuntimePhase::ActiveTurn);
-    let steering = command(
-        HeadlessCommandKind::Prompt,
-        Some(HeadlessQueueing::Steer),
-        STEER_PAYLOAD,
-    );
+    let steering = command(HeadlessCommandKind::Prompt, Some(HeadlessQueueing::Steer), STEER_PAYLOAD);
     let accepted = acknowledge_headless_command(&steering, HeadlessRuntimePhase::ActiveTurn);
 
     assert_eq!(rejected.status(), HeadlessResponseStatus::Rejected);
-    assert_eq!(
-        rejected.error().expect("rejection has error").kind(),
-        HeadlessProtocolErrorKind::InvalidState
-    );
+    assert_eq!(rejected.error().expect("rejection has error").kind(), HeadlessProtocolErrorKind::InvalidState);
     assert_eq!(accepted.status(), HeadlessResponseStatus::Accepted);
 }
 
@@ -94,14 +81,8 @@ fn runtime_tool_events_carry_shared_safe_tool_correlation() {
     ])
     .expect("tool events should project");
 
-    assert_eq!(
-        events[FIRST_EVENT_INDEX].tool_call_id(),
-        Some("tool:search")
-    );
-    assert_eq!(
-        events[FIRST_EVENT_INDEX].tool_call_id(),
-        events[SECOND_EVENT_INDEX].tool_call_id()
-    );
+    assert_eq!(events[FIRST_EVENT_INDEX].tool_call_id(), Some("tool:search"));
+    assert_eq!(events[FIRST_EVENT_INDEX].tool_call_id(), events[SECOND_EVENT_INDEX].tool_call_id());
     assert!(!events[FIRST_EVENT_INDEX].summary().contains(TOOL_INPUT));
     assert_eq!(events[SECOND_EVENT_INDEX].summary(), TOOL_DENIAL);
 }
@@ -111,15 +92,14 @@ fn tool_request() -> animus_adapters::ToolRequest {
         name: Some(TOOL_ARGUMENT_NAME),
         value: Some(TOOL_INPUT),
     }];
-    let arguments = animus_adapters::tool::PreparedArguments::prepare(
-        &animus_adapters::tool::ArgumentPreparationRequest {
+    let arguments =
+        animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
             current_schema_identity: TOOL_SCHEMA,
             allowed_field_names: &[TOOL_ARGUMENT_NAME],
             compatibility_rules: &[],
             fields: &fields,
-        },
-    )
-    .expect("arguments should validate");
+        })
+        .expect("arguments should validate");
     assert_eq!(arguments.schema_identity(), TOOL_SCHEMA);
     assert_eq!(arguments.fields().len(), TOOL_ARGUMENT_COUNT);
     let request = animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
@@ -141,39 +121,18 @@ fn tool_request() -> animus_adapters::ToolRequest {
 
 #[test]
 fn malformed_and_unsafe_records_return_bounded_errors_without_echoing_payloads() {
-    let malformed = parse_headless_command_record(MALFORMED_RECORD)
-        .expect_err("malformed record should be rejected");
-    let unsafe_payload =
-        parse_headless_command_record(UNSAFE_RECORD).expect_err("unsafe record should be rejected");
+    let malformed = parse_headless_command_record(MALFORMED_RECORD).expect_err("malformed record should be rejected");
+    let unsafe_payload = parse_headless_command_record(UNSAFE_RECORD).expect_err("unsafe record should be rejected");
 
     assert_eq!(malformed.status(), HeadlessResponseStatus::Rejected);
-    assert_eq!(
-        malformed.error().expect("malformed has error").kind(),
-        HeadlessProtocolErrorKind::Parse
-    );
-    assert_eq!(
-        malformed.error().expect("malformed has error").message(),
-        "malformed_record"
-    );
+    assert_eq!(malformed.error().expect("malformed has error").kind(), HeadlessProtocolErrorKind::Parse);
+    assert_eq!(malformed.error().expect("malformed has error").message(), "malformed_record");
     assert_eq!(unsafe_payload.status(), HeadlessResponseStatus::Rejected);
-    assert_eq!(
-        unsafe_payload.error().expect("unsafe has error").message(),
-        "malformed_record"
-    );
-    assert!(
-        !unsafe_payload
-            .error()
-            .expect("unsafe has error")
-            .message()
-            .contains("secret")
-    );
+    assert_eq!(unsafe_payload.error().expect("unsafe has error").message(), "malformed_record");
+    assert!(!unsafe_payload.error().expect("unsafe has error").message().contains("secret"));
 }
 
-fn command(
-    kind: HeadlessCommandKind,
-    queueing: Option<HeadlessQueueing>,
-    payload: &str,
-) -> HeadlessCommand {
+fn command(kind: HeadlessCommandKind, queueing: Option<HeadlessQueueing>, payload: &str) -> HeadlessCommand {
     HeadlessCommand::validate(&HeadlessCommandDraft {
         request_id: REQUEST_ID,
         kind: kind.as_str(),

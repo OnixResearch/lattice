@@ -1,0 +1,21 @@
+{
+  "schema": "iced.replay-receipt.v1",
+  "adapter": "iced-replay",
+  "evidence_role": "pure-replay",
+  "artifacts": [
+    {
+      "fixture_id": "workspace-shell.positive",
+      "state_blake3": "178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f",
+      "workspace_snapshot_blake3": "178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f",
+      "semantic_artifact": "docs/generated/iced/workspace-shell-positive.iced-semantic.txt",
+      "semantic_blake3": "8988e083ebaac36f9d6949b5e99f42f614fd0c1af44e28902a12f5e6b0551640"
+    },
+    {
+      "fixture_id": "workspace-shell.negative",
+      "state_blake3": "0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5",
+      "workspace_snapshot_blake3": "0f42e9c2dc0c7ebd7739bd20886552b12555634b72c3b6c55a6ffdd0d512c4c5",
+      "semantic_artifact": "docs/generated/iced/workspace-shell-negative.iced-semantic.txt",
+      "semantic_blake3": "11a6308d2b878819217bd390e1c76995b7f4fd1cafc57c20d737cf7921fd35b5"
+    }
+  ]
+}

@@ -1,7 +1,5 @@
-const HOST_SUMMARY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("host_effect_summary");
-const CAPABILITY_SUMMARY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("capability_summary");
+const HOST_SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("host_effect_summary");
+const CAPABILITY_SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("capability_summary");
 const CANCELLATION_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("cancellation_summary");
 const RUNTIME_POLICY_SUMMARY_FIELD: crate::validation::FieldName =
@@ -21,15 +19,9 @@ impl HostRequest {
     ///
     /// Returns [`crate::AdapterContractError`] when the summary is empty, too
     /// long, or contains a NUL character.
-    pub fn new(
-        capability: super::CapabilityClass,
-        summary: &str,
-    ) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(capability: super::CapabilityClass, summary: &str) -> Result<Self, crate::AdapterContractError> {
         let summary = crate::validation::normalized_adapter_field(HOST_SUMMARY_FIELD, summary)?;
-        Ok(Self {
-            capability,
-            summary,
-        })
+        Ok(Self { capability, summary })
     }
 
     /// Returns the requested capability class.
@@ -59,16 +51,9 @@ impl CapabilityDecisionRequest {
     ///
     /// Returns [`crate::AdapterContractError`] when the summary is empty, too
     /// long, or contains a NUL character.
-    pub fn new(
-        capability: super::CapabilityClass,
-        summary: &str,
-    ) -> Result<Self, crate::AdapterContractError> {
-        let summary =
-            crate::validation::normalized_adapter_field(CAPABILITY_SUMMARY_FIELD, summary)?;
-        Ok(Self {
-            capability,
-            summary,
-        })
+    pub fn new(capability: super::CapabilityClass, summary: &str) -> Result<Self, crate::AdapterContractError> {
+        let summary = crate::validation::normalized_adapter_field(CAPABILITY_SUMMARY_FIELD, summary)?;
+        Ok(Self { capability, summary })
     }
 
     /// Returns the requested capability class.
@@ -98,8 +83,7 @@ impl CancellationCheck {
     /// Returns [`crate::AdapterContractError`] when the summary is empty, too
     /// long, or contains a NUL character.
     pub fn new(summary: &str) -> Result<Self, crate::AdapterContractError> {
-        let summary =
-            crate::validation::normalized_adapter_field(CANCELLATION_SUMMARY_FIELD, summary)?;
+        let summary = crate::validation::normalized_adapter_field(CANCELLATION_SUMMARY_FIELD, summary)?;
         Ok(Self { summary })
     }
 
@@ -124,16 +108,9 @@ impl RuntimePolicyRequest {
     ///
     /// Returns [`crate::AdapterContractError`] when the summary is empty, too
     /// long, or contains a NUL character.
-    pub fn new(
-        capability: super::CapabilityClass,
-        summary: &str,
-    ) -> Result<Self, crate::AdapterContractError> {
-        let summary =
-            crate::validation::normalized_adapter_field(RUNTIME_POLICY_SUMMARY_FIELD, summary)?;
-        Ok(Self {
-            capability,
-            summary,
-        })
+    pub fn new(capability: super::CapabilityClass, summary: &str) -> Result<Self, crate::AdapterContractError> {
+        let summary = crate::validation::normalized_adapter_field(RUNTIME_POLICY_SUMMARY_FIELD, summary)?;
+        Ok(Self { capability, summary })
     }
 
     /// Returns the requested capability class.

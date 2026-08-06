@@ -1,11 +1,8 @@
-const SOURCE_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_source_id");
-const WORKSPACE_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_id");
+const SOURCE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_source_id");
+const WORKSPACE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_id");
 const PARENT_WORKSPACE_ID_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("parent_workspace_id");
-const WRITABLE_ROOT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_writable_root");
+const WRITABLE_ROOT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_writable_root");
 const WRITABLE_ROOTS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_writable_roots");
 
@@ -35,23 +32,17 @@ impl Descriptor {
     pub fn new(draft: DescriptorDraft<'_>) -> Result<Self, crate::AdapterContractError> {
         crate::validation::validate_required_adapter_field(SOURCE_ID_FIELD, draft.source_id)?;
         crate::validation::validate_required_adapter_field(WORKSPACE_ID_FIELD, draft.workspace_id)?;
-        let parent_workspace_id =
-            super::text::optional_field(PARENT_WORKSPACE_ID_FIELD, draft.parent_workspace_id)?;
-        let writable_roots = super::text::required_texts(
-            WRITABLE_ROOTS_FIELD,
-            WRITABLE_ROOT_FIELD,
-            draft.writable_roots,
-        )?;
+        let parent_workspace_id = super::text::optional_field(PARENT_WORKSPACE_ID_FIELD, draft.parent_workspace_id)?;
+        let writable_roots =
+            super::text::required_texts(WRITABLE_ROOTS_FIELD, WRITABLE_ROOT_FIELD, draft.writable_roots)?;
         let file_inclusion = super::rules::FileInclusionPolicy::parse(draft.file_inclusion)?;
         let operation = super::rules::Operation::parse(draft.operation)?;
         let commit_target = super::rules::CommitTarget::parse(draft.commit_target)?;
         let abort_policy = super::rules::AbortPolicy::parse(draft.abort_policy)?;
         let conflict_policy = super::rules::ConflictPolicy::parse(draft.conflict_policy)?;
         let cleanup_policy = super::rules::CleanupPolicy::parse(draft.cleanup_policy)?;
-        let required_capabilities = super::text::collect_capabilities(
-            draft.required_capabilities,
-            super::adapter::Capability::parse,
-        )?;
+        let required_capabilities =
+            super::text::collect_capabilities(draft.required_capabilities, super::adapter::Capability::parse)?;
 
         Ok(Self {
             source_id: alloc::string::String::from(draft.source_id),

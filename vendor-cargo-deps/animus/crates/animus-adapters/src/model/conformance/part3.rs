@@ -3,9 +3,7 @@
 use super::*;
 
 pub fn canonical_projection_request() -> CanonicalModelRequest {
-    let developer_content = [CanonicalContentPartDraft::Text {
-        text: DEVELOPER_TEXT,
-    }];
+    let developer_content = [CanonicalContentPartDraft::Text { text: DEVELOPER_TEXT }];
     let user_content = [
         CanonicalContentPartDraft::Text { text: USER_TEXT },
         CanonicalContentPartDraft::ImageDescriptor {
@@ -89,9 +87,7 @@ pub fn full_support(family: ProviderProjectionFamily) -> ProviderProjectionSuppo
     }
 }
 
-pub fn expected_literals(
-    family: ProviderProjectionFamily,
-) -> [alloc::string::String; EXPECTED_LITERAL_COUNT] {
+pub fn expected_literals(family: ProviderProjectionFamily) -> [alloc::string::String; EXPECTED_LITERAL_COUNT] {
     [
         alloc::format!("family:{}", family.as_str()),
         alloc::string::String::from("role:developer"),

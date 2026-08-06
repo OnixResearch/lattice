@@ -82,8 +82,7 @@ impl RecipeParameter {
         let name = super::required_text(PARAMETER_NAME_FIELD, draft.name)?;
         let kind = RecipeParameterKind::parse(draft.kind)?;
         let default_value = super::optional_text(PARAMETER_DEFAULT_FIELD, draft.default_value)?;
-        let select_options =
-            super::text_collection(PARAMETER_OPTION_FIELD, draft.select_options, false)?;
+        let select_options = super::text_collection(PARAMETER_OPTION_FIELD, draft.select_options, false)?;
         validate_parameter_defaults(name.as_str(), kind, draft.required, default_value.as_ref())?;
         validate_parameter_options(name.as_str(), kind, default_value.as_ref(), &select_options)?;
 
@@ -133,10 +132,7 @@ pub(super) fn collect_parameters(
     let mut parameters: Collection<RecipeParameter> = Collection::with_capacity(drafts.len());
     for draft in drafts {
         let parameter = RecipeParameter::validate(draft)?;
-        if parameters
-            .iter()
-            .any(|existing| existing.name() == parameter.name())
-        {
+        if parameters.iter().any(|existing| existing.name() == parameter.name()) {
             return Err(super::RecipeWorkflowError::DuplicateName {
                 field: PARAMETER_NAME_FIELD.as_str(),
                 value: Text::from(parameter.name()),
@@ -173,10 +169,7 @@ fn validate_parameter_options(
     select_options: &[Text],
 ) -> Result<(), super::RecipeWorkflowError> {
     assert!(!name.is_empty(), "parameter name was normalized");
-    assert!(
-        !PARAMETER_NAME_FIELD.as_str().is_empty(),
-        "parameter fields are stable"
-    );
+    assert!(!PARAMETER_NAME_FIELD.as_str().is_empty(), "parameter fields are stable");
     let parameter = Text::from(name);
     if kind == RecipeParameterKind::Select && select_options.is_empty() {
         return Err(super::RecipeWorkflowError::EmptySelectOptions { parameter });
@@ -185,9 +178,7 @@ fn validate_parameter_options(
         return Err(super::RecipeWorkflowError::UnexpectedSelectOptions { parameter });
     }
     if let Some(default_text) = default_value {
-        if kind == RecipeParameterKind::Select
-            && !super::contains_text(select_options, default_text.as_str())
-        {
+        if kind == RecipeParameterKind::Select && !super::contains_text(select_options, default_text.as_str()) {
             return Err(super::RecipeWorkflowError::InvalidSelectValue {
                 parameter,
                 value: default_text.clone(),

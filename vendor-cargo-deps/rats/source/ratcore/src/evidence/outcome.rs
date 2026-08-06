@@ -49,11 +49,7 @@ pub struct ReplayIssue {
 }
 
 impl ReplayIssue {
-    pub(crate) fn new(
-        code: ReplayIssueCode,
-        field: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub(crate) fn new(code: ReplayIssueCode, field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             field: field.into(),

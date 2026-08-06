@@ -10,31 +10,56 @@ mod rule;
 #[cfg(test)]
 mod tests;
 
-pub use dialog::{Decision, DecisionDraft, DecisionOutcome, PromptRequest, PromptRequestDraft};
-pub use evidence::{Receipt, ReceiptDraft, ReceiptLeak, validate_text};
+pub use dialog::Decision;
+pub use dialog::DecisionDraft;
+pub use dialog::DecisionOutcome;
+pub use dialog::PromptRequest;
+pub use dialog::PromptRequestDraft;
+pub use evidence::Receipt;
+pub use evidence::ReceiptDraft;
+pub use evidence::ReceiptLeak;
+pub use evidence::validate_text;
 pub use fault::Error;
-pub use flow::{
-    DecisionReason, DecisionStatus, PromptStatus, Resolution, ResolutionRequest, resolve,
-};
-pub use kernel::{
-    KernelReceipt, KernelReceiptDraft, ModeDefaultReason, ModeDefaultRequest,
-    ModeDefaultResolution, PatternMatchKind, PatternRule, PatternRuleDraft, PermissionMode,
-    RepeatedActionInput, RepeatedActionPolicy, RepeatedActionResolution, RepeatedActionStatus,
-    SessionAllowlistEntry, SessionAllowlistEntryDraft, SessionAllowlistStatus,
-    SessionAllowlistValidation, detect_repeated_action, resolve_mode_default,
-    validate_session_allowlist,
-};
-pub use rule::{Outcome, Policy, PolicyDraft, PromptSummaryPolicy, TrustScope, TrustStatus};
+pub use flow::DecisionReason;
+pub use flow::DecisionStatus;
+pub use flow::PromptStatus;
+pub use flow::Resolution;
+pub use flow::ResolutionRequest;
+pub use flow::resolve;
+pub use kernel::KernelReceipt;
+pub use kernel::KernelReceiptDraft;
+pub use kernel::ModeDefaultReason;
+pub use kernel::ModeDefaultRequest;
+pub use kernel::ModeDefaultResolution;
+pub use kernel::PatternMatchKind;
+pub use kernel::PatternRule;
+pub use kernel::PatternRuleDraft;
+pub use kernel::PermissionMode;
+pub use kernel::RepeatedActionInput;
+pub use kernel::RepeatedActionPolicy;
+pub use kernel::RepeatedActionResolution;
+pub use kernel::RepeatedActionStatus;
+pub use kernel::SessionAllowlistEntry;
+pub use kernel::SessionAllowlistEntryDraft;
+pub use kernel::SessionAllowlistStatus;
+pub use kernel::SessionAllowlistValidation;
+pub use kernel::detect_repeated_action;
+pub use kernel::resolve_mode_default;
+pub use kernel::validate_session_allowlist;
+pub use rule::Outcome;
+pub use rule::Policy;
+pub use rule::PolicyDraft;
+pub use rule::PromptSummaryPolicy;
+pub use rule::TrustScope;
+pub use rule::TrustStatus;
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
-pub(super) const ACTION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("permission_action");
+pub(super) const ACTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("permission_action");
 pub(super) const RESOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("permission_resource_label");
-pub(super) const OUTCOME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("permission_outcome");
+pub(super) const OUTCOME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("permission_outcome");
 pub(super) const SOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("permission_source_identity");
 pub(super) const TRUST_SCOPE_FIELD: crate::validation::FieldName =
@@ -53,8 +78,7 @@ pub(super) const SESSION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("permission_session_label");
 pub(super) const TOKEN_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("permission_prompt_token");
-pub(super) const REASON_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("permission_reason");
+pub(super) const REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("permission_reason");
 pub(super) const REDACTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("permission_redaction_marker");
 
@@ -78,22 +102,14 @@ const _: () = assert!(MIN_PRECEDENCE > 0);
 const _: () = assert!(MAX_PRECEDENCE >= MIN_PRECEDENCE);
 const _: () = assert!(MAX_REDACTIONS > 0);
 
-pub(super) fn required_text(
-    field: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<Text, Error> {
+pub(super) fn required_text(field: crate::validation::FieldName, value: Option<&str>) -> Result<Text, Error> {
     match value {
         Some(raw) => required_text_value(field, raw),
-        None => Err(Error::MissingField {
-            field: field.as_str(),
-        }),
+        None => Err(Error::MissingField { field: field.as_str() }),
     }
 }
 
-pub(super) fn required_text_value(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<Text, Error> {
+pub(super) fn required_text_value(field: crate::validation::FieldName, value: &str) -> Result<Text, Error> {
     crate::validation::normalized_adapter_field(field, value).map_err(Error::from)
 }
 

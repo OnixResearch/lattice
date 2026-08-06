@@ -1,11 +1,22 @@
 use super::super::*;
-use crate::terminal_ide_kit::{
-    WorkspaceFocusPolicy, WorkspaceShellCommand, WorkspaceShellDiagnostic,
-    WorkspaceShellDiagnosticCode, WorkspaceShellEffectRequest, WorkspaceShellFocus,
-    WorkspaceShellModel, WorkspaceShellPane, WorkspaceShellTab, WorkspaceShellWorkspace,
-    WorkspaceSplitAxis, WorkspaceTaskStatus, reduce_workspace_shell_command,
-    validate_workspace_shell, workspace_status_rollup,
-};
+use crate::terminal_ide_kit::WorkspaceFocusPolicy;
+use crate::terminal_ide_kit::WorkspaceId;
+use crate::terminal_ide_kit::WorkspacePaneId;
+use crate::terminal_ide_kit::WorkspaceShellCommand;
+use crate::terminal_ide_kit::WorkspaceShellDiagnostic;
+use crate::terminal_ide_kit::WorkspaceShellDiagnosticCode;
+use crate::terminal_ide_kit::WorkspaceShellEffectRequest;
+use crate::terminal_ide_kit::WorkspaceShellFocus;
+use crate::terminal_ide_kit::WorkspaceShellModel;
+use crate::terminal_ide_kit::WorkspaceShellPane;
+use crate::terminal_ide_kit::WorkspaceShellTab;
+use crate::terminal_ide_kit::WorkspaceShellWorkspace;
+use crate::terminal_ide_kit::WorkspaceSplitAxis;
+use crate::terminal_ide_kit::WorkspaceTabId;
+use crate::terminal_ide_kit::WorkspaceTaskStatus;
+use crate::terminal_ide_kit::reduce_workspace_shell_command;
+use crate::terminal_ide_kit::validate_workspace_shell;
+use crate::terminal_ide_kit::workspace_status_rollup;
 
 const TARGET_WORKSPACE_SHELL: &str = "workspace-shell";
 const WORKSPACE_LIVE: &str = "workspace:main";
@@ -70,12 +81,12 @@ impl ReplayTarget for WorkspaceShellReplayTarget {
             .iter()
             .flat_map(|workspace| &workspace.tabs)
             .flat_map(|tab| &tab.panes)
-            .map(|pane| pane.live_id.clone())
+            .map(|pane| pane.live_id.to_string())
             .collect()
     }
 
     fn focused_target(&self) -> Option<String> {
-        self.model.focus.as_ref().map(|focus| focus.pane.clone())
+        self.model.focus.as_ref().map(|focus| focus.pane.to_string())
     }
 
     fn bounds(&self) -> (u16, u16) {
@@ -126,9 +137,7 @@ impl ReplayTarget for WorkspaceShellReplayTarget {
                 self.model
                     .workspaces
                     .first()
-                    .map_or(WorkspaceTaskStatus::Unknown, |workspace| {
-                        workspace_status_rollup(workspace).overall
-                    })
+                    .map_or(WorkspaceTaskStatus::Unknown, |workspace| workspace_status_rollup(workspace).overall)
                     .label()
                     .to_string(),
             ),
@@ -214,109 +223,98 @@ pub fn workspace_shell_replay_target() -> WorkspaceShellReplayTarget {
 /// Creates a valid workspace shell replay script.
 #[must_use]
 pub fn workspace_shell_positive_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        POSITIVE_FIXTURE_ID,
-        "workspace shell positive",
-        TARGET_WORKSPACE_SHELL,
-    ))
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_SPLIT_BACKGROUND.to_string(),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::StateContains {
-                key: "panes".to_string(),
-                needle: PANE_TASK_LIVE.to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::StateEquals {
-                key: "focus_pane".to_string(),
-                expected: PANE_EDITOR_LIVE.to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_STATUS_WORKING.to_string(),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::StateEquals {
-                key: "workspace_status".to_string(),
-                expected: WorkspaceTaskStatus::Working.label().to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_FOCUS_TASK.to_string(),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::FocusTarget {
-                target: PANE_TASK_LIVE.to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::SnapshotContains {
-                label: SNAPSHOT_WORKSPACE_STATE.to_string(),
-                needle: PANE_TASK_LIVE.to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_assertion(ReplayAssertion::new("focus_pane", PANE_TASK_LIVE))
-    .with_assertion(ReplayAssertion::new(
-        "workspace_status",
-        WorkspaceTaskStatus::Working.label(),
-    ))
+    ReplayScript::new(ReplayMetadata::new(POSITIVE_FIXTURE_ID, "workspace shell positive", TARGET_WORKSPACE_SHELL))
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_SPLIT_BACKGROUND.to_string(),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::StateContains {
+                    key: "panes".to_string(),
+                    needle: PANE_TASK_LIVE.to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::StateEquals {
+                    key: "focus_pane".to_string(),
+                    expected: PANE_EDITOR_LIVE.to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_STATUS_WORKING.to_string(),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::StateEquals {
+                    key: "workspace_status".to_string(),
+                    expected: WorkspaceTaskStatus::Working.label().to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_FOCUS_TASK.to_string(),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::FocusTarget {
+                    target: PANE_TASK_LIVE.to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::SnapshotContains {
+                    label: SNAPSHOT_WORKSPACE_STATE.to_string(),
+                    needle: PANE_TASK_LIVE.to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_assertion(ReplayAssertion::new("focus_pane", PANE_TASK_LIVE))
+        .with_assertion(ReplayAssertion::new("workspace_status", WorkspaceTaskStatus::Working.label()))
 }
 
 /// Creates an invalid workspace shell replay script with stable diagnostics.
 #[must_use]
 pub fn workspace_shell_negative_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        NEGATIVE_FIXTURE_ID,
-        "workspace shell negative",
-        TARGET_WORKSPACE_SHELL,
-    ))
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_DISABLED_CLOSE.to_string(),
-    })
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_FOCUS_STALE.to_string(),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::DiagnosticPresent {
-                code: format!("{:?}", WorkspaceShellDiagnosticCode::StaleLiveId),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Command {
-        action_id: ACTION_RESTORE_IMPOSSIBLE.to_string(),
-    })
-    .with_event(ReplayEvent::Wait {
-        condition: ReplayWaitCondition::new(
-            ReplayWaitPredicate::Unsupported {
-                predicate: "wall-clock-output-scrape".to_string(),
-            },
-            WAIT_BUDGET,
-        ),
-    })
-    .with_event(ReplayEvent::Mouse {
-        target: PANE_EDITOR_LIVE.to_string(),
-        x: DEFAULT_REPLAY_WIDTH,
-        y: DEFAULT_REPLAY_HEIGHT,
-    })
+    ReplayScript::new(ReplayMetadata::new(NEGATIVE_FIXTURE_ID, "workspace shell negative", TARGET_WORKSPACE_SHELL))
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_DISABLED_CLOSE.to_string(),
+        })
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_FOCUS_STALE.to_string(),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::DiagnosticPresent {
+                    code: format!("{:?}", WorkspaceShellDiagnosticCode::StaleLiveId),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Command {
+            action_id: ACTION_RESTORE_IMPOSSIBLE.to_string(),
+        })
+        .with_event(ReplayEvent::Wait {
+            condition: ReplayWaitCondition::new(
+                ReplayWaitPredicate::Unsupported {
+                    predicate: "wall-clock-output-scrape".to_string(),
+                },
+                WAIT_BUDGET,
+            ),
+        })
+        .with_event(ReplayEvent::Mouse {
+            target: PANE_EDITOR_LIVE.to_string(),
+            x: DEFAULT_REPLAY_WIDTH,
+            y: DEFAULT_REPLAY_HEIGHT,
+        })
 }
 
 /// Runs workspace shell replay fixtures and returns deterministic evidence rows.
@@ -334,20 +332,14 @@ fn run_workspace_fixture(script: ReplayScript) -> WorkspaceShellReplayEvidenceRo
     let scenario = script.metadata.name.clone();
     let mut target = workspace_shell_replay_target();
     let report = run_replay(&script, &mut target);
-    let snapshot_hash = target
-        .snapshot_bytes(SNAPSHOT_WORKSPACE_STATE)
-        .map_or_else(String::new, |bytes| blake3_hex(&bytes));
+    let snapshot_hash =
+        target.snapshot_bytes(SNAPSHOT_WORKSPACE_STATE).map_or_else(String::new, |bytes| blake3_hex(&bytes));
     WorkspaceShellReplayEvidenceRow {
         fixture_id,
         scenario,
         state_hash: report.state_hash,
         snapshot_hash,
-        diagnostics: join_ids(
-            report
-                .issues
-                .iter()
-                .map(|issue| format!("{:?}", issue.code)),
-        ),
+        diagnostics: join_ids(report.issues.iter().map(|issue| format!("{:?}", issue.code))),
     }
 }
 
@@ -356,77 +348,47 @@ fn baseline_model() -> WorkspaceShellModel {
         WORKSPACE_LIVE,
         WORKSPACE_PERSISTED,
         "Workspace",
-        vec![WorkspaceShellTab::new(
-            TAB_LIVE,
-            TAB_PERSISTED,
-            "Main",
-            vec![
-                WorkspaceShellPane::new(
-                    PANE_EDITOR_LIVE,
-                    PANE_EDITOR_PERSISTED,
-                    "Editor",
-                    WorkspaceTaskStatus::Idle,
-                )
+        vec![WorkspaceShellTab::new(TAB_LIVE, TAB_PERSISTED, "Main", vec![
+            WorkspaceShellPane::new(PANE_EDITOR_LIVE, PANE_EDITOR_PERSISTED, "Editor", WorkspaceTaskStatus::Idle)
                 .with_content_summary("editor ready")
                 .with_diagnostic(WorkspaceShellDiagnostic::new(
                     WorkspaceShellDiagnosticCode::MissingStatusAdapter,
                     PANE_EDITOR_LIVE,
                     "task status adapter is missing",
                 )),
-            ],
-        )],
+        ])],
     )])
-    .with_retired_live_id(PANE_STALE_LIVE)
+    .with_retired_live_id(WorkspacePaneId::new(PANE_STALE_LIVE))
 }
 
 fn baseline_commands() -> std::collections::BTreeMap<String, WorkspaceShellCommand> {
     std::collections::BTreeMap::from([
-        (
-            ACTION_SPLIT_BACKGROUND.to_string(),
-            WorkspaceShellCommand::SplitPane {
-                workspace: WORKSPACE_LIVE.to_string(),
-                tab: TAB_LIVE.to_string(),
-                target_pane: PANE_EDITOR_LIVE.to_string(),
-                pane: WorkspaceShellPane::new(
-                    PANE_TASK_LIVE,
-                    PANE_TASK_PERSISTED,
-                    "Task",
-                    WorkspaceTaskStatus::Idle,
-                )
+        (ACTION_SPLIT_BACKGROUND.to_string(), WorkspaceShellCommand::SplitPane {
+            workspace: WorkspaceId::new(WORKSPACE_LIVE),
+            tab: WorkspaceTabId::new(TAB_LIVE),
+            target_pane: WorkspacePaneId::new(PANE_EDITOR_LIVE),
+            pane: WorkspaceShellPane::new(PANE_TASK_LIVE, PANE_TASK_PERSISTED, "Task", WorkspaceTaskStatus::Idle)
                 .with_content_summary("task starting"),
-                axis: WorkspaceSplitAxis::Horizontal,
-                focus_policy: WorkspaceFocusPolicy::Preserve,
-            },
-        ),
-        (
-            ACTION_STATUS_WORKING.to_string(),
-            WorkspaceShellCommand::UpdateTaskStatus {
-                pane: PANE_TASK_LIVE.to_string(),
-                status: WorkspaceTaskStatus::Working,
-            },
-        ),
-        (
-            ACTION_FOCUS_TASK.to_string(),
-            WorkspaceShellCommand::FocusPane {
-                workspace: WORKSPACE_LIVE.to_string(),
-                tab: TAB_LIVE.to_string(),
-                pane: PANE_TASK_LIVE.to_string(),
-            },
-        ),
-        (
-            ACTION_FOCUS_STALE.to_string(),
-            WorkspaceShellCommand::FocusPane {
-                workspace: WORKSPACE_LIVE.to_string(),
-                tab: TAB_LIVE.to_string(),
-                pane: PANE_STALE_LIVE.to_string(),
-            },
-        ),
-        (
-            ACTION_RESTORE_IMPOSSIBLE.to_string(),
-            WorkspaceShellCommand::RestoreLayout {
-                model: impossible_restore_model(),
-            },
-        ),
+            axis: WorkspaceSplitAxis::Horizontal,
+            focus_policy: WorkspaceFocusPolicy::Preserve,
+        }),
+        (ACTION_STATUS_WORKING.to_string(), WorkspaceShellCommand::UpdateTaskStatus {
+            pane: WorkspacePaneId::new(PANE_TASK_LIVE),
+            status: WorkspaceTaskStatus::Working,
+        }),
+        (ACTION_FOCUS_TASK.to_string(), WorkspaceShellCommand::FocusPane {
+            workspace: WorkspaceId::new(WORKSPACE_LIVE),
+            tab: WorkspaceTabId::new(TAB_LIVE),
+            pane: WorkspacePaneId::new(PANE_TASK_LIVE),
+        }),
+        (ACTION_FOCUS_STALE.to_string(), WorkspaceShellCommand::FocusPane {
+            workspace: WorkspaceId::new(WORKSPACE_LIVE),
+            tab: WorkspaceTabId::new(TAB_LIVE),
+            pane: WorkspacePaneId::new(PANE_STALE_LIVE),
+        }),
+        (ACTION_RESTORE_IMPOSSIBLE.to_string(), WorkspaceShellCommand::RestoreLayout {
+            model: impossible_restore_model(),
+        }),
     ])
 }
 
@@ -435,32 +397,13 @@ fn impossible_restore_model() -> WorkspaceShellModel {
         WORKSPACE_LIVE,
         WORKSPACE_PERSISTED,
         "Invalid Workspace",
-        vec![WorkspaceShellTab::new(
-            TAB_LIVE,
-            TAB_PERSISTED,
-            "Invalid",
-            vec![
-                WorkspaceShellPane::new(
-                    PANE_EDITOR_LIVE,
-                    PANE_EDITOR_PERSISTED,
-                    "Editor",
-                    WorkspaceTaskStatus::Idle,
-                ),
-                WorkspaceShellPane::new(
-                    PANE_TASK_LIVE,
-                    PANE_EDITOR_PERSISTED,
-                    "Duplicate",
-                    WorkspaceTaskStatus::Idle,
-                ),
-            ],
-        )],
+        vec![WorkspaceShellTab::new(TAB_LIVE, TAB_PERSISTED, "Invalid", vec![
+            WorkspaceShellPane::new(PANE_EDITOR_LIVE, PANE_EDITOR_PERSISTED, "Editor", WorkspaceTaskStatus::Idle),
+            WorkspaceShellPane::new(PANE_TASK_LIVE, PANE_EDITOR_PERSISTED, "Duplicate", WorkspaceTaskStatus::Idle),
+        ])],
     )])
-    .with_focus(WorkspaceShellFocus::new(
-        WORKSPACE_LIVE,
-        TAB_LIVE,
-        PANE_STALE_LIVE,
-    ))
-    .with_retired_live_id(PANE_STALE_LIVE)
+    .with_focus(WorkspaceShellFocus::new(WORKSPACE_LIVE, TAB_LIVE, PANE_STALE_LIVE))
+    .with_retired_live_id(WorkspacePaneId::new(PANE_STALE_LIVE))
 }
 
 fn pane_ids(model: &WorkspaceShellModel) -> Vec<String> {
@@ -469,7 +412,7 @@ fn pane_ids(model: &WorkspaceShellModel) -> Vec<String> {
         .iter()
         .flat_map(|workspace| &workspace.tabs)
         .flat_map(|tab| &tab.panes)
-        .map(|pane| pane.live_id.clone())
+        .map(|pane| pane.live_id.to_string())
         .collect::<Vec<_>>();
     ids.sort();
     ids
@@ -488,11 +431,7 @@ fn pane_content(model: &WorkspaceShellModel) -> String {
 
 fn layout_shape(model: &WorkspaceShellModel) -> String {
     let workspace_count = model.workspaces.len();
-    let tab_count = model
-        .workspaces
-        .iter()
-        .map(|workspace| workspace.tabs.len())
-        .sum::<usize>();
+    let tab_count = model.workspaces.iter().map(|workspace| workspace.tabs.len()).sum::<usize>();
     let pane_count = model
         .workspaces
         .iter()
@@ -502,28 +441,16 @@ fn layout_shape(model: &WorkspaceShellModel) -> String {
     format!("workspaces={workspace_count},tabs={tab_count},panes={pane_count}")
 }
 
-fn diagnostic_codes(
-    diagnostics: &[WorkspaceShellDiagnostic],
-) -> std::collections::BTreeSet<String> {
-    diagnostics
-        .iter()
-        .map(|diagnostic| format!("{:?}", diagnostic.code))
-        .collect()
+fn diagnostic_codes(diagnostics: &[WorkspaceShellDiagnostic]) -> std::collections::BTreeSet<String> {
+    diagnostics.iter().map(|diagnostic| format!("{:?}", diagnostic.code)).collect()
 }
 
 fn state_bytes(state: &std::collections::BTreeMap<String, String>) -> Vec<u8> {
-    state
-        .iter()
-        .map(|(key, value)| format!("{key}={value}\n"))
-        .collect::<String>()
-        .into_bytes()
+    state.iter().map(|(key, value)| format!("{key}={value}\n")).collect::<String>().into_bytes()
 }
 
 fn join_ids(ids: impl IntoIterator<Item = impl AsRef<str>>) -> String {
-    let values = ids
-        .into_iter()
-        .map(|id| id.as_ref().to_string())
-        .collect::<Vec<_>>();
+    let values = ids.into_iter().map(|id| id.as_ref().to_string()).collect::<Vec<_>>();
     if values.is_empty() {
         EMPTY_MARKER.to_string()
     } else {

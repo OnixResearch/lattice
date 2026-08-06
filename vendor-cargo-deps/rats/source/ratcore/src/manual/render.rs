@@ -15,13 +15,11 @@ pub fn generate_snapshot_manifest_page(entries: &[SnapshotManifestEntry]) -> Str
     let mut page = String::new();
     page.push_str(super::fixtures::GENERATED_COMMENT);
     page.push_str("\n# Snapshot manifest\n\n");
-    page.push_str(
-        "| Fixture | Renderer | Artifact | Size | BLAKE3 | Generator | Source fixture |\n",
-    );
+    page.push_str("| Fixture | Renderer | Artifact | Size | BLAKE3 | Generator | Source fixture |\n");
     page.push_str("| --- | --- | --- | --- | --- | --- | --- |\n");
     for entry in sorted_entries {
         page.push_str("| `");
-        page.push_str(&entry.fixture_id);
+        page.push_str(entry.fixture_id.as_str());
         page.push_str("` | `");
         page.push_str(&entry.renderer);
         page.push_str("` | `");
@@ -35,7 +33,7 @@ pub fn generate_snapshot_manifest_page(entries: &[SnapshotManifestEntry]) -> Str
         page.push_str("` | `");
         page.push_str(&entry.generator);
         page.push_str("` | `");
-        page.push_str(&entry.source_fixture);
+        page.push_str(entry.source_fixture.as_str());
         page.push_str("` |\n");
     }
     page
@@ -49,11 +47,11 @@ pub fn generate_component_page(
 ) -> (String, Vec<SnapshotIssue>) {
     let mut issues = Vec::new();
     debug_assert!(source.title.trim().len() <= source.title.len());
-    debug_assert!(source.component_id.trim().len() <= source.component_id.len());
+    debug_assert!(source.component_id.as_str().trim().len() <= source.component_id.as_str().len());
     if source.snippets.is_empty() {
         issues.push(SnapshotIssue::new(
             SnapshotIssueCode::MissingSnippet,
-            source.component_id.clone(),
+            source.component_id.to_string(),
             "component docs require at least one code snippet",
         ));
     }
@@ -63,10 +61,7 @@ pub fn generate_component_page(
     page.push_str("# ");
     page.push_str(&source.title);
     page.push_str("\n\n## Snapshots\n\n");
-    for entry in entries
-        .iter()
-        .filter(|entry| entry.fixture_id == source.component_id)
-    {
+    for entry in entries.iter().filter(|entry| entry.fixture_id == source.component_id) {
         page.push_str("- `");
         page.push_str(&entry.renderer);
         page.push_str("` `");

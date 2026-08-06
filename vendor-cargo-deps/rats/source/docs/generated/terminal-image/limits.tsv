@@ -1,0 +1,15 @@
+limit	conservative_default	hard_maximum	arithmetic_or_enforcement
+encoded_bytes	8388608	33554432	length before inspection/encoding
+terminal_width	256	1024	nonzero checked u16
+terminal_height	128	1024	nonzero checked u16
+terminal_cells	32768	262144	checked u64 width*height
+source_width	8192	32768	metadata check and decoder strict limit
+source_height	8192	32768	metadata check and decoder strict limit
+source_pixels	16777216	268435456	checked u64 width*height
+decoded_bytes	134217728	536870912	image max_alloc plus source*16+target*(4+index)+fixed histogram reserve
+prepared_bytes	33554432	134217728	checked estimate and every staged append
+chunks	8192	32768	ceil(base64/4096)
+palette_colors	255	255	validated u16 and palette truncation
+work_units	250000000	1000000000	checked 2*target_pixels*actual_palette
+formats	PNG JPEG GIF WebP	PNG JPEG GIF WebP	closed mask; current decoders only
+protocols	Kitty iTerm2 Sixel None	Kitty iTerm2 Sixel None	closed mask; no implicit protocol switch

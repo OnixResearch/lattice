@@ -2,18 +2,31 @@ const REQUIRED_TEXT_FIELD_COUNT: usize = 6;
 const COMMAND_FIELD_COUNT: usize = 2;
 const EXTRA_STATUS_ISSUE_BOUND: usize = 2;
 
-/// Validates browser showcase entries against shared fixture data.
+/// Validates browser showcase entries against the fixed maintained browser scope.
 #[must_use]
 pub fn validate_browser_showcase_index(
     entries: &[super::BrowserShowcaseEntry],
     fixtures: &[super::super::ShowcaseFixture],
 ) -> Vec<super::BrowserShowcaseIssue> {
-    let mut issues = Vec::with_capacity(entries.len());
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let scope =
+        crate::targeting_core::built_in_renderer_scope(crate::targeting_core::BuiltInRendererScope::BrowserTargets);
+    validate_browser_showcase_index_with_policy(entries, fixtures, &registry, &scope)
+}
+
+/// Validates browser entries against an explicit concrete-target scope.
+#[must_use]
+pub fn validate_browser_showcase_index_with_policy(
+    entries: &[super::BrowserShowcaseEntry],
+    fixtures: &[super::super::ShowcaseFixture],
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> Vec<super::BrowserShowcaseIssue> {
+    let mut issues = renderer_scope_issues(registry, scope);
+    issues.reserve(entries.len());
     let mut seen_ids = std::collections::BTreeSet::new();
-    let fixture_ids = fixtures
-        .iter()
-        .map(|fixture| fixture.id.as_str())
-        .collect::<std::collections::BTreeSet<_>>();
+    let mut seen_targets = std::collections::BTreeSet::new();
+    let fixture_ids = fixtures.iter().map(|fixture| &fixture.id).collect::<std::collections::BTreeSet<_>>();
     debug_assert!(issues.capacity() >= entries.len());
     debug_assert!(seen_ids.is_empty());
     for entry in entries {
@@ -25,14 +38,104 @@ pub fn validate_browser_showcase_index(
                 "duplicate browser showcase entry ID",
             ));
         }
+        issues.extend(renderer_target_issues(entry, registry, scope));
+        seen_targets.insert(entry.renderer_target.clone());
         issues.extend(single_entry_issues(entry, &fixture_ids));
     }
+    issues.extend(missing_target_issues(scope, &seen_targets));
     issues
+}
+
+fn missing_target_issues(
+    scope: &crate::targeting_core::RendererRequirementScope,
+    seen: &std::collections::BTreeSet<crate::targeting_core::RendererTargetId>,
+) -> Vec<super::BrowserShowcaseIssue> {
+    scope
+        .members
+        .iter()
+        .filter(
+            |member| matches!(member, crate::targeting_core::RendererSubject::Target(target) if !seen.contains(target)),
+        )
+        .map(|member| {
+            super::BrowserShowcaseIssue::new(
+                super::BrowserShowcaseIssueCode::InvalidRendererTarget,
+                scope.id.as_str(),
+                super::FIELD_RENDERER_LABEL,
+                format!("browser scope requires target `{}`", member.as_str()),
+            )
+        })
+        .collect()
+}
+
+fn renderer_scope_issues(
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> Vec<super::BrowserShowcaseIssue> {
+    crate::targeting_core::validate_renderer_scope(registry, scope)
+        .issues
+        .into_iter()
+        .map(|issue| {
+            super::BrowserShowcaseIssue::new(
+                super::BrowserShowcaseIssueCode::InvalidRendererScope,
+                scope.id.as_str(),
+                issue.subject,
+                issue.message,
+            )
+        })
+        .collect()
+}
+
+fn renderer_target_issues(
+    entry: &super::BrowserShowcaseEntry,
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> Vec<super::BrowserShowcaseIssue> {
+    [
+        invalid_target_issue(entry, registry, scope),
+        mismatched_label_issue(entry),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn invalid_target_issue(
+    entry: &super::BrowserShowcaseEntry,
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> Option<super::BrowserShowcaseIssue> {
+    let is_registered = registry.target(&entry.renderer_target).is_some();
+    let is_in_scope = scope.members.iter().any(|member| {
+        matches!(
+            member,
+            crate::targeting_core::RendererSubject::Target(target)
+                if target == &entry.renderer_target
+        )
+    });
+    (!is_registered || !is_in_scope).then(|| {
+        super::BrowserShowcaseIssue::new(
+            super::BrowserShowcaseIssueCode::InvalidRendererTarget,
+            entry.id.clone(),
+            super::FIELD_RENDERER_LABEL,
+            "browser renderer target is unknown or outside the browser scope",
+        )
+    })
+}
+
+fn mismatched_label_issue(entry: &super::BrowserShowcaseEntry) -> Option<super::BrowserShowcaseIssue> {
+    (super::legacy_browser_target(&entry.renderer_label) != entry.renderer_target).then(|| {
+        super::BrowserShowcaseIssue::new(
+            super::BrowserShowcaseIssueCode::MismatchedRendererLabel,
+            entry.id.clone(),
+            super::FIELD_RENDERER_LABEL,
+            "browser renderer label does not match its explicit target mapping",
+        )
+    })
 }
 
 pub(super) fn unknown_fixture_issue(
     entry: &super::BrowserShowcaseEntry,
-    fixture_id: &str,
+    fixture_id: &super::super::FixtureId,
 ) -> super::BrowserShowcaseIssue {
     super::BrowserShowcaseIssue::new(
         super::BrowserShowcaseIssueCode::InvalidFixtureReference,
@@ -44,7 +147,7 @@ pub(super) fn unknown_fixture_issue(
 
 fn single_entry_issues(
     entry: &super::BrowserShowcaseEntry,
-    fixture_ids: &std::collections::BTreeSet<&str>,
+    fixture_ids: &std::collections::BTreeSet<&super::super::FixtureId>,
 ) -> Vec<super::BrowserShowcaseIssue> {
     let issue_bound = REQUIRED_TEXT_FIELD_COUNT
         .saturating_add(COMMAND_FIELD_COUNT)
@@ -64,9 +167,7 @@ fn evidence_status_issues(entry: &super::BrowserShowcaseEntry) -> Vec<super::Bro
     let mut issues = Vec::with_capacity(EXTRA_STATUS_ISSUE_BOUND);
     debug_assert!(issues.capacity() >= EXTRA_STATUS_ISSUE_BOUND);
     debug_assert!(!entry.evidence_status.label().is_empty());
-    if entry.evidence_status == super::BrowserShowcaseEvidenceStatus::Complete
-        && entry.evidence_links.is_empty()
-    {
+    if entry.evidence_status == super::BrowserShowcaseEvidenceStatus::Complete && entry.evidence_links.is_empty() {
         issues.push(super::BrowserShowcaseIssue::new(
             super::BrowserShowcaseIssueCode::CompleteEvidenceWithoutLinks,
             entry.id.clone(),
@@ -94,10 +195,7 @@ fn required_text_issues(entry: &super::BrowserShowcaseEntry) -> Vec<super::Brows
         (super::FIELD_RENDERER_LABEL, entry.renderer_label.as_str()),
         (super::FIELD_PACKAGE_NAME, entry.package_name.as_str()),
         (super::FIELD_CRATE_PATH, entry.crate_path.as_str()),
-        (
-            super::FIELD_VALIDATION_PROFILE,
-            entry.validation_profile.as_str(),
-        ),
+        (super::FIELD_VALIDATION_PROFILE, entry.validation_profile.as_str()),
     ];
     debug_assert_eq!(required.len(), REQUIRED_TEXT_FIELD_COUNT);
     required
@@ -136,7 +234,7 @@ fn command_issues(entry: &super::BrowserShowcaseEntry) -> Vec<super::BrowserShow
 
 fn fixture_reference_issues(
     entry: &super::BrowserShowcaseEntry,
-    fixture_ids: &std::collections::BTreeSet<&str>,
+    fixture_ids: &std::collections::BTreeSet<&super::super::FixtureId>,
 ) -> Vec<super::BrowserShowcaseIssue> {
     if entry.supported_fixture_ids.is_empty() {
         return vec![super::BrowserShowcaseIssue::new(
@@ -149,7 +247,7 @@ fn fixture_reference_issues(
     entry
         .supported_fixture_ids
         .iter()
-        .filter(|fixture_id| !fixture_ids.contains(fixture_id.as_str()))
+        .filter(|fixture_id| !fixture_ids.contains(fixture_id))
         .map(|fixture_id| unknown_fixture_issue(entry, fixture_id))
         .collect()
 }

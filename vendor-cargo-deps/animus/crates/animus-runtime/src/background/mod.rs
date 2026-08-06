@@ -12,15 +12,24 @@ mod envelope;
 mod errors;
 
 pub use core::resolve_process_job_profile;
-pub use data::{
-    NamedProcessJobProfile, ProcessJobBackend, ProcessJobEnvironmentVariable,
-    ProcessJobMetadataField, ProcessJobNotificationPolicy, ProcessJobProfile,
-    ProcessJobProfileManifest, ProcessJobProfilePolicy, ProcessJobProfileResolveRequest,
-    ProcessJobProfileSource, ProcessJobProfileSourcePrecedence, ProcessJobResourceLimits,
-    ResolvedProcessJobProfile, StartProcessJobRequest,
-};
+
+pub use data::NamedProcessJobProfile;
+pub use data::ProcessJobBackend;
+pub use data::ProcessJobEnvironmentVariable;
+pub use data::ProcessJobMetadataField;
+pub use data::ProcessJobNotificationPolicy;
+pub use data::ProcessJobProfile;
+pub use data::ProcessJobProfileManifest;
+pub use data::ProcessJobProfilePolicy;
+pub use data::ProcessJobProfileResolveRequest;
+pub use data::ProcessJobProfileSource;
+pub use data::ProcessJobProfileSourcePrecedence;
+pub use data::ProcessJobResourceLimits;
+pub use data::ResolvedProcessJobProfile;
+pub use data::StartProcessJobRequest;
 pub use envelope::ProcessJobProfileIdentity;
-pub use errors::{ProcessJobProfileError, ProcessJobProfileErrorKind};
+pub use errors::ProcessJobProfileError;
+pub use errors::ProcessJobProfileErrorKind;
 
 pub(crate) const PROCESS_JOB_PROFILE_SCHEMA: &str = "animus.process-job-profile.v1";
 pub(crate) const PROCESS_JOB_PROFILE_SCHEMA_VERSION: u16 = 1;

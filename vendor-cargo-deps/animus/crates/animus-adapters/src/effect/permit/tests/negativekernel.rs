@@ -15,10 +15,7 @@ fn yolo_mode_cannot_bypass_missing_authority() {
     });
 
     assert_eq!(missing_authority.status(), DecisionStatus::Denied);
-    assert_eq!(
-        missing_authority.reason(),
-        ModeDefaultReason::MissingAuthority
-    );
+    assert_eq!(missing_authority.reason(), ModeDefaultReason::MissingAuthority);
     assert_eq!(missing_authority.local_outcome(), Outcome::Allow);
     assert!(!missing_authority.dispatch_allowed());
 }
@@ -26,23 +23,16 @@ fn yolo_mode_cannot_bypass_missing_authority() {
 #[test]
 fn pattern_rules_reject_bad_match_kind_and_regex() {
     // r[verify agent_harness_runtime.zerostack_permission_kernel.pattern_rules.invalid]
-    let unsupported_match_kind =
-        pattern_error(Some(UNKNOWN_MATCH_KIND), Some(GLOB_RESOURCE_PATTERN));
+    let unsupported_match_kind = pattern_error(Some(UNKNOWN_MATCH_KIND), Some(GLOB_RESOURCE_PATTERN));
     let invalid_regex = pattern_error(Some(REGEX_MATCH_KIND), Some(INVALID_REGEX_RESOURCE_PATTERN));
 
-    assert_eq!(
-        unsupported_match_kind,
-        Error::UnsupportedValue {
-            field: PATTERN_MATCH_KIND_FIELD.as_str(),
-            value: Text::from(UNKNOWN_MATCH_KIND),
-        }
-    );
-    assert_eq!(
-        invalid_regex,
-        Error::InvalidPattern {
-            field: PATTERN_RESOURCE_FIELD.as_str(),
-        }
-    );
+    assert_eq!(unsupported_match_kind, Error::UnsupportedValue {
+        field: PATTERN_MATCH_KIND_FIELD.as_str(),
+        value: Text::from(UNKNOWN_MATCH_KIND),
+    });
+    assert_eq!(invalid_regex, Error::InvalidPattern {
+        field: PATTERN_RESOURCE_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -64,26 +54,17 @@ fn pattern_rules_reject_missing_source_outcome_and_action() {
     })
     .expect_err("bad action should fail");
 
-    assert_eq!(
-        missing_source,
-        Error::MissingField {
-            field: SOURCE_FIELD.as_str(),
-        }
-    );
-    assert_eq!(
-        unsupported_outcome,
-        Error::UnsupportedValue {
-            field: OUTCOME_FIELD.as_str(),
-            value: Text::from(UNSUPPORTED_OUTCOME_LABEL),
-        }
-    );
-    assert_eq!(
-        malformed_action,
-        Error::UnsupportedValue {
-            field: ACTION_FIELD.as_str(),
-            value: Text::from(BAD_ACTION),
-        }
-    );
+    assert_eq!(missing_source, Error::MissingField {
+        field: SOURCE_FIELD.as_str(),
+    });
+    assert_eq!(unsupported_outcome, Error::UnsupportedValue {
+        field: OUTCOME_FIELD.as_str(),
+        value: Text::from(UNSUPPORTED_OUTCOME_LABEL),
+    });
+    assert_eq!(malformed_action, Error::UnsupportedValue {
+        field: ACTION_FIELD.as_str(),
+        value: Text::from(BAD_ACTION),
+    });
 }
 
 #[test]
@@ -131,16 +112,10 @@ fn repeated_destructive_action_denies_without_dispatch() {
 #[test]
 fn kernel_receipt_leak_scan_rejects_raw_prompt() {
     // r[verify agent_harness_runtime.zerostack_permission_kernel.receipts.redacted]
-    assert_eq!(
-        validate_text(RAW_PROMPT_RECEIPT),
-        Err(ReceiptLeak::RawPrompt)
-    );
+    assert_eq!(validate_text(RAW_PROMPT_RECEIPT), Err(ReceiptLeak::RawPrompt));
 }
 
-fn pattern_error(
-    match_kind: Option<&'static str>,
-    resource_pattern: Option<&'static str>,
-) -> Error {
+fn pattern_error(match_kind: Option<&'static str>, resource_pattern: Option<&'static str>) -> Error {
     PatternRule::validate(&PatternRuleDraft {
         match_kind,
         resource_pattern,

@@ -3,8 +3,8 @@ use super::support::*;
 
 #[test]
 fn controller_resume_and_cancellation_check_thread_identity_before_execution() {
-    let snapshot = ThreadSnapshot::new(THREAD_ID, LEDGER_HASH, ThreadStatus::Running)
-        .expect("snapshot should validate");
+    let snapshot =
+        ThreadSnapshot::new(THREAD_ID, LEDGER_HASH, ThreadStatus::Running).expect("snapshot should validate");
     let resume = ThreadResume::validate(&ThreadResumeDraft {
         thread_id: THREAD_ID,
         ledger_hash: LEDGER_HASH,

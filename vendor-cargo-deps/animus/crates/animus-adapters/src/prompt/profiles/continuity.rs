@@ -40,16 +40,11 @@ impl ChainPlan {
     /// Returns [`super::types::Error`] when identifiers or extra instruction text
     /// fail adapter bounds.
     pub fn from_request(request: ChainRequest<'_>) -> Result<Self, super::types::Error> {
-        let source_profile_id = super::support::required_text(
-            super::support::PROFILE_ID_FIELD,
-            request.source_profile_id,
-        )?;
-        let target_profile_id = super::support::required_text(
-            super::support::PROFILE_ID_FIELD,
-            request.target_profile_id,
-        )?;
-        let extra_instruction =
-            super::support::normalize_extra_instruction(request.extra_instruction)?;
+        let source_profile_id =
+            super::support::required_text(super::support::PROFILE_ID_FIELD, request.source_profile_id)?;
+        let target_profile_id =
+            super::support::required_text(super::support::PROFILE_ID_FIELD, request.target_profile_id)?;
+        let extra_instruction = super::support::normalize_extra_instruction(request.extra_instruction)?;
         let active_profile_id = active_profile(ActiveProfileInput {
             source_profile_id: source_profile_id.as_str(),
             target_profile_id: target_profile_id.as_str(),
@@ -106,8 +101,6 @@ struct ActiveProfileInput<'a> {
 fn active_profile(input: ActiveProfileInput<'_>) -> super::support::Text {
     match input.decision {
         ChainDecision::Accepted => super::support::Text::from(input.target_profile_id),
-        ChainDecision::Declined | ChainDecision::Unavailable => {
-            super::support::Text::from(input.source_profile_id)
-        }
+        ChainDecision::Declined | ChainDecision::Unavailable => super::support::Text::from(input.source_profile_id),
     }
 }

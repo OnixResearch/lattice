@@ -62,11 +62,7 @@ pub fn evaluate_records<R: QueryRecord>(
         if !search_matches {
             continue;
         }
-        let group_key = query
-            .group_by
-            .as_ref()
-            .and_then(|field| record.get_value(field))
-            .map(group_key_for_value);
+        let group_key = query.group_by.as_ref().and_then(|field| record.get_value(field)).map(group_key_for_value);
         rows.push(QueryRow {
             index,
             score,
@@ -103,16 +99,11 @@ fn sort_rows<R: QueryRecord>(rows: &mut [QueryRow], records: &[R], sort_keys: &[
 }
 
 fn group_key_for_value(value: &QueryValue) -> String {
-    value
-        .facet_values()
-        .first()
-        .cloned()
-        .unwrap_or_else(|| DEFAULT_GROUP_KEY.to_string())
+    value.facet_values().first().cloned().unwrap_or_else(|| DEFAULT_GROUP_KEY.to_string())
 }
 
 fn collect_groups(rows: &[QueryRow]) -> std::collections::BTreeMap<String, Vec<usize>> {
-    let mut groups: std::collections::BTreeMap<String, Vec<usize>> =
-        std::collections::BTreeMap::new();
+    let mut groups: std::collections::BTreeMap<String, Vec<usize>> = std::collections::BTreeMap::new();
     for row in rows {
         if let Some(group_key) = &row.group_key {
             groups.entry(group_key.clone()).or_default().push(row.index);

@@ -15,9 +15,7 @@ fn host_owned_path_uses_injected_contract() {
         calls: super::support::NO_BROKER_CALLS,
     };
 
-    let broker_outcome = broker
-        .call(&request)
-        .expect("recording broker should return typed outcome");
+    let broker_outcome = broker.call(&request).expect("recording broker should return typed outcome");
     let evaluation = evaluate_confirmation_outcome(
         &request,
         &broker_outcome,

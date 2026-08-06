@@ -1,3 +1,5 @@
+use super::ActionId;
+
 /// Stable issue code for registry validation diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ActionRegistryIssueCode {
@@ -27,7 +29,7 @@ pub struct ActionRegistryIssue {
     /// Stable issue code.
     pub code: ActionRegistryIssueCode,
     /// Affected descriptor IDs when known.
-    pub action_ids: Vec<String>,
+    pub action_ids: Vec<ActionId>,
     /// Affected field when the issue is field-local.
     pub field: Option<String>,
     /// Human-readable diagnostic.
@@ -35,12 +37,7 @@ pub struct ActionRegistryIssue {
 }
 
 impl ActionRegistryIssue {
-    pub(super) fn field_issue(
-        code: ActionRegistryIssueCode,
-        action_id: String,
-        field: &str,
-        message: &str,
-    ) -> Self {
+    pub(super) fn field_issue(code: ActionRegistryIssueCode, action_id: ActionId, field: &str, message: &str) -> Self {
         Self {
             code,
             action_ids: vec![action_id],
@@ -51,7 +48,7 @@ impl ActionRegistryIssue {
 
     pub(super) fn multi_action_issue(
         code: ActionRegistryIssueCode,
-        mut action_ids: Vec<String>,
+        mut action_ids: Vec<ActionId>,
         message: String,
     ) -> Self {
         action_ids.sort();

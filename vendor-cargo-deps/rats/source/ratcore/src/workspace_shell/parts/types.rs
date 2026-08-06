@@ -11,11 +11,88 @@ const STATUS_DONE_LABEL: &str = "done";
 const STATUS_IDLE_LABEL: &str = "idle";
 const STATUS_UNKNOWN_LABEL: &str = "unknown";
 
-/// Compact session-visible workspace, tab, or pane identifier.
-pub type LiveId = String;
+semantic_string_id! {
+    /// Compact session-visible workspace identifier.
+    ///
+    /// ```compile_fail
+    /// use ratcore::terminal_ide_kit::{WorkspaceId, WorkspaceTabId};
+    /// let tab = WorkspaceTabId::new("same-text");
+    /// let _: WorkspaceId = tab;
+    /// ```
+    pub struct WorkspaceId;
+}
 
-/// Durable persisted workspace, tab, pane, or layout identifier.
-pub type PersistedId = String;
+semantic_string_id! {
+    /// Durable persisted workspace identifier.
+    ///
+    /// ```compile_fail
+    /// use ratcore::terminal_ide_kit::{PersistedWorkspaceId, WorkspaceId};
+    /// let persisted = PersistedWorkspaceId::new("workspace");
+    /// let _: WorkspaceId = persisted;
+    /// ```
+    pub struct PersistedWorkspaceId;
+}
+
+semantic_string_id! {
+    /// Compact session-visible tab identifier.
+    pub struct TabId;
+}
+
+semantic_string_id! {
+    /// Durable persisted tab identifier.
+    pub struct PersistedTabId;
+}
+
+semantic_string_id! {
+    /// Compact session-visible pane identifier.
+    pub struct PaneId;
+}
+
+semantic_string_id! {
+    /// Durable persisted pane identifier.
+    pub struct PersistedPaneId;
+}
+
+/// Typed identity retained after a workspace entity is removed.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RetiredLiveId {
+    /// A retired workspace identity.
+    Workspace(WorkspaceId),
+    /// A retired tab identity.
+    Tab(TabId),
+    /// A retired pane identity.
+    Pane(PaneId),
+}
+
+impl RetiredLiveId {
+    /// Returns the stable raw key used by global stale-ID validation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Workspace(id) => id.as_str(),
+            Self::Tab(id) => id.as_str(),
+            Self::Pane(id) => id.as_str(),
+        }
+    }
+}
+
+impl From<WorkspaceId> for RetiredLiveId {
+    fn from(id: WorkspaceId) -> Self {
+        Self::Workspace(id)
+    }
+}
+
+impl From<TabId> for RetiredLiveId {
+    fn from(id: TabId) -> Self {
+        Self::Tab(id)
+    }
+}
+
+impl From<PaneId> for RetiredLiveId {
+    fn from(id: PaneId) -> Self {
+        Self::Pane(id)
+    }
+}
 
 /// Stable workspace shell diagnostic code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,11 +129,7 @@ pub struct Diagnostic {
 impl Diagnostic {
     /// Creates a deterministic diagnostic.
     #[must_use]
-    pub fn new(
-        code: DiagnosticCode,
-        subject: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn new(code: DiagnosticCode, subject: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             subject: subject.into(),
@@ -166,12 +239,7 @@ pub fn tab_rollup(tab: &super::state::Tab) -> StatusRollup {
 /// Rolls a workspace's panes into stable status counts.
 #[must_use]
 pub fn space_rollup(space: &super::state::Space) -> StatusRollup {
-    rollup(
-        space
-            .tabs
-            .iter()
-            .flat_map(|tab| tab.panes.iter().map(|pane| pane.status)),
-    )
+    rollup(space.tabs.iter().flat_map(|tab| tab.panes.iter().map(|pane| pane.status)))
 }
 
 fn overall(rollup: &StatusRollup) -> TaskStatus {

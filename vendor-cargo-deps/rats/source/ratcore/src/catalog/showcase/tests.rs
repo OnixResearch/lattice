@@ -5,23 +5,13 @@ fn built_in_summary_contains_shared_rows_and_evidence() {
     let summary = built_in_fixture_parity_summary();
 
     assert!(summary.is_valid());
-    assert!(
-        summary
-            .rows
-            .iter()
-            .any(|row| row.fixture_id == FIXTURE_DIALOG_BASIC
-                && row.status == STATUS_SHARED
-                && row.subwayrat.contains(STATUS_EVIDENCE_COMPLETE)
-                && row.meteorite.contains(STATUS_EVIDENCE_COMPLETE))
-    );
-    assert!(
-        summary
-            .rows
-            .iter()
-            .any(|row| row.fixture_id == FIXTURE_CHROME_SHELL
-                && row.subwayrat.contains(STATUS_EVIDENCE_COMPLETE)
-                && row.meteorite.contains(STATUS_EVIDENCE_COMPLETE))
-    );
+    assert!(summary.rows.iter().any(|row| row.fixture_id == FIXTURE_DIALOG_BASIC
+        && row.status == STATUS_SHARED
+        && row.subwayrat.contains(STATUS_EVIDENCE_COMPLETE)
+        && row.meteorite.contains(STATUS_EVIDENCE_COMPLETE)));
+    assert!(summary.rows.iter().any(|row| row.fixture_id == FIXTURE_CHROME_SHELL
+        && row.subwayrat.contains(STATUS_EVIDENCE_COMPLETE)
+        && row.meteorite.contains(STATUS_EVIDENCE_COMPLETE)));
 }
 
 #[test]
@@ -41,38 +31,17 @@ fn built_in_summary_reports_knowledge_as_shared() {
 #[test]
 fn invalid_summary_returns_diagnostics() {
     let invalid_rows = vec![
-        FixtureParityRow::new("missing.fixture", FAMILY_DIALOG, "").with_renderer(
-            FixtureParityRenderer::unsupported(ShowcaseRenderer::Subwayrat, ""),
-        ),
+        FixtureParityRow::new("missing.fixture", FAMILY_DIALOG, "")
+            .with_renderer(FixtureParityRenderer::unsupported(ShowcaseRenderer::Subwayrat, "")),
     ];
 
     let summary = build_fixture_parity_summary(&invalid_rows, &built_in_fixtures());
 
     assert!(!summary.is_valid());
-    assert!(
-        summary
-            .rows
-            .iter()
-            .any(|row| row.fixture_id == "missing.fixture")
-    );
-    assert!(
-        summary
-            .issues
-            .iter()
-            .any(|issue| issue.code == FixtureIssueCode::ParityUnknownFixture)
-    );
-    assert!(
-        summary
-            .issues
-            .iter()
-            .any(|issue| issue.code == FixtureIssueCode::ParityMissingRenderer)
-    );
-    assert!(
-        summary
-            .issues
-            .iter()
-            .any(|issue| issue.code == FixtureIssueCode::ParityMissingUnsupportedReason)
-    );
+    assert!(summary.rows.iter().any(|row| row.fixture_id == "missing.fixture"));
+    assert!(summary.issues.iter().any(|issue| issue.code == FixtureIssueCode::ParityUnknownFixture));
+    assert!(summary.issues.iter().any(|issue| issue.code == FixtureIssueCode::ParityMissingRenderer));
+    assert!(summary.issues.iter().any(|issue| issue.code == FixtureIssueCode::ParityMissingUnsupportedReason));
 }
 
 #[test]
@@ -92,16 +61,7 @@ fn knowledge_fixture_contains_projection_fields() {
         .collect::<std::collections::BTreeMap<_, _>>();
 
     assert_eq!(data.get(KNOWLEDGE_DATA_GRAPH), Some(&KNOWLEDGE_GRAPH_FACTS));
-    assert_eq!(
-        data.get(KNOWLEDGE_DATA_AGENDA),
-        Some(&KNOWLEDGE_AGENDA_FACTS)
-    );
-    assert_eq!(
-        data.get(KNOWLEDGE_DATA_METADATA),
-        Some(&KNOWLEDGE_METADATA_FACTS)
-    );
-    assert_eq!(
-        data.get(KNOWLEDGE_DATA_DIAGNOSTICS),
-        Some(&KNOWLEDGE_DIAGNOSTIC_FACTS)
-    );
+    assert_eq!(data.get(KNOWLEDGE_DATA_AGENDA), Some(&KNOWLEDGE_AGENDA_FACTS));
+    assert_eq!(data.get(KNOWLEDGE_DATA_METADATA), Some(&KNOWLEDGE_METADATA_FACTS));
+    assert_eq!(data.get(KNOWLEDGE_DATA_DIAGNOSTICS), Some(&KNOWLEDGE_DIAGNOSTIC_FACTS));
 }

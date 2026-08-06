@@ -8,6 +8,10 @@ const SPINNING_PROGRAM: &str = r"
 (define (animus-decide)
   (animus-model animus-summary))
 ";
+const COMPLETION_PROGRAM: &str = r#"
+(define (animus-decide)
+  (animus-completion-candidate "COMPLETE"))
+"#;
 const TOOL_PROGRAM: &str = r#"
 (define tool-visible-character-budget 64)
 (define (animus-decide)
@@ -157,6 +161,27 @@ fn stopped_and_max_turn_reports_map_to_node_failures() {
 
     assert!(mapping_error(&stopped).to_string().contains("stopped without a final response"));
     assert!(mapping_error(&max_turns).to_string().contains(&format!("exceeded its {MAX_TURNS}-turn limit")));
+}
+
+#[test]
+fn completion_candidate_fails_without_host_owned_evaluation_authority() {
+    let runtime_input = animus_runtime::RuntimeInput::new(SUMMARY).expect("runtime input is valid");
+    let mut steel_fabric = animus_steel::SteelLoopFabric::new(COMPLETION_PROGRAM).expect("Steel program is valid");
+    let adapters = animus_runtime::RuntimeAdapters::<ModelStub, NeverTool>::new_optional(None, None);
+
+    let run_report = animus_runtime::run_agent_loop(
+        &runtime_input,
+        animus_runtime::RuntimeConfig::new(animus_runtime::DEFAULT_MAX_TURNS),
+        &mut steel_fabric,
+        adapters,
+    );
+
+    assert!(matches!(
+        run_report.status(),
+        animus_runtime::RuntimeStatus::CompletionCandidate { candidate }
+            if candidate.request() == "COMPLETE"
+    ));
+    assert!(mapping_error(&run_report).to_string().contains("unsupported host-owned completion evaluation"));
 }
 
 // r[verify lattice.agent_runtime.animus_effects]

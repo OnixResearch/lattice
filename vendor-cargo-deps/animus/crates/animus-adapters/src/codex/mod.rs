@@ -11,28 +11,34 @@ mod summary;
 mod tests;
 
 pub use err::DiffReviewError;
-pub use gate::{
-    DiffReviewActionKind, DiffReviewDenialReason, DiffReviewPolicyDecision, DiffReviewPolicyProfile,
-};
-pub use input::{
-    DiffReviewRequest, DiffReviewRequestDraft, DiffReviewSelector, DiffReviewSelectorDraft,
-    DiffReviewSelectorKind,
-};
-pub use issue::{
-    DiffReviewEvidence, DiffReviewEvidenceDraft, DiffReviewEvidenceKind, DiffReviewFinding,
-    DiffReviewFindingCategory, DiffReviewFindingDraft, DiffReviewFindingSeverity, DiffReviewSpan,
-    DiffReviewSpanDraft,
-};
-pub use summary::{
-    DiffReviewFindingState, DiffReviewFindingStateRecord, DiffReviewReport, DiffReviewReportDraft,
-    compare_diff_review_rerun,
-};
+pub use gate::DiffReviewActionKind;
+pub use gate::DiffReviewDenialReason;
+pub use gate::DiffReviewPolicyDecision;
+pub use gate::DiffReviewPolicyProfile;
+pub use input::DiffReviewRequest;
+pub use input::DiffReviewRequestDraft;
+pub use input::DiffReviewSelector;
+pub use input::DiffReviewSelectorDraft;
+pub use input::DiffReviewSelectorKind;
+pub use issue::DiffReviewEvidence;
+pub use issue::DiffReviewEvidenceDraft;
+pub use issue::DiffReviewEvidenceKind;
+pub use issue::DiffReviewFinding;
+pub use issue::DiffReviewFindingCategory;
+pub use issue::DiffReviewFindingDraft;
+pub use issue::DiffReviewFindingSeverity;
+pub use issue::DiffReviewSpan;
+pub use issue::DiffReviewSpanDraft;
+pub use summary::DiffReviewFindingState;
+pub use summary::DiffReviewFindingStateRecord;
+pub use summary::DiffReviewReport;
+pub use summary::DiffReviewReportDraft;
+pub use summary::compare_diff_review_rerun;
 
 pub(super) type Text = alloc::string::String;
 pub(super) type Collection<T> = alloc::vec::Vec<T>;
 
-pub(super) const RUN_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("diff_review_run_id");
+pub(super) const RUN_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("diff_review_run_id");
 pub(super) const SELECTOR_REF_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("diff_review_selector_ref");
 pub(super) const TARGET_LABEL_FIELD: crate::validation::FieldName =

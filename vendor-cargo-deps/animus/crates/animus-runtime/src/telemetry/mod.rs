@@ -57,6 +57,8 @@ pub enum LoopDecisionKind {
     Tool,
     /// Final response decision.
     Respond,
+    /// Advisory completion-candidate decision.
+    CompletionCandidate,
     /// Stop decision.
     Stop,
 }
@@ -69,6 +71,7 @@ impl LoopDecisionKind {
             Self::Model => "model",
             Self::Tool => "tool",
             Self::Respond => "respond",
+            Self::CompletionCandidate => "completion_candidate",
             Self::Stop => "stop",
         }
     }
@@ -79,6 +82,8 @@ impl LoopDecisionKind {
 pub enum RuntimeTerminalKind {
     /// Run completed with a final response.
     FinalResponse,
+    /// Run requested host-owned completion evaluation.
+    CompletionCandidate,
     /// Run stopped without a final response.
     Stopped,
     /// Run exhausted its configured turn budget.
@@ -93,6 +98,7 @@ impl RuntimeTerminalKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::FinalResponse => "final_response",
+            Self::CompletionCandidate => "completion_candidate",
             Self::Stopped => "stopped",
             Self::MaxTurnsExceeded => "max_turns_exceeded",
             Self::Failed => "failed",
@@ -102,6 +108,7 @@ impl RuntimeTerminalKind {
     pub(crate) fn from_status(status: &crate::RuntimeStatus) -> Self {
         match status {
             crate::RuntimeStatus::FinalResponse { .. } => Self::FinalResponse,
+            crate::RuntimeStatus::CompletionCandidate { .. } => Self::CompletionCandidate,
             crate::RuntimeStatus::Stopped => Self::Stopped,
             crate::RuntimeStatus::MaxTurnsExceeded { .. } => Self::MaxTurnsExceeded,
             crate::RuntimeStatus::Failed { .. } => Self::Failed,
@@ -146,6 +153,8 @@ pub enum RuntimeEventKind {
     ToolDenied,
     /// Final response event.
     FinalResponse,
+    /// Advisory completion-candidate request event.
+    CompletionCandidateRequested,
     /// Stop event.
     Stopped,
     /// Max-turn exhaustion event.
@@ -170,6 +179,14 @@ pub enum RuntimeEventKind {
     Cancelled,
     /// Compaction event.
     CompactionRequested,
+    /// Coding-session lifecycle state event.
+    SessionStateChanged,
+    /// Coding-session durable commit event.
+    SessionCommitObserved,
+    /// Coding-session recovery event.
+    SessionRecoveryObserved,
+    /// Session authority-profile binding or comparison event.
+    SessionAuthorityProfileObserved,
     /// Shutdown event.
     Shutdown,
 }
@@ -196,6 +213,7 @@ impl RuntimeEventKind {
             Self::ToolResponded => "tool_responded",
             Self::ToolDenied => "tool_denied",
             Self::FinalResponse => "final_response",
+            Self::CompletionCandidateRequested => "completion_candidate_requested",
             Self::Stopped => "stopped",
             Self::MaxTurnsExceeded => "max_turns_exceeded",
             Self::AdapterOutcomeClassified => "adapter_outcome_classified",
@@ -208,6 +226,10 @@ impl RuntimeEventKind {
             Self::SandboxEscalation => "sandbox_escalation",
             Self::Cancelled => "cancelled",
             Self::CompactionRequested => "compaction_requested",
+            Self::SessionStateChanged => "session_state_changed",
+            Self::SessionCommitObserved => "session_commit_observed",
+            Self::SessionRecoveryObserved => "session_recovery_observed",
+            Self::SessionAuthorityProfileObserved => "session_authority_profile_observed",
             Self::Shutdown => "shutdown",
         }
     }

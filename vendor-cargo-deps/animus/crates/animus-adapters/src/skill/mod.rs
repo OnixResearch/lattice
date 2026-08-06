@@ -12,27 +12,32 @@ mod resource;
 mod tests;
 mod validation;
 
-pub use disclosure::{BodyDraft, Context, LoadedBody, Request, build_context};
-pub use manifest::{Descriptor, Draft, Error, TrustStatus};
-pub use resource::{Catalog, Diagnostic, Issue, Summary, advertise};
+pub use disclosure::BodyDraft;
+pub use disclosure::Context;
+pub use disclosure::LoadedBody;
+pub use disclosure::Request;
+pub use disclosure::build_context;
+pub use manifest::Descriptor;
+pub use manifest::Draft;
+pub use manifest::Error;
+pub use manifest::TrustStatus;
+pub use resource::Catalog;
+pub use resource::Diagnostic;
+pub use resource::Issue;
+pub use resource::Summary;
+pub use resource::advertise;
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
 const NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_name");
-const DESCRIPTION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_description");
-const VERSION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_version");
-const CATEGORY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_category");
+const DESCRIPTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_description");
+const VERSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_version");
+const CATEGORY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_category");
 const TAG_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_tag");
-const RELATED_SKILL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("related_skill");
-const PROVENANCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_provenance");
-const TRUST_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("skill_trust_status");
+const RELATED_SKILL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("related_skill");
+const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_provenance");
+const TRUST_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_trust_status");
 const CONTENT_IDENTITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("skill_content_identity");
 const BODY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("skill_body");

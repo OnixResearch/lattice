@@ -1,9 +1,10 @@
-use super::super::*;
-use super::support::{ALTERNATE_HASH, HASH_HEX_LENGTH};
 use serde::Deserialize;
 
-const GENERATED_JSON: &str =
-    include_str!("../../../../../config/generated/model-runtime-profiles.json");
+use super::super::*;
+use super::support::ALTERNATE_HASH;
+use super::support::HASH_HEX_LENGTH;
+
+const GENERATED_JSON: &str = include_str!("../../../../../config/generated/model-runtime-profiles.json");
 
 #[derive(Clone, Debug, Deserialize)]
 struct GeneratedSet {
@@ -81,22 +82,15 @@ struct GeneratedNamedReference {
 #[test]
 fn generated_profile_export_matches_validated_runtime_dto_meaning() {
     // r[verify agent_harness_runtime.model_runtime_profiles.contract.nickel]
-    let generated: GeneratedSet =
-        serde_json::from_str(GENERATED_JSON).expect("generated profile JSON");
+    let generated: GeneratedSet = serde_json::from_str(GENERATED_JSON).expect("generated profile JSON");
     let validated = validate_generated(&generated).expect("generated profile set validates");
 
     assert_eq!(validated.profiles().len(), generated.profiles.len());
-    assert_eq!(
-        validated.explicit_default_profile_id(),
-        Some(generated.explicit_default_profile_id.as_str())
-    );
+    assert_eq!(validated.explicit_default_profile_id(), Some(generated.explicit_default_profile_id.as_str()));
     for (profile, row) in validated.profiles().iter().zip(generated.profiles.iter()) {
         assert_eq!(profile.profile_id(), row.profile_id);
         assert_eq!(profile.profile_hash(), row.profile_hash);
-        assert_eq!(
-            profile.memory_access_mode().as_str(),
-            row.memory_access_mode
-        );
+        assert_eq!(profile.memory_access_mode().as_str(), row.memory_access_mode);
         assert_eq!(profile.memory_policy_hash(), row.memory_policy_hash);
         assert_eq!(profile.profile_hash().len(), HASH_HEX_LENGTH);
     }
@@ -104,20 +98,14 @@ fn generated_profile_export_matches_validated_runtime_dto_meaning() {
 
 #[test]
 fn drifted_generated_profile_identity_fails_closed() {
-    let mut generated: GeneratedSet =
-        serde_json::from_str(GENERATED_JSON).expect("generated profile JSON");
+    let mut generated: GeneratedSet = serde_json::from_str(GENERATED_JSON).expect("generated profile JSON");
     generated.profiles[0].profile_hash = ALTERNATE_HASH.to_string();
 
     let error = validate_generated(&generated).expect_err("drifted generated profile hash");
-    assert_eq!(
-        error.issue(),
-        ModelRuntimeProfileIssue::StaleProfileIdentity
-    );
+    assert_eq!(error.issue(), ModelRuntimeProfileIssue::StaleProfileIdentity);
 }
 
-fn validate_generated(
-    generated: &GeneratedSet,
-) -> Result<ModelRuntimeProfileSet, ModelRuntimeProfileError> {
+fn validate_generated(generated: &GeneratedSet) -> Result<ModelRuntimeProfileSet, ModelRuntimeProfileError> {
     let budgets: Vec<ModelRuntimeBudgetPolicyDraft<'_>> = generated
         .budget_policies
         .iter()
@@ -151,15 +139,12 @@ fn validate_generated(
         .iter()
         .enumerate()
         .map(|(index, profile)| {
-            generated_profile_draft(
-                profile,
-                GeneratedProfileResources {
-                    prompt_sources: prompt_refs[index].as_slice(),
-                    skills: skill_refs[index].as_slice(),
-                    tools: tool_refs[index].as_slice(),
-                    toolsets: toolset_refs[index].as_slice(),
-                },
-            )
+            generated_profile_draft(profile, GeneratedProfileResources {
+                prompt_sources: prompt_refs[index].as_slice(),
+                skills: skill_refs[index].as_slice(),
+                tools: tool_refs[index].as_slice(),
+                toolsets: toolset_refs[index].as_slice(),
+            })
         })
         .collect();
     ModelRuntimeProfileSet::validate(&ModelRuntimeProfileSetDraft {
@@ -172,9 +157,7 @@ fn validate_generated(
     })
 }
 
-fn generated_prompt_refs(
-    generated: &GeneratedSet,
-) -> Vec<Vec<ModelPromptSourceReferenceDraft<'_>>> {
+fn generated_prompt_refs(generated: &GeneratedSet) -> Vec<Vec<ModelPromptSourceReferenceDraft<'_>>> {
     generated
         .profiles
         .iter()

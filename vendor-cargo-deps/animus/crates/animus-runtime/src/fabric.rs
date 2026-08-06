@@ -8,23 +8,16 @@ pub trait LoopFabric {
     /// # Errors
     ///
     /// Returns [`Self::Error`] when the fabric cannot produce a valid decision.
-    fn decide(
-        &mut self,
-        turn: &crate::RuntimeLoopTurn,
-    ) -> Result<crate::RuntimeLoopDecision, Self::Error>;
+    fn decide(&mut self, turn: &crate::RuntimeLoopTurn) -> Result<crate::RuntimeLoopDecision, Self::Error>;
 }
 
 #[cfg(feature = "steel")]
 impl LoopFabric for animus_steel::SteelLoopFabric {
     type Error = animus_steel::LoopError;
 
-    fn decide(
-        &mut self,
-        turn: &crate::RuntimeLoopTurn,
-    ) -> Result<crate::RuntimeLoopDecision, Self::Error> {
+    fn decide(&mut self, turn: &crate::RuntimeLoopTurn) -> Result<crate::RuntimeLoopDecision, Self::Error> {
         let steel_turn = animus_steel::LoopTurn::try_from(turn)?;
-        animus_steel::SteelLoopFabric::decide(self, &steel_turn)
-            .map(crate::RuntimeLoopDecision::from)
+        animus_steel::SteelLoopFabric::decide(self, &steel_turn).map(crate::RuntimeLoopDecision::from)
     }
 }
 
@@ -70,25 +63,15 @@ mod tests {
 
     impl FakeLoop {
         fn new(decisions: Vec<Result<crate::RuntimeLoopDecision, DecisionFailure>>) -> Self {
-            Self {
-                decisions,
-                index: 0,
-            }
+            Self { decisions, index: 0 }
         }
     }
 
     impl LoopFabric for FakeLoop {
         type Error = DecisionFailure;
 
-        fn decide(
-            &mut self,
-            _turn: &crate::RuntimeLoopTurn,
-        ) -> Result<crate::RuntimeLoopDecision, Self::Error> {
-            let decision = self
-                .decisions
-                .get(self.index)
-                .cloned()
-                .unwrap_or(Err(DecisionFailure));
+        fn decide(&mut self, _turn: &crate::RuntimeLoopTurn) -> Result<crate::RuntimeLoopDecision, Self::Error> {
+            let decision = self.decisions.get(self.index).cloned().unwrap_or(Err(DecisionFailure));
             self.index = self.index.saturating_add(ONE_ADAPTER_CALL);
             decision
         }
@@ -115,12 +98,7 @@ mod tests {
         }
     }
 
-    impl
-        animus_adapters::ComponentAdapter<
-            animus_adapters::ModelRequest,
-            animus_adapters::ModelResponse,
-        > for ModelStub
-    {
+    impl animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse> for ModelStub {
         type Error = AdapterFailure;
 
         fn call(
@@ -145,12 +123,7 @@ mod tests {
         }
     }
 
-    impl
-        animus_adapters::ComponentAdapter<
-            animus_adapters::ToolRequest,
-            animus_adapters::ToolResponse,
-        > for ToolStub
-    {
+    impl animus_adapters::ComponentAdapter<animus_adapters::ToolRequest, animus_adapters::ToolResponse> for ToolStub {
         type Error = AdapterFailure;
 
         fn call(
@@ -160,10 +133,7 @@ mod tests {
             assert_eq!(request.name(), TOOL_NAME);
             assert_eq!(request.schema_identity(), TOOL_SCHEMA);
             assert_eq!(request.arguments()[NO_ADAPTER_CALLS].name(), TOOL_INPUT);
-            assert_eq!(
-                request.arguments()[NO_ADAPTER_CALLS].value(),
-                TOOL_ARGUMENT_VALUE
-            );
+            assert_eq!(request.arguments()[NO_ADAPTER_CALLS].value(), TOOL_ARGUMENT_VALUE);
             self.calls = self.calls.saturating_add(ONE_ADAPTER_CALL);
             Ok(tool_response())
         }
@@ -188,15 +158,9 @@ mod tests {
     fn non_steel_loop_dispatches_model_and_tool_paths() {
         let mut model = ModelStub::new();
         let mut tool = ToolStub::new();
-        let mut model_fabric = FakeLoop::new(vec![
-            Ok(model_decision()),
-            Ok(response_decision(MODEL_MESSAGE)),
-        ]);
+        let mut model_fabric = FakeLoop::new(vec![Ok(model_decision()), Ok(response_decision(MODEL_MESSAGE))]);
         let model_result = run_fake(&mut model_fabric, &mut model, &mut tool);
-        let mut tool_fabric = FakeLoop::new(vec![
-            Ok(tool_decision()),
-            Ok(response_decision(TOOL_OUTPUT)),
-        ]);
+        let mut tool_fabric = FakeLoop::new(vec![Ok(tool_decision()), Ok(response_decision(TOOL_OUTPUT))]);
         let tool_result = run_fake(&mut tool_fabric, &mut model, &mut tool);
 
         assert!(matches!(
@@ -241,17 +205,8 @@ mod tests {
         assert_eq!(tool.calls, NO_ADAPTER_CALLS);
     }
 
-    fn run_fake(
-        fabric: &mut FakeLoop,
-        model: &mut ModelStub,
-        tool: &mut ToolStub,
-    ) -> crate::RunReport {
-        crate::run_agent_loop(
-            &runtime_input(),
-            runtime_config(),
-            fabric,
-            runtime_adapters(Some(model), Some(tool)),
-        )
+    fn run_fake(fabric: &mut FakeLoop, model: &mut ModelStub, tool: &mut ToolStub) -> crate::RunReport {
+        crate::run_agent_loop(&runtime_input(), runtime_config(), fabric, runtime_adapters(Some(model), Some(tool)))
     }
 
     fn runtime_input() -> crate::RuntimeInput {
@@ -259,8 +214,7 @@ mod tests {
     }
 
     fn runtime_config() -> crate::RuntimeConfig {
-        crate::RuntimeConfig::from_max_turn_count(FOLLOWUP_TURN_BUDGET)
-            .expect("turn budget should validate")
+        crate::RuntimeConfig::from_max_turn_count(FOLLOWUP_TURN_BUDGET).expect("turn budget should validate")
     }
 
     fn model_decision() -> crate::RuntimeLoopDecision {
@@ -279,30 +233,28 @@ mod tests {
             name: Some(TOOL_INPUT),
             value: Some(TOOL_ARGUMENT_VALUE),
         }];
-        let arguments = animus_adapters::tool::PreparedArguments::prepare(
-            &animus_adapters::tool::ArgumentPreparationRequest {
+        let arguments =
+            animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
                 current_schema_identity: TOOL_SCHEMA,
                 allowed_field_names: &[TOOL_INPUT],
                 compatibility_rules: &[],
                 fields: &fields,
-            },
-        )
-        .expect("arguments should validate");
+            })
+            .expect("arguments should validate");
         assert_eq!(arguments.schema_identity(), TOOL_SCHEMA);
         assert_eq!(arguments.fields().len(), TOOL_ARGUMENT_COUNT);
-        let request =
-            animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
-                name: Some(TOOL_NAME),
-                arguments: Some(&arguments),
-                correlation_id: Some(TOOL_CALL_ID),
-                output_policy: animus_adapters::tool::OutputPolicy {
-                    visible_char_budget: TOOL_VISIBLE_BUDGET,
-                },
-                mutation_targets: &[TOOL_MUTATION_TARGET],
-                required_capability_labels: &[TOOL_CAPABILITY],
-                approval_posture: animus_adapters::tool::ApprovalPosture::PreApproved.as_str(),
-            })
-            .expect("tool request should validate");
+        let request = animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
+            name: Some(TOOL_NAME),
+            arguments: Some(&arguments),
+            correlation_id: Some(TOOL_CALL_ID),
+            output_policy: animus_adapters::tool::OutputPolicy {
+                visible_char_budget: TOOL_VISIBLE_BUDGET,
+            },
+            mutation_targets: &[TOOL_MUTATION_TARGET],
+            required_capability_labels: &[TOOL_CAPABILITY],
+            approval_posture: animus_adapters::tool::ApprovalPosture::PreApproved.as_str(),
+        })
+        .expect("tool request should validate");
         assert_eq!(request.name(), TOOL_NAME);
         assert_eq!(request.correlation_id(), TOOL_CALL_ID);
         request
@@ -320,10 +272,7 @@ mod tests {
             },
         )
         .expect("output should bound");
-        animus_adapters::ToolResponse::from_bounded(
-            bounded,
-            animus_adapters::tool::OutputRedactionClass::Safe,
-        )
+        animus_adapters::ToolResponse::from_bounded(bounded, animus_adapters::tool::OutputRedactionClass::Safe)
     }
 
     fn runtime_adapters<'a>(

@@ -24,7 +24,7 @@
 //!     DockIntent::new(
 //!         DockRenderer::Tui,
 //!         DockOperation::SplitFocused {
-//!             panel: "sidebar".to_string(),
+//!             panel: ratcore::docking::PanelId::new("sidebar"),
 //!             axis: DockAxis::Horizontal,
 //!             ratio: SplitRatio::new(SIDEBAR_RATIO_NUMERATOR, SIDEBAR_RATIO_DENOMINATOR).unwrap(),
 //!         },
@@ -43,13 +43,19 @@ const DEFAULT_FLOAT_HEIGHT: u16 = 12;
 const DEFAULT_MIN_WIDTH: u16 = 1;
 const DEFAULT_MIN_HEIGHT: u16 = 1;
 
+mod identity;
+mod proportion;
 mod state;
 mod tree;
-pub use state::{DockLayout, DockLayoutSnapshot, FloatingPanel};
+pub use identity::DockInsertionIndex;
+pub use identity::DockNodeId;
+pub use identity::LegacyZoneName;
+pub use identity::PanelId;
+pub use proportion::SplitRatio;
+pub use state::DockLayout;
+pub use state::DockLayoutSnapshot;
+pub use state::FloatingPanel;
 pub use tree::DockNode;
-
-/// Stable panel identifier.
-pub type PanelId = String;
 
 /// Split axis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,48 +64,6 @@ pub enum DockAxis {
     Horizontal,
     /// Vertical split creates top/bottom children.
     Vertical,
-}
-
-/// Integer split ratio.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SplitRatio {
-    /// First-child numerator.
-    pub numerator: u16,
-    /// Ratio denominator.
-    pub denominator: u16,
-}
-
-impl SplitRatio {
-    /// Creates a validated split ratio.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`DockingError::InvalidRatio`] when denominator is zero or the
-    /// numerator would collapse either side of the split.
-    pub fn new(numerator: u16, denominator: u16) -> Result<Self, DockingError> {
-        if denominator == 0 || numerator == 0 || numerator >= denominator {
-            return Err(DockingError::InvalidRatio);
-        }
-        Ok(Self {
-            numerator,
-            denominator,
-        })
-    }
-
-    fn first_len(self, total: u16) -> u16 {
-        let numerator = u32::from(self.numerator);
-        let denominator = u32::from(self.denominator);
-        let total_len = u32::from(total);
-        let scaled_len = total_len.saturating_mul(numerator);
-        let Some(first_len) = scaled_len.checked_div(denominator) else {
-            return 0;
-        };
-        let capped_len = first_len.min(total_len);
-        let Ok(value) = u16::try_from(capped_len) else {
-            return total;
-        };
-        value
-    }
 }
 
 /// Minimum geometry constraints for a panel.
@@ -115,10 +79,7 @@ impl PanelConstraints {
     /// Creates constraints.
     #[must_use]
     pub fn new(min_width: u16, min_height: u16) -> Self {
-        Self {
-            min_width,
-            min_height,
-        }
+        Self { min_width, min_height }
     }
 }
 
@@ -145,12 +106,7 @@ impl DockRect {
     /// Creates a rectangle.
     #[must_use]
     pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
+        Self { x, y, width, height }
     }
 }
 
@@ -201,10 +157,7 @@ impl DockIntent {
     /// Creates an intent.
     #[must_use]
     pub fn new(renderer: DockRenderer, operation: DockOperation) -> Self {
-        Self {
-            renderer,
-            operation,
-        }
+        Self { renderer, operation }
     }
 }
 
@@ -217,9 +170,7 @@ impl DockIntent {
 pub fn apply_intent(layout: DockLayout, intent: DockIntent) -> Result<DockLayout, DockingError> {
     match intent.operation {
         DockOperation::Focus(panel) => layout.focus_panel(&panel),
-        DockOperation::SplitFocused { panel, axis, ratio } => {
-            layout.split_focused(panel, axis, ratio)
-        }
+        DockOperation::SplitFocused { panel, axis, ratio } => layout.split_focused(panel, axis, ratio),
         DockOperation::TabFocused { panel } => layout.tab_focused(panel),
         DockOperation::Float(floating) => layout.float_panel(floating),
         DockOperation::ResizeRoot(ratio) => layout.resize_root_split(ratio),
@@ -245,6 +196,8 @@ pub enum DockingError {
     InvalidTabs(PanelId),
     /// Panel constraints conflict with valid layout geometry.
     ConflictingConstraints(PanelId),
+    /// Public or persisted insertion position cannot fit the host index type.
+    InvalidInsertionIndex(u128),
 }
 
 #[cfg(test)]

@@ -5,10 +5,7 @@ fn allowed_model_path_matches() {
     let request = capability_request!(GuardedAction::Model, MODEL_RESOURCE, MODEL_ABILITY);
     let contract = policy_contract!(GuardedAction::Model, MODEL_PREFIX, MODEL_ABILITY);
     let grant = ucan_grant!(MODEL_PREFIX, MODEL_ABILITY);
-    let caveats = [LocalCaveat::new(
-        LocalPolicyLayer::Project,
-        LocalCaveatDecision::Allow,
-    )];
+    let caveats = [LocalCaveat::new(LocalPolicyLayer::Project, LocalCaveatDecision::Allow)];
     let context = AuthorizationContext {
         request: &request,
         contract: &contract,
@@ -61,10 +58,7 @@ fn local_denial_counterexample_matches() {
     let request = capability_request!(GuardedAction::Tool, TOOL_RESOURCE, TOOL_ABILITY);
     let contract = policy_contract!(GuardedAction::Tool, TOOL_PREFIX, TOOL_ABILITY);
     let grant = ucan_grant!(TOOL_PREFIX, TOOL_ABILITY);
-    let caveats = [LocalCaveat::new(
-        LocalPolicyLayer::Harness,
-        LocalCaveatDecision::Deny,
-    )];
+    let caveats = [LocalCaveat::new(LocalPolicyLayer::Harness, LocalCaveatDecision::Deny)];
     let context = AuthorizationContext {
         request: &request,
         contract: &contract,

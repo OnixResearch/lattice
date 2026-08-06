@@ -5,7 +5,8 @@ mod engine;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-pub use engine::{materialize_execution_plan, materialize_execution_plan_with_rotation};
+pub use engine::materialize_execution_plan;
+pub use engine::materialize_execution_plan_with_rotation;
 
 /// Materialized router execution plan.
 #[derive(Clone, Debug, Eq, PartialEq)]

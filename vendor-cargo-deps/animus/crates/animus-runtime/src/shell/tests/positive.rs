@@ -2,11 +2,8 @@
 fn steel_runtime_returns_immediate_final_response() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
-    let result = super::support::run_program_with_initial_turn_budget(
-        super::support::RESPOND_PROGRAM,
-        &mut model,
-        &mut tool,
-    );
+    let result =
+        super::support::run_program_with_initial_turn_budget(super::support::RESPOND_PROGRAM, &mut model, &mut tool);
 
     assert!(matches!(
         result.status(),
@@ -20,11 +17,8 @@ fn steel_runtime_returns_immediate_final_response() {
 fn steel_runtime_stops_without_response() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
-    let result = super::support::run_program_with_initial_turn_budget(
-        super::support::STOP_PROGRAM,
-        &mut model,
-        &mut tool,
-    );
+    let result =
+        super::support::run_program_with_initial_turn_budget(super::support::STOP_PROGRAM, &mut model, &mut tool);
 
     assert_eq!(result.status(), &crate::RuntimeStatus::Stopped);
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
@@ -63,10 +57,15 @@ fn steel_policy_runtime_allows_matching_profile_before_dispatch() {
         &mut tool,
     );
 
-    assert!(matches!(
-        result.status(),
-        crate::RuntimeStatus::FinalResponse { response } if response.message() == super::support::MODEL_MESSAGE
-    ));
+    assert!(
+        matches!(
+            result.status(),
+            crate::RuntimeStatus::FinalResponse { response }
+                if response.message() == super::support::MODEL_MESSAGE
+        ),
+        "unexpected policy runtime status: {:?}",
+        result.status()
+    );
     assert_eq!(model.calls, super::support::EXPECTED_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
 }

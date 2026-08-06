@@ -6,16 +6,22 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::assignment::{
-    AgentRoleAssignment, AgentRoleCapabilityResolution, AgentRolePlan,
-    RoleAuthorizationExpectation, role_authorization_is_exact,
-};
+use super::assignment::AgentRoleAssignment;
+use super::assignment::AgentRoleCapabilityResolution;
+use super::assignment::AgentRolePlan;
+use super::assignment::RoleAuthorizationExpectation;
+use super::assignment::role_authorization_is_exact;
 use super::separation::AgentRoleSeparationDecision;
-use super::types::{
-    AGENT_ROLE_OUTPUT_HASH_DOMAIN, AgentRoleClass, AgentRoleError, AgentRoleIssue,
-    AgentRoleOutputKind, AgentRoleProfile,
-};
-use super::validation::{ValidationValue, error, hash_parts, lowercase_blake3};
+use super::types::AGENT_ROLE_OUTPUT_HASH_DOMAIN;
+use super::types::AgentRoleClass;
+use super::types::AgentRoleError;
+use super::types::AgentRoleIssue;
+use super::types::AgentRoleOutputKind;
+use super::types::AgentRoleProfile;
+use super::validation::ValidationValue;
+use super::validation::error;
+use super::validation::hash_parts;
+use super::validation::lowercase_blake3;
 
 /// Scoped implementation-candidate emission ability.
 pub const AGENT_ROLE_EMIT_CANDIDATE_ABILITY: &str = "emit_candidate";
@@ -35,8 +41,7 @@ pub const AGENT_ROLE_EMIT_COORDINATION_ABILITY: &str = "emit_coordination";
 pub const AGENT_ROLE_EMIT_OBSERVATION_ABILITY: &str = "emit_observation";
 
 const FIELD_OUTPUT: &str = "agent_role_output";
-const AGENT_ROLE_OUTPUT_AUTHORIZATION_HASH_DOMAIN: &str =
-    "animus.agent-role-output-authorization.v1";
+const AGENT_ROLE_OUTPUT_AUTHORIZATION_HASH_DOMAIN: &str = "animus.agent-role-output-authorization.v1";
 const REDACTION_MARKER: &str = "raw-role-output-omitted";
 
 /// Role output status, including explicit non-success paths.
@@ -269,40 +274,30 @@ pub struct AgentRoleOutputResourceInput<'a> {
 ///
 /// Returns [`AgentRoleError`] for malformed evidence identities or cross-plan,
 /// cross-assignment, cross-subject, or failed-separation inputs.
-pub fn agent_role_output_resource(
-    input: AgentRoleOutputResourceInput<'_>,
-) -> Result<String, AgentRoleError> {
+pub fn agent_role_output_resource(input: AgentRoleOutputResourceInput<'_>) -> Result<String, AgentRoleError> {
     validate_output_resource_input(&input)?;
-    let binding_hash = hash_parts(
-        AGENT_ROLE_OUTPUT_AUTHORIZATION_HASH_DOMAIN,
-        &[
-            input.assignment.assignment_hash().to_string(),
-            input.assignment.subject_hash().to_string(),
-            input.profile.profile_hash().to_string(),
-            input.role_plan.plan_hash().to_string(),
-            input.assignment.model_plan_hash().to_string(),
-            input.capability_resolution.decision_hash().to_string(),
-            input.assignment.policy_hash().to_string(),
-            input.separation.decision_hash().to_string(),
-            input.assignment.output_contract_hash().to_string(),
-            input.status.as_str().to_string(),
-            input.effect.as_str().to_string(),
-            input.evidence_hash.to_string(),
-            input.verifier_hash.unwrap_or("none").to_string(),
-            input.rubric_hash.unwrap_or("none").to_string(),
-            input.admission.deterministic_policy.as_str().to_string(),
-            input.admission.host_evidence.as_str().to_string(),
-            input.admission.verifier.as_str().to_string(),
-            input.admission.rubric.as_str().to_string(),
-        ],
-    );
+    let binding_hash = hash_parts(AGENT_ROLE_OUTPUT_AUTHORIZATION_HASH_DOMAIN, &[
+        input.assignment.assignment_hash().to_string(),
+        input.assignment.subject_hash().to_string(),
+        input.profile.profile_hash().to_string(),
+        input.role_plan.plan_hash().to_string(),
+        input.assignment.model_plan_hash().to_string(),
+        input.capability_resolution.decision_hash().to_string(),
+        input.assignment.policy_hash().to_string(),
+        input.separation.decision_hash().to_string(),
+        input.assignment.output_contract_hash().to_string(),
+        input.status.as_str().to_string(),
+        input.effect.as_str().to_string(),
+        input.evidence_hash.to_string(),
+        input.verifier_hash.unwrap_or("none").to_string(),
+        input.rubric_hash.unwrap_or("none").to_string(),
+        input.admission.deterministic_policy.as_str().to_string(),
+        input.admission.host_evidence.as_str().to_string(),
+        input.admission.verifier.as_str().to_string(),
+        input.admission.rubric.as_str().to_string(),
+    ]);
     debug_assert!(!binding_hash.is_empty());
-    Ok(format!(
-        "role:{}:{}:{}",
-        input.profile.role_id(),
-        input.assignment.subject_hash(),
-        binding_hash
-    ))
+    Ok(format!("role:{}:{}:{}", input.profile.role_id(), input.assignment.subject_hash(), binding_hash))
 }
 
 /// Explicit role output admission input.
@@ -414,36 +409,31 @@ impl AgentRoleOutput {
 /// missing output authority, deterministic-denial override, mutation, overclaim,
 /// or forbidden raw material.
 // r[impl agent_harness_runtime.agent_role_profiles.outputs]
-pub fn admit_agent_role_output(
-    draft: AgentRoleOutputDraft<'_>,
-) -> Result<AgentRoleOutput, AgentRoleError> {
+pub fn admit_agent_role_output(draft: AgentRoleOutputDraft<'_>) -> Result<AgentRoleOutput, AgentRoleError> {
     validate_output_bindings(&draft)?;
     validate_output_class(&draft)?;
     validate_output_claims(&draft)?;
     validate_output_sensitive(draft.sensitive)?;
     validate_output_authority(&draft)?;
-    let output_hash = hash_parts(
-        AGENT_ROLE_OUTPUT_HASH_DOMAIN,
-        &[
-            draft.assignment.assignment_hash().to_string(),
-            draft.assignment.subject_hash().to_string(),
-            draft.profile.profile_hash().to_string(),
-            draft.role_plan.plan_hash().to_string(),
-            draft.assignment.model_plan_hash().to_string(),
-            draft.capability_resolution.decision_hash().to_string(),
-            draft.assignment.policy_hash().to_string(),
-            draft.separation.decision_hash().to_string(),
-            draft.assignment.output_contract_hash().to_string(),
-            draft.profile.output_kind().as_str().to_string(),
-            draft.status.as_str().to_string(),
-            draft.effect.as_str().to_string(),
-            draft.evidence_hash.to_string(),
-            draft.verifier_hash.unwrap_or("none").to_string(),
-            draft.rubric_hash.unwrap_or("none").to_string(),
-            REDACTION_MARKER.to_string(),
-            draft.output_receipt.receipt_hash().to_string(),
-        ],
-    );
+    let output_hash = hash_parts(AGENT_ROLE_OUTPUT_HASH_DOMAIN, &[
+        draft.assignment.assignment_hash().to_string(),
+        draft.assignment.subject_hash().to_string(),
+        draft.profile.profile_hash().to_string(),
+        draft.role_plan.plan_hash().to_string(),
+        draft.assignment.model_plan_hash().to_string(),
+        draft.capability_resolution.decision_hash().to_string(),
+        draft.assignment.policy_hash().to_string(),
+        draft.separation.decision_hash().to_string(),
+        draft.assignment.output_contract_hash().to_string(),
+        draft.profile.output_kind().as_str().to_string(),
+        draft.status.as_str().to_string(),
+        draft.effect.as_str().to_string(),
+        draft.evidence_hash.to_string(),
+        draft.verifier_hash.unwrap_or("none").to_string(),
+        draft.rubric_hash.unwrap_or("none").to_string(),
+        REDACTION_MARKER.to_string(),
+        draft.output_receipt.receipt_hash().to_string(),
+    ]);
     debug_assert!(!output_hash.is_empty());
     debug_assert!(draft.claims.is_empty());
     Ok(AgentRoleOutput {
@@ -487,17 +477,12 @@ fn output_resource_input<'a>(draft: &AgentRoleOutputDraft<'a>) -> AgentRoleOutpu
     }
 }
 
-fn validate_output_resource_input(
-    input: &AgentRoleOutputResourceInput<'_>,
-) -> Result<(), AgentRoleError> {
+fn validate_output_resource_input(input: &AgentRoleOutputResourceInput<'_>) -> Result<(), AgentRoleError> {
     lowercase_blake3(ValidationValue {
         field: "evidence_hash",
         value: input.evidence_hash,
     })?;
-    for hash in [input.verifier_hash, input.rubric_hash]
-        .into_iter()
-        .flatten()
-    {
+    for hash in [input.verifier_hash, input.rubric_hash].into_iter().flatten() {
         lowercase_blake3(ValidationValue {
             field: FIELD_OUTPUT,
             value: hash,
@@ -531,10 +516,9 @@ fn validate_output_class(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentRo
                 | AgentRoleOutputEffect::Tighten
                 | AgentRoleOutputEffect::Abstain
         ),
-        AgentRoleClass::Verification => matches!(
-            draft.effect,
-            AgentRoleOutputEffect::CheckEvidence | AgentRoleOutputEffect::Abstain
-        ),
+        AgentRoleClass::Verification => {
+            matches!(draft.effect, AgentRoleOutputEffect::CheckEvidence | AgentRoleOutputEffect::Abstain)
+        }
         AgentRoleClass::Judgment => matches!(
             draft.effect,
             AgentRoleOutputEffect::Rank
@@ -544,10 +528,9 @@ fn validate_output_class(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentRo
                 | AgentRoleOutputEffect::Abstain
         ),
         AgentRoleClass::Coordination => draft.effect == AgentRoleOutputEffect::Coordinate,
-        AgentRoleClass::Observation => matches!(
-            draft.effect,
-            AgentRoleOutputEffect::Observe | AgentRoleOutputEffect::Abstain
-        ),
+        AgentRoleClass::Observation => {
+            matches!(draft.effect, AgentRoleOutputEffect::Observe | AgentRoleOutputEffect::Abstain)
+        }
     };
     if !is_effect_allowed {
         return Err(error(
@@ -556,8 +539,8 @@ fn validate_output_class(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentRo
             "role output effect contradicts its semantic class",
         ));
     }
-    let is_check_evidence = draft.profile.class() == AgentRoleClass::Verification
-        && draft.effect == AgentRoleOutputEffect::CheckEvidence;
+    let is_check_evidence =
+        draft.profile.class() == AgentRoleClass::Verification && draft.effect == AgentRoleOutputEffect::CheckEvidence;
     if is_check_evidence
         && (draft.verifier_hash.is_none()
             || !draft.admission.host_evidence.is_admitted()
@@ -569,8 +552,8 @@ fn validate_output_class(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentRo
             "verification evidence requires an admitted named verifier and independently supplied host evidence",
         ));
     }
-    let is_judgment = draft.profile.class() == AgentRoleClass::Judgment
-        && draft.effect != AgentRoleOutputEffect::Abstain;
+    let is_judgment =
+        draft.profile.class() == AgentRoleClass::Judgment && draft.effect != AgentRoleOutputEffect::Abstain;
     if is_judgment && (draft.rubric_hash.is_none() || !draft.admission.rubric.is_admitted()) {
         return Err(error(
             AgentRoleIssue::MissingReference,
@@ -592,10 +575,7 @@ fn validate_output_claims(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentR
         ));
     }
     if draft.admission.deterministic_policy == AgentRoleDeterministicPolicyState::Denied
-        && matches!(
-            draft.effect,
-            AgentRoleOutputEffect::Select | AgentRoleOutputEffect::Rank
-        )
+        && matches!(draft.effect, AgentRoleOutputEffect::Select | AgentRoleOutputEffect::Rank)
     {
         return Err(error(
             AgentRoleIssue::OutputDenied,
@@ -631,14 +611,10 @@ fn validate_output_sensitive(sensitive: &[AgentRoleOutputLeak<'_>]) -> Result<()
 fn validate_output_authority(draft: &AgentRoleOutputDraft<'_>) -> Result<(), AgentRoleError> {
     let expected_resource = agent_role_output_resource(output_resource_input(draft))?;
     let expected_ability = output_ability(draft.profile.class(), draft.effect);
-    if !role_authorization_is_exact(
-        draft.output_request,
-        draft.output_receipt,
-        RoleAuthorizationExpectation {
-            resource: expected_resource.as_str(),
-            ability: expected_ability,
-        },
-    ) {
+    if !role_authorization_is_exact(draft.output_request, draft.output_receipt, RoleAuthorizationExpectation {
+        resource: expected_resource.as_str(),
+        ability: expected_ability,
+    }) {
         return Err(error(
             AgentRoleIssue::AuthorityDenied,
             FIELD_OUTPUT,

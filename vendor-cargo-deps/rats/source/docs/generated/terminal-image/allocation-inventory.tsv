@@ -1,0 +1,18 @@
+coordinate	current_checked_bound	allocation_or_effect_timing	owner	rejection_or_outcome
+encoded-input	8MiB default;32MiB hard	borrowed before allocation	caller owns bytes;rat-image admits	EmptyInput or OversizedInput
+format-signature	allowlisted PNG JPEG GIF WebP	before protocol encoding/full decode	rat-image plus image metadata parser	UnsupportedFormat
+source-dimensions	8192 each and 16777216 pixels default	metadata inspection before full decode	rat-image policy	SourceDimensionsExceeded
+image-decoder	128MiB default max_alloc plus strict dimensions	Sixel only after admission	image decoder under rat-image limits	DecodeFailed or DecodedBudgetExceeded
+resize-RGBA-index-histogram	source*16 plus target*(4+Option<usize>) plus fixed 32768-bin histogram within decoded budget	after bounded decode before palette	rat-image	DecodedBudgetExceeded
+terminal-cells	256x128 and 32768 cells default	request admission	rat-image from caller intent	InvalidRequest with coordinate
+sixel-pixel-target	cells times 8x16 within checked decoded reserve	before resize allocation	rat-image	DecodedBudgetExceeded
+palette	255 default/hard	from bounded resized RGBA	rat-image	InvalidLimits or OutputBudgetExceeded
+palette-index-work	250000000 units default	preflighted before index/payload construction	rat-image	OutputBudgetExceeded WorkUnits
+base64	checked 4*ceil(encoded/3)	before base64 allocation	rat-image	OutputBudgetExceeded
+kitty-chunks	8192 default;32768 hard	before encoded allocation/write	rat-image	OutputBudgetExceeded Chunks
+protocol-framing	32MiB default;128MiB hard	bounded staging only	rat-image	OutputBudgetExceeded PreparedBytes
+placeholder	content-free bounded byte-count label	explicit None protocol only	rat-image	OutputBudgetExceeded
+row-estimate	validated terminal/Sixel target dimensions	prepared metadata	rat-image	accepted rows
+protocol-writer	complete admitted prepared bytes only	after all validation/decode/preparation	caller-supplied writer	complete or WriterFailed with exact bytes_written
+writer-capability	caller-supplied Available Unsupported or Denied fact	before supplied-writer invocation	application terminal adapter	Ready WriterUnsupported or WriterDenied
+capture-ingress-worker-policy	not owned	outside library	downstream application	application policy outcome

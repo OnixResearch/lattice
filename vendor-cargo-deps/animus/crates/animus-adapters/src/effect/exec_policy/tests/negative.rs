@@ -74,18 +74,12 @@ fn unsupported_decision_and_missing_fields_are_rejected() {
     })
     .expect_err("missing id should fail");
 
-    assert_eq!(
-        bad_decision_error,
-        Error::UnsupportedDecision {
-            value: Text::from("maybe"),
-        }
-    );
-    assert_eq!(
-        missing,
-        Error::MissingField {
-            field: RULE_ID_FIELD.as_str(),
-        }
-    );
+    assert_eq!(bad_decision_error, Error::UnsupportedDecision {
+        value: Text::from("maybe"),
+    });
+    assert_eq!(missing, Error::MissingField {
+        field: RULE_ID_FIELD.as_str(),
+    });
 }
 
 #[test]
@@ -111,12 +105,6 @@ fn rule_examples_must_prove_match_and_not_match_boundaries() {
     })
     .expect_err("negative example must not match");
 
-    assert!(matches!(
-        positive_mismatch,
-        Error::PositiveExampleMismatch { .. }
-    ));
-    assert!(matches!(
-        negative_match,
-        Error::NegativeExampleMatched { .. }
-    ));
+    assert!(matches!(positive_mismatch, Error::PositiveExampleMismatch { .. }));
+    assert!(matches!(negative_match, Error::NegativeExampleMatched { .. }));
 }

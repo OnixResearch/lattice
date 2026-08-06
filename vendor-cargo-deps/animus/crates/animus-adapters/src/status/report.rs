@@ -1,11 +1,7 @@
-const STATUS_SOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("status_source_id");
-const STATUS_TARGET_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("status_target_id");
-const AGENT_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("agent_label");
-const STATUS_MESSAGE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("status_message");
+const STATUS_SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("status_source_id");
+const STATUS_TARGET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("status_target_id");
+const AGENT_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_label");
+const STATUS_MESSAGE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("status_message");
 
 /// Validated semantic status observation supplied by a host adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,10 +32,7 @@ impl Observation {
         crate::validation::validate_required_adapter_field(STATUS_SOURCE_FIELD, draft.source_id)?;
         crate::validation::validate_required_adapter_field(STATUS_TARGET_FIELD, draft.target_id)?;
         crate::validation::validate_required_adapter_field(AGENT_LABEL_FIELD, draft.agent_label)?;
-        let session = draft
-            .session
-            .map(super::identity::Reference::new)
-            .transpose()?;
+        let session = draft.session.map(super::identity::Reference::new).transpose()?;
         let message = super::view::optional_field(STATUS_MESSAGE_FIELD, draft.message)?;
         let presentation = super::view::Presentation::new(draft.presentation)?;
         let evidence_hashes = super::evidence::collect_hashes(draft.evidence_hashes)?;

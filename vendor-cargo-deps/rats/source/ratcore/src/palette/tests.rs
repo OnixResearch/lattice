@@ -5,10 +5,7 @@ fn generated_presets_validate() {
     let outcome = validate_generated_themes();
 
     assert!(outcome.is_valid());
-    assert!(
-        semantic_role_names(&crate::generated_theme_tokens::GENERATED_THEME_PRESETS[0])
-            .contains(&"primary")
-    );
+    assert!(semantic_role_names(&crate::generated_theme_tokens::GENERATED_THEME_PRESETS[0]).contains(&"primary"));
 }
 
 #[test]
@@ -67,16 +64,10 @@ fn empty_renderer_projection_is_rejected() {
 #[test]
 fn fresh_theme_artifacts_validate_against_source_identity() {
     let source = theme_source();
-    let artifacts = expected_theme_artifacts(
-        &source,
-        crate::generated_theme_tokens::GENERATED_THEME_PRESETS,
-    );
+    let artifacts = expected_theme_artifacts(&source, crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
 
-    let outcome = validate_theme_artifact_freshness(
-        &source,
-        &artifacts,
-        crate::generated_theme_tokens::GENERATED_THEME_PRESETS,
-    );
+    let outcome =
+        validate_theme_artifact_freshness(&source, &artifacts, crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
 
     assert!(outcome.is_valid());
     assert_eq!(
@@ -89,15 +80,8 @@ fn fresh_theme_artifacts_validate_against_source_identity() {
 
 #[test]
 fn theme_artifact_guard_rejects_missing_stale_and_unsupported_metadata() {
-    let bad_source = ThemeTokenSource::new(
-        "themes/rats-theme-tokens.ncl",
-        theme_source_bytes(),
-        "old-generator",
-    );
-    let mut artifacts = expected_theme_artifacts(
-        &bad_source,
-        crate::generated_theme_tokens::GENERATED_THEME_PRESETS,
-    );
+    let bad_source = ThemeTokenSource::new("themes/rats-theme-tokens.ncl", theme_source_bytes(), "old-generator");
+    let mut artifacts = expected_theme_artifacts(&bad_source, crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
     artifacts.pop();
     if let Some(first) = artifacts.first_mut() {
         first.content = b"stale".to_vec();
@@ -129,21 +113,12 @@ fn theme_artifact_guard_rejects_missing_stale_and_unsupported_metadata() {
 fn theme_preview_matrix_covers_built_in_renderers_and_states() {
     let rows = theme_preview_matrix(crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
 
-    let outcome = validate_theme_preview_matrix(
-        &rows,
-        crate::generated_theme_tokens::GENERATED_THEME_PRESETS,
-    );
+    let outcome = validate_theme_preview_matrix(&rows, crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
 
     assert!(outcome.is_valid());
     assert!(rows.iter().any(|row| row.renderer == RENDERER_RATATUI_RUST));
-    assert!(
-        rows.iter()
-            .any(|row| row.renderer == RENDERER_METEORITE_CSS)
-    );
-    assert!(
-        rows.iter()
-            .all(|row| row.states.len() == PREVIEW_STATES.len())
-    );
+    assert!(rows.iter().any(|row| row.renderer == RENDERER_METEORITE_CSS));
+    assert!(rows.iter().all(|row| row.states.len() == PREVIEW_STATES.len()));
 }
 
 #[test]
@@ -155,10 +130,7 @@ fn theme_preview_matrix_rejects_missing_roles_and_renderer_mapping() {
         vec!["missing-role".to_string()],
     )];
 
-    let outcome = validate_theme_preview_matrix(
-        &rows,
-        crate::generated_theme_tokens::GENERATED_THEME_PRESETS,
-    );
+    let outcome = validate_theme_preview_matrix(&rows, crate::generated_theme_tokens::GENERATED_THEME_PRESETS);
 
     assert!(!outcome.is_valid());
     assert_issue(&outcome, ThemeIssueCode::MissingToken);
@@ -168,11 +140,7 @@ fn theme_preview_matrix_rejects_missing_roles_and_renderer_mapping() {
 const EXPECTED_ARTIFACT_GUARD_ISSUES: usize = 4;
 
 fn theme_source() -> ThemeTokenSource {
-    ThemeTokenSource::new(
-        "themes/rats-theme-tokens.ncl",
-        theme_source_bytes(),
-        SUPPORTED_THEME_GENERATOR,
-    )
+    ThemeTokenSource::new("themes/rats-theme-tokens.ncl", theme_source_bytes(), SUPPORTED_THEME_GENERATOR)
 }
 
 fn theme_source_bytes() -> Vec<u8> {

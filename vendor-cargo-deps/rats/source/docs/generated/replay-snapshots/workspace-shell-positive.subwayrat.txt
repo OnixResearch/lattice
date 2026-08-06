@@ -1,0 +1,8 @@
+fixture=workspace-shell.positive
+renderer=subwayrat-tui
+generator=workspace-shell-replay-snapshots-v1
+logical-size=80x24
+scenario=workspace shell positive
+state-blake3=178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f
+workspace-snapshot-blake3=178e777affc1f4fb6cf1800f778ff983fe8c627978572a2518218ff33d32d17f
+diagnostics=-

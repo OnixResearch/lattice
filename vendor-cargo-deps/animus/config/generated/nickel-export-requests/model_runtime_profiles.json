@@ -1,0 +1,17 @@
+{
+  "allow_secret_material": true,
+  "contract": "",
+  "dependencies": [
+    "policy/contracts/primitives.ncl"
+  ],
+  "destination": "config/generated/model-runtime-profiles.json",
+  "family_id": "animus.model-runtime-profiles",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "model_runtime_profile_set",
+  "source": "config/model-runtime-profiles.ncl"
+}

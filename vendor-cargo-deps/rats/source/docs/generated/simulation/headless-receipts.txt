@@ -1,0 +1,31 @@
+# success
+schema=rats.deterministic-simulation-headless-receipt.v1
+evidence_class=provider-neutral-headless
+scenario=simulation.scenario.workspace-effect-v1
+adapter=simulation.adapter.provider-neutral-v1
+behavior_blake3=6f30cda6c5b3618a7a1bead71c9f978c14cbcbc9d7b050a14357f8824457ed10
+state_blake3=90a924b96d99f174caf532c6078c484fe413af51db7d9e0a68fdd1e5d0e7bb49
+probe_diagnostics=0
+dropped_probes=0
+oracle=simulation.invariant.effect-reached-v1:reachable:reached
+oracle=simulation.invariant.failure-observed-v1:sometimes:sometimes-unobserved-success
+oracle=simulation.invariant.state-valid-v1:always:always-passed
+claims=local-controlled-hooks-only
+not_claimed=in-process-simulator,vm-replay,snapshot-reproduction,fault-coverage
+
+# controlled-failure
+schema=rats.deterministic-simulation-headless-receipt.v1
+evidence_class=provider-neutral-headless
+scenario=simulation.scenario.workspace-effect-v1
+adapter=simulation.adapter.provider-neutral-v1
+behavior_blake3=6c1d05813095d0ed90bbf6c02cb2993169edd1577a7ffef47e074a5c8c39e254
+state_blake3=6716af07211a78b7905877b2df2d58ffed61c9c4c29493a1515b2077d754f8cf
+probe_diagnostics=0
+dropped_probes=0
+oracle=simulation.invariant.effect-reached-v1:reachable:reached
+oracle=simulation.invariant.failure-observed-v1:sometimes:sometimes-observed
+oracle=simulation.invariant.state-valid-v1:always:always-passed
+claims=local-controlled-hooks-only
+not_claimed=in-process-simulator,vm-replay,snapshot-reproduction,fault-coverage
+
+divergence.effect-result=6f30cda6c5b3618a7a1bead71c9f978c14cbcbc9d7b050a14357f8824457ed10=>6c1d05813095d0ed90bbf6c02cb2993169edd1577a7ffef47e074a5c8c39e254

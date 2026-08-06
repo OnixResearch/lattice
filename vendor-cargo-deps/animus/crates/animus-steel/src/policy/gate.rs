@@ -7,6 +7,7 @@ pub const DEFAULT_RUNTIME_HOST_ACTIONS: &[super::HostAction] = &[
     super::HostAction::Model,
     super::HostAction::Tool,
     super::HostAction::Respond,
+    super::HostAction::CompletionCandidate,
     super::HostAction::Stop,
 ];
 
@@ -58,11 +59,7 @@ pub struct Activation<'a> {
 impl<'a> Activation<'a> {
     /// Builds activation inputs for one runtime execution.
     #[must_use]
-    pub const fn new(
-        script: Script<'a>,
-        turn_budget: u32,
-        requested_host_actions: &'a [super::HostAction],
-    ) -> Self {
+    pub const fn new(script: Script<'a>, turn_budget: u32, requested_host_actions: &'a [super::HostAction]) -> Self {
         Self {
             script,
             turn_budget,
@@ -216,9 +213,7 @@ impl ActivationReceipt {
     /// Returns a bounded safe message for runtime failures.
     #[must_use]
     pub fn denial_message(&self) -> String {
-        let reason = self
-            .denied_reason
-            .map_or("unknown", super::DenyReason::as_str);
+        let reason = self.denied_reason.map_or("unknown", super::DenyReason::as_str);
         format!("steel policy denied: {reason}")
     }
 

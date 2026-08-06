@@ -50,17 +50,15 @@ pub fn default_unsupported_pointer_kind() -> String {
 
 fn route_captured_target(
     event: &super::input::PointerEvent,
-    target_id: &str,
+    target_id: &super::shape::PointerTargetId,
     hit_map: &super::area::HitMap,
 ) -> super::result::PointerRouteOutcome {
     let Some(region) = hit_map.target(target_id) else {
-        return super::result::PointerRouteOutcome::Diagnostic(
-            super::result::PointerDiagnostic::new(
-                super::result::PointerDiagnosticCode::StaleTarget,
-                Some(target_id.to_string()),
-                "captured target is no longer present",
-            ),
-        );
+        return super::result::PointerRouteOutcome::Diagnostic(super::result::PointerDiagnostic::new(
+            super::result::PointerDiagnosticCode::StaleTarget,
+            Some(target_id.clone()),
+            "captured target is no longer present",
+        ));
     };
     route_region(event, region)
 }
@@ -119,9 +117,7 @@ fn pass_through_route(
     })
 }
 
-fn deferred_route_candidate<'a>(
-    candidates: &[&'a super::area::HitRegion],
-) -> Option<DeferredCandidate<'a>> {
+fn deferred_route_candidate<'a>(candidates: &[&'a super::area::HitRegion]) -> Option<DeferredCandidate<'a>> {
     let mut deferred_disabled = None;
     let mut deferred_hidden = None;
     let mut deferred_pass_through = None;
@@ -148,62 +144,33 @@ fn deferred_outcome(
         Some(DeferredCandidate::Disabled(region)) => super::diagnose::disabled_diagnostic(region),
         Some(DeferredCandidate::Hidden(region)) => super::diagnose::hidden_diagnostic(region),
         Some(DeferredCandidate::PassThrough(region)) => pass_through_route(event, region),
-        None => {
-            super::result::PointerRouteOutcome::Diagnostic(super::result::PointerDiagnostic::new(
-                super::result::PointerDiagnosticCode::NoTarget,
-                None,
-                "no hit region contains the pointer event",
-            ))
-        }
+        None => super::result::PointerRouteOutcome::Diagnostic(super::result::PointerDiagnostic::new(
+            super::result::PointerDiagnosticCode::NoTarget,
+            None,
+            "no hit region contains the pointer event",
+        )),
     }
 }
 
 fn route_candidate_is_skipped(region: &super::area::HitRegion) -> bool {
-    !region.visible
-        || region.capture == super::area::HitCapturePolicy::PassThrough
-        || !region.enabled
+    !region.visible || region.capture == super::area::HitCapturePolicy::PassThrough || !region.enabled
 }
 
 fn matching_regions(
     position: super::shape::PointerPoint,
     hit_map: &super::area::HitMap,
 ) -> Vec<&super::area::HitRegion> {
-    hit_map
-        .regions
-        .iter()
-        .filter(|region| region.bounds.contains(position))
-        .collect()
+    hit_map.regions.iter().filter(|region| region.bounds.contains(position)).collect()
 }
 
 fn assert_normalize_shape(event: &super::input::PointerEvent) {
-    debug_assert!(
-        event
-            .captured_target
-            .as_ref()
-            .is_none_or(|target| !target.contains('\n'))
-    );
-    debug_assert!(
-        event
-            .buttons
-            .unsupported
-            .iter()
-            .all(|button| !button.contains('\n'))
-    );
+    debug_assert!(event.captured_target.as_ref().is_none_or(|target| !target.as_str().contains('\n')));
+    debug_assert!(event.buttons.unsupported.iter().all(|button| !button.contains('\n')));
 }
 
 fn assert_hit_map_shape(hit_map: &super::area::HitMap) {
-    debug_assert!(
-        hit_map
-            .regions
-            .iter()
-            .all(|region| !region.target_id.is_empty())
-    );
-    debug_assert!(
-        hit_map
-            .regions
-            .iter()
-            .all(|region| region.bounds.width > i32::MIN)
-    );
+    debug_assert!(hit_map.regions.iter().all(|region| !region.target_id.is_empty()));
+    debug_assert!(hit_map.regions.iter().all(|region| region.bounds.width > i32::MIN));
 }
 
 #[derive(Clone, Copy)]

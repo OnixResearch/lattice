@@ -136,15 +136,11 @@ pub(super) fn build(
         ability: alloc::string::String::from(request.ability()),
         audience_hash,
         actor_hash,
-        credential_hash: request
-            .credential()
-            .map(|credential| credential.credential_hash().clone()),
+        credential_hash: request.credential().map(|credential| credential.credential_hash().clone()),
         caveat: request.caveat(),
         policy_hash: request.policy_hash().cloned(),
         expiry: request.credential().map(super::CredentialEvidence::expiry),
-        verifier_status: request
-            .credential()
-            .map(super::CredentialEvidence::verifier_status),
+        verifier_status: request.credential().map(super::CredentialEvidence::verifier_status),
         receipt_hash: digest::zero_identity()?,
     };
     receipt.receipt_hash = digest::identity_for_text(&receipt)?;

@@ -14,12 +14,9 @@ const WEB_NATIVE_REASON: &str = "browser owns anchoring, portals, focus, and ari
 const RENDERER_OWNED_REASON: &str = "adapter consumes shared state but owns DOM shell";
 const KEEP_FRESH_ACTION: &str = "keep evidence fresh when overlay surface changes";
 
-fn shared_surface(
-    surface_id: &str,
-    shared_chrome_kind: OverlayChromeKind,
-) -> MeteoriteOverlaySurfaceEvidence {
+fn shared_surface(surface_id: &str, shared_chrome_kind: OverlayChromeKind) -> MeteoriteOverlaySurfaceEvidence {
     MeteoriteOverlaySurfaceEvidence {
-        surface_id: surface_id.to_owned(),
+        surface_id: surface_id.into(),
         owner: OWNER_WIDGETS.to_owned(),
         role: MeteoriteOverlayRole::SharedChromeFrame,
         shared_chrome_kind: Some(shared_chrome_kind),
@@ -31,7 +28,7 @@ fn shared_surface(
 
 fn web_native_surface(surface_id: &str) -> MeteoriteOverlaySurfaceEvidence {
     MeteoriteOverlaySurfaceEvidence {
-        surface_id: surface_id.to_owned(),
+        surface_id: surface_id.into(),
         owner: OWNER_OVERLAY.to_owned(),
         role: MeteoriteOverlayRole::WebNativePrimitive,
         shared_chrome_kind: None,
@@ -43,7 +40,7 @@ fn web_native_surface(surface_id: &str) -> MeteoriteOverlaySurfaceEvidence {
 
 fn renderer_owned_surface(surface_id: &str) -> MeteoriteOverlaySurfaceEvidence {
     MeteoriteOverlaySurfaceEvidence {
-        surface_id: surface_id.to_owned(),
+        surface_id: surface_id.into(),
         owner: OWNER_LEADER.to_owned(),
         role: MeteoriteOverlayRole::RendererOwnedAdapter,
         shared_chrome_kind: None,
@@ -53,14 +50,8 @@ fn renderer_owned_surface(surface_id: &str) -> MeteoriteOverlaySurfaceEvidence {
     }
 }
 
-fn has_code(
-    report: &MeteoriteOverlaySemanticsReport,
-    code: MeteoriteOverlayDiagnosticCode,
-) -> bool {
-    report
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.code == code)
+fn has_code(report: &MeteoriteOverlaySemanticsReport, code: MeteoriteOverlayDiagnosticCode) -> bool {
+    report.diagnostics.iter().any(|diagnostic| diagnostic.code == code)
 }
 
 #[test]
@@ -73,24 +64,15 @@ fn valid_overlay_semantics_classify_shared_web_native_and_renderer_owned_rows() 
     ]);
 
     assert!(report.is_valid(), "diagnostics: {:?}", report.diagnostics);
-    assert_eq!(
-        report.shared_surface_ids,
-        vec![DIALOG_SURFACE.to_owned(), OVERLAY_SURFACE.to_owned()]
-    );
-    assert_eq!(
-        report.web_native_surface_ids,
-        vec![POPOVER_SURFACE.to_owned()]
-    );
-    assert_eq!(
-        report.renderer_owned_surface_ids,
-        vec![LEADER_SURFACE.to_owned()]
-    );
+    assert_eq!(report.shared_surface_ids, vec![DIALOG_SURFACE.to_owned(), OVERLAY_SURFACE.to_owned()]);
+    assert_eq!(report.web_native_surface_ids, vec![POPOVER_SURFACE.to_owned()]);
+    assert_eq!(report.renderer_owned_surface_ids, vec![LEADER_SURFACE.to_owned()]);
 }
 
 #[test]
 fn malformed_overlay_semantics_report_required_field_and_role_diagnostics() {
     let missing_required_fields = MeteoriteOverlaySurfaceEvidence {
-        surface_id: String::new(),
+        surface_id: MeteoriteOverlaySurfaceId::default(),
         owner: String::new(),
         role: MeteoriteOverlayRole::SharedChromeFrame,
         shared_chrome_kind: None,
@@ -101,7 +83,7 @@ fn malformed_overlay_semantics_report_required_field_and_role_diagnostics() {
     let duplicate = shared_surface(OVERLAY_SURFACE, OverlayChromeKind::OverlayFrame);
     let invalid_shared_kind = shared_surface(OVERLAY_SURFACE, OverlayChromeKind::TitleBar);
     let invalid_web_native = MeteoriteOverlaySurfaceEvidence {
-        surface_id: POPOVER_SURFACE.to_owned(),
+        surface_id: POPOVER_SURFACE.into(),
         owner: OWNER_OVERLAY.to_owned(),
         role: MeteoriteOverlayRole::WebNativePrimitive,
         shared_chrome_kind: Some(OverlayChromeKind::DialogFrame),
@@ -118,40 +100,13 @@ fn malformed_overlay_semantics_report_required_field_and_role_diagnostics() {
     ]);
 
     assert!(!report.is_valid());
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::EmptySurfaceId
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::DuplicateSurfaceId
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::EmptyOwner
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::MissingEvidence
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::MissingNextAction
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::MissingSharedChromeKind
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::UnsupportedSharedChromeKind
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::MissingReason
-    ));
-    assert!(has_code(
-        &report,
-        MeteoriteOverlayDiagnosticCode::UnexpectedSharedChromeKind
-    ));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::EmptySurfaceId));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::DuplicateSurfaceId));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::EmptyOwner));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::MissingEvidence));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::MissingNextAction));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::MissingSharedChromeKind));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::UnsupportedSharedChromeKind));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::MissingReason));
+    assert!(has_code(&report, MeteoriteOverlayDiagnosticCode::UnexpectedSharedChromeKind));
 }

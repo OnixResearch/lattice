@@ -1,0 +1,10 @@
+domain	canonical_writer	persistence_action	restart_action	allowed_reference	forbidden_shadow
+frontend-theme-preference	Rat-showcase shell	persist v2 preference	load through typed application message	none	none
+frontend-workspace-shape	application shell	persist bounded durable IDs/names	map with caller-supplied new session ID	none	live focus handles caches diagnostics
+external-view-wrap	downstream object owner for object;frontend for wrap preference	persist wrap plus stable reference only	validate against fresh current external snapshot	stable reference when contract permits	object lifecycle revision content recovery
+daemon-resources	downstream daemon	reject	protocol refresh	none	resource buffer view snapshots
+action-keymap-policy	downstream service	reject	protocol refresh	none	action catalog policy authorization
+focus-input-capture	downstream runtime	reject	runtime reacquisition	none	focus target capture token
+process-jobs	downstream runtime	reject	protocol recovery	none	PID handle job state
+revisions-recovery	downstream daemon	reject	fresh revision-fenced snapshot	none	local continuity or repaired revision
+authorization	downstream policy edge	reject	fresh authorization	none	cached grant or effect authority

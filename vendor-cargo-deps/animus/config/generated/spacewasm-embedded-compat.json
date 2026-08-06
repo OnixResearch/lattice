@@ -1,0 +1,64 @@
+{
+  "enabled": true,
+  "excluded_capabilities": [
+    "wasi",
+    "filesystem",
+    "process",
+    "network",
+    "credentials",
+    "clock",
+    "terminal",
+    "provider",
+    "tool",
+    "persistence",
+    "plugin"
+  ],
+  "expected_outcomes": [
+    "returned",
+    "expected-trap",
+    "resource-exhausted"
+  ],
+  "guest": {
+    "crates": [
+      "animus-core",
+      "animus-adapters"
+    ],
+    "exports": [
+      "run"
+    ],
+    "features": [],
+    "imports": [],
+    "source": "fixtures/spacewasm/guest.rs"
+  },
+  "limits": {
+    "artifact_bytes": 1048576,
+    "fuel": 1000000,
+    "input_bytes": 4096,
+    "output_bytes": 4096
+  },
+  "non_claims": [
+    "not-general-wasm-runtime-support",
+    "not-plugin-activation",
+    "not-runtime-correctness",
+    "not-sandbox-completeness",
+    "not-production-or-release-readiness"
+  ],
+  "octet": {
+    "profile_id": "spacewasm-mvp",
+    "role": "static_boundary"
+  },
+  "producer": {
+    "opaque_lowering": false,
+    "rust_version": "1.91.1",
+    "target": "wasm32v1-none"
+  },
+  "profile_id": "spacewasm-e24-hostless-run-v1",
+  "runtime": {
+    "cohort_identity": "b3:7c537eef7bff66d0a90508715de08de79c9aaac23352e1007a6d47e7fb4674a2",
+    "mantle_bundle": "mantle-spacewasm-reference-bundle-e24cf09355a90497148eb5029fdb8e3400bd63e3",
+    "repository": "https://github.com/nasa/spacewasm",
+    "revision": "e24cf09355a90497148eb5029fdb8e3400bd63e3",
+    "source_lock_identity": "b3:4e6a07910125d4c921a62cec03d8bc9acb3bf341ebd1a11999df08d6c6c5c5f1"
+  },
+  "schema": "animus.spacewasm-embedded-compat.v1"
+}

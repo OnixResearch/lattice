@@ -87,35 +87,58 @@ const DEFAULT_EVENT_VISIBLE_BYTES: usize = 256;
 type Text = String;
 type Collection<T> = Vec<T>;
 
-pub use control::{
-    RuntimeThreadController, ThreadSnapshot, ThreadStatus, validate_thread_cancellation,
-    validate_thread_resume,
-};
-pub use events::{
-    AutomationEnvelope, AutomationEventDraft, AutomationEventKind, EventPayloadSummary,
-    EventProjection, EventRedaction, EventSequence, build_automation_stream, project_event,
-    summarize_event_payload,
-};
+pub use control::RuntimeThreadController;
+pub use control::ThreadSnapshot;
+pub use control::ThreadStatus;
+pub use control::validate_thread_cancellation;
+pub use control::validate_thread_resume;
+pub use events::AutomationEnvelope;
+pub use events::AutomationEventDraft;
+pub use events::AutomationEventKind;
+pub use events::EventPayloadSummary;
+pub use events::EventProjection;
+pub use events::EventRedaction;
+pub use events::EventSequence;
+pub use events::build_automation_stream;
+pub use events::project_event;
+pub use events::summarize_event_payload;
 pub use fault::AutomationError;
-pub use protocol::{
-    HeadlessCommand, HeadlessCommandDraft, HeadlessCommandKind, HeadlessProtocolError,
-    HeadlessProtocolErrorKind, HeadlessProtocolEvent, HeadlessProtocolEventClass, HeadlessQueueing,
-    HeadlessRecordBatch, HeadlessResponse, HeadlessResponseStatus, HeadlessRuntimePhase,
-    acknowledge_headless_command, map_runtime_events_to_headless, parse_headless_command_record,
-    split_lf_records,
-};
-pub use request::{
-    NoninteractiveBehavior, OutputPreference, RunIdentity, RunRequest, RunRequestDraft,
-    SandboxProfile, ThreadResume, ThreadResumeDraft,
-};
-pub use sink::{
-    CompletionReceipt, CompletionReceiptDraft, CompletionStatus, FinalOutput,
-    prompt_required_completion, select_final_output,
-};
-pub use structure::{
-    StructuredOutputDraft, StructuredOutputFailure, StructuredOutputReport, StructuredOutputStatus,
-    StructuredSchemaDraft, validate_structured_output,
-};
+pub use protocol::HeadlessCommand;
+pub use protocol::HeadlessCommandDraft;
+pub use protocol::HeadlessCommandKind;
+pub use protocol::HeadlessProtocolError;
+pub use protocol::HeadlessProtocolErrorKind;
+pub use protocol::HeadlessProtocolEvent;
+pub use protocol::HeadlessProtocolEventClass;
+pub use protocol::HeadlessQueueing;
+pub use protocol::HeadlessRecordBatch;
+pub use protocol::HeadlessResponse;
+pub use protocol::HeadlessResponseStatus;
+pub use protocol::HeadlessRuntimePhase;
+pub use protocol::acknowledge_headless_command;
+pub use protocol::map_runtime_events_to_headless;
+pub use protocol::parse_headless_command_record;
+pub use protocol::split_lf_records;
+pub use request::NoninteractiveBehavior;
+pub use request::OutputPreference;
+pub use request::RunIdentity;
+pub use request::RunRequest;
+pub use request::RunRequestDraft;
+pub use request::SandboxProfile;
+pub use request::ThreadResume;
+pub use request::ThreadResumeDraft;
+pub use sink::CompletionReceipt;
+pub use sink::CompletionReceiptDraft;
+pub use sink::CompletionStatus;
+pub use sink::FinalOutput;
+pub use sink::prompt_required_completion;
+pub use sink::select_final_output;
+pub use structure::StructuredOutputDraft;
+pub use structure::StructuredOutputFailure;
+pub use structure::StructuredOutputReport;
+pub use structure::StructuredOutputStatus;
+pub use structure::StructuredSchemaDraft;
+pub use structure::validate_structured_output;
 
 #[derive(Clone, Copy)]
 struct TextField<'a> {
@@ -164,10 +187,7 @@ fn unique_texts(field: &'static str, values: &[&str]) -> Result<Collection<Text>
     Ok(normalized)
 }
 
-fn required_unique_texts(
-    field: &'static str,
-    values: &[&str],
-) -> Result<Collection<Text>, AutomationError> {
+fn required_unique_texts(field: &'static str, values: &[&str]) -> Result<Collection<Text>, AutomationError> {
     if values.is_empty() {
         return Err(AutomationError::EmptyField { field });
     }

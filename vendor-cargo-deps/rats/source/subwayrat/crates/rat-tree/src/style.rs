@@ -1,6 +1,7 @@
 //! Tree visual styling configuration.
 
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
+use ratatui::style::Style;
 
 /// Controls the visual appearance of a tree widget.
 #[derive(Debug, Clone)]

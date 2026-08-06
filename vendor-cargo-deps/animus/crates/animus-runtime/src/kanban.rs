@@ -29,8 +29,7 @@ const CROSS_TENANT_REASON: &str = "cross-tenant dependency or handoff is not adm
 const AMBIGUOUS_DEPENDENCY_REASON: &str = "dependency state cannot safely promote the child";
 const STALE_COMPLETION_REASON: &str = "completion record does not match the task revision";
 const OUT_OF_SCOPE_REASON: &str = "mutation target is outside declared workspace scope";
-const MISSING_BOARD_SERVICE_REASON: &str =
-    "Kanban orchestration requires an injected board service";
+const MISSING_BOARD_SERVICE_REASON: &str = "Kanban orchestration requires an injected board service";
 const ADAPTER_BRIDGE_ACTOR_LABEL: &str = "runtime-kanban-bridge";
 const ADAPTER_BRIDGE_POLICY_LABEL: &str = "kanban-compatibility";
 const ROOT_CAPABILITY_FIELD: &str = "workspace_scope.root_capability";
@@ -198,11 +197,7 @@ impl KanbanError {
 
 impl std::fmt::Display for KanbanError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "kanban field `{}` failed ({:?}): {}",
-            self.field, self.kind, self.reason
-        )
+        write!(formatter, "kanban field `{}` failed ({:?}): {}", self.field, self.kind, self.reason)
     }
 }
 
@@ -635,9 +630,7 @@ pub struct OrchestrationAdapterBoardService<'a> {
 impl<'a> OrchestrationAdapterBoardService<'a> {
     /// Builds a compatibility bridge over an injected orchestration service.
     #[must_use]
-    pub const fn new(
-        service: &'a mut dyn animus_adapters::orchestration::OrchestrationService,
-    ) -> Self {
+    pub const fn new(service: &'a mut dyn animus_adapters::orchestration::OrchestrationService) -> Self {
         Self { service }
     }
 }
@@ -645,27 +638,17 @@ impl<'a> OrchestrationAdapterBoardService<'a> {
 impl KanbanBoardService for OrchestrationAdapterBoardService<'_> {
     fn load_task_graph(&mut self, board_label: &str) -> Result<KanbanTaskGraphDraft, KanbanError> {
         let metadata = adapter_operation_metadata()?;
-        let request = animus_adapters::orchestration::OrchestrationTaskGraphLoadRequest::new(
-            board_label,
-            metadata,
-        )
-        .map_err(adapter_error_to_kanban)?;
-        let adapter_graph = animus_adapters::orchestration::load_orchestration_task_graph(
-            Some(self.service),
-            &request,
-        )
-        .map_err(adapter_error_to_kanban)?;
+        let request = animus_adapters::orchestration::OrchestrationTaskGraphLoadRequest::new(board_label, metadata)
+            .map_err(adapter_error_to_kanban)?;
+        let adapter_graph = animus_adapters::orchestration::load_orchestration_task_graph(Some(self.service), &request)
+            .map_err(adapter_error_to_kanban)?;
         Ok(adapter_graph_to_kanban(&adapter_graph))
     }
 
     fn append_handoff(&mut self, handoff: &KanbanContextHandoff) -> Result<(), KanbanError> {
         let metadata = adapter_operation_metadata()?;
-        let adapter_handoff =
-            kanban_handoff_to_adapter(handoff).map_err(adapter_error_to_kanban)?;
-        let request = animus_adapters::orchestration::OrchestrationHandoffAppendRequest::new(
-            adapter_handoff,
-            metadata,
-        );
+        let adapter_handoff = kanban_handoff_to_adapter(handoff).map_err(adapter_error_to_kanban)?;
+        let request = animus_adapters::orchestration::OrchestrationHandoffAppendRequest::new(adapter_handoff, metadata);
         animus_adapters::orchestration::append_orchestration_handoff(Some(self.service), &request)
             .map(|_receipt| ())
             .map_err(adapter_error_to_kanban)
@@ -709,22 +692,14 @@ pub fn evaluate_kanban_promotion(
 ) -> Result<KanbanPromotionDecision, KanbanError> {
     debug_assert!(graph.tasks().len() <= MAX_KANBAN_TASKS);
     debug_assert!(!task_id.trim().is_empty());
-    let child = graph.task(task_id).ok_or_else(|| {
-        KanbanError::new(
-            KanbanErrorKind::UnknownTaskId,
-            TASK_ID_FIELD,
-            INVALID_LINK_REASON,
-        )
-    })?;
+    let child = graph
+        .task(task_id)
+        .ok_or_else(|| KanbanError::new(KanbanErrorKind::UnknownTaskId, TASK_ID_FIELD, INVALID_LINK_REASON))?;
     let mut waiting_parent_ids = Vec::with_capacity(child.parent_ids().len());
     for parent_id in child.parent_ids() {
-        let parent = graph.task(parent_id).ok_or_else(|| {
-            KanbanError::new(
-                KanbanErrorKind::UnknownTaskId,
-                PARENT_FIELD,
-                INVALID_LINK_REASON,
-            )
-        })?;
+        let parent = graph
+            .task(parent_id)
+            .ok_or_else(|| KanbanError::new(KanbanErrorKind::UnknownTaskId, PARENT_FIELD, INVALID_LINK_REASON))?;
         match evaluate_parent_for_promotion(parent, child)? {
             ParentPromotion::Complete => {}
             ParentPromotion::Waiting { parent_id } => waiting_parent_ids.push(parent_id),
@@ -756,33 +731,19 @@ pub fn validate_kanban_workspace_mutation(
     mutation: &KanbanMutationIntent,
 ) -> Result<KanbanWorkspaceAdmission, KanbanError> {
     debug_assert!(!scope.root_capability.trim().is_empty());
-    debug_assert!(
-        !scope.writable_targets.is_empty() || !scope.approval_required_targets.is_empty()
-    );
+    debug_assert!(!scope.writable_targets.is_empty() || !scope.approval_required_targets.is_empty());
     let target = label!(MUTATION_TARGET_FIELD, mutation.target_label.as_str())?;
-    if scope
-        .writable_targets
-        .iter()
-        .any(|allowed| allowed == &target)
-    {
+    if scope.writable_targets.iter().any(|allowed| allowed == &target) {
         return Ok(KanbanWorkspaceAdmission::Allowed);
     }
-    if scope
-        .approval_required_targets
-        .iter()
-        .any(|guarded| guarded == &target)
-    {
+    if scope.approval_required_targets.iter().any(|guarded| guarded == &target) {
         if let Some(approval_label) = mutation.approval_label.as_deref() {
             label!(MUTATION_APPROVAL_FIELD, approval_label)?;
             return Ok(KanbanWorkspaceAdmission::Allowed);
         }
         return Ok(KanbanWorkspaceAdmission::RequiresHostApproval);
     }
-    Err(KanbanError::new(
-        KanbanErrorKind::OutOfScopeMutation,
-        MUTATION_TARGET_FIELD,
-        OUT_OF_SCOPE_REASON,
-    ))
+    Err(KanbanError::new(KanbanErrorKind::OutOfScopeMutation, MUTATION_TARGET_FIELD, OUT_OF_SCOPE_REASON))
 }
 
 /// Assembles tenant-safe downstream context from parent handoffs.
@@ -805,11 +766,7 @@ pub fn assemble_kanban_context(
         if tenant_mismatch(child.tenant_label(), validated.tenant_label.as_deref()) {
             match tenant_policy {
                 KanbanTenantPolicy::RejectCrossTenant => {
-                    return Err(KanbanError::new(
-                        KanbanErrorKind::CrossTenantLeak,
-                        TENANT_FIELD,
-                        CROSS_TENANT_REASON,
-                    ));
+                    return Err(KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, CROSS_TENANT_REASON));
                 }
                 KanbanTenantPolicy::QuarantineCrossTenant => {
                     quarantined.push(KanbanQuarantinedHandoff {
@@ -866,16 +823,11 @@ fn injected_board_service(
     service: Option<&mut dyn KanbanBoardService>,
 ) -> Result<&mut dyn KanbanBoardService, KanbanError> {
     service.ok_or_else(|| {
-        KanbanError::new(
-            KanbanErrorKind::BoardServiceUnavailable,
-            BOARD_SERVICE_FIELD,
-            MISSING_BOARD_SERVICE_REASON,
-        )
+        KanbanError::new(KanbanErrorKind::BoardServiceUnavailable, BOARD_SERVICE_FIELD, MISSING_BOARD_SERVICE_REASON)
     })
 }
 
-fn adapter_operation_metadata()
--> Result<animus_adapters::orchestration::OrchestrationOperationMetadata, KanbanError> {
+fn adapter_operation_metadata() -> Result<animus_adapters::orchestration::OrchestrationOperationMetadata, KanbanError> {
     animus_adapters::orchestration::OrchestrationOperationMetadata::new(
         ADAPTER_BRIDGE_ACTOR_LABEL,
         ADAPTER_BRIDGE_POLICY_LABEL,
@@ -894,9 +846,7 @@ fn adapter_graph_to_kanban(
     KanbanTaskGraphDraft { tasks }
 }
 
-fn adapter_task_to_kanban(
-    task: &animus_adapters::orchestration::OrchestrationTaskDraft,
-) -> KanbanTaskDraft {
+fn adapter_task_to_kanban(task: &animus_adapters::orchestration::OrchestrationTaskDraft) -> KanbanTaskDraft {
     KanbanTaskDraft {
         task_id: String::from(task.task_id()),
         title: String::from(task.title()),
@@ -906,9 +856,7 @@ fn adapter_task_to_kanban(
         parent_ids: task.parent_ids().to_vec(),
         child_ids: task.child_ids().to_vec(),
         priority: adapter_priority_to_kanban(task.priority()),
-        workspace_scope: task
-            .workspace_scope()
-            .map(adapter_workspace_scope_to_kanban),
+        workspace_scope: task.workspace_scope().map(adapter_workspace_scope_to_kanban),
         tenant_label: task.tenant_label().map(String::from),
         comments: adapter_comments_to_kanban(task.comments()),
         heartbeats: adapter_heartbeats_to_kanban(task.heartbeats()),
@@ -924,15 +872,9 @@ fn adapter_workspace_scope_to_kanban(
 ) -> KanbanWorkspaceScope {
     KanbanWorkspaceScope {
         kind: match scope.kind() {
-            animus_adapters::orchestration::OrchestrationWorkspaceKind::Scratch => {
-                KanbanWorkspaceKind::Scratch
-            }
-            animus_adapters::orchestration::OrchestrationWorkspaceKind::Directory => {
-                KanbanWorkspaceKind::Directory
-            }
-            animus_adapters::orchestration::OrchestrationWorkspaceKind::IsolatedBranch => {
-                KanbanWorkspaceKind::Worktree
-            }
+            animus_adapters::orchestration::OrchestrationWorkspaceKind::Scratch => KanbanWorkspaceKind::Scratch,
+            animus_adapters::orchestration::OrchestrationWorkspaceKind::Directory => KanbanWorkspaceKind::Directory,
+            animus_adapters::orchestration::OrchestrationWorkspaceKind::IsolatedBranch => KanbanWorkspaceKind::Worktree,
         },
         root_capability: String::from(scope.root_capability()),
         writable_targets: scope.writable_targets().to_vec(),
@@ -940,28 +882,18 @@ fn adapter_workspace_scope_to_kanban(
     }
 }
 
-fn adapter_task_state_to_kanban(
-    state: animus_adapters::orchestration::OrchestrationTaskState,
-) -> KanbanTaskState {
+fn adapter_task_state_to_kanban(state: animus_adapters::orchestration::OrchestrationTaskState) -> KanbanTaskState {
     match state {
         animus_adapters::orchestration::OrchestrationTaskState::Draft => KanbanTaskState::Draft,
         animus_adapters::orchestration::OrchestrationTaskState::Ready => KanbanTaskState::Ready,
-        animus_adapters::orchestration::OrchestrationTaskState::InProgress => {
-            KanbanTaskState::InProgress
-        }
+        animus_adapters::orchestration::OrchestrationTaskState::InProgress => KanbanTaskState::InProgress,
         animus_adapters::orchestration::OrchestrationTaskState::Blocked => KanbanTaskState::Blocked,
-        animus_adapters::orchestration::OrchestrationTaskState::Completed => {
-            KanbanTaskState::Completed
-        }
-        animus_adapters::orchestration::OrchestrationTaskState::Cancelled => {
-            KanbanTaskState::Cancelled
-        }
+        animus_adapters::orchestration::OrchestrationTaskState::Completed => KanbanTaskState::Completed,
+        animus_adapters::orchestration::OrchestrationTaskState::Cancelled => KanbanTaskState::Cancelled,
     }
 }
 
-fn adapter_priority_to_kanban(
-    priority: animus_adapters::orchestration::OrchestrationPriority,
-) -> KanbanPriority {
+fn adapter_priority_to_kanban(priority: animus_adapters::orchestration::OrchestrationPriority) -> KanbanPriority {
     match priority {
         animus_adapters::orchestration::OrchestrationPriority::Low => KanbanPriority::Low,
         animus_adapters::orchestration::OrchestrationPriority::Normal => KanbanPriority::Normal,
@@ -970,9 +902,7 @@ fn adapter_priority_to_kanban(
     }
 }
 
-fn adapter_comments_to_kanban(
-    comments: &[animus_adapters::orchestration::OrchestrationComment],
-) -> Vec<KanbanComment> {
+fn adapter_comments_to_kanban(comments: &[animus_adapters::orchestration::OrchestrationComment]) -> Vec<KanbanComment> {
     comments
         .iter()
         .map(|comment| KanbanComment {
@@ -1048,9 +978,7 @@ fn kanban_handoff_to_adapter(
     )
 }
 
-fn adapter_error_to_kanban(
-    error: animus_adapters::orchestration::OrchestrationError,
-) -> KanbanError {
+fn adapter_error_to_kanban(error: animus_adapters::orchestration::OrchestrationError) -> KanbanError {
     let reason = error.to_string();
     assert!(!reason.is_empty());
     assert!(!BOARD_SERVICE_FIELD.is_empty());
@@ -1071,11 +999,9 @@ fn adapter_error_to_kanban(
         | animus_adapters::orchestration::OrchestrationError::CapabilityDenied
         | animus_adapters::orchestration::OrchestrationError::InvalidGraph
         | animus_adapters::orchestration::OrchestrationError::UnsupportedOperation
-        | animus_adapters::orchestration::OrchestrationError::SchemaMismatch => KanbanError::new(
-            KanbanErrorKind::InjectedServiceFailure,
-            BOARD_SERVICE_FIELD,
-            reason,
-        ),
+        | animus_adapters::orchestration::OrchestrationError::SchemaMismatch => {
+            KanbanError::new(KanbanErrorKind::InjectedServiceFailure, BOARD_SERVICE_FIELD, reason)
+        }
         animus_adapters::orchestration::OrchestrationError::UnsafeHandoff
         | animus_adapters::orchestration::OrchestrationError::UnsafeEvidence { .. } => {
             KanbanError::new(KanbanErrorKind::UnsafeText, HANDOFF_BODY_FIELD, reason)
@@ -1083,11 +1009,9 @@ fn adapter_error_to_kanban(
         animus_adapters::orchestration::OrchestrationError::CrossTenantLeak => {
             KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, reason)
         }
-        animus_adapters::orchestration::OrchestrationError::OutOfScopeMutation => KanbanError::new(
-            KanbanErrorKind::OutOfScopeMutation,
-            MUTATION_TARGET_FIELD,
-            reason,
-        ),
+        animus_adapters::orchestration::OrchestrationError::OutOfScopeMutation => {
+            KanbanError::new(KanbanErrorKind::OutOfScopeMutation, MUTATION_TARGET_FIELD, reason)
+        }
         animus_adapters::orchestration::OrchestrationError::EmptyCollection { .. } => {
             KanbanError::new(KanbanErrorKind::EmptyField, BOARD_SERVICE_FIELD, reason)
         }
@@ -1100,10 +1024,7 @@ fn adapter_error_to_kanban(
     }
 }
 
-fn adapter_contract_error_to_kanban(
-    contract: &animus_adapters::AdapterContractError,
-    reason: String,
-) -> KanbanError {
+fn adapter_contract_error_to_kanban(contract: &animus_adapters::AdapterContractError, reason: String) -> KanbanError {
     match contract {
         animus_adapters::AdapterContractError::EmptyField { field }
         | animus_adapters::AdapterContractError::EmptyCollection { field } => {
@@ -1117,12 +1038,8 @@ fn adapter_contract_error_to_kanban(
             KanbanError::new(KanbanErrorKind::UnsafeText, field, reason)
         }
         animus_adapters::AdapterContractError::UnsupportedStatusState { field, .. }
-        | animus_adapters::AdapterContractError::UnsupportedStatusObservationKind {
-            field, ..
-        }
-        | animus_adapters::AdapterContractError::UnsupportedSessionReferenceKind {
-            field, ..
-        }
+        | animus_adapters::AdapterContractError::UnsupportedStatusObservationKind { field, .. }
+        | animus_adapters::AdapterContractError::UnsupportedSessionReferenceKind { field, .. }
         | animus_adapters::AdapterContractError::UnsupportedWorkspaceValue { field, .. }
         | animus_adapters::AdapterContractError::UnsupportedDataspaceValue { field, .. }
         | animus_adapters::AdapterContractError::UnsupportedRouterValue { field, .. } => {
@@ -1133,18 +1050,10 @@ fn adapter_contract_error_to_kanban(
 
 fn validate_task_count(tasks: &[KanbanTaskDraft]) -> Result<(), KanbanError> {
     if tasks.is_empty() {
-        return Err(KanbanError::new(
-            KanbanErrorKind::EmptyField,
-            "tasks",
-            EMPTY_FIELD_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::EmptyField, "tasks", EMPTY_FIELD_REASON));
     }
     if tasks.len() > MAX_KANBAN_TASKS {
-        return Err(KanbanError::new(
-            KanbanErrorKind::TooManyItems,
-            "tasks",
-            TOO_MANY_ITEMS_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::TooManyItems, "tasks", TOO_MANY_ITEMS_REASON));
     }
     Ok(())
 }
@@ -1152,11 +1061,7 @@ fn validate_task_count(tasks: &[KanbanTaskDraft]) -> Result<(), KanbanError> {
 fn validate_unique_task_ids(tasks: &[KanbanTask]) -> Result<(), KanbanError> {
     for pair in tasks.windows(2) {
         if pair[0].task_id == pair[1].task_id {
-            return Err(KanbanError::new(
-                KanbanErrorKind::DuplicateTaskId,
-                TASK_ID_FIELD,
-                DUPLICATE_TASK_REASON,
-            ));
+            return Err(KanbanError::new(KanbanErrorKind::DuplicateTaskId, TASK_ID_FIELD, DUPLICATE_TASK_REASON));
         }
     }
     Ok(())
@@ -1177,14 +1082,9 @@ fn validate_task(draft: KanbanTaskDraft) -> Result<KanbanTask, KanbanError> {
     validate_revision(draft.revision)?;
     let comments = validate_comments(draft.comments.as_slice(), tenant_label.as_deref())?;
     let heartbeats = validate_heartbeats(draft.heartbeats.as_slice(), tenant_label.as_deref())?;
-    let block_records =
-        validate_block_records(draft.block_records.as_slice(), tenant_label.as_deref())?;
-    let completion = validate_completion_record(
-        draft.completion.as_ref(),
-        draft.state,
-        draft.revision,
-        tenant_label.as_deref(),
-    )?;
+    let block_records = validate_block_records(draft.block_records.as_slice(), tenant_label.as_deref())?;
+    let completion =
+        validate_completion_record(draft.completion.as_ref(), draft.state, draft.revision, tenant_label.as_deref())?;
     Ok(KanbanTask {
         task_id,
         title,
@@ -1205,46 +1105,20 @@ fn validate_task(draft: KanbanTaskDraft) -> Result<KanbanTask, KanbanError> {
     })
 }
 
-fn validate_workspace_scope(
-    scope: Option<KanbanWorkspaceScope>,
-) -> Result<KanbanWorkspaceScope, KanbanError> {
-    let scope = scope.ok_or_else(|| {
-        KanbanError::new(
-            KanbanErrorKind::MissingField,
-            WORKSPACE_FIELD,
-            MISSING_FIELD_REASON,
-        )
-    })?;
+fn validate_workspace_scope(scope: Option<KanbanWorkspaceScope>) -> Result<KanbanWorkspaceScope, KanbanError> {
+    let scope =
+        scope.ok_or_else(|| KanbanError::new(KanbanErrorKind::MissingField, WORKSPACE_FIELD, MISSING_FIELD_REASON))?;
     let root_capability = label!(ROOT_CAPABILITY_FIELD, scope.root_capability.as_str())?;
-    let writable_targets = validate_label_list(
-        WORKSPACE_TARGET_FIELD,
-        scope.writable_targets.as_slice(),
-        MAX_KANBAN_LINKS,
-    )?;
-    let approval_required_targets = validate_label_list(
-        WORKSPACE_TARGET_FIELD,
-        scope.approval_required_targets.as_slice(),
-        MAX_KANBAN_LINKS,
-    )?;
+    let writable_targets =
+        validate_label_list(WORKSPACE_TARGET_FIELD, scope.writable_targets.as_slice(), MAX_KANBAN_LINKS)?;
+    let approval_required_targets =
+        validate_label_list(WORKSPACE_TARGET_FIELD, scope.approval_required_targets.as_slice(), MAX_KANBAN_LINKS)?;
     if writable_targets.is_empty() && approval_required_targets.is_empty() {
-        return Err(KanbanError::new(
-            KanbanErrorKind::EmptyField,
-            WORKSPACE_TARGET_FIELD,
-            EMPTY_FIELD_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::EmptyField, WORKSPACE_TARGET_FIELD, EMPTY_FIELD_REASON));
     }
-    assert!(
-        !root_capability.is_empty(),
-        "workspace root capability must be validated"
-    );
-    assert!(
-        writable_targets.len() <= MAX_KANBAN_LINKS,
-        "writable target bounds are enforced"
-    );
-    assert!(
-        approval_required_targets.len() <= MAX_KANBAN_LINKS,
-        "approval target bounds are enforced"
-    );
+    assert!(!root_capability.is_empty(), "workspace root capability must be validated");
+    assert!(writable_targets.len() <= MAX_KANBAN_LINKS, "writable target bounds are enforced");
+    assert!(approval_required_targets.len() <= MAX_KANBAN_LINKS, "approval target bounds are enforced");
     Ok(KanbanWorkspaceScope {
         kind: scope.kind,
         root_capability,
@@ -1257,29 +1131,17 @@ fn validate_link_ids(field: &'static str, values: &[String]) -> Result<Vec<Strin
     validate_label_list(field, values, MAX_KANBAN_LINKS)
 }
 
-fn validate_label_list(
-    field: &'static str,
-    values: &[String],
-    limit: usize,
-) -> Result<Vec<String>, KanbanError> {
+fn validate_label_list(field: &'static str, values: &[String], limit: usize) -> Result<Vec<String>, KanbanError> {
     debug_assert!(!field.is_empty());
     debug_assert!(limit <= MAX_KANBAN_LINKS);
     if values.len() > limit {
-        return Err(KanbanError::new(
-            KanbanErrorKind::TooManyItems,
-            field,
-            TOO_MANY_ITEMS_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::TooManyItems, field, TOO_MANY_ITEMS_REASON));
     }
     let mut result = Vec::with_capacity(values.len());
     for value in values {
         let label = label!(field, value.as_str())?;
         if result.iter().any(|existing| existing == &label) {
-            return Err(KanbanError::new(
-                KanbanErrorKind::InvalidLink,
-                field,
-                DUPLICATE_LINK_REASON,
-            ));
+            return Err(KanbanError::new(KanbanErrorKind::InvalidLink, field, DUPLICATE_LINK_REASON));
         }
         result.push(label);
     }
@@ -1287,10 +1149,7 @@ fn validate_label_list(
     Ok(result)
 }
 
-fn validate_comments(
-    comments: &[KanbanComment],
-    task_tenant: Option<&str>,
-) -> Result<Vec<KanbanComment>, KanbanError> {
+fn validate_comments(comments: &[KanbanComment], task_tenant: Option<&str>) -> Result<Vec<KanbanComment>, KanbanError> {
     if comments.len() > MAX_KANBAN_RECORDS {
         return Err(too_many_records(COMMENT_FIELD));
     }
@@ -1363,11 +1222,9 @@ fn validate_completion_record(
             let validated = validate_completion(record, task_revision, task_tenant)?;
             Ok(Some(validated))
         }
-        None if matches!(state, KanbanTaskState::Completed) => Err(KanbanError::new(
-            KanbanErrorKind::StaleCompletion,
-            COMPLETION_FIELD,
-            STALE_COMPLETION_REASON,
-        )),
+        None if matches!(state, KanbanTaskState::Completed) => {
+            Err(KanbanError::new(KanbanErrorKind::StaleCompletion, COMPLETION_FIELD, STALE_COMPLETION_REASON))
+        }
         None => Ok(None),
     }
 }
@@ -1378,11 +1235,7 @@ fn validate_completion(
     task_tenant: Option<&str>,
 ) -> Result<KanbanCompletion, KanbanError> {
     if record.task_revision != task_revision || record.task_revision < MIN_KANBAN_REVISION {
-        return Err(KanbanError::new(
-            KanbanErrorKind::StaleCompletion,
-            COMPLETION_FIELD,
-            STALE_COMPLETION_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::StaleCompletion, COMPLETION_FIELD, STALE_COMPLETION_REASON));
     }
     let tenant_label = validate_record_tenant(record.tenant_label.as_deref(), task_tenant)?;
     Ok(KanbanCompletion {
@@ -1395,9 +1248,7 @@ fn validate_completion(
     })
 }
 
-fn validate_context_handoff(
-    handoff: &KanbanContextHandoff,
-) -> Result<KanbanContextHandoff, KanbanError> {
+fn validate_context_handoff(handoff: &KanbanContextHandoff) -> Result<KanbanContextHandoff, KanbanError> {
     Ok(KanbanContextHandoff {
         handoff_id: label!(HANDOFF_ID_FIELD, handoff.handoff_id.as_str())?,
         task_id: label!(TASK_ID_FIELD, handoff.task_id.as_str())?,
@@ -1414,33 +1265,21 @@ fn validate_record_tenant(
 ) -> Result<Option<String>, KanbanError> {
     let tenant_label = validate_optional_label(TENANT_FIELD, record_tenant)?;
     if tenant_mismatch(task_tenant, tenant_label.as_deref()) {
-        return Err(KanbanError::new(
-            KanbanErrorKind::CrossTenantLeak,
-            TENANT_FIELD,
-            CROSS_TENANT_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, CROSS_TENANT_REASON));
     }
     Ok(tenant_label)
 }
 
 fn validate_revision(revision: u64) -> Result<(), KanbanError> {
     if revision < MIN_KANBAN_REVISION {
-        return Err(KanbanError::new(
-            KanbanErrorKind::EmptyField,
-            REVISION_FIELD,
-            EMPTY_FIELD_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::EmptyField, REVISION_FIELD, EMPTY_FIELD_REASON));
     }
     Ok(())
 }
 
 fn validate_sequence(sequence: u64) -> Result<u64, KanbanError> {
     if sequence < MIN_KANBAN_SEQUENCE {
-        return Err(KanbanError::new(
-            KanbanErrorKind::EmptyField,
-            SEQUENCE_FIELD,
-            EMPTY_FIELD_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::EmptyField, SEQUENCE_FIELD, EMPTY_FIELD_REASON));
     }
     Ok(sequence)
 }
@@ -1450,11 +1289,7 @@ fn validate_metadata(
     metadata: std::collections::BTreeMap<String, String>,
 ) -> Result<std::collections::BTreeMap<String, String>, KanbanError> {
     if metadata.len() > MAX_KANBAN_METADATA_FIELDS {
-        return Err(KanbanError::new(
-            KanbanErrorKind::TooManyItems,
-            field,
-            TOO_MANY_ITEMS_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::TooManyItems, field, TOO_MANY_ITEMS_REASON));
     }
     let mut entries = Vec::with_capacity(metadata.len());
     for (key, value) in metadata {
@@ -1465,27 +1300,12 @@ fn validate_metadata(
     Ok(entries.into_iter().collect())
 }
 
-fn validate_optional_label(
-    field: &'static str,
-    value: Option<&str>,
-) -> Result<Option<String>, KanbanError> {
-    value
-        .map(|label| {
-            validate_label(StringInput {
-                field,
-                value: label,
-            })
-        })
-        .transpose()
+fn validate_optional_label(field: &'static str, value: Option<&str>) -> Result<Option<String>, KanbanError> {
+    value.map(|label| validate_label(StringInput { field, value: label })).transpose()
 }
 
-fn validate_optional_text(
-    field: &'static str,
-    value: Option<&str>,
-) -> Result<Option<String>, KanbanError> {
-    value
-        .map(|text| validate_text(StringInput { field, value: text }))
-        .transpose()
+fn validate_optional_text(field: &'static str, value: Option<&str>) -> Result<Option<String>, KanbanError> {
+    value.map(|text| validate_text(StringInput { field, value: text })).transpose()
 }
 
 fn validate_label(input: StringInput<'_>) -> Result<String, KanbanError> {
@@ -1509,25 +1329,13 @@ fn validate_string(input: LimitedStringInput<'_>) -> Result<String, KanbanError>
     debug_assert!(input.limit > 0);
     let trimmed = input.value.trim();
     if trimmed.is_empty() {
-        return Err(KanbanError::new(
-            KanbanErrorKind::EmptyField,
-            input.field,
-            EMPTY_FIELD_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::EmptyField, input.field, EMPTY_FIELD_REASON));
     }
     if trimmed.chars().count() > input.limit {
-        return Err(KanbanError::new(
-            KanbanErrorKind::FieldTooLong,
-            input.field,
-            TOO_LONG_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::FieldTooLong, input.field, TOO_LONG_REASON));
     }
     if contains_unsafe_marker(trimmed) {
-        return Err(KanbanError::new(
-            KanbanErrorKind::UnsafeText,
-            input.field,
-            UNSAFE_TEXT_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::UnsafeText, input.field, UNSAFE_TEXT_REASON));
     }
     Ok(String::from(trimmed))
 }
@@ -1550,12 +1358,9 @@ struct UnsafeMarkerCheck<'a> {
 
 fn contains_unsafe_marker_value(check: UnsafeMarkerCheck<'_>) -> bool {
     if check.marker == OPENAI_KEY_PREFIX_MARKER {
-        return check.normalized_value.starts_with(check.marker)
-            || check.normalized_value.contains(" sk-");
+        return check.normalized_value.starts_with(check.marker) || check.normalized_value.contains(" sk-");
     }
-    check
-        .normalized_value
-        .contains(&check.marker.to_ascii_lowercase())
+    check.normalized_value.contains(&check.marker.to_ascii_lowercase())
 }
 
 fn validate_links(tasks: &[KanbanTask]) -> Result<(), KanbanError> {
@@ -1575,16 +1380,8 @@ fn validate_parent_links(task: &KanbanTask, tasks: &[KanbanTask]) -> Result<(), 
             task_id: parent_id,
             field: PARENT_FIELD,
         })?;
-        if !parent
-            .child_ids()
-            .iter()
-            .any(|child_id| child_id == task.task_id())
-        {
-            return Err(KanbanError::new(
-                KanbanErrorKind::InvalidLink,
-                PARENT_FIELD,
-                INVALID_LINK_REASON,
-            ));
+        if !parent.child_ids().iter().any(|child_id| child_id == task.task_id()) {
+            return Err(KanbanError::new(KanbanErrorKind::InvalidLink, PARENT_FIELD, INVALID_LINK_REASON));
         }
     }
     Ok(())
@@ -1599,16 +1396,8 @@ fn validate_child_links(task: &KanbanTask, tasks: &[KanbanTask]) -> Result<(), K
             task_id: child_id,
             field: CHILD_FIELD,
         })?;
-        if !child
-            .parent_ids()
-            .iter()
-            .any(|parent_id| parent_id == task.task_id())
-        {
-            return Err(KanbanError::new(
-                KanbanErrorKind::InvalidLink,
-                CHILD_FIELD,
-                INVALID_LINK_REASON,
-            ));
+        if !child.parent_ids().iter().any(|parent_id| parent_id == task.task_id()) {
+            return Err(KanbanError::new(KanbanErrorKind::InvalidLink, CHILD_FIELD, INVALID_LINK_REASON));
         }
     }
     Ok(())
@@ -1619,13 +1408,7 @@ fn task_by_id(input: TaskLookup<'_>) -> Result<&KanbanTask, KanbanError> {
         .tasks
         .iter()
         .find(|task| task.task_id() == input.task_id)
-        .ok_or_else(|| {
-            KanbanError::new(
-                KanbanErrorKind::UnknownTaskId,
-                input.field,
-                INVALID_LINK_REASON,
-            )
-        })
+        .ok_or_else(|| KanbanError::new(KanbanErrorKind::UnknownTaskId, input.field, INVALID_LINK_REASON))
 }
 
 fn validate_tenant_dependencies(tasks: &[KanbanTask]) -> Result<(), KanbanError> {
@@ -1637,11 +1420,7 @@ fn validate_tenant_dependencies(tasks: &[KanbanTask]) -> Result<(), KanbanError>
                 field: PARENT_FIELD,
             })?;
             if tenant_mismatch(child.tenant_label(), parent.tenant_label()) {
-                return Err(KanbanError::new(
-                    KanbanErrorKind::CrossTenantLeak,
-                    TENANT_FIELD,
-                    CROSS_TENANT_REASON,
-                ));
+                return Err(KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, CROSS_TENANT_REASON));
             }
         }
     }
@@ -1685,19 +1464,11 @@ fn validate_task_acyclic(tasks: &[KanbanTask], start_task_id: &str) -> Result<()
         }
         let parent_id = task.parent_ids()[parent_index].as_str();
         let Some(next_parent_index) = parent_index.checked_add(1) else {
-            return Err(KanbanError::new(
-                KanbanErrorKind::InvalidLink,
-                PARENT_FIELD,
-                INVALID_LINK_REASON,
-            ));
+            return Err(KanbanError::new(KanbanErrorKind::InvalidLink, PARENT_FIELD, INVALID_LINK_REASON));
         };
         stack[top_index].next_parent_index = next_parent_index;
         if stack.iter().any(|frame| frame.task_id == parent_id) || stack.len() >= tasks.len() {
-            return Err(KanbanError::new(
-                KanbanErrorKind::Cycle,
-                PARENT_FIELD,
-                CYCLE_REASON,
-            ));
+            return Err(KanbanError::new(KanbanErrorKind::Cycle, PARENT_FIELD, CYCLE_REASON));
         }
         stack.push(CycleFrame {
             task_id: parent_id,
@@ -1707,29 +1478,20 @@ fn validate_task_acyclic(tasks: &[KanbanTask], start_task_id: &str) -> Result<()
     Ok(())
 }
 
-fn evaluate_parent_for_promotion(
-    parent: &KanbanTask,
-    child: &KanbanTask,
-) -> Result<ParentPromotion, KanbanError> {
+fn evaluate_parent_for_promotion(parent: &KanbanTask, child: &KanbanTask) -> Result<ParentPromotion, KanbanError> {
     debug_assert!(!parent.task_id().is_empty());
     debug_assert!(!child.task_id().is_empty());
     if tenant_mismatch(parent.tenant_label(), child.tenant_label()) {
-        return Err(KanbanError::new(
-            KanbanErrorKind::CrossTenantLeak,
-            TENANT_FIELD,
-            CROSS_TENANT_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, CROSS_TENANT_REASON));
     }
     match parent.state() {
         KanbanTaskState::Completed => {
             validate_parent_completion(parent, child)?;
             Ok(ParentPromotion::Complete)
         }
-        KanbanTaskState::Draft | KanbanTaskState::Ready | KanbanTaskState::InProgress => {
-            Ok(ParentPromotion::Waiting {
-                parent_id: String::from(parent.task_id()),
-            })
-        }
+        KanbanTaskState::Draft | KanbanTaskState::Ready | KanbanTaskState::InProgress => Ok(ParentPromotion::Waiting {
+            parent_id: String::from(parent.task_id()),
+        }),
         KanbanTaskState::Blocked | KanbanTaskState::Cancelled => Err(KanbanError::new(
             KanbanErrorKind::AmbiguousDependencyState,
             PARENT_FIELD,
@@ -1741,26 +1503,14 @@ fn evaluate_parent_for_promotion(
 fn validate_parent_completion(parent: &KanbanTask, child: &KanbanTask) -> Result<(), KanbanError> {
     debug_assert_eq!(parent.state(), KanbanTaskState::Completed);
     debug_assert!(!child.task_id().is_empty());
-    let completion = parent.completion().ok_or_else(|| {
-        KanbanError::new(
-            KanbanErrorKind::StaleCompletion,
-            COMPLETION_FIELD,
-            STALE_COMPLETION_REASON,
-        )
-    })?;
+    let completion = parent
+        .completion()
+        .ok_or_else(|| KanbanError::new(KanbanErrorKind::StaleCompletion, COMPLETION_FIELD, STALE_COMPLETION_REASON))?;
     if completion.task_revision != parent.revision() {
-        return Err(KanbanError::new(
-            KanbanErrorKind::StaleCompletion,
-            COMPLETION_FIELD,
-            STALE_COMPLETION_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::StaleCompletion, COMPLETION_FIELD, STALE_COMPLETION_REASON));
     }
     if tenant_mismatch(child.tenant_label(), completion.tenant_label.as_deref()) {
-        return Err(KanbanError::new(
-            KanbanErrorKind::CrossTenantLeak,
-            TENANT_FIELD,
-            CROSS_TENANT_REASON,
-        ));
+        return Err(KanbanError::new(KanbanErrorKind::CrossTenantLeak, TENANT_FIELD, CROSS_TENANT_REASON));
     }
     Ok(())
 }
@@ -1845,14 +1595,10 @@ mod tests {
             sequence: MIN_KANBAN_SEQUENCE,
             metadata: std::collections::BTreeMap::new(),
         };
-        let assembly =
-            assemble_kanban_context(child, &[handoff], KanbanTenantPolicy::RejectCrossTenant)
-                .expect("tenant-safe assembly");
+        let assembly = assemble_kanban_context(child, &[handoff], KanbanTenantPolicy::RejectCrossTenant)
+            .expect("tenant-safe assembly");
         assert_eq!(assembly.admitted.len(), EXPECTED_SINGLE_ITEM);
-        assert_eq!(
-            assembly.admitted[0].tenant_label.as_deref(),
-            Some(TENANT_ALPHA)
-        );
+        assert_eq!(assembly.admitted[0].tenant_label.as_deref(), Some(TENANT_ALPHA));
         assert_eq!(assembly.admitted[0].safe_summary, SAFE_HANDOFF_BODY);
     }
 
@@ -1906,8 +1652,7 @@ mod tests {
             tasks: vec![blocked_parent, child],
         })
         .expect("valid blocked graph");
-        let ambiguous =
-            evaluate_kanban_promotion(&graph, CHILD).expect_err("blocked parent ambiguous");
+        let ambiguous = evaluate_kanban_promotion(&graph, CHILD).expect_err("blocked parent ambiguous");
         assert_eq!(ambiguous.kind(), KanbanErrorKind::AmbiguousDependencyState);
 
         let stale = KanbanTaskDraft {
@@ -1956,19 +1701,12 @@ mod tests {
             sequence: MIN_KANBAN_SEQUENCE,
             metadata: std::collections::BTreeMap::new(),
         };
-        let reject = assemble_kanban_context(
-            child,
-            std::slice::from_ref(&beta_handoff),
-            KanbanTenantPolicy::RejectCrossTenant,
-        )
-        .expect_err("cross-tenant context rejected");
+        let reject =
+            assemble_kanban_context(child, std::slice::from_ref(&beta_handoff), KanbanTenantPolicy::RejectCrossTenant)
+                .expect_err("cross-tenant context rejected");
         assert_eq!(reject.kind(), KanbanErrorKind::CrossTenantLeak);
-        let quarantine = assemble_kanban_context(
-            child,
-            &[beta_handoff],
-            KanbanTenantPolicy::QuarantineCrossTenant,
-        )
-        .expect("cross-tenant context quarantined");
+        let quarantine = assemble_kanban_context(child, &[beta_handoff], KanbanTenantPolicy::QuarantineCrossTenant)
+            .expect("cross-tenant context quarantined");
         assert!(quarantine.admitted.is_empty());
         assert_eq!(quarantine.quarantined.len(), EXPECTED_SINGLE_ITEM);
     }
@@ -1985,31 +1723,22 @@ mod tests {
             sequence: MIN_KANBAN_SEQUENCE,
             metadata: std::collections::BTreeMap::new(),
         };
-        let unsafe_error = assemble_kanban_context(
-            child,
-            &[unsafe_handoff],
-            KanbanTenantPolicy::RejectCrossTenant,
-        )
-        .expect_err("unsafe handoff rejected");
+        let unsafe_error = assemble_kanban_context(child, &[unsafe_handoff], KanbanTenantPolicy::RejectCrossTenant)
+            .expect_err("unsafe handoff rejected");
         assert_eq!(unsafe_error.kind(), KanbanErrorKind::UnsafeText);
 
         let out_of_scope = KanbanMutationIntent {
             target_label: String::from("private-root"),
             approval_label: Some(String::from(APPROVAL)),
         };
-        let scope_error =
-            validate_kanban_workspace_mutation(child.workspace_scope(), &out_of_scope)
-                .expect_err("out-of-scope mutation rejected");
+        let scope_error = validate_kanban_workspace_mutation(child.workspace_scope(), &out_of_scope)
+            .expect_err("out-of-scope mutation rejected");
         assert_eq!(scope_error.kind(), KanbanErrorKind::OutOfScopeMutation);
     }
 
     fn valid_graph_draft() -> KanbanTaskGraphDraft {
         KanbanTaskGraphDraft {
-            tasks: vec![
-                completed_parent(PARENT_A),
-                completed_parent(PARENT_B),
-                ready_child(),
-            ],
+            tasks: vec![completed_parent(PARENT_A), completed_parent(PARENT_B), ready_child()],
         }
     }
 
@@ -2045,10 +1774,7 @@ mod tests {
             heartbeats: vec![heartbeat()],
             block_records: vec![block_record()],
             completion: None,
-            metadata: std::collections::BTreeMap::from([(
-                String::from("priority-source"),
-                String::from("host"),
-            )]),
+            metadata: std::collections::BTreeMap::from([(String::from("priority-source"), String::from("host"))]),
             revision: MIN_KANBAN_REVISION,
         }
     }
@@ -2101,10 +1827,7 @@ mod tests {
             summary: String::from("completed with bounded metadata"),
             task_revision: MIN_KANBAN_REVISION,
             tenant_label: Some(String::from(tenant)),
-            metadata: std::collections::BTreeMap::from([(
-                String::from("result"),
-                String::from("accepted"),
-            )]),
+            metadata: std::collections::BTreeMap::from([(String::from("result"), String::from("accepted"))]),
         }
     }
 
@@ -2163,8 +1886,8 @@ mod tests {
             error: animus_adapters::orchestration::OrchestrationError::BackendUnavailable,
         };
         let mut bridge = OrchestrationAdapterBoardService::new(&mut failing);
-        let unavailable = load_kanban_graph(Some(&mut bridge), BOARD)
-            .expect_err("backend unavailable should fail closed");
+        let unavailable =
+            load_kanban_graph(Some(&mut bridge), BOARD).expect_err("backend unavailable should fail closed");
         assert_eq!(unavailable.kind(), KanbanErrorKind::InjectedServiceFailure);
 
         let unsafe_handoff = KanbanContextHandoff {
@@ -2196,10 +1919,8 @@ mod tests {
             animus_adapters::orchestration::OrchestrationError,
         > {
             assert_eq!(request.board_label(), BOARD);
-            self.loads = self
-                .loads
-                .checked_add(EXPECTED_SINGLE_ITEM)
-                .expect("adapter load count stays within fixture bound");
+            self.loads =
+                self.loads.checked_add(EXPECTED_SINGLE_ITEM).expect("adapter load count stays within fixture bound");
             adapter_graph_draft()
         }
 
@@ -2215,9 +1936,7 @@ mod tests {
                 .handoffs
                 .checked_add(EXPECTED_SINGLE_ITEM)
                 .expect("adapter handoff count stays within fixture bound");
-            adapter_receipt(
-                animus_adapters::orchestration::OrchestrationOperationKind::AppendHandoff,
-            )
+            adapter_receipt(animus_adapters::orchestration::OrchestrationOperationKind::AppendHandoff)
         }
 
         fn admit_scheduling(
@@ -2359,24 +2078,17 @@ mod tests {
 
     fn adapter_receipt(
         operation: animus_adapters::orchestration::OrchestrationOperationKind,
-    ) -> Result<
-        animus_adapters::orchestration::OrchestrationReceipt,
-        animus_adapters::orchestration::OrchestrationError,
-    > {
+    ) -> Result<animus_adapters::orchestration::OrchestrationReceipt, animus_adapters::orchestration::OrchestrationError>
+    {
         assert!(!operation.as_str().is_empty());
         assert!(!BOARD.is_empty());
         assert!(!PARENT_A.is_empty());
         assert!(!ADAPTER_BRIDGE_POLICY_LABEL.is_empty());
-        let hash = animus_adapters::orchestration::blake3_orchestration_hash(&[
-            operation.as_str(),
-            BOARD,
-            PARENT_A,
-        ]);
+        let hash = animus_adapters::orchestration::blake3_orchestration_hash(&[operation.as_str(), BOARD, PARENT_A]);
         assert!(!hash.as_str().is_empty());
         animus_adapters::orchestration::OrchestrationReceipt::new(
             &animus_adapters::orchestration::OrchestrationReceiptDraft {
-                contract_identity:
-                    animus_adapters::orchestration::ORCHESTRATION_RECEIPT_CONTRACT_IDENTITY,
+                contract_identity: animus_adapters::orchestration::ORCHESTRATION_RECEIPT_CONTRACT_IDENTITY,
                 operation,
                 status: animus_adapters::orchestration::OrchestrationStatusClass::Accepted,
                 family_label: animus_adapters::orchestration::ORCHESTRATION_FAMILY_LABEL,
@@ -2398,23 +2110,15 @@ mod tests {
     }
 
     impl KanbanBoardService for RecordingBoardService {
-        fn load_task_graph(
-            &mut self,
-            board_label: &str,
-        ) -> Result<KanbanTaskGraphDraft, KanbanError> {
+        fn load_task_graph(&mut self, board_label: &str) -> Result<KanbanTaskGraphDraft, KanbanError> {
             assert_eq!(board_label, BOARD);
-            self.loads = self
-                .loads
-                .checked_add(EXPECTED_SINGLE_ITEM)
-                .expect("load count stays within fixture bound");
+            self.loads = self.loads.checked_add(EXPECTED_SINGLE_ITEM).expect("load count stays within fixture bound");
             Ok(valid_graph_draft())
         }
 
         fn append_handoff(&mut self, _handoff: &KanbanContextHandoff) -> Result<(), KanbanError> {
-            self.handoffs = self
-                .handoffs
-                .checked_add(EXPECTED_SINGLE_ITEM)
-                .expect("handoff count stays within fixture bound");
+            self.handoffs =
+                self.handoffs.checked_add(EXPECTED_SINGLE_ITEM).expect("handoff count stays within fixture bound");
             Ok(())
         }
     }

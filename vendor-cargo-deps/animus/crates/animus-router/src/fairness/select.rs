@@ -86,7 +86,8 @@ impl From<crate::AdapterContractError> for RouterRotationError {
 ///
 /// # Errors
 ///
-/// Returns [`RouterRotationError`] when no eligible candidates exist or stale cursor policy denies reset.
+/// Returns [`RouterRotationError`] when no eligible candidates exist or stale cursor policy denies
+/// reset.
 ///
 /// # Panics
 ///
@@ -105,10 +106,7 @@ pub fn rotate_eligible_candidates(
         candidates.len() > super::FIRST_CURSOR_INDEX,
         "candidate list must remain non-empty after validation"
     );
-    assert!(
-        snapshot.catalog_hash().len() == crate::SafeHash::HEX_CHARS,
-        "catalog hash must stay BLAKE3-sized"
-    );
+    assert!(snapshot.catalog_hash().len() == crate::SafeHash::HEX_CHARS, "catalog hash must stay BLAKE3-sized");
 
     let (selected_index, cursor_class) = cursor_start_index(CursorStartRequest {
         role,
@@ -121,11 +119,8 @@ pub fn rotate_eligible_candidates(
         candidate_count: candidates.len(),
     });
     let next_position = u32::try_from(next_index).unwrap_or(super::MAX_CURSOR_POSITION);
-    let next_cursor = super::RouterRotationCursor::from_parts(
-        role,
-        next_position,
-        snapshot.catalog_safe_hash().clone(),
-    );
+    let next_cursor =
+        super::RouterRotationCursor::from_parts(role, next_position, snapshot.catalog_safe_hash().clone());
     let next_cursor_hash = cursor_hash(&next_cursor, snapshot.catalog_safe_hash());
     let candidate_count = u32::try_from(candidates.len()).unwrap_or(super::MAX_CURSOR_POSITION);
 
@@ -151,48 +146,30 @@ struct CursorStartRequest<'a> {
 fn cursor_start_index(
     request: CursorStartRequest<'_>,
 ) -> Result<(usize, super::RouterRotationCursorClass), RouterRotationError> {
-    assert!(
-        request.candidate_count > super::FIRST_CURSOR_INDEX,
-        "candidate count must be non-zero"
-    );
+    assert!(request.candidate_count > super::FIRST_CURSOR_INDEX, "candidate count must be non-zero");
     assert!(
         request.snapshot.catalog_hash().len() == crate::SafeHash::HEX_CHARS,
         "catalog hash must stay BLAKE3-sized"
     );
     if !request.snapshot.policy().rotates_role(request.role) {
-        return Ok((
-            super::FIRST_CURSOR_INDEX,
-            super::RouterRotationCursorClass::Disabled,
-        ));
+        return Ok((super::FIRST_CURSOR_INDEX, super::RouterRotationCursorClass::Disabled));
     }
 
     let Some(cursor) = request.snapshot.cursor_for(request.role) else {
-        return Ok((
-            super::FIRST_CURSOR_INDEX,
-            super::RouterRotationCursorClass::Absent,
-        ));
+        return Ok((super::FIRST_CURSOR_INDEX, super::RouterRotationCursorClass::Absent));
     };
 
-    if cursor
-        .catalog_hash()
-        .is_some_and(|hash| hash != request.snapshot.catalog_hash())
-    {
+    if cursor.catalog_hash().is_some_and(|hash| hash != request.snapshot.catalog_hash()) {
         if request.snapshot.stale_cursor_policy() == super::RouterRotationStaleCursorPolicy::Deny {
             return Err(RouterRotationError::StaleCursor);
         }
-        return Ok((
-            super::FIRST_CURSOR_INDEX,
-            super::RouterRotationCursorClass::StaleReset,
-        ));
+        return Ok((super::FIRST_CURSOR_INDEX, super::RouterRotationCursorClass::StaleReset));
     }
 
     let raw_index = match usize::try_from(cursor.position()) {
         Ok(index) => index,
         Err(_overflow) => {
-            return Ok((
-                super::FIRST_CURSOR_INDEX,
-                super::RouterRotationCursorClass::Wrapped,
-            ));
+            return Ok((super::FIRST_CURSOR_INDEX, super::RouterRotationCursorClass::Wrapped));
         }
     };
     if raw_index >= request.candidate_count {
@@ -227,10 +204,7 @@ fn wrapped_index(window: CursorWindow) -> usize {
 fn next_index(window: CursorWindow) -> usize {
     let divisor = window.candidate_count;
     assert!(divisor != 0, "divisor must be non-zero");
-    assert!(
-        window.selected_index < window.candidate_count,
-        "selected index must be inside the candidate window"
-    );
+    assert!(window.selected_index < window.candidate_count, "selected index must be inside the candidate window");
     let advanced_index = match window.selected_index.checked_add(super::CURSOR_ADVANCE) {
         Some(index) => index,
         None => super::FIRST_CURSOR_INDEX,
@@ -238,10 +212,7 @@ fn next_index(window: CursorWindow) -> usize {
     advanced_index % divisor
 }
 
-fn cursor_hash(
-    cursor: &super::RouterRotationCursor,
-    catalog_hash: &crate::SafeHash,
-) -> alloc::string::String {
+fn cursor_hash(cursor: &super::RouterRotationCursor, catalog_hash: &crate::SafeHash) -> alloc::string::String {
     let position = cursor.position().to_string();
     crate::hash_parts(&[
         super::CURSOR_HASH_SCHEMA,

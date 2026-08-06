@@ -55,34 +55,26 @@ impl Descriptor {
         let trust_text = super::validate::required_text(super::TRUST_FIELD, draft.trust)?;
         let goal = super::validate::required_text(super::GOAL_FIELD, draft.goal)?;
         let provenance = super::validate::required_text(super::PROVENANCE_FIELD, draft.provenance)?;
-        let kind = super::validate::parse_kind(kind_text.as_str()).ok_or_else(|| {
-            super::Error::UnsupportedValue {
-                field: super::KIND_FIELD.as_str(),
-                value: kind_text,
-            }
+        let kind = super::validate::parse_kind(kind_text.as_str()).ok_or_else(|| super::Error::UnsupportedValue {
+            field: super::KIND_FIELD.as_str(),
+            value: kind_text,
         })?;
-        let scope = super::validate::parse_scope(scope_text.as_str()).ok_or_else(|| {
-            super::Error::UnsupportedValue {
+        let scope =
+            super::validate::parse_scope(scope_text.as_str()).ok_or_else(|| super::Error::UnsupportedValue {
                 field: super::SCOPE_FIELD.as_str(),
                 value: scope_text,
-            }
-        })?;
-        let trust = super::validate::parse_trust(trust_text.as_str()).ok_or_else(|| {
-            super::Error::UnsupportedValue {
+            })?;
+        let trust =
+            super::validate::parse_trust(trust_text.as_str()).ok_or_else(|| super::Error::UnsupportedValue {
                 field: super::TRUST_FIELD.as_str(),
                 value: trust_text,
-            }
-        })?;
+            })?;
         super::validate::priority(draft.priority)?;
-        let success_criteria =
-            super::validate::required_collection(super::SUCCESS_FIELD, draft.success_criteria)?;
-        let constraints =
-            super::validate::optional_collection(super::CONSTRAINT_FIELD, draft.constraints)?;
-        let validation_rules =
-            super::validate::required_collection(super::VALIDATION_FIELD, draft.validation_rules)?;
+        let success_criteria = super::validate::required_collection(super::SUCCESS_FIELD, draft.success_criteria)?;
+        let constraints = super::validate::optional_collection(super::CONSTRAINT_FIELD, draft.constraints)?;
+        let validation_rules = super::validate::required_collection(super::VALIDATION_FIELD, draft.validation_rules)?;
         let stop_rules = super::validate::required_collection(super::STOP_FIELD, draft.stop_rules)?;
-        let prompt_snippets =
-            super::validate::optional_collection(super::SNIPPET_FIELD, draft.prompt_snippets)?;
+        let prompt_snippets = super::validate::optional_collection(super::SNIPPET_FIELD, draft.prompt_snippets)?;
         let profile = Self {
             kind,
             scope,
@@ -170,10 +162,9 @@ impl Descriptor {
     #[must_use]
     pub const fn enforcement_boundary(&self) -> super::EnforcementBoundary {
         match self.scope {
-            SourceScope::Global
-            | SourceScope::Session
-            | SourceScope::Project
-            | SourceScope::Tool => super::EnforcementBoundary::GuidanceOnly,
+            SourceScope::Global | SourceScope::Session | SourceScope::Project | SourceScope::Tool => {
+                super::EnforcementBoundary::GuidanceOnly
+            }
         }
     }
 
@@ -187,9 +178,7 @@ impl Descriptor {
     }
 
     pub(super) fn validates_as_read_only_guidance(&self) -> bool {
-        self.constraints
-            .iter()
-            .any(|constraint| constraint == super::READ_ONLY_CONSTRAINT)
+        self.constraints.iter().any(|constraint| constraint == super::READ_ONLY_CONSTRAINT)
     }
 
     fn validate_prompt_hygiene(&self) -> Result<(), super::Error> {

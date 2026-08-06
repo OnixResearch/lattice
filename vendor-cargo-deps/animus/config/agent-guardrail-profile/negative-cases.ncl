@@ -1,0 +1,22 @@
+{
+  schema = "animus.agent-guardrail.negative-cases.v1",
+  cases = [
+    { id = "unknown-cohort", field = "cohort", value = "unknown" },
+    { id = "project-local-policy", field = "trust_source", value = "project-local" },
+    { id = "implicit-writable", field = "roots.mode", value = "implicit" },
+    { id = "broad-devices", field = "devices", value = "true" },
+    { id = "host-sockets", field = "host_sockets", value = "true" },
+    { id = "filtered-network-claim", field = "network", value = "filtered" },
+    { id = "raw-arguments", field = "escape_hatches.raw_arguments", value = "true" },
+    { id = "command-prefix", field = "escape_hatches.command_prefix", value = "true" },
+    { id = "passthrough", field = "escape_hatches.passthrough", value = "true" },
+    { id = "command-source", field = "escape_hatches.command_environment_source", value = "true" },
+    { id = "implicit-shell", field = "escape_hatches.implicit_shell", value = "true" },
+    { id = "unguarded-fallback", field = "escape_hatches.unguarded_fallback", value = "true" },
+    { id = "privileged-sidecar", field = "escape_hatches.privileged_sidecar", value = "true" },
+    { id = "zero-bound", field = "bounds.max_roots", value = "0" },
+    { id = "unsafe-label", field = "label", value = "/private/profile" },
+    { id = "weakened-redaction", field = "redaction.raw_payloads", value = "true" },
+    { id = "weakened-non-claims", field = "non_claims", value = "empty" },
+  ],
+}

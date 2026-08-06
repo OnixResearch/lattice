@@ -1,0 +1,12 @@
+schema=headless-tabs-fixtures.v1
+evidence_class=semantic-behavior-not-visual
+fixture=headless-tabs.normal-v1 status=accepted selected=tab.details focused=tab.details semantics=58ecaa816a7e1893ea5576c17da5e182bc56747b416d5f1d19d2d8a107f7ef3e
+fixture=headless-tabs.disabled-v1 status=accepted selected=tab.history focused=tab.history semantics=74bbd95d8ab98ec5bb0f928ad4c78ab5d0b810cb0ac6b0032f0202c59a2dce33
+fixture=headless-tabs.hidden-v1 status=accepted selected=tab.details focused=tab.details semantics=2b14c63a727454ae21c790021a8a8bf22e522a0b7c0cee636116a2101137fad6
+fixture=headless-tabs.empty-v1 status=rejected diagnostics=[TabsDiagnostic { code: EmptyCatalog, subject: "catalog" }, TabsDiagnostic { code: NoEligibleTab, subject: "catalog" }, TabsDiagnostic { code: UnknownSelection, subject: "tab.overview" }, TabsDiagnostic { code: UnknownFocus, subject: "tab.overview" }]
+fixture=headless-tabs.replacement-v1 status=repaired selected=tab.details focused=tab.details semantics=ad92b2be8941a8c97547f961affb6da47a0d2186d659941cf44da593b7575312
+fixture=headless-tabs.narrow-v1 status=accepted selected=tab.details focused=tab.details semantics=58ecaa816a7e1893ea5576c17da5e182bc56747b416d5f1d19d2d8a107f7ef3e
+fixture=headless-tabs.manual-v1 status=accepted selected=tab.details focused=tab.details semantics=58ecaa816a7e1893ea5576c17da5e182bc56747b416d5f1d19d2d8a107f7ef3e
+fixture=headless-tabs.automatic-v1 status=accepted selected=tab.details focused=tab.details semantics=58ecaa816a7e1893ea5576c17da5e182bc56747b416d5f1d19d2d8a107f7ef3e
+fixture=headless-tabs.invalid-v1 status=rejected diagnostics=[TabsDiagnostic { code: DuplicateTab, subject: "tab.overview" }]
+not_claimed=markup-parity,pixel-parity,physical-focus-runtime

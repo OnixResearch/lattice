@@ -12,18 +12,12 @@ const SAFE_CALLBACK: &str = "bounded-selection";
 fn evaluation_matrix_accepts_safe_metadata_fixture() {
     let evaluation = Descriptor::evaluate(&safe_descriptor()).expect("safe fixture should parse");
 
-    assert_eq!(
-        evaluation.adoption_decision(),
-        AdoptionDecision::DataOnlyAdoptable
-    );
+    assert_eq!(evaluation.adoption_decision(), AdoptionDecision::DataOnlyAdoptable);
     assert_eq!(evaluation.risk_reason(), RiskReason::SafeMetadata);
     assert_eq!(Evaluation::covered_axes(), MCP_APP_EVALUATION_AXES);
     assert_eq!(evaluation.descriptor().resource_uri(), SAFE_RESOURCE);
     assert_eq!(evaluation.descriptor().size_policy(), SizePolicy::Bounded);
-    assert_eq!(
-        evaluation.descriptor().lifecycle_policy(),
-        LifecyclePolicy::BoundedCallbacks
-    );
+    assert_eq!(evaluation.descriptor().lifecycle_policy(), LifecyclePolicy::BoundedCallbacks);
 }
 
 #[test]
@@ -39,14 +33,8 @@ fn evaluation_matrix_classifies_remote_domains_as_policy_gated() {
     })
     .expect("policy-gated fixture should parse");
 
-    assert_eq!(
-        evaluation.adoption_decision(),
-        AdoptionDecision::NeedsHostPolicy
-    );
-    assert_eq!(
-        evaluation.risk_reason(),
-        RiskReason::RemoteDomainRequiresAdmission
-    );
+    assert_eq!(evaluation.adoption_decision(), AdoptionDecision::NeedsHostPolicy);
+    assert_eq!(evaluation.risk_reason(), RiskReason::RemoteDomainRequiresAdmission);
 }
 
 #[test]
@@ -93,10 +81,7 @@ fn evaluation_matrix_rejects_unsafe_fixtures() {
 
     for (draft, expected_reason) in cases {
         let evaluation = Descriptor::evaluate(&draft).expect("unsafe fixture should parse");
-        assert_eq!(
-            evaluation.adoption_decision(),
-            AdoptionDecision::RejectDefault
-        );
+        assert_eq!(evaluation.adoption_decision(), AdoptionDecision::RejectDefault);
         assert_eq!(evaluation.risk_reason(), expected_reason);
     }
 }
@@ -110,10 +95,7 @@ fn descriptor_validation_is_data_only() {
     .expect("runtime-claim fixture should parse as data");
     let rendered_effects = alloc::format!("{PROHIBITED_MCP_APP_VALIDATION_EFFECTS:?}");
 
-    assert_eq!(
-        evaluation.adoption_decision(),
-        AdoptionDecision::RejectDefault
-    );
+    assert_eq!(evaluation.adoption_decision(), AdoptionDecision::RejectDefault);
     assert_eq!(evaluation.risk_reason(), RiskReason::RuntimeExecutionClaim);
     assert!(rendered_effects.contains("HTML rendering"));
     assert!(rendered_effects.contains("JavaScript execution"));
@@ -133,14 +115,8 @@ fn descriptor_validation_rejects_malformed_data() {
     })
     .expect_err("unknown size policy is rejected");
 
-    assert!(matches!(
-        missing_uri,
-        EvaluationError::Contract(crate::AdapterContractError::EmptyField { .. })
-    ));
-    assert!(matches!(
-        bad_policy_error,
-        EvaluationError::UnsupportedValue { .. }
-    ));
+    assert!(matches!(missing_uri, EvaluationError::Contract(crate::AdapterContractError::EmptyField { .. })));
+    assert!(matches!(bad_policy_error, EvaluationError::UnsupportedValue { .. }));
 }
 
 fn safe_descriptor() -> DescriptorDraft<'static> {

@@ -1,10 +1,12 @@
 //! Loading/spinner indicator
 
-use rat_spinner::{SpinnerSpec, SpinnerState};
+use rat_spinner::SpinnerSpec;
+use rat_spinner::SpinnerState;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::text::{Line, Span};
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
 use crate::theme::WidgetTheme;
@@ -56,34 +58,16 @@ impl<'a> Loader<'a> {
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect, state: &SpinnerState) {
-        let style = self
-            .style
-            .clone()
-            .unwrap_or_else(|| LoaderStyle::themed(&WidgetTheme::default()));
+        let style = self.style.clone().unwrap_or_else(|| LoaderStyle::themed(&WidgetTheme::default()));
         self.render_with_style(frame, area, state, style);
     }
 
-    pub fn render_themed(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        state: &SpinnerState,
-        theme: &WidgetTheme,
-    ) {
-        let style = self
-            .style
-            .clone()
-            .unwrap_or_else(|| LoaderStyle::themed(theme));
+    pub fn render_themed(&self, frame: &mut Frame, area: Rect, state: &SpinnerState, theme: &WidgetTheme) {
+        let style = self.style.clone().unwrap_or_else(|| LoaderStyle::themed(theme));
         self.render_with_style(frame, area, state, style);
     }
 
-    fn render_with_style(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        state: &SpinnerState,
-        style: LoaderStyle,
-    ) {
+    fn render_with_style(&self, frame: &mut Frame, area: Rect, state: &SpinnerState, style: LoaderStyle) {
         let line = self.line_for_state(state, style);
         frame.render_widget(Paragraph::new(line), area);
     }
@@ -98,10 +82,7 @@ impl<'a> Loader<'a> {
 
         match &self.message {
             Some(message) => {
-                let mut spans = vec![
-                    spinner_span,
-                    Span::styled(style.separator, style.message_style),
-                ];
+                let mut spans = vec![spinner_span, Span::styled(style.separator, style.message_style)];
                 spans.extend(message.spans.clone());
 
                 let mut line = Line::from(spans);
@@ -118,10 +99,7 @@ impl ratatui::widgets::StatefulWidget for &Loader<'_> {
     type State = SpinnerState;
 
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
-        let style = self
-            .style
-            .clone()
-            .unwrap_or_else(|| LoaderStyle::themed(&WidgetTheme::default()));
+        let style = self.style.clone().unwrap_or_else(|| LoaderStyle::themed(&WidgetTheme::default()));
         let line = self.line_for_state(state, style);
         ratatui::widgets::Widget::render(Paragraph::new(line), area, buf);
     }
@@ -149,21 +127,19 @@ impl LoaderStyle {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_spinner::SpinnerState;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::layout::Position;
     use ratatui::style::Color;
 
+    use super::*;
+
     #[test]
     fn themed_style_uses_widget_theme() {
         let style = LoaderStyle::themed(&WidgetTheme::default());
         assert_eq!(style.spinner_style.fg, Some(WidgetTheme::default().primary));
-        assert_eq!(
-            style.message_style.fg,
-            Some(WidgetTheme::default().text_muted)
-        );
+        assert_eq!(style.message_style.fg, Some(WidgetTheme::default().text_muted));
     }
 
     #[test]
@@ -173,9 +149,7 @@ mod tests {
         let loader = Loader::new("Load");
         let state = SpinnerState::new();
 
-        terminal
-            .draw(|frame| loader.render(frame, Rect::new(0, 0, 12, 1), &state))
-            .unwrap();
+        terminal.draw(|frame| loader.render(frame, Rect::new(0, 0, 12, 1), &state)).unwrap();
 
         let buffer = terminal.backend().buffer();
         let spinner = buffer.cell(Position::new(0, 0)).unwrap();
@@ -196,9 +170,7 @@ mod tests {
         let mut state = SpinnerState::new();
         state.tick(&custom);
 
-        terminal
-            .draw(|frame| loader.render(frame, Rect::new(0, 0, 12, 1), &state))
-            .unwrap();
+        terminal.draw(|frame| loader.render(frame, Rect::new(0, 0, 12, 1), &state)).unwrap();
 
         let buffer = terminal.backend().buffer();
         let spinner = buffer.cell(Position::new(0, 0)).unwrap();
@@ -217,13 +189,7 @@ mod tests {
         ratatui::widgets::StatefulWidget::render(&loader, area, &mut second, &mut state);
 
         assert_eq!(first, second);
-        assert_eq!(
-            first
-                .cell(Position::new(BUFFER_X, BUFFER_Y))
-                .unwrap()
-                .symbol(),
-            "⠋"
-        );
+        assert_eq!(first.cell(Position::new(BUFFER_X, BUFFER_Y)).unwrap().symbol(), "⠋");
     }
 
     #[test]
@@ -247,11 +213,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                loader.render(
-                    frame,
-                    Rect::new(BUFFER_X, BUFFER_Y, TINY_WIDTH, TINY_HEIGHT),
-                    &state,
-                );
+                loader.render(frame, Rect::new(BUFFER_X, BUFFER_Y, TINY_WIDTH, TINY_HEIGHT), &state);
             })
             .unwrap();
     }

@@ -74,36 +74,31 @@ pub(super) const WRITABLE_ROOTS: &[&str] = &[SAFE_WRITABLE_ROOT];
 pub(super) const ROLE_CONTEXTS: &[&str] = &[ROLE_CONTEXT];
 pub(super) const HOST_CAPABILITIES: &[&str] = &[HOST_CAPABILITY];
 pub(super) const PLATFORMS: &[&str] = &[PLATFORM];
-pub(super) const MANIFEST_COMPATIBILITY: PluginCompatibilityDraft<'static> =
-    PluginCompatibilityDraft {
-        minimum_host_version: Some(HOST_VERSION),
-        required_host_capabilities: HOST_CAPABILITIES,
-        supported_platforms: PLATFORMS,
-    };
-pub(super) const INHERITED_COMPATIBILITY: PluginCompatibilityDraft<'static> =
-    PluginCompatibilityDraft {
-        minimum_host_version: None,
-        required_host_capabilities: &[],
-        supported_platforms: &[],
-    };
-pub(super) const NEWER_COMPATIBILITY: PluginCompatibilityDraft<'static> =
-    PluginCompatibilityDraft {
-        minimum_host_version: Some(NEWER_HOST_VERSION),
-        required_host_capabilities: HOST_CAPABILITIES,
-        supported_platforms: PLATFORMS,
-    };
-pub(super) const UNSUPPORTED_PLATFORM_COMPATIBILITY: PluginCompatibilityDraft<'static> =
-    PluginCompatibilityDraft {
-        minimum_host_version: Some(HOST_VERSION),
-        required_host_capabilities: HOST_CAPABILITIES,
-        supported_platforms: &[UNSUPPORTED_PLATFORM],
-    };
-pub(super) const MISSING_CAPABILITY_COMPATIBILITY: PluginCompatibilityDraft<'static> =
-    PluginCompatibilityDraft {
-        minimum_host_version: Some(HOST_VERSION),
-        required_host_capabilities: &[MISSING_HOST_CAPABILITY],
-        supported_platforms: PLATFORMS,
-    };
+pub(super) const MANIFEST_COMPATIBILITY: PluginCompatibilityDraft<'static> = PluginCompatibilityDraft {
+    minimum_host_version: Some(HOST_VERSION),
+    required_host_capabilities: HOST_CAPABILITIES,
+    supported_platforms: PLATFORMS,
+};
+pub(super) const INHERITED_COMPATIBILITY: PluginCompatibilityDraft<'static> = PluginCompatibilityDraft {
+    minimum_host_version: None,
+    required_host_capabilities: &[],
+    supported_platforms: &[],
+};
+pub(super) const NEWER_COMPATIBILITY: PluginCompatibilityDraft<'static> = PluginCompatibilityDraft {
+    minimum_host_version: Some(NEWER_HOST_VERSION),
+    required_host_capabilities: HOST_CAPABILITIES,
+    supported_platforms: PLATFORMS,
+};
+pub(super) const UNSUPPORTED_PLATFORM_COMPATIBILITY: PluginCompatibilityDraft<'static> = PluginCompatibilityDraft {
+    minimum_host_version: Some(HOST_VERSION),
+    required_host_capabilities: HOST_CAPABILITIES,
+    supported_platforms: &[UNSUPPORTED_PLATFORM],
+};
+pub(super) const MISSING_CAPABILITY_COMPATIBILITY: PluginCompatibilityDraft<'static> = PluginCompatibilityDraft {
+    minimum_host_version: Some(HOST_VERSION),
+    required_host_capabilities: &[MISSING_HOST_CAPABILITY],
+    supported_platforms: PLATFORMS,
+};
 pub(super) const DECLARED_TOOLS: &[ToolDescriptorDraft<'static>] = &[ToolDescriptorDraft {
     name: Some(TOOL_NAME),
     description: Some(TOOL_DESCRIPTION),
@@ -127,22 +122,20 @@ pub(super) const DUPLICATE_DECLARED_TOOLS: &[ToolDescriptorDraft<'static>] = &[
         capability_labels: TOOL_CAPABILITIES,
     },
 ];
-pub(super) const BUILT_IN_COLLISION_TOOLS: &[ToolDescriptorDraft<'static>] =
-    &[ToolDescriptorDraft {
-        name: Some(BUILT_IN_TOOL_NAME),
-        description: Some(TOOL_DESCRIPTION),
-        parameter_schema_identity: Some(SCHEMA_IDENTITY),
-        result_contract_identity: Some(RESULT_IDENTITY),
-        capability_labels: TOOL_CAPABILITIES,
-    }];
-pub(super) const CATALOG_COLLISION_TOOLS: &[ToolDescriptorDraft<'static>] =
-    &[ToolDescriptorDraft {
-        name: Some(CATALOG_TOOL_NAME),
-        description: Some(TOOL_DESCRIPTION),
-        parameter_schema_identity: Some(SCHEMA_IDENTITY),
-        result_contract_identity: Some(RESULT_IDENTITY),
-        capability_labels: TOOL_CAPABILITIES,
-    }];
+pub(super) const BUILT_IN_COLLISION_TOOLS: &[ToolDescriptorDraft<'static>] = &[ToolDescriptorDraft {
+    name: Some(BUILT_IN_TOOL_NAME),
+    description: Some(TOOL_DESCRIPTION),
+    parameter_schema_identity: Some(SCHEMA_IDENTITY),
+    result_contract_identity: Some(RESULT_IDENTITY),
+    capability_labels: TOOL_CAPABILITIES,
+}];
+pub(super) const CATALOG_COLLISION_TOOLS: &[ToolDescriptorDraft<'static>] = &[ToolDescriptorDraft {
+    name: Some(CATALOG_TOOL_NAME),
+    description: Some(TOOL_DESCRIPTION),
+    parameter_schema_identity: Some(SCHEMA_IDENTITY),
+    result_contract_identity: Some(RESULT_IDENTITY),
+    capability_labels: TOOL_CAPABILITIES,
+}];
 pub(super) const TWO_DECLARED_TOOLS: &[ToolDescriptorDraft<'static>] = &[
     ToolDescriptorDraft {
         name: Some(TOOL_NAME),

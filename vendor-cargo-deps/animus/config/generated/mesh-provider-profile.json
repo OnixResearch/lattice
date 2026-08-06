@@ -1,0 +1,31 @@
+{
+  "api_style": "responses",
+  "catalog": {
+    "max_model_id_bytes": 128,
+    "max_models": 128
+  },
+  "denied_virtual_models": [
+    "auto",
+    "mesh"
+  ],
+  "exact_model_required": true,
+  "gateway_posture": "private_only",
+  "non_claims": [
+    "not-remote-runtime-integrity",
+    "not-peer-honesty",
+    "not-physical-route-truth",
+    "not-model-correctness",
+    "not-split-parity",
+    "not-production-readiness"
+  ],
+  "physical_route": "unknown",
+  "profile_id": "private-responses-exact-model-v1",
+  "provider_fallback": "denied",
+  "provider_label": "mesh-private",
+  "redaction": "metadata_only",
+  "response": {
+    "max_bytes": 8388608
+  },
+  "schema": "animus.mesh-provider-profile.v1",
+  "unknown_capability": "deny_required"
+}

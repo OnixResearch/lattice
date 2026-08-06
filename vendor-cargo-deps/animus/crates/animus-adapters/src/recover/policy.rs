@@ -45,18 +45,13 @@ impl ProtectedMutationDecision {
 #[must_use]
 pub fn evaluate_protected_mutation(input: ProtectedMutationInput) -> ProtectedMutationDecision {
     assert!(
-        matches!(
-            input.protection,
-            super::MutationProtection::Protected | super::MutationProtection::Unprotected
-        ),
+        matches!(input.protection, super::MutationProtection::Protected | super::MutationProtection::Unprotected),
         "mutation protection policy matrix is exhaustive"
     );
     assert!(
         matches!(
             input.policy,
-            super::CheckpointPolicy::Disabled
-                | super::CheckpointPolicy::BestEffort
-                | super::CheckpointPolicy::Strict
+            super::CheckpointPolicy::Disabled | super::CheckpointPolicy::BestEffort | super::CheckpointPolicy::Strict
         ),
         "checkpoint policy matrix is exhaustive"
     );
@@ -70,8 +65,7 @@ pub fn evaluate_protected_mutation(input: ProtectedMutationInput) -> ProtectedMu
         };
     }
     let failure_class = input.service_state.failure_class();
-    let is_checkpoint_required =
-        matches!(input.service_state, super::CheckpointServiceState::Injected);
+    let is_checkpoint_required = matches!(input.service_state, super::CheckpointServiceState::Injected);
     let is_dispatch_allowed = matches!(input.policy, super::CheckpointPolicy::BestEffort)
         || matches!(failure_class, super::CheckpointFailureClass::None);
     ProtectedMutationDecision {
@@ -130,18 +124,9 @@ impl RollbackValidation {
 /// invoking the pure rollback validator.
 #[must_use]
 pub fn validate_rollback(input: RollbackValidationInput<'_>) -> RollbackValidation {
-    assert!(
-        !input.target.checkpoint_id().is_empty(),
-        "rollback target must have a validated checkpoint id"
-    );
-    assert!(
-        !input.expected_current_hash.as_str().is_empty(),
-        "rollback expected hash must be validated"
-    );
-    if !matches!(
-        input.confirmation,
-        super::RollbackConfirmationStatus::Approved
-    ) {
+    assert!(!input.target.checkpoint_id().is_empty(), "rollback target must have a validated checkpoint id");
+    assert!(!input.expected_current_hash.as_str().is_empty(), "rollback expected hash must be validated");
+    if !matches!(input.confirmation, super::RollbackConfirmationStatus::Approved) {
         return RollbackValidation {
             is_restore_allowed: false,
             status: super::CheckpointStatus::Blocked,
@@ -172,10 +157,7 @@ pub struct CheckpointServiceRequest {
 impl CheckpointServiceRequest {
     /// Builds a checkpoint service request.
     #[must_use]
-    pub const fn new(
-        operation: super::CheckpointOperation,
-        target: Option<super::CheckpointRecord>,
-    ) -> Self {
+    pub const fn new(operation: super::CheckpointOperation, target: Option<super::CheckpointRecord>) -> Self {
         Self { operation, target }
     }
 
@@ -235,12 +217,6 @@ impl CheckpointServiceResponse {
 }
 
 /// Host-injected checkpoint service boundary.
-pub trait CheckpointService:
-    crate::ComponentAdapter<CheckpointServiceRequest, CheckpointServiceResponse>
-{
-}
+pub trait CheckpointService: crate::ComponentAdapter<CheckpointServiceRequest, CheckpointServiceResponse> {}
 
-impl<T> CheckpointService for T where
-    T: crate::ComponentAdapter<CheckpointServiceRequest, CheckpointServiceResponse>
-{
-}
+impl<T> CheckpointService for T where T: crate::ComponentAdapter<CheckpointServiceRequest, CheckpointServiceResponse> {}

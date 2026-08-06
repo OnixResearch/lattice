@@ -1,0 +1,36 @@
+/* Generated from themes/rats-theme-tokens.ncl; source-blake3=463e69cf119ca95615d1080aca2096cf4d87dfcd8425bbaf088cb9b00d23dfe8; adaptive-only additive tokens. */
+:root {
+  --rats-density-compact-target: 16px;
+  --rats-density-compact-gap: 8px;
+  --rats-density-compact-padding: 8px;
+  --rats-density-comfortable-target: 24px;
+  --rats-density-comfortable-gap: 16px;
+  --rats-density-comfortable-padding: 16px;
+  --rats-density-touch-target: 32px;
+  --rats-density-touch-gap: 16px;
+  --rats-density-touch-padding: 24px;
+  --rats-focus-indicator-width: 16px;
+  --rats-surface-base-elevation: 0;
+  --rats-surface-raised-elevation: 1;
+  --rats-surface-overlay-elevation: 2;
+  --rats-surface-modal-elevation: 3;
+  --rats-type-body-emphasis: regular;
+  --rats-type-label-emphasis: medium;
+  --rats-type-heading-emphasis: strong;
+  --rats-type-code-emphasis: monospace;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --rats-contrast-text-emphasis: 2;
+    --rats-contrast-boundary-emphasis: 3;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --rats-focus-indicator-color: Highlight;
+    --rats-adaptive-text-color: CanvasText;
+    --rats-adaptive-surface-color: Canvas;
+  }
+}

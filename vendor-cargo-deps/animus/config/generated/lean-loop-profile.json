@@ -1,0 +1,66 @@
+{
+  "allowed_decisions": [
+    "model",
+    "tool",
+    "respond",
+    "stop"
+  ],
+  "bounds": {
+    "argument_count": 32,
+    "capability_count": 32,
+    "cleanup_poll_count": 100,
+    "diagnostic_bytes": 4096,
+    "frame_bytes": 65536,
+    "poll_interval_millis": 10,
+    "response_poll_count": 500,
+    "sequence_limit": 4096,
+    "shutdown_poll_count": 100,
+    "startup_poll_count": 100,
+    "target_count": 32,
+    "text_bytes": 8192
+  },
+  "identity": {
+    "algorithm": "blake3",
+    "artifact_domain": "animus.lean-loop.artifact.v1",
+    "profile_domain": "animus.lean-loop.profile.v1",
+    "proof_source_domain": "animus.lean-loop.proof-source.v1",
+    "proof_source_identity": "d8e0ffd0ae32507bb7051c5b77e162f76484debde12a32d09f40616fed7c0c54",
+    "receipt_domain": "animus.lean-loop.receipt.v1"
+  },
+  "launch": {
+    "environment_allowlist": [],
+    "executable_selection": "explicit-absolute-path",
+    "fallback_policy": "deny",
+    "inherited_environment": false,
+    "path_discovery": false,
+    "restart_policy": "deny-after-activation",
+    "sandbox_posture": "fixture-only",
+    "working_directory": "explicit-absolute-path"
+  },
+  "non_claims": [
+    "not-arbitrary-policy-correctness",
+    "not-lean-compiler-or-runtime-soundness",
+    "not-child-process-confinement",
+    "not-atomic-executable-path-pinning",
+    "not-provider-or-tool-correctness",
+    "not-theorem-to-rust-equivalence",
+    "not-authoritative-completion",
+    "not-whole-agent-correctness",
+    "not-production-readiness"
+  ],
+  "protocol": {
+    "envelope_schema": "animus.lean-loop.envelope.v1",
+    "identity": "animus.lean-loop.protocol.v1"
+  },
+  "redaction": {
+    "authoritative_completion_claim": false,
+    "marker": "raw-turn-model-tool-provider-source-path-environment-credential-stderr-and-hidden-material-omitted",
+    "raw_payloads": false
+  },
+  "schema": "animus.lean-loop.profile.v1",
+  "toolchain": {
+    "cohort": "lean4-4.30.0",
+    "package": "animus-lean-0.1.0",
+    "source_module": "AnimusLean.Core"
+  }
+}

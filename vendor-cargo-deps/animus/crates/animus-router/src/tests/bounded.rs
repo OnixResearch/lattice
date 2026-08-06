@@ -17,19 +17,16 @@ fn simple_remote_request_projects_low_bands() {
         fallback_hint: "eligible",
     });
 
-    assert_signal_labels(
-        &metadata,
-        [
-            "simple",
-            "low",
-            "low",
-            "low",
-            "low",
-            "low",
-            "remote_allowed",
-            "eligible",
-        ],
-    );
+    assert_signal_labels(&metadata, [
+        "simple",
+        "low",
+        "low",
+        "low",
+        "low",
+        "low",
+        "remote_allowed",
+        "eligible",
+    ]);
 }
 
 #[test]
@@ -44,19 +41,7 @@ fn local_code_request_projects_coding_bands() {
         fallback_hint: "ineligible",
     });
 
-    assert_signal_labels(
-        &metadata,
-        [
-            "coding",
-            "low",
-            "low",
-            "low",
-            "low",
-            "low",
-            "local_only",
-            "ineligible",
-        ],
-    );
+    assert_signal_labels(&metadata, ["coding", "low", "low", "low", "low", "low", "local_only", "ineligible"]);
 }
 
 #[test]
@@ -71,19 +56,16 @@ fn structured_review_request_projects_pressure_bands() {
         fallback_hint: "eligible",
     });
 
-    assert_signal_labels(
-        &metadata,
-        [
-            "review",
-            "medium",
-            "strict",
-            "high",
-            "medium",
-            "medium",
-            "remote_allowed",
-            "eligible",
-        ],
-    );
+    assert_signal_labels(&metadata, [
+        "review",
+        "medium",
+        "strict",
+        "high",
+        "medium",
+        "medium",
+        "remote_allowed",
+        "eligible",
+    ]);
 }
 
 #[test]
@@ -98,19 +80,16 @@ fn workflow_request_projects_strict_bands() {
         fallback_hint: "eligible",
     });
 
-    assert_signal_labels(
-        &metadata,
-        [
-            "workflow",
-            "strict",
-            "high",
-            "strict",
-            "high",
-            "high",
-            "remote_allowed",
-            "eligible",
-        ],
-    );
+    assert_signal_labels(&metadata, [
+        "workflow",
+        "strict",
+        "high",
+        "strict",
+        "high",
+        "high",
+        "remote_allowed",
+        "eligible",
+    ]);
 }
 
 #[test]
@@ -125,9 +104,7 @@ fn rule_signal_source_feeds_signal_projection() {
         privacy_policy: "remote_allowed",
         fallback_hint: "eligible",
     });
-    let draft = source
-        .project(&metadata)
-        .expect("rule source should project");
+    let draft = source.project(&metadata).expect("rule source should project");
     let projected = crate::Signals::project(draft).expect("projected labels should parse");
 
     assert_eq!(projected.task_shape(), crate::TaskShape::Reasoning);
@@ -135,10 +112,7 @@ fn rule_signal_source_feeds_signal_projection() {
     assert_eq!(projected.privacy(), crate::PrivacyBand::RemoteAllowed);
 }
 
-fn assert_signal_labels(
-    metadata: &crate::RequestMetadata,
-    expected: [&str; crate::projection::SIGNAL_BUCKET_COUNT],
-) {
+fn assert_signal_labels(metadata: &crate::RequestMetadata, expected: [&str; crate::projection::SIGNAL_BUCKET_COUNT]) {
     let draft = crate::project_signals(metadata);
     let projected = crate::Signals::project(draft).expect("signal labels should parse");
     let actual = projected.bucket_labels();
@@ -275,10 +249,7 @@ fn budget_ledger_rejects_exhausted_consumption() {
     let cases = [
         (ledger.consume_candidate(), crate::BudgetKind::Candidate),
         (ledger.consume_parallelism(), crate::BudgetKind::Parallelism),
-        (
-            ledger.consume_synthesis_attempt(),
-            crate::BudgetKind::Synthesis,
-        ),
+        (ledger.consume_synthesis_attempt(), crate::BudgetKind::Synthesis),
         (ledger.consume_repair_attempt(), crate::BudgetKind::Repair),
     ];
 

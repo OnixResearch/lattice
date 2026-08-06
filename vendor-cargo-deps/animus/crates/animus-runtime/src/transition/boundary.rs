@@ -61,9 +61,7 @@ pub fn apply_adapter_outcome(state: super::TurnState, outcome: AdapterOutcome) -
         AdapterOutcome::ToolCall { outcome } => tool_call_outcome(state, outcome),
         AdapterOutcome::ModelOk { response } => model_success(state, response),
         AdapterOutcome::ToolOk { response } => tool_success(state, response),
-        AdapterOutcome::Blocked { component, outcome } => {
-            adapter_blocked(state, component, outcome)
-        }
+        AdapterOutcome::Blocked { component, outcome } => adapter_blocked(state, component, outcome),
         AdapterOutcome::Err { component, message } => adapter_classified_failure(
             state,
             component,
@@ -78,16 +76,9 @@ fn model_call_outcome(
     outcome: animus_adapters::AdapterCallOutcome<animus_adapters::ModelResponse>,
 ) -> AdapterStep {
     match outcome {
-        animus_adapters::AdapterCallOutcome::Completed { response } => {
-            model_success(state, response)
-        }
+        animus_adapters::AdapterCallOutcome::Completed { response } => model_success(state, response),
         animus_adapters::AdapterCallOutcome::Failed { class, metadata } => {
-            adapter_classified_failure(
-                state,
-                crate::AdapterComponent::Model,
-                class,
-                String::from(metadata.message()),
-            )
+            adapter_classified_failure(state, crate::AdapterComponent::Model, class, String::from(metadata.message()))
         }
     }
 }
@@ -97,41 +88,24 @@ fn tool_call_outcome(
     outcome: animus_adapters::AdapterCallOutcome<animus_adapters::ToolResponse>,
 ) -> AdapterStep {
     match outcome {
-        animus_adapters::AdapterCallOutcome::Completed { response } => {
-            tool_success(state, response)
-        }
+        animus_adapters::AdapterCallOutcome::Completed { response } => tool_success(state, response),
         animus_adapters::AdapterCallOutcome::Failed { class, metadata } => {
-            adapter_classified_failure(
-                state,
-                crate::AdapterComponent::Tool,
-                class,
-                String::from(metadata.message()),
-            )
+            adapter_classified_failure(state, crate::AdapterComponent::Tool, class, String::from(metadata.message()))
         }
     }
 }
 
-fn model_success(
-    mut state: super::TurnState,
-    response: animus_adapters::ModelResponse,
-) -> AdapterStep {
+fn model_success(mut state: super::TurnState, response: animus_adapters::ModelResponse) -> AdapterStep {
     state.turns_completed = state.turns_completed.saturating_add(1);
     state.last_model_message = Some(String::from(response.message()));
-    state
-        .events
-        .push(crate::RuntimeEvent::ModelResponded { response });
+    state.events.push(crate::RuntimeEvent::ModelResponded { response });
     AdapterStep::Continue { state }
 }
 
-fn tool_success(
-    mut state: super::TurnState,
-    response: animus_adapters::ToolResponse,
-) -> AdapterStep {
+fn tool_success(mut state: super::TurnState, response: animus_adapters::ToolResponse) -> AdapterStep {
     state.turns_completed = state.turns_completed.saturating_add(1);
     state.last_tool_output = Some(String::from(response.output()));
-    state
-        .events
-        .push(crate::RuntimeEvent::ToolResponded { response });
+    state.events.push(crate::RuntimeEvent::ToolResponded { response });
     AdapterStep::Continue { state }
 }
 

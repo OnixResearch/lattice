@@ -31,31 +31,16 @@ fn isolated_workspace_accepts_jujutsu_capabilities_without_git_worktree() {
     assert_eq!(workspace.source_id(), SOURCE_ID);
     assert_eq!(workspace.workspace_id(), WORKSPACE_ID);
     assert_eq!(workspace.snapshot_id(), SNAPSHOT_ID);
-    assert_eq!(
-        workspace.adapter_kind(),
-        crate::WorkspaceAdapterKind::JujutsuWorkspace
-    );
-    assert!(
-        !workspace
-            .adapter_capabilities()
-            .contains(&crate::WorkspaceCapability::VcsWorktree)
-    );
-    assert_eq!(
-        workspace.writable_roots().len(),
-        EXPECTED_WRITABLE_ROOT_COUNT
-    );
+    assert_eq!(workspace.adapter_kind(), crate::WorkspaceAdapterKind::JujutsuWorkspace);
+    assert!(!workspace.adapter_capabilities().contains(&crate::WorkspaceCapability::VcsWorktree));
+    assert_eq!(workspace.writable_roots().len(), EXPECTED_WRITABLE_ROOT_COUNT);
     assert_eq!(workspace.restore_metadata().manifest_hash(), MANIFEST_HASH);
 }
 
 #[test]
 fn isolated_workspace_rejects_git_only_requirement_when_adapter_lacks_it() {
     // r[verify agent_harness_runtime.openai_codex_worktree_automations.isolated_workspace.vcs_neutral]
-    let descriptor = descriptor(
-        WORKSPACE_ID,
-        Some(PARENT_ID),
-        OP_CREATE,
-        &[CAP_VCS_WORKTREE],
-    );
+    let descriptor = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_CREATE, &[CAP_VCS_WORKTREE]);
     let restore_metadata = restore_metadata();
     let adapter = jujutsu_adapter(&[CAP_JUJUTSU, CAP_NESTED, CAP_CLEANUP]);
     assert!(!adapter.supports(crate::WorkspaceCapability::VcsWorktree));
@@ -68,25 +53,21 @@ fn isolated_workspace_rejects_git_only_requirement_when_adapter_lacks_it() {
     })
     .expect_err("Git-only capability must not be assumed for Jujutsu workspaces");
 
-    assert_eq!(
-        error,
-        crate::AdapterContractError::UnsupportedWorkspaceValue {
-            field: "workspace_required_capability",
-            value: alloc::string::String::from(CAP_VCS_WORKTREE),
-        }
-    );
+    assert_eq!(error, crate::AdapterContractError::UnsupportedWorkspaceValue {
+        field: "workspace_required_capability",
+        value: alloc::string::String::from(CAP_VCS_WORKTREE),
+    });
 }
 
 #[test]
 fn isolated_workspace_rejects_mismatched_restore_snapshot() {
     let descriptor = descriptor(WORKSPACE_ID, Some(PARENT_ID), OP_CREATE, &[CAP_JUJUTSU]);
-    let restore_metadata =
-        crate::WorkspaceRestoreMetadata::new(crate::WorkspaceRestoreMetadataDraft {
-            snapshot_id: "snap:other",
-            manifest_hash: MANIFEST_HASH,
-            restore_hint: RESTORE_HINT,
-        })
-        .expect("restore metadata fixture should parse");
+    let restore_metadata = crate::WorkspaceRestoreMetadata::new(crate::WorkspaceRestoreMetadataDraft {
+        snapshot_id: "snap:other",
+        manifest_hash: MANIFEST_HASH,
+        restore_hint: RESTORE_HINT,
+    })
+    .expect("restore metadata fixture should parse");
     let adapter = jujutsu_adapter(&[CAP_JUJUTSU, CAP_NESTED, CAP_CLEANUP]);
     assert_ne!(restore_metadata.snapshot_id(), SNAPSHOT_ID);
 
@@ -98,13 +79,10 @@ fn isolated_workspace_rejects_mismatched_restore_snapshot() {
     })
     .expect_err("snapshot mismatch should fail closed");
 
-    assert!(matches!(
-        error,
-        crate::AdapterContractError::UnsupportedWorkspaceValue {
-            field: "workspace_snapshot_id",
-            ..
-        }
-    ));
+    assert!(matches!(error, crate::AdapterContractError::UnsupportedWorkspaceValue {
+        field: "workspace_snapshot_id",
+        ..
+    }));
 }
 
 fn restore_metadata() -> crate::WorkspaceRestoreMetadata {
@@ -116,9 +94,7 @@ fn restore_metadata() -> crate::WorkspaceRestoreMetadata {
     .expect("restore metadata fixture should parse")
 }
 
-fn jujutsu_adapter(
-    supported_capabilities: &'static [&'static str],
-) -> crate::WorkspaceAdapterCapabilities {
+fn jujutsu_adapter(supported_capabilities: &'static [&'static str]) -> crate::WorkspaceAdapterCapabilities {
     crate::WorkspaceAdapterCapabilities::new(crate::WorkspaceAdapterCapabilitiesDraft {
         adapter_label: ADAPTER_LABEL,
         kind: KIND_JUJUTSU,

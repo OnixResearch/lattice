@@ -49,23 +49,16 @@ impl DiffReviewEvidence {
     /// Returns [`super::super::DiffReviewError`] when evidence attempts to embed full
     /// files, unbounded logs, unrelated context, unsafe raw material, or snippets
     /// that exceed review report bounds.
-    pub fn validate(
-        draft: &DiffReviewEvidenceDraft<'_>,
-    ) -> Result<Self, super::super::DiffReviewError> {
+    pub fn validate(draft: &DiffReviewEvidenceDraft<'_>) -> Result<Self, super::super::DiffReviewError> {
         super::super::check::evidence_kind(draft.kind)?;
         super::super::check::evidence_bounds(super::super::check::EvidenceBounds {
             line_count: draft.line_count,
             byte_count: draft.byte_count,
             snippet: draft.snippet,
         })?;
-        let source_label = super::super::check::required_safe_text(
-            super::super::SOURCE_LABEL_FIELD,
-            draft.source_label,
-        )?;
-        let snippet = super::super::check::required_safe_text(
-            super::super::EVIDENCE_SNIPPET_FIELD,
-            draft.snippet,
-        )?;
+        let source_label =
+            super::super::check::required_safe_text(super::super::SOURCE_LABEL_FIELD, draft.source_label)?;
+        let snippet = super::super::check::required_safe_text(super::super::EVIDENCE_SNIPPET_FIELD, draft.snippet)?;
         let snippet_hash = super::super::hash_parts(&[
             super::super::HASH_SCHEMA,
             super::super::EVIDENCE_SNIPPET_FIELD.as_str(),

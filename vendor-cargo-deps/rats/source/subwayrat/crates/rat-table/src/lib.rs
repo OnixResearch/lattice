@@ -1,4 +1,5 @@
 mod render;
+pub mod virtualization;
 
 #[cfg(test)]
 mod tests;
@@ -9,14 +10,74 @@ pub(crate) const DEFAULT_COLUMN_SPACING: u16 = 1;
 const EMPTY_INDEX: usize = 0;
 const EMPTY_COUNT: u64 = 0;
 
+/// Position of one row in the table.
+///
+/// A row position is a distinct role from a column position
+/// ([`TableColumnIndex`]); a column value may not be consumed where a row is
+/// required (and vice-versa).
+///
+/// Supplying a column value where a row is required must not compile.
+///
+/// ```compile_fail
+/// use rat_table::{TableColumnIndex, TableRowIndex};
+/// let column = TableColumnIndex::from_zero_based(2);
+/// let row: TableRowIndex = column;
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct TableRowIndex(u64);
+
+impl TableRowIndex {
+    /// Creates a row position from a zero-based backing value.
+    #[must_use]
+    pub const fn from_zero_based(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// Returns the zero-based backing value for checked row access.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+/// Position of one column in the table.
+///
+/// A column position is a distinct role from a row position
+/// ([`TableRowIndex`]); a row value may not be consumed where a column is
+/// required (and vice-versa).
+///
+/// Supplying a row value where a column is required must not compile.
+///
+/// ```compile_fail
+/// use rat_table::{TableColumnIndex, TableRowIndex};
+/// let row = TableRowIndex::from_zero_based(1);
+/// let column: TableColumnIndex = row;
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct TableColumnIndex(u64);
+
+impl TableColumnIndex {
+    /// Creates a column position from a zero-based backing value.
+    #[must_use]
+    pub const fn from_zero_based(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// Returns the zero-based backing value for checked column access.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
 /// A scrollable data table widget for ratatui with auto column sizing
 #[derive(Debug, Clone)]
 pub struct DataTable {
     columns: Vec<String>,
     rows: Vec<Vec<String>>,
     column_widths: Vec<u16>,
-    selected_row: usize,
-    scroll_col: usize,
+    selected_row: TableRowIndex,
+    scroll_col: TableColumnIndex,
     max_cell_width: u16,
     min_cell_width: u16,
 }
@@ -44,9 +105,7 @@ impl Default for DataTableStyle {
     fn default() -> Self {
         Self {
             header_style: ratatui::style::Style::new().bold().yellow(),
-            selected_style: ratatui::style::Style::new()
-                .bg(ratatui::style::Color::DarkGray)
-                .bold(),
+            selected_style: ratatui::style::Style::new().bg(ratatui::style::Color::DarkGray).bold(),
             normal_style: ratatui::style::Style::new(),
             truncation_suffix: "...".to_string(),
             column_spacing: DEFAULT_COLUMN_SPACING,
@@ -59,18 +118,14 @@ impl DataTable {
     pub fn new(columns: Vec<String>, rows: Vec<Vec<String>>) -> Self {
         let max_cell_width = DEFAULT_MAX_CELL_WIDTH;
         let min_cell_width = DEFAULT_MIN_CELL_WIDTH;
-        let column_widths = calculate_column_widths(
-            &columns,
-            &rows,
-            WidthBounds::new(min_cell_width, max_cell_width),
-        );
+        let column_widths = calculate_column_widths(&columns, &rows, WidthBounds::new(min_cell_width, max_cell_width));
 
         Self {
             columns,
             rows,
             column_widths,
-            selected_row: EMPTY_INDEX,
-            scroll_col: EMPTY_INDEX,
+            selected_row: TableRowIndex::from_zero_based(EMPTY_INDEX as u64),
+            scroll_col: TableColumnIndex::from_zero_based(EMPTY_INDEX as u64),
             max_cell_width,
             min_cell_width,
         }
@@ -94,62 +149,61 @@ impl DataTable {
     pub fn set_data(&mut self, columns: Vec<String>, rows: Vec<Vec<String>>) {
         self.columns = columns;
         self.rows = rows;
-        self.selected_row = EMPTY_INDEX;
-        self.scroll_col = EMPTY_INDEX;
+        self.selected_row = TableRowIndex::from_zero_based(EMPTY_INDEX as u64);
+        self.scroll_col = TableColumnIndex::from_zero_based(EMPTY_INDEX as u64);
         self.recalculate_widths();
     }
 
     /// Move selection to the next row
     pub fn select_next(&mut self) {
         if !self.rows.is_empty() {
-            self.selected_row = self
-                .selected_row
-                .saturating_add(1)
-                .min(self.rows.len().saturating_sub(1));
+            self.selected_row = TableRowIndex::from_zero_based(
+                self.selected_row.get().saturating_add(1).min(self.rows.len().saturating_sub(1) as u64),
+            );
         }
     }
 
     /// Move selection to the previous row
     pub fn select_prev(&mut self) {
-        if self.selected_row > 0 {
-            self.selected_row = self.selected_row.saturating_sub(1);
+        if self.selected_row.get() > 0 {
+            self.selected_row = TableRowIndex::from_zero_based(self.selected_row.get().saturating_sub(1));
         }
     }
 
     /// Move selection to the first row
     pub fn select_first(&mut self) {
-        self.selected_row = EMPTY_INDEX;
+        self.selected_row = TableRowIndex::from_zero_based(EMPTY_INDEX as u64);
     }
 
     /// Move selection to the last row
     pub fn select_last(&mut self) {
         if !self.rows.is_empty() {
-            self.selected_row = self.rows.len().saturating_sub(1);
+            self.selected_row = TableRowIndex::from_zero_based(self.rows.len().saturating_sub(1) as u64);
         }
     }
 
     /// Scroll right to show more columns
     pub fn scroll_right(&mut self) {
-        if self.scroll_col < self.columns.len().saturating_sub(1) {
-            self.scroll_col = self.scroll_col.saturating_add(1);
+        if self.scroll_col.get() < self.columns.len().saturating_sub(1) as u64 {
+            self.scroll_col = TableColumnIndex::from_zero_based(self.scroll_col.get().saturating_add(1));
         }
     }
 
     /// Scroll left to show previous columns
     pub fn scroll_left(&mut self) {
-        if self.scroll_col > 0 {
-            self.scroll_col = self.scroll_col.saturating_sub(1);
+        if self.scroll_col.get() > 0 {
+            self.scroll_col = TableColumnIndex::from_zero_based(self.scroll_col.get().saturating_sub(1));
         }
     }
 
     /// Get the currently selected row's data
     pub fn selected_row(&self) -> Option<&[String]> {
-        self.rows.get(self.selected_row).map(|row| row.as_slice())
+        self.rows.get(self.selected_row.get() as usize).map(|row| row.as_slice())
     }
 
-    /// Get the index of the currently selected row
-    pub fn selected_index(&self) -> u64 {
-        usize_to_public_count(self.selected_row)
+    /// Get the position of the currently selected row
+    pub fn selected_index(&self) -> TableRowIndex {
+        self.selected_row
     }
 
     /// Get the number of data rows (excluding header)
@@ -172,8 +226,8 @@ impl DataTable {
         self.columns.clear();
         self.rows.clear();
         self.column_widths.clear();
-        self.selected_row = EMPTY_INDEX;
-        self.scroll_col = EMPTY_INDEX;
+        self.selected_row = TableRowIndex::from_zero_based(EMPTY_INDEX as u64);
+        self.scroll_col = TableColumnIndex::from_zero_based(EMPTY_INDEX as u64);
     }
 
     /// Get table info for rendering info bars
@@ -225,15 +279,9 @@ fn usize_to_u16_saturating(count: usize) -> u16 {
 }
 
 /// Calculate optimal column widths based on content and constraints
-fn calculate_column_widths(
-    columns: &[String],
-    rows: &[Vec<String>],
-    bounds: WidthBounds,
-) -> Vec<u16> {
-    let mut widths: Vec<u16> = columns
-        .iter()
-        .map(|col| usize_to_u16_saturating(col.len()).clamp(bounds.min, bounds.max))
-        .collect();
+fn calculate_column_widths(columns: &[String], rows: &[Vec<String>], bounds: WidthBounds) -> Vec<u16> {
+    let mut widths: Vec<u16> =
+        columns.iter().map(|col| usize_to_u16_saturating(col.len()).clamp(bounds.min, bounds.max)).collect();
 
     for row in rows {
         for (col_idx, cell) in row.iter().enumerate() {

@@ -1,0 +1,277 @@
+{
+  "artifact_hash": "d7669863a1514bcc6f377569cd03ed3262f793d8b45e72befec85081ca95b2aa",
+  "body": {
+    "adapter": "met-widgets.project_dom_semantics",
+    "browser": {
+      "headless_mode": "new",
+      "package_source": "nixpkgs",
+      "product": "Chrome/149.0.7827.53",
+      "protocol_version": "1.3"
+    },
+    "capability_status": {
+      "action_authority_effects": 0,
+      "browser_focus_join": "pass",
+      "hidden_ignored": "pass",
+      "matrix_hash": "e794223caddb4a26edaa89a9f41d2648f3850b4cd47319d933344e8318814929",
+      "rejected_snapshot_diagnostic": "DuplicateNode",
+      "rejected_snapshot_empty": "pass",
+      "required_direct_facts": "pass"
+    },
+    "diagnostics": [
+      {
+        "code": "fixture-rejection-proved",
+        "semantic_diagnostic": "DuplicateNode"
+      }
+    ],
+    "evidence_class": "browser-accessibility-tree-runtime",
+    "fixtures": [
+      {
+        "fixture_id": "accessibility.menu-dialog",
+        "generation": 1,
+        "nodes": [
+          {
+            "description": "Command help",
+            "ignored": false,
+            "name": "Commands",
+            "properties": {},
+            "role": "dialog",
+            "semantic_id": "semantic.command-dialog",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-dialog"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Commands",
+            "properties": {
+              "level": 2
+            },
+            "role": "heading",
+            "semantic_id": "semantic.dialog-title",
+            "semantic_key": "accessibility.menu-dialog:semantic.dialog-title"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Command help",
+            "properties": {},
+            "role": "group",
+            "semantic_id": "semantic.dialog-description",
+            "semantic_key": "accessibility.menu-dialog:semantic.dialog-description"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Available commands",
+            "properties": {},
+            "role": "menu",
+            "semantic_id": "semantic.command-menu",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-menu"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Open file",
+            "properties": {
+              "focused": true
+            },
+            "role": "menuitem",
+            "semantic_id": "semantic.command-open",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-open"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Delete file",
+            "properties": {
+              "disabled": true
+            },
+            "role": "menuitem",
+            "semantic_id": "semantic.command-delete",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-delete"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Indexing progress",
+            "properties": {
+              "valuemax": 100,
+              "valuemin": 0,
+              "valuenow": 40,
+              "valuetext": ""
+            },
+            "role": "progressbar",
+            "semantic_id": "semantic.command-progress",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-progress"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Command diagnostics",
+            "properties": {
+              "atomic": true,
+              "live": "polite",
+              "relevant": "additions text"
+            },
+            "role": "status",
+            "semantic_id": "semantic.command-status",
+            "semantic_key": "accessibility.menu-dialog:semantic.command-status"
+          }
+        ],
+        "semantic_hash": "e169ff2fa51404a32e488b3a1f57c40c450f7d51e449800124d71d0d41aceff8"
+      },
+      {
+        "fixture_id": "accessibility.tree",
+        "generation": 7,
+        "nodes": [
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Project files",
+            "properties": {
+              "required": false
+            },
+            "role": "tree",
+            "semantic_id": "semantic.project-tree",
+            "semantic_key": "accessibility.tree:semantic.project-tree"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Source",
+            "properties": {
+              "expanded": true,
+              "level": 1,
+              "selected": true
+            },
+            "role": "treeitem",
+            "semantic_id": "semantic.tree-source",
+            "semantic_key": "accessibility.tree:semantic.tree-source"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Library source",
+            "properties": {
+              "level": 2
+            },
+            "role": "treeitem",
+            "semantic_id": "semantic.tree-library",
+            "semantic_key": "accessibility.tree:semantic.tree-library"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Archive",
+            "properties": {
+              "expanded": false,
+              "level": 1,
+              "selected": false
+            },
+            "role": "treeitem",
+            "semantic_id": "semantic.tree-archive",
+            "semantic_key": "accessibility.tree:semantic.tree-archive"
+          }
+        ],
+        "semantic_hash": "8f910f79fffcf4203503c776078dbf4e3194059a329a31db27eb6cf94227f779"
+      },
+      {
+        "fixture_id": "accessibility.menu-dialog.hidden",
+        "generation": 1,
+        "nodes": [
+          {
+            "description": "Command help",
+            "ignored": false,
+            "name": "Commands",
+            "properties": {},
+            "role": "dialog",
+            "semantic_id": "semantic.command-dialog",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-dialog"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Commands",
+            "properties": {
+              "level": 2
+            },
+            "role": "heading",
+            "semantic_id": "semantic.dialog-title",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.dialog-title"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Command help",
+            "properties": {},
+            "role": "group",
+            "semantic_id": "semantic.dialog-description",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.dialog-description"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Available commands",
+            "properties": {},
+            "role": "menu",
+            "semantic_id": "semantic.command-menu",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-menu"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Open file",
+            "properties": {},
+            "role": "menuitem",
+            "semantic_id": "semantic.command-open",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-open"
+          },
+          {
+            "description": null,
+            "ignored": true,
+            "name": null,
+            "properties": {},
+            "role": "none",
+            "semantic_id": "semantic.command-delete",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-delete"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Indexing progress",
+            "properties": {
+              "valuemax": 100,
+              "valuemin": 0,
+              "valuenow": 40,
+              "valuetext": ""
+            },
+            "role": "progressbar",
+            "semantic_id": "semantic.command-progress",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-progress"
+          },
+          {
+            "description": null,
+            "ignored": false,
+            "name": "Command diagnostics",
+            "properties": {
+              "atomic": true,
+              "live": "polite",
+              "relevant": "additions text"
+            },
+            "role": "status",
+            "semantic_id": "semantic.command-status",
+            "semantic_key": "accessibility.menu-dialog.hidden:semantic.command-status"
+          }
+        ],
+        "semantic_hash": "aa9c3f6e5d790bbe0c591e72c20bc33682d25b02fb08420015f6a884a8c1f0da"
+      }
+    ],
+    "limitations": [
+      "not screen-reader usability or assistive action delivery",
+      "not WCAG conformance or accessibility certification",
+      "not native, AccessKit, cross-browser, cross-platform, speech, or braille evidence",
+      "browser focus observation is not physical keyboard focus proof"
+    ],
+    "renderer_target": "meteorite.web.dom",
+    "schema": "meteorite-browser-accessibility-runtime-v1"
+  }
+}

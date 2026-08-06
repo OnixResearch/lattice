@@ -72,20 +72,14 @@ impl SubwayratMouseInput {
 
     /// Adds modifiers.
     #[must_use]
-    pub const fn with_modifiers(
-        mut self,
-        modifiers: super::super::input::PointerModifiers,
-    ) -> Self {
+    pub const fn with_modifiers(mut self, modifiers: super::super::input::PointerModifiers) -> Self {
         self.modifiers = modifiers;
         self
     }
 
     /// Adds a capture target.
     #[must_use]
-    pub fn with_captured_target(
-        mut self,
-        target: impl Into<super::super::shape::PointerTargetId>,
-    ) -> Self {
+    pub fn with_captured_target(mut self, target: impl Into<super::super::shape::PointerTargetId>) -> Self {
         self.captured_target = Some(target.into());
         self
     }
@@ -122,9 +116,7 @@ fn terminal_button(button: SubwayratMouseButton) -> super::super::input::Pointer
         SubwayratMouseButton::Right => super::super::input::PointerButton::Secondary,
         SubwayratMouseButton::Middle => super::super::input::PointerButton::Middle,
         SubwayratMouseButton::None => super::super::input::PointerButton::None,
-        SubwayratMouseButton::Unsupported(kind) => {
-            super::super::input::PointerButton::Unsupported(kind)
-        }
+        SubwayratMouseButton::Unsupported(kind) => super::super::input::PointerButton::Unsupported(kind),
     }
 }
 
@@ -138,15 +130,11 @@ fn terminal_phase(kind: &SubwayratMouseKind) -> super::super::input::PointerPhas
         | SubwayratMouseKind::ScrollDown
         | SubwayratMouseKind::ScrollLeft
         | SubwayratMouseKind::ScrollRight => super::super::input::PointerPhase::Wheel,
-        SubwayratMouseKind::Unsupported(kind) => {
-            super::super::input::PointerPhase::Unsupported(kind.clone())
-        }
+        SubwayratMouseKind::Unsupported(kind) => super::super::input::PointerPhase::Unsupported(kind.clone()),
     }
 }
 
-fn terminal_wheel_delta(
-    kind: &SubwayratMouseKind,
-) -> Option<super::super::input::PointerWheelDelta> {
+fn terminal_wheel_delta(kind: &SubwayratMouseKind) -> Option<super::super::input::PointerWheelDelta> {
     match kind {
         SubwayratMouseKind::ScrollUp => Some(super::super::input::PointerWheelDelta::new(
             0,

@@ -12,11 +12,7 @@ pub struct ReplayMetadata {
 impl ReplayMetadata {
     /// Creates replay metadata.
     #[must_use]
-    pub fn new(
-        id: impl Into<String>,
-        name: impl Into<String>,
-        component: impl Into<String>,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, name: impl Into<String>, component: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             name: name.into(),

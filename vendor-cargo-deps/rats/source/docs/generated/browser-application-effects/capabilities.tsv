@@ -1,0 +1,11 @@
+mechanism	classification	outcome	bound_or_reason	non_claim
+clipboard-write	direct	completed	256 UTF-8 bytes; current secure focused authorized operation	no clipboard read or native/terminal fallback
+clipboard-read	unsupported	unsupported	pilot exposes no read API	no clipboard content observation
+file-select-read	direct	completed	one explicit .rats UTF-8 file; 1024 bytes	no directories paths persistent handles or downstream identity
+file-selection-cancel	simulated	cancelled	pure event boundary; native picker cancellation not automated	no direct cancellation claim
+file-invalid	direct	rejected	wrong extension/encoding/count/size preserves prior state	no partial snapshot
+file-export-initiation	direct	initiated-and-cleaned	1024 prepared bytes; safe supplied name and text media	no download completion or durable file claim
+file-download-completion	untested	-	headless pilot proves initiation and object URL revocation only	no completed download claim
+directory-selection	unsupported	unsupported	outside pilot	no traversal or directory handles
+persistent-file-handle	unsupported	unsupported	outside pilot	no File System Access API support
+network-transfer	unsupported	unsupported	no fetch upload or background sync mechanism	no network persistence or sync

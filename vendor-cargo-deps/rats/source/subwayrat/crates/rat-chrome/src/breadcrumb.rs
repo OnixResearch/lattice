@@ -6,8 +6,11 @@
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 const DEFAULT_SEPARATOR: char = '/';
 const ELLIPSIS: &str = "…";
@@ -86,9 +89,7 @@ impl BreadcrumbModel {
 
     /// Return the active segment index and label.
     pub fn select(&self) -> Option<(usize, String)> {
-        self.segments
-            .get(self.active)
-            .map(|label| (self.active, label.clone()))
+        self.segments.get(self.active).map(|label| (self.active, label.clone()))
     }
 }
 
@@ -112,9 +113,7 @@ impl Default for BreadcrumbStyle {
         Self {
             background: Style::default().bg(Color::Black),
             segment: Style::default().fg(Color::Gray),
-            active_segment: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            active_segment: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             separator: Style::default().fg(Color::DarkGray),
             ellipsis: Style::default().fg(Color::DarkGray),
         }
@@ -188,15 +187,13 @@ pub fn compute_breadcrumb_layout(area: Rect, model: &BreadcrumbModel) -> Breadcr
     if has_ellipsis {
         cursor = cursor.saturating_add(ELLIPSIS_WIDTH.min(right.saturating_sub(cursor)));
         if cursor < right {
-            cursor =
-                cursor.saturating_add(separator_width(model).min(right.saturating_sub(cursor)));
+            cursor = cursor.saturating_add(separator_width(model).min(right.saturating_sub(cursor)));
         }
     }
 
     for index in visible_start..model.segments.len() {
         if index > visible_start {
-            cursor =
-                cursor.saturating_add(separator_width(model).min(right.saturating_sub(cursor)));
+            cursor = cursor.saturating_add(separator_width(model).min(right.saturating_sub(cursor)));
         }
         if cursor >= right {
             break;
@@ -251,12 +248,7 @@ fn render_breadcrumb_content(
     let right = rect_right(area);
 
     if layout.has_ellipsis && cursor < right {
-        buffer.set_string(
-            cursor,
-            area.y,
-            ELLIPSIS,
-            style.ellipsis.patch(style.background),
-        );
+        buffer.set_string(cursor, area.y, ELLIPSIS, style.ellipsis.patch(style.background));
         cursor = cursor.saturating_add(ELLIPSIS_WIDTH);
         render_separator(buffer, &mut cursor, right, area.y, model, style);
     }
@@ -292,12 +284,7 @@ fn render_separator(
     if *cursor >= right {
         return;
     }
-    buffer.set_string(
-        *cursor,
-        y,
-        model.separator.to_string(),
-        style.separator.patch(style.background),
-    );
+    buffer.set_string(*cursor, y, model.separator.to_string(), style.separator.patch(style.background));
     *cursor = cursor.saturating_add(separator_width(model));
 }
 
@@ -331,9 +318,7 @@ fn total_width(model: &BreadcrumbModel, start: usize, ellipsis: bool) -> u16 {
 }
 
 fn separator_width(model: &BreadcrumbModel) -> u16 {
-    UnicodeWidthChar::width(model.separator)
-        .unwrap_or_default()
-        .min(usize::from(u16::MAX)) as u16
+    UnicodeWidthChar::width(model.separator).unwrap_or_default().min(usize::from(u16::MAX)) as u16
 }
 
 fn truncate_to_width(text: &str, max_width: u16) -> String {
@@ -388,9 +373,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const AREA_X: u16 = 0;
     const AREA_Y: u16 = 0;
@@ -472,11 +458,7 @@ mod tests {
         BreadcrumbModel::new(["home", "user", "project"])
     }
 
-    fn render_to_buffer(
-        width: u16,
-        model: &BreadcrumbModel,
-        style: &BreadcrumbStyle,
-    ) -> ratatui::buffer::Buffer {
+    fn render_to_buffer(width: u16, model: &BreadcrumbModel, style: &BreadcrumbStyle) -> ratatui::buffer::Buffer {
         let backend = TestBackend::new(width, AREA_HEIGHT);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal

@@ -5,13 +5,117 @@
 //! via [`NodeGraphState::handle_mouse`] and [`NodeGraphState::handle_key`], which
 //! return [`GraphAction`] events for the caller to act on.
 
-use crate::model::{Graph, NodeId, PortDirection, PortId};
-use rat_canvas::{Position, Viewport};
+use std::collections::HashSet;
+
+use rat_canvas::Position;
+use rat_canvas::Viewport;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
 use ratatui::widgets::StatefulWidget;
-use std::collections::HashSet;
+
+use crate::model::Graph;
+use crate::model::NodeId;
+use crate::model::PortDirection;
+use crate::model::PortId;
+
+macro_rules! canvas_axis {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+        pub struct $name(i32);
+
+        impl $name {
+            /// Creates a canvas coordinate from a scaled backing value.
+            #[must_use]
+            pub const fn from_scaled(value: i32) -> Self {
+                Self(value)
+            }
+
+            /// Returns the backing value for renderer/projection arithmetic.
+            #[must_use]
+            pub const fn get(self) -> i32 {
+                self.0
+            }
+
+            /// Adds a raw delta returning a value in this same coordinate role.
+            #[must_use]
+            pub fn plus(self, delta: i32) -> Self {
+                Self(self.0 + delta)
+            }
+
+            /// Subtracts a raw delta returning a value in this same coordinate role.
+            #[must_use]
+            pub fn minus(self, delta: i32) -> Self {
+                Self(self.0 - delta)
+            }
+
+            /// The minimum of two same-role coordinates.
+            #[must_use]
+            pub fn min(self, other: Self) -> Self {
+                Self(self.0.min(other.0))
+            }
+
+            /// The maximum of two same-role coordinates.
+            #[must_use]
+            pub fn max(self, other: Self) -> Self {
+                Self(self.0.max(other.0))
+            }
+        }
+    };
+}
+
+canvas_axis!(
+    /// Canvas-space horizontal coordinate.
+    ///
+    /// Distinct from a screen coordinate and from [`CanvasY`]; mixing roles
+    /// fails at compile time.
+    ///
+    /// Supplying a vertical canvas coordinate where a horizontal one is
+    /// required must not compile.
+    ///
+    /// ```compile_fail
+    /// use rat_nodegraph::view::{CanvasX, CanvasY};
+    /// let y = CanvasY::from_scaled(4);
+    /// let x: CanvasX = y;
+    /// ```
+    CanvasX
+);
+canvas_axis!(
+    /// Canvas-space vertical coordinate.
+    ///
+    /// Distinct from a screen coordinate and from [`CanvasX`]; mixing roles
+    /// fails at compile time.
+    ///
+    /// Supplying a horizontal canvas coordinate where a vertical one is
+    /// required must not compile.
+    ///
+    /// ```compile_fail
+    /// use rat_nodegraph::view::{CanvasX, CanvasY};
+    /// let x = CanvasX::from_scaled(4);
+    /// let y: CanvasY = x;
+    /// ```
+    CanvasY
+);
+
+/// A point in canvas space with distinct horizontal and vertical roles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanvasPoint {
+    /// Canvas-space horizontal coordinate.
+    pub x: CanvasX,
+    /// Canvas-space vertical coordinate.
+    pub y: CanvasY,
+}
+
+impl CanvasPoint {
+    /// Creates a canvas-space point.
+    #[must_use]
+    pub const fn new(x: CanvasX, y: CanvasY) -> Self {
+        Self { x, y }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -21,7 +125,7 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GraphAction {
     SelectionChanged { selected: Vec<NodeId> },
-    NodeMoved { node: NodeId, x: i32, y: i32 },
+    NodeMoved { node: NodeId, x: CanvasX, y: CanvasY },
     EdgeCreated { source: PortId, target: PortId },
     EdgeDeleted { source: PortId, target: PortId },
     WiringStarted { source: PortId },
@@ -38,19 +142,19 @@ pub enum InteractionMode {
     /// Default idle state.
     Normal,
     /// Dragging selected nodes. `origin` is the canvas pos where drag started.
-    Dragging { origin_x: i32, origin_y: i32 },
+    Dragging { origin_x: CanvasX, origin_y: CanvasY },
     /// Drawing a wire from a source port.
     Wiring {
         source: PortId,
-        cursor_x: i32,
-        cursor_y: i32,
+        cursor_x: CanvasX,
+        cursor_y: CanvasY,
     },
     /// Box-selecting with a rectangle.
     BoxSelect {
-        start_x: i32,
-        start_y: i32,
-        end_x: i32,
-        end_y: i32,
+        start_x: CanvasX,
+        start_y: CanvasY,
+        end_x: CanvasX,
+        end_y: CanvasY,
     },
 }
 
@@ -131,14 +235,13 @@ impl NodeGraphState {
             }
             GraphAction::NodeMoved { node, x, y } => {
                 if let Some(n) = self.graph.node_mut(*node) {
-                    n.x = *x;
-                    n.y = *y;
+                    n.x = x.get();
+                    n.y = y.get();
                 }
             }
             // Selection changes and wiring state are view-layer, no graph mutation needed
-            GraphAction::SelectionChanged { .. }
-            | GraphAction::WiringStarted { .. }
-            | GraphAction::WiringCancelled => {}
+            GraphAction::SelectionChanged { .. } | GraphAction::WiringStarted { .. } | GraphAction::WiringCancelled => {
+            }
         }
     }
 
@@ -158,18 +261,20 @@ impl NodeGraphState {
 #[derive(Debug, Clone, Copy)]
 pub struct NodeBounds {
     pub node_id: NodeId,
-    pub x: i32,
-    pub y: i32,
+    pub x: CanvasX,
+    pub y: CanvasY,
     pub width: u16,
     pub height: u16,
 }
 
 impl NodeBounds {
-    pub fn contains(&self, cx: i32, cy: i32) -> bool {
-        cx >= self.x
-            && cx < self.x + self.width as i32
-            && cy >= self.y
-            && cy < self.y + self.height as i32
+    pub fn contains(&self, point: CanvasPoint) -> bool {
+        let cx = point.x.get();
+        let cy = point.y.get();
+        cx >= self.x.get()
+            && cx < self.x.get() + self.width as i32
+            && cy >= self.y.get()
+            && cy < self.y.get() + self.height as i32
     }
 }
 
@@ -179,18 +284,8 @@ pub fn node_bounds(graph: &Graph, node_id: NodeId) -> Option<NodeBounds> {
 
     // Width: max of label length, longest input label + longest output label + padding.
     let label_width = node.label.len() as u16 + 4; // "│ Label │"
-    let max_input_label = node
-        .input_ports
-        .iter()
-        .map(|p| p.label.len() as u16)
-        .max()
-        .unwrap_or(0);
-    let max_output_label = node
-        .output_ports
-        .iter()
-        .map(|p| p.label.len() as u16)
-        .max()
-        .unwrap_or(0);
+    let max_input_label = node.input_ports.iter().map(|p| p.label.len() as u16).max().unwrap_or(0);
+    let max_output_label = node.output_ports.iter().map(|p| p.label.len() as u16).max().unwrap_or(0);
     // "│● label    label ●│" — marker(2) + label + gap(3) + label + marker(2) + borders(2)
     let port_row_width = 2 + max_input_label + 3 + max_output_label + 2 + 2;
 
@@ -203,28 +298,15 @@ pub fn node_bounds(graph: &Graph, node_id: NodeId) -> Option<NodeBounds> {
 
     Some(NodeBounds {
         node_id,
-        x: node.x,
-        y: node.y,
+        x: CanvasX::from_scaled(node.x),
+        y: CanvasY::from_scaled(node.y),
         width,
         height,
     })
 }
 
-/// Compute bounding boxes for all nodes.
-pub fn all_node_bounds(graph: &Graph) -> Vec<NodeBounds> {
-    graph
-        .node_ids()
-        .iter()
-        .filter_map(|&id| node_bounds(graph, id))
-        .collect()
-}
-
-// ---------------------------------------------------------------------------
-// Port position helpers
-// ---------------------------------------------------------------------------
-
-/// Screen position of a port marker (in canvas coordinates).
-pub fn port_canvas_position(graph: &Graph, port_id: PortId) -> Option<(i32, i32)> {
+/// Canvas-space position of a port marker.
+pub fn port_canvas_position(graph: &Graph, port_id: PortId) -> Option<CanvasPoint> {
     let node_id = graph.port_owner(port_id)?;
     let bounds = node_bounds(graph, node_id)?;
     let node = graph.node(node_id)?;
@@ -233,14 +315,22 @@ pub fn port_canvas_position(graph: &Graph, port_id: PortId) -> Option<(i32, i32)
 
     let (port_list, side_x) = match port.direction {
         PortDirection::Input => (&node.input_ports, bounds.x),
-        PortDirection::Output => (&node.output_ports, bounds.x + bounds.width as i32 - 1),
+        PortDirection::Output => (&node.output_ports, bounds.x.plus(bounds.width as i32).minus(1)),
     };
 
     let port_index = port_list.iter().position(|p| p.id == port_id)?;
-    let port_y = bounds.y + 2 + port_index as i32; // skip top border + label row
+    let port_y = bounds.y.plus(2 + port_index as i32); // skip top border + label row
 
-    Some((side_x, port_y))
+    Some(CanvasPoint::new(side_x, port_y))
 }
+/// Compute bounding boxes for all nodes.
+pub fn all_node_bounds(graph: &Graph) -> Vec<NodeBounds> {
+    graph.node_ids().iter().filter_map(|&id| node_bounds(graph, id)).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Port position helpers
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Hit testing
@@ -256,7 +346,9 @@ pub enum HitTarget {
 }
 
 /// Hit-test a canvas position against nodes, ports, and edges.
-pub fn hit_test(state: &NodeGraphState, canvas_x: i32, canvas_y: i32) -> HitTarget {
+pub fn hit_test(state: &NodeGraphState, point: CanvasPoint) -> HitTarget {
+    let canvas_x = point.x.get();
+    let canvas_y = point.y.get();
     let bounds_list = all_node_bounds(&state.graph);
 
     // Check ports first (they're on node edges, more specific).
@@ -265,8 +357,8 @@ pub fn hit_test(state: &NodeGraphState, canvas_x: i32, canvas_y: i32) -> HitTarg
 
         // Input ports — left edge.
         for (i, port) in node.input_ports.iter().enumerate() {
-            let px = bounds.x;
-            let py = bounds.y + 2 + i as i32;
+            let px = bounds.x.get();
+            let py = bounds.y.get() + 2 + i as i32;
             if canvas_x == px && canvas_y == py {
                 return HitTarget::Port(port.id);
             }
@@ -274,8 +366,8 @@ pub fn hit_test(state: &NodeGraphState, canvas_x: i32, canvas_y: i32) -> HitTarg
 
         // Output ports — right edge.
         for (i, port) in node.output_ports.iter().enumerate() {
-            let px = bounds.x + bounds.width as i32 - 1;
-            let py = bounds.y + 2 + i as i32;
+            let px = bounds.x.get() + bounds.width as i32 - 1;
+            let py = bounds.y.get() + 2 + i as i32;
             if canvas_x == px && canvas_y == py {
                 return HitTarget::Port(port.id);
             }
@@ -284,17 +376,23 @@ pub fn hit_test(state: &NodeGraphState, canvas_x: i32, canvas_y: i32) -> HitTarg
 
     // Check node body.
     for bounds in &bounds_list {
-        if bounds.contains(canvas_x, canvas_y) {
+        if bounds.contains(point) {
             return HitTarget::Node(bounds.node_id);
         }
     }
 
     // Check edges (coarse — test if point is near any edge segment).
     for edge in state.graph.edges() {
-        if let (Some((sx, sy)), Some((tx, ty))) = (
-            port_canvas_position(&state.graph, edge.source),
-            port_canvas_position(&state.graph, edge.target),
-        ) && point_near_manhattan_path(canvas_x, canvas_y, sx, sy, tx, ty)
+        if let (Some(src_pos), Some(tgt_pos)) =
+            (port_canvas_position(&state.graph, edge.source), port_canvas_position(&state.graph, edge.target))
+            && point_near_manhattan_path(
+                canvas_x,
+                canvas_y,
+                src_pos.x.get(),
+                src_pos.y.get(),
+                tgt_pos.x.get(),
+                tgt_pos.y.get(),
+            )
         {
             return HitTarget::Edge(edge.source, edge.target);
         }
@@ -329,20 +427,13 @@ fn point_near_manhattan_path(px: i32, py: i32, sx: i32, sy: i32, tx: i32, ty: i3
 
 impl NodeGraphState {
     /// Handle a mouse click at screen coordinates. Returns actions.
-    pub fn handle_mouse_click(
-        &mut self,
-        screen_x: u16,
-        screen_y: u16,
-        shift: bool,
-    ) -> Vec<GraphAction> {
-        let canvas_pos = self.viewport.screen_to_canvas(
-            screen_x.saturating_sub(self.area.x),
-            screen_y.saturating_sub(self.area.y),
-        );
-        let cx = canvas_pos.x;
-        let cy = canvas_pos.y;
+    pub fn handle_mouse_click(&mut self, screen_x: u16, screen_y: u16, shift: bool) -> Vec<GraphAction> {
+        let canvas_pos = self
+            .viewport
+            .screen_to_canvas(screen_x.saturating_sub(self.area.x), screen_y.saturating_sub(self.area.y));
+        let point = CanvasPoint::new(CanvasX::from_scaled(canvas_pos.x), CanvasY::from_scaled(canvas_pos.y));
 
-        let hit = hit_test(self, cx, cy);
+        let hit = hit_test(self, point);
         let mut actions = Vec::new();
 
         match (&self.mode, hit) {
@@ -351,18 +442,13 @@ impl NodeGraphState {
                 let source = *source;
 
                 // Check compatibility without mutating the graph
-                if let (Some(src_port), Some(tgt_port)) =
-                    (self.graph.port(source), self.graph.port(target_port))
-                {
+                if let (Some(src_port), Some(tgt_port)) = (self.graph.port(source), self.graph.port(target_port)) {
                     // Verify source is Output, target is Input
-                    if src_port.direction == PortDirection::Output
-                        && tgt_port.direction == PortDirection::Input
-                    {
+                    if src_port.direction == PortDirection::Output && tgt_port.direction == PortDirection::Input {
                         // Verify they're on different nodes
-                        if let (Some(src_node), Some(tgt_node)) = (
-                            self.graph.port_owner(source),
-                            self.graph.port_owner(target_port),
-                        ) {
+                        if let (Some(src_node), Some(tgt_node)) =
+                            (self.graph.port_owner(source), self.graph.port_owner(target_port))
+                        {
                             if src_node != tgt_node {
                                 // Check type compatibility (exact string match)
                                 if src_port.type_tag == tgt_port.type_tag {
@@ -391,8 +477,8 @@ impl NodeGraphState {
                 {
                     self.mode = InteractionMode::Wiring {
                         source: port_id,
-                        cursor_x: cx,
-                        cursor_y: cy,
+                        cursor_x: point.x,
+                        cursor_y: point.y,
                     };
                     actions.push(GraphAction::WiringStarted { source: port_id });
                 }
@@ -427,9 +513,7 @@ impl NodeGraphState {
                     self.selected.clear();
                     self.selected_edge = None;
                     self.focused = None;
-                    actions.push(GraphAction::SelectionChanged {
-                        selected: Vec::new(),
-                    });
+                    actions.push(GraphAction::SelectionChanged { selected: Vec::new() });
                 }
             }
 
@@ -440,32 +524,25 @@ impl NodeGraphState {
     }
 
     /// Handle mouse drag to move selected nodes.
-    pub fn handle_mouse_drag(
-        &mut self,
-        screen_x: u16,
-        screen_y: u16,
-        dx: i32,
-        dy: i32,
-    ) -> Vec<GraphAction> {
+    pub fn handle_mouse_drag(&mut self, screen_x: u16, screen_y: u16, dx: i32, dy: i32) -> Vec<GraphAction> {
         let mut actions = Vec::new();
 
         if self.selected.is_empty() {
             // Start box selection.
-            let canvas_pos = self.viewport.screen_to_canvas(
-                screen_x.saturating_sub(self.area.x),
-                screen_y.saturating_sub(self.area.y),
-            );
+            let canvas_pos = self
+                .viewport
+                .screen_to_canvas(screen_x.saturating_sub(self.area.x), screen_y.saturating_sub(self.area.y));
             match &mut self.mode {
                 InteractionMode::BoxSelect { end_x, end_y, .. } => {
-                    *end_x = canvas_pos.x;
-                    *end_y = canvas_pos.y;
+                    *end_x = CanvasX::from_scaled(canvas_pos.x);
+                    *end_y = CanvasY::from_scaled(canvas_pos.y);
                 }
                 _ => {
                     self.mode = InteractionMode::BoxSelect {
-                        start_x: canvas_pos.x - dx,
-                        start_y: canvas_pos.y - dy,
-                        end_x: canvas_pos.x,
-                        end_y: canvas_pos.y,
+                        start_x: CanvasX::from_scaled(canvas_pos.x - dx),
+                        start_y: CanvasY::from_scaled(canvas_pos.y - dy),
+                        end_x: CanvasX::from_scaled(canvas_pos.x),
+                        end_y: CanvasY::from_scaled(canvas_pos.y),
                     };
                 }
             }
@@ -476,8 +553,8 @@ impl NodeGraphState {
         let selected: Vec<NodeId> = self.selected.iter().copied().collect();
         for &id in &selected {
             if let Some(node) = self.graph.node(id) {
-                let new_x = node.x + dx;
-                let new_y = node.y + dy;
+                let new_x = CanvasX::from_scaled(node.x + dx);
+                let new_y = CanvasY::from_scaled(node.y + dy);
                 actions.push(GraphAction::NodeMoved {
                     node: id,
                     x: new_x,
@@ -507,8 +584,8 @@ impl NodeGraphState {
 
             self.selected.clear();
             for bounds in all_node_bounds(&self.graph) {
-                let bx2 = bounds.x + bounds.width as i32;
-                let by2 = bounds.y + bounds.height as i32;
+                let bx2 = bounds.x.plus(bounds.width as i32);
+                let by2 = bounds.y.plus(bounds.height as i32);
                 // Intersection test.
                 if bounds.x < max_x && bx2 > min_x && bounds.y < max_y && by2 > min_y {
                     self.selected.insert(bounds.node_id);
@@ -583,9 +660,7 @@ impl NodeGraphState {
                     }
                     _ => {
                         // Cycle node focus.
-                        let current_idx = self
-                            .focused
-                            .and_then(|f| self.tab_order.iter().position(|&id| id == f));
+                        let current_idx = self.focused.and_then(|f| self.tab_order.iter().position(|&id| id == f));
                         let next_idx = match current_idx {
                             Some(i) => (i + 1) % self.tab_order.len(),
                             None => 0,
@@ -595,9 +670,7 @@ impl NodeGraphState {
                         if !shift {
                             self.selected.clear();
                             self.selected.insert(next);
-                            actions.push(GraphAction::SelectionChanged {
-                                selected: vec![next],
-                            });
+                            actions.push(GraphAction::SelectionChanged { selected: vec![next] });
                         }
                     }
                 }
@@ -610,25 +683,20 @@ impl NodeGraphState {
                         let source = *source;
                         if let Some(target) = self.focused_port {
                             // Check compatibility without mutating the graph
-                            if let (Some(src_port), Some(tgt_port)) =
-                                (self.graph.port(source), self.graph.port(target))
+                            if let (Some(src_port), Some(tgt_port)) = (self.graph.port(source), self.graph.port(target))
                             {
                                 // Verify source is Output, target is Input
                                 if src_port.direction == PortDirection::Output
                                     && tgt_port.direction == PortDirection::Input
                                 {
                                     // Verify they're on different nodes
-                                    if let (Some(src_node), Some(tgt_node)) = (
-                                        self.graph.port_owner(source),
-                                        self.graph.port_owner(target),
-                                    ) {
+                                    if let (Some(src_node), Some(tgt_node)) =
+                                        (self.graph.port_owner(source), self.graph.port_owner(target))
+                                    {
                                         if src_node != tgt_node {
                                             // Check type compatibility (exact string match)
                                             if src_port.type_tag == tgt_port.type_tag {
-                                                actions.push(GraphAction::EdgeCreated {
-                                                    source,
-                                                    target,
-                                                });
+                                                actions.push(GraphAction::EdgeCreated { source, target });
                                             }
                                         }
                                     }
@@ -647,8 +715,8 @@ impl NodeGraphState {
                             let pid = port.id;
                             self.mode = InteractionMode::Wiring {
                                 source: pid,
-                                cursor_x: node.x,
-                                cursor_y: node.y,
+                                cursor_x: CanvasX::from_scaled(node.x),
+                                cursor_y: CanvasY::from_scaled(node.y),
                             };
                             actions.push(GraphAction::WiringStarted { source: pid });
                         }
@@ -661,10 +729,10 @@ impl NodeGraphState {
             "Up" => {
                 for &id in &self.selected.clone() {
                     if let Some(n) = self.graph.node(id) {
-                        let new_y = n.y - 1;
+                        let new_y = CanvasY::from_scaled(n.y - 1);
                         actions.push(GraphAction::NodeMoved {
                             node: id,
-                            x: n.x,
+                            x: CanvasX::from_scaled(n.x),
                             y: new_y,
                         });
                     }
@@ -673,10 +741,10 @@ impl NodeGraphState {
             "Down" => {
                 for &id in &self.selected.clone() {
                     if let Some(n) = self.graph.node(id) {
-                        let new_y = n.y + 1;
+                        let new_y = CanvasY::from_scaled(n.y + 1);
                         actions.push(GraphAction::NodeMoved {
                             node: id,
-                            x: n.x,
+                            x: CanvasX::from_scaled(n.x),
                             y: new_y,
                         });
                     }
@@ -685,11 +753,11 @@ impl NodeGraphState {
             "Left" => {
                 for &id in &self.selected.clone() {
                     if let Some(n) = self.graph.node(id) {
-                        let new_x = n.x - 1;
+                        let new_x = CanvasX::from_scaled(n.x - 1);
                         actions.push(GraphAction::NodeMoved {
                             node: id,
                             x: new_x,
-                            y: n.y,
+                            y: CanvasY::from_scaled(n.y),
                         });
                     }
                 }
@@ -697,11 +765,11 @@ impl NodeGraphState {
             "Right" => {
                 for &id in &self.selected.clone() {
                     if let Some(n) = self.graph.node(id) {
-                        let new_x = n.x + 1;
+                        let new_x = CanvasX::from_scaled(n.x + 1);
                         actions.push(GraphAction::NodeMoved {
                             node: id,
                             x: new_x,
-                            y: n.y,
+                            y: CanvasY::from_scaled(n.y),
                         });
                     }
                 }
@@ -735,9 +803,7 @@ impl Default for NodeGraphWidget {
         Self {
             type_color_fn: None,
             node_style: Style::default().fg(Color::White),
-            selected_style: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            selected_style: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             edge_style: Style::default().fg(Color::DarkGray),
         }
     }
@@ -767,17 +833,13 @@ impl StatefulWidget for NodeGraphWidget {
             let src_pos = port_canvas_position(&state.graph, edge.source);
             let tgt_pos = port_canvas_position(&state.graph, edge.target);
 
-            if let (Some((sx, sy)), Some((tx, ty))) = (src_pos, tgt_pos) {
+            if let (Some(src), Some(tgt)) = (src_pos, tgt_pos) {
                 let source_port = state.graph.port(edge.source);
-                let color = source_port
-                    .map(|p| self.type_color(&p.type_tag))
-                    .unwrap_or(Color::DarkGray);
+                let color = source_port.map(|p| self.type_color(&p.type_tag)).unwrap_or(Color::DarkGray);
 
                 let is_selected = state.selected_edge == Some((edge.source, edge.target));
                 let style = if is_selected {
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(color)
                 };
@@ -786,7 +848,12 @@ impl StatefulWidget for NodeGraphWidget {
                     buf,
                     &state.viewport,
                     area,
-                    EdgeCoords { sx, sy, tx, ty },
+                    EdgeCoords {
+                        sx: src.x.get(),
+                        sy: src.y.get(),
+                        tx: tgt.x.get(),
+                        ty: tgt.y.get(),
+                    },
                     style,
                 );
             }
@@ -798,20 +865,18 @@ impl StatefulWidget for NodeGraphWidget {
             cursor_x,
             cursor_y,
         } = &state.mode
-            && let Some((sx, sy)) = port_canvas_position(&state.graph, *source)
+            && let Some(src) = port_canvas_position(&state.graph, *source)
         {
-            let style = Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD);
+            let style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
             render_manhattan_edge(
                 buf,
                 &state.viewport,
                 area,
                 EdgeCoords {
-                    sx,
-                    sy,
-                    tx: *cursor_x,
-                    ty: *cursor_y,
+                    sx: src.x.get(),
+                    sy: src.y.get(),
+                    tx: cursor_x.get(),
+                    ty: cursor_y.get(),
                 },
                 style,
             );
@@ -825,18 +890,16 @@ impl StatefulWidget for NodeGraphWidget {
             end_y,
         } = state.mode
         {
-            render_box_select(buf, &state.viewport, area, start_x, start_y, end_x, end_y);
+            render_box_select(buf, &state.viewport, area, start_x.get(), start_y.get(), end_x.get(), end_y.get());
         }
 
         // -- render nodes ---------------------------------------------------
         for bounds in &bounds_list {
             // Viewport culling.
-            let screen_tl = state
-                .viewport
-                .canvas_to_screen(Position::new(bounds.x, bounds.y));
+            let screen_tl = state.viewport.canvas_to_screen(Position::new(bounds.x.get(), bounds.y.get()));
             let screen_br = state.viewport.canvas_to_screen(Position::new(
-                bounds.x + bounds.width as i32 - 1,
-                bounds.y + bounds.height as i32 - 1,
+                bounds.x.get() + bounds.width as i32 - 1,
+                bounds.y.get() + bounds.height as i32 - 1,
             ));
 
             // Skip if entirely off-screen.
@@ -845,12 +908,9 @@ impl StatefulWidget for NodeGraphWidget {
                 let vis = state.viewport.visible_canvas_size();
                 let vx = state.viewport.offset_x;
                 let vy = state.viewport.offset_y;
-                let bx2 = bounds.x + bounds.width as i32;
-                let by2 = bounds.y + bounds.height as i32;
-                if bx2 <= vx
-                    || bounds.x >= vx + vis.0 as i32
-                    || by2 <= vy
-                    || bounds.y >= vy + vis.1 as i32
+                let bx2 = bounds.x.get() + bounds.width as i32;
+                let by2 = bounds.y.get() + bounds.height as i32;
+                if bx2 <= vx || bounds.x.get() >= vx + vis.0 as i32 || by2 <= vy || bounds.y.get() >= vy + vis.1 as i32
                 {
                     continue;
                 }
@@ -912,7 +972,7 @@ fn render_node(
     // Render each cell of the node box.
     for dy in 0..h {
         for dx in 0..w {
-            let canvas_pos = Position::new(bounds.x + dx as i32, bounds.y + dy as i32);
+            let canvas_pos = Position::new(bounds.x.get() + dx as i32, bounds.y.get() + dy as i32);
             let screen = viewport.canvas_to_screen(canvas_pos);
             let Some((sx, sy)) = screen else {
                 continue;
@@ -1033,13 +1093,7 @@ struct EdgeCoords {
 }
 
 /// Render a Manhattan-routed edge between two canvas points.
-fn render_manhattan_edge(
-    buf: &mut Buffer,
-    viewport: &Viewport,
-    area: Rect,
-    coords: EdgeCoords,
-    style: Style,
-) {
+fn render_manhattan_edge(buf: &mut Buffer, viewport: &Viewport, area: Rect, coords: EdgeCoords, style: Style) {
     let mid_x = (coords.sx + coords.tx) / 2;
 
     // Horizontal from source to mid.
@@ -1093,15 +1147,7 @@ fn render_manhattan_edge(
 }
 
 /// Render a box-selection rectangle.
-fn render_box_select(
-    buf: &mut Buffer,
-    viewport: &Viewport,
-    area: Rect,
-    x1: i32,
-    y1: i32,
-    x2: i32,
-    y2: i32,
-) {
+fn render_box_select(buf: &mut Buffer, viewport: &Viewport, area: Rect, x1: i32, y1: i32, x2: i32, y2: i32) {
     let min_x = x1.min(x2);
     let max_x = x1.max(x2);
     let min_y = y1.min(y2);
@@ -1191,7 +1237,7 @@ mod tests {
         let ids = state.graph.node_ids();
         for &id in &ids {
             let b = node_bounds(&state.graph, id).unwrap();
-            let tl = state.viewport.canvas_to_screen(Position::new(b.x, b.y));
+            let tl = state.viewport.canvas_to_screen(Position::new(b.x.get(), b.y.get()));
             assert!(tl.is_none());
         }
     }
@@ -1204,14 +1250,14 @@ mod tests {
         let b = node_bounds(&state.graph, first_id).unwrap();
 
         // Hit inside the node body.
-        let hit = hit_test(&state, b.x + 2, b.y + 1);
+        let hit = hit_test(&state, CanvasPoint::new(b.x.plus(2), b.y.plus(1)));
         assert!(matches!(hit, HitTarget::Node(id) if id == first_id));
     }
 
     #[test]
     fn hit_test_empty() {
         let state = make_state();
-        let hit = hit_test(&state, 500, 500);
+        let hit = hit_test(&state, CanvasPoint::new(CanvasX::from_scaled(500), CanvasY::from_scaled(500)));
         assert_eq!(hit, HitTarget::Empty);
     }
 
@@ -1224,7 +1270,7 @@ mod tests {
 
         let b = node_bounds(&state.graph, ids[0]).unwrap();
         // Input port is on the left edge, row = y + 2.
-        let hit = hit_test(&state, b.x, b.y + 2);
+        let hit = hit_test(&state, CanvasPoint::new(b.x, b.y.plus(2)));
         assert!(matches!(hit, HitTarget::Port(pid) if pid == input_port.id));
     }
 
@@ -1237,7 +1283,7 @@ mod tests {
         let b = node_bounds(&state.graph, first_id).unwrap();
 
         // Simulate click at node center (screen coords = canvas coords when offset=0).
-        let actions = state.handle_mouse_click((b.x + 2) as u16, (b.y + 1) as u16, false);
+        let actions = state.handle_mouse_click((b.x.get() + 2) as u16, (b.y.get() + 1) as u16, false);
 
         assert!(!actions.is_empty());
         assert!(state.selected.contains(&first_id));
@@ -1252,9 +1298,11 @@ mod tests {
 
         let actions = state.handle_mouse_click(70, 20, false);
         assert!(state.selected.is_empty());
-        assert!(actions.iter().any(
-            |a| matches!(a, GraphAction::SelectionChanged { selected } if selected.is_empty())
-        ));
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, GraphAction::SelectionChanged { selected } if selected.is_empty()))
+        );
     }
 
     #[test]
@@ -1269,11 +1317,7 @@ mod tests {
         state.apply_actions(&actions);
 
         assert_eq!(state.graph.node(id).unwrap().x, orig_x + 1);
-        assert!(
-            actions
-                .iter()
-                .any(|a| matches!(a, GraphAction::NodeMoved { .. }))
-        );
+        assert!(actions.iter().any(|a| matches!(a, GraphAction::NodeMoved { .. })));
     }
 
     #[test]
@@ -1285,17 +1329,13 @@ mod tests {
 
         state.mode = InteractionMode::Wiring {
             source: out_port,
-            cursor_x: 0,
-            cursor_y: 0,
+            cursor_x: CanvasX::from_scaled(0),
+            cursor_y: CanvasY::from_scaled(0),
         };
 
         let actions = state.handle_key("Escape", false);
         assert!(matches!(state.mode, InteractionMode::Normal));
-        assert!(
-            actions
-                .iter()
-                .any(|a| matches!(a, GraphAction::WiringCancelled))
-        );
+        assert!(actions.iter().any(|a| matches!(a, GraphAction::WiringCancelled)));
     }
 
     #[test]
@@ -1319,21 +1359,12 @@ mod tests {
         state.area = Rect::new(0, 0, 80, 24);
 
         // Focus the node that has output ports ("Transform").
-        let src_node = state
-            .graph
-            .nodes()
-            .find(|n| !n.output_ports.is_empty())
-            .unwrap()
-            .id;
+        let src_node = state.graph.nodes().find(|n| !n.output_ports.is_empty()).unwrap().id;
         state.focused = Some(src_node);
 
         // Enter starts wiring from first output port.
         let actions = state.handle_key("Enter", false);
-        assert!(
-            actions
-                .iter()
-                .any(|a| matches!(a, GraphAction::WiringStarted { .. }))
-        );
+        assert!(actions.iter().any(|a| matches!(a, GraphAction::WiringStarted { .. })));
         assert!(matches!(state.mode, InteractionMode::Wiring { .. }));
 
         // Tab cycles to a compatible target port.
@@ -1345,11 +1376,7 @@ mod tests {
         state.apply_actions(&actions);
         assert!(matches!(state.mode, InteractionMode::Normal));
         // Edge should have been created (same type "string").
-        assert!(
-            actions
-                .iter()
-                .any(|a| matches!(a, GraphAction::EdgeCreated { .. }))
-        );
+        assert!(actions.iter().any(|a| matches!(a, GraphAction::EdgeCreated { .. })));
     }
 
     #[test]
@@ -1357,18 +1384,8 @@ mod tests {
         let mut state = make_state();
 
         // Find the node with output ports ("Transform") and the one with input ports ("Output").
-        let src_node = state
-            .graph
-            .nodes()
-            .find(|n| !n.output_ports.is_empty())
-            .unwrap()
-            .id;
-        let tgt_node = state
-            .graph
-            .nodes()
-            .find(|n| n.id != src_node && !n.input_ports.is_empty())
-            .unwrap()
-            .id;
+        let src_node = state.graph.nodes().find(|n| !n.output_ports.is_empty()).unwrap().id;
+        let tgt_node = state.graph.nodes().find(|n| n.id != src_node && !n.input_ports.is_empty()).unwrap().id;
 
         // Create an edge.
         let src = state.graph.node(src_node).unwrap().output_ports[0].id;
@@ -1381,10 +1398,6 @@ mod tests {
         let actions = state.handle_key("Delete", false);
         state.apply_actions(&actions);
         assert_eq!(state.graph.edge_count(), 0);
-        assert!(
-            actions
-                .iter()
-                .any(|a| matches!(a, GraphAction::EdgeDeleted { .. }))
-        );
+        assert!(actions.iter().any(|a| matches!(a, GraphAction::EdgeDeleted { .. })));
     }
 }

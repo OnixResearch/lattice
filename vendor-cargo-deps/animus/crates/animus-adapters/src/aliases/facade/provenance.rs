@@ -1,4 +1,5 @@
-pub use crate::safe::receipt::{BoundedCount, BoundedCountDraft};
+pub use crate::safe::receipt::BoundedCount;
+pub use crate::safe::receipt::BoundedCountDraft;
 /// Largest accepted bounded count value in a safe receipt.
 pub const MAX_SAFE_RECEIPT_COUNT: u32 = crate::safe::receipt::MAX_COUNT;
 /// Largest accepted safe metadata label length.

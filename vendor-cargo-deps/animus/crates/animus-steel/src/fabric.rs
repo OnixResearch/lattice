@@ -6,6 +6,7 @@ const FABRIC_PRELUDE: &str = "\
 (define (animus-tool name schema arguments correlation-id visible-budget mutation-targets capabilities approval)\n\
   (list 'tool name schema arguments correlation-id visible-budget mutation-targets capabilities approval))\n\
 (define (animus-respond message) (list 'respond message))\n\
+(define (animus-completion-candidate request) (list 'completion-candidate request))\n\
 (define (animus-stop) (list 'stop))\n";
 const DECIDE_CALL: &str = "(animus-decide)";
 
@@ -39,17 +40,11 @@ impl Runtime {
     ///
     /// Returns [`crate::LoopError`] when Steel evaluation fails or when the
     /// returned decision violates the Rust boundary contract.
-    pub fn decide(
-        &mut self,
-        input: &crate::LoopTurn,
-    ) -> Result<crate::LoopDecision, crate::LoopError> {
+    pub fn decide(&mut self, input: &crate::LoopTurn) -> Result<crate::LoopDecision, crate::LoopError> {
         let bindings = input.bindings_program();
         evaluate_program(&mut self.engine, &bindings)?;
         let values = evaluate_program(&mut self.engine, DECIDE_CALL)?;
-        let decision_value = values
-            .into_iter()
-            .last()
-            .ok_or(crate::LoopError::MissingDecision)?;
+        let decision_value = values.into_iter().last().ok_or(crate::LoopError::MissingDecision)?;
 
         crate::LoopDecision::from_value(decision_value)
     }
@@ -60,19 +55,13 @@ impl Runtime {
     ///
     /// Returns [`crate::LoopError`] when loading or evaluating the Steel program
     /// fails or the decision is invalid.
-    pub fn decide_once(
-        program: &str,
-        input: &crate::LoopTurn,
-    ) -> Result<crate::LoopDecision, crate::LoopError> {
+    pub fn decide_once(program: &str, input: &crate::LoopTurn) -> Result<crate::LoopDecision, crate::LoopError> {
         let mut runtime = Self::new(program)?;
         runtime.decide(input)
     }
 }
 
-fn load_program(
-    engine: &mut steel::steel_vm::engine::Engine,
-    program: &str,
-) -> Result<(), crate::LoopError> {
+fn load_program(engine: &mut steel::steel_vm::engine::Engine, program: &str) -> Result<(), crate::LoopError> {
     engine
         .run(String::from(program))
         .map(|_values| ())
@@ -83,9 +72,7 @@ fn evaluate_program(
     engine: &mut steel::steel_vm::engine::Engine,
     program: &str,
 ) -> Result<Vec<steel::SteelVal>, crate::LoopError> {
-    engine
-        .run(String::from(program))
-        .map_err(|source| crate::LoopError::Evaluate { source })
+    engine.run(String::from(program)).map_err(|source| crate::LoopError::Evaluate { source })
 }
 
 #[cfg(test)]
@@ -150,10 +137,9 @@ mod tests {
 
     #[test]
     fn steel_program_can_use_previous_outputs() {
-        let input = crate::LoopTurn::new(SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_OUTPUT))
-            .expect("valid turn should parse");
-        let decision =
-            Runtime::decide_once(RESPOND_PROGRAM, &input).expect("decision should parse");
+        let input =
+            crate::LoopTurn::new(SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_OUTPUT)).expect("valid turn should parse");
+        let decision = Runtime::decide_once(RESPOND_PROGRAM, &input).expect("decision should parse");
 
         match decision {
             crate::LoopDecision::Respond { response } => {
@@ -166,8 +152,7 @@ mod tests {
     #[test]
     fn steel_program_can_stop() {
         let input = crate::LoopTurn::new(SUMMARY, None, None).expect("valid turn should parse");
-        let decision =
-            Runtime::decide_once(RESPOND_PROGRAM, &input).expect("decision should parse");
+        let decision = Runtime::decide_once(RESPOND_PROGRAM, &input).expect("decision should parse");
 
         assert_eq!(decision, crate::LoopDecision::Stop);
     }
@@ -175,8 +160,7 @@ mod tests {
     #[test]
     fn invalid_return_shape_is_rejected() {
         let input = crate::LoopTurn::new(SUMMARY, None, None).expect("valid turn should parse");
-        let error = Runtime::decide_once(INVALID_RETURN_PROGRAM, &input)
-            .expect_err("invalid decision should fail");
+        let error = Runtime::decide_once(INVALID_RETURN_PROGRAM, &input).expect_err("invalid decision should fail");
 
         assert!(matches!(error, crate::LoopError::InvalidDecision { .. }));
     }
@@ -184,8 +168,7 @@ mod tests {
     #[test]
     fn invalid_adapter_payload_is_rejected() {
         let input = crate::LoopTurn::new(SUMMARY, None, None).expect("valid turn should parse");
-        let error = Runtime::decide_once(INVALID_PAYLOAD_PROGRAM, &input)
-            .expect_err("invalid payload should fail");
+        let error = Runtime::decide_once(INVALID_PAYLOAD_PROGRAM, &input).expect_err("invalid payload should fail");
 
         assert!(matches!(error, crate::LoopError::AdapterContract { .. }));
     }

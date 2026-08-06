@@ -1,0 +1,6 @@
+alternative	removes_equivalent_lines	new_authority	dependency_direction	target_naming	diagnostics_and_review	estimated_custom_cost	decision
+ordinary-shared-helper	15-25	one additional Ratcore helper	frontends-to-Ratcore unchanged	local names retained	ordinary Rust compiler and tests	20-50 lines if a second consumer appears	preferred future option only after measured repetition grows
+generic-adapter-wrapper	25-35	generic state wrapper in Ratcore	frontends-to-Ratcore unchanged	generic parameters obscure local vocabulary	type errors less direct at renderer edge	50-100 lines plus public generic API	defer; current TabsState already supplies most value
+declarative-macro	35-45	macro invocation contract	each frontend owns or imports macro	local names configurable	expansion and diagnostics harder to review	80-150 lines plus tests	defer; configuration approaches emitted bodies
+checked-code-generation	maximum 52	JSON schema validator emitters manifest artifact lifecycle	tool knows all targets; runtime independent	fully configurable	generated diffs plus source/manifest joins	more than 1000 tool/test/config/generated lines and new tool dependencies	reject for tabs-only baseline
+retain-handwritten	0	no new authority	unchanged	fully idiomatic	direct compiler diagnostics and local review	zero	selected

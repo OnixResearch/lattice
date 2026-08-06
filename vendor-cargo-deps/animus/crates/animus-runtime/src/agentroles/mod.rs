@@ -12,48 +12,98 @@ mod separation;
 mod types;
 mod validation;
 
-pub use assignment::{
-    AGENT_ROLE_ACTIVATE_ABILITY, AGENT_ROLE_ASSIGN_ABILITY, AGENT_ROLE_CAPABILITY_CONTRACT,
-    AGENT_ROLE_HANDOFF_ABILITY, AgentRoleActivationResourceInput, AgentRoleAssignment,
-    AgentRoleAssignmentRequest, AgentRoleBoundModelPlan, AgentRoleCapabilityCeilings,
-    AgentRoleCapabilityDenial, AgentRoleCapabilityResolution, AgentRoleCapabilityResolutionInput,
-    AgentRoleCapabilitySource, AgentRoleHandoff, AgentRoleHandoffDraft,
-    AgentRoleHandoffResourceInput, AgentRoleHandoffSensitiveDraft, AgentRoleModelCompositionInput,
-    AgentRolePlan, AgentRolePlanInput, AgentRolePlanSnapshot, AgentRoleToolActionBinding,
-    AgentRoleToolActionInput, AgentRoleTransitionDecision, AgentRoleTransitionKind,
-    AgentRoleTransitionRequest, admit_agent_role_assignment, admit_agent_role_capability_use,
-    agent_role_activation_resource, agent_role_handoff_resource, bind_agent_role_tool_action,
-    build_agent_role_plan, compose_agent_role_model_plan, evaluate_agent_role_transition,
-    resolve_agent_role_capabilities, validate_agent_role_handoff,
-};
-pub use output::{
-    AGENT_ROLE_EMIT_CANDIDATE_ABILITY, AGENT_ROLE_EMIT_COORDINATION_ABILITY,
-    AGENT_ROLE_EMIT_JUDGMENT_ABILITY, AGENT_ROLE_EMIT_OBSERVATION_ABILITY,
-    AGENT_ROLE_EMIT_REVIEW_ABILITY, AGENT_ROLE_EMIT_VERIFICATION_ABILITY,
-    AGENT_ROLE_SELECT_ABILITY, AGENT_ROLE_VETO_ABILITY, AgentRoleAdmissionState,
-    AgentRoleDeterministicPolicyState, AgentRoleOutput, AgentRoleOutputAdmission,
-    AgentRoleOutputClaim, AgentRoleOutputDraft, AgentRoleOutputEffect, AgentRoleOutputLeak,
-    AgentRoleOutputResourceInput, AgentRoleOutputStatus, admit_agent_role_output,
-    agent_role_output_resource,
-};
-pub use receipt::{
-    AgentRoleReceipt, AgentRoleReceiptInput, AgentRoleReceiptKind, AgentRoleReceiptSensitiveDraft,
-    project_agent_role_receipt,
-};
-pub use separation::{
-    AgentRoleSeparationDecision, AgentRoleSeparationObservation, evaluate_agent_role_separation,
-};
-pub use types::{
-    AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN, AGENT_ROLE_CAPABILITY_HASH_DOMAIN,
-    AGENT_ROLE_CATALOG_SCHEMA, AGENT_ROLE_HANDOFF_HASH_DOMAIN, AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN,
-    AGENT_ROLE_OUTPUT_HASH_DOMAIN, AGENT_ROLE_PLAN_HASH_DOMAIN, AGENT_ROLE_PROFILE_HASH_DOMAIN,
-    AGENT_ROLE_RECEIPT_HASH_DOMAIN, AGENT_ROLE_SEPARATION_HASH_DOMAIN, AgentRoleBudgetPolicy,
-    AgentRoleBudgetPolicyDraft, AgentRoleCatalog, AgentRoleCatalogDraft, AgentRoleClass,
-    AgentRoleContextPosture, AgentRoleError, AgentRoleEvidencePosture, AgentRoleIssue,
-    AgentRoleMutationPosture, AgentRoleOutputKind, AgentRoleProfile, AgentRoleProfileDraft,
-    AgentRoleSeparationDimension, AgentRoleSeparationPolicy, AgentRoleSeparationPolicyDraft,
-    AgentRoleToolset, AgentRoleToolsetDraft,
-};
+pub use assignment::AGENT_ROLE_ACTIVATE_ABILITY;
+pub use assignment::AGENT_ROLE_ASSIGN_ABILITY;
+pub use assignment::AGENT_ROLE_CAPABILITY_CONTRACT;
+pub use assignment::AGENT_ROLE_HANDOFF_ABILITY;
+pub use assignment::AgentRoleActivationResourceInput;
+pub use assignment::AgentRoleAssignment;
+pub use assignment::AgentRoleAssignmentRequest;
+pub use assignment::AgentRoleBoundModelPlan;
+pub use assignment::AgentRoleCapabilityCeilings;
+pub use assignment::AgentRoleCapabilityDenial;
+pub use assignment::AgentRoleCapabilityResolution;
+pub use assignment::AgentRoleCapabilityResolutionInput;
+pub use assignment::AgentRoleCapabilitySource;
+pub use assignment::AgentRoleHandoff;
+pub use assignment::AgentRoleHandoffDraft;
+pub use assignment::AgentRoleHandoffResourceInput;
+pub use assignment::AgentRoleHandoffSensitiveDraft;
+pub use assignment::AgentRoleModelCompositionInput;
+pub use assignment::AgentRolePlan;
+pub use assignment::AgentRolePlanInput;
+pub use assignment::AgentRolePlanSnapshot;
+pub use assignment::AgentRoleToolActionBinding;
+pub use assignment::AgentRoleToolActionInput;
+pub use assignment::AgentRoleTransitionDecision;
+pub use assignment::AgentRoleTransitionKind;
+pub use assignment::AgentRoleTransitionRequest;
+pub use assignment::admit_agent_role_assignment;
+pub use assignment::admit_agent_role_capability_use;
+pub use assignment::agent_role_activation_resource;
+pub use assignment::agent_role_handoff_resource;
+pub use assignment::bind_agent_role_tool_action;
+pub use assignment::build_agent_role_plan;
+pub use assignment::compose_agent_role_model_plan;
+pub use assignment::evaluate_agent_role_transition;
+pub use assignment::resolve_agent_role_capabilities;
+pub use assignment::validate_agent_role_handoff;
+pub use output::AGENT_ROLE_EMIT_CANDIDATE_ABILITY;
+pub use output::AGENT_ROLE_EMIT_COORDINATION_ABILITY;
+pub use output::AGENT_ROLE_EMIT_JUDGMENT_ABILITY;
+pub use output::AGENT_ROLE_EMIT_OBSERVATION_ABILITY;
+pub use output::AGENT_ROLE_EMIT_REVIEW_ABILITY;
+pub use output::AGENT_ROLE_EMIT_VERIFICATION_ABILITY;
+pub use output::AGENT_ROLE_SELECT_ABILITY;
+pub use output::AGENT_ROLE_VETO_ABILITY;
+pub use output::AgentRoleAdmissionState;
+pub use output::AgentRoleDeterministicPolicyState;
+pub use output::AgentRoleOutput;
+pub use output::AgentRoleOutputAdmission;
+pub use output::AgentRoleOutputClaim;
+pub use output::AgentRoleOutputDraft;
+pub use output::AgentRoleOutputEffect;
+pub use output::AgentRoleOutputLeak;
+pub use output::AgentRoleOutputResourceInput;
+pub use output::AgentRoleOutputStatus;
+pub use output::admit_agent_role_output;
+pub use output::agent_role_output_resource;
+pub use receipt::AgentRoleReceipt;
+pub use receipt::AgentRoleReceiptInput;
+pub use receipt::AgentRoleReceiptKind;
+pub use receipt::AgentRoleReceiptSensitiveDraft;
+pub use receipt::project_agent_role_receipt;
+pub use separation::AgentRoleSeparationDecision;
+pub use separation::AgentRoleSeparationObservation;
+pub use separation::evaluate_agent_role_separation;
+pub use types::AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN;
+pub use types::AGENT_ROLE_CAPABILITY_HASH_DOMAIN;
+pub use types::AGENT_ROLE_CATALOG_SCHEMA;
+pub use types::AGENT_ROLE_HANDOFF_HASH_DOMAIN;
+pub use types::AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN;
+pub use types::AGENT_ROLE_OUTPUT_HASH_DOMAIN;
+pub use types::AGENT_ROLE_PLAN_HASH_DOMAIN;
+pub use types::AGENT_ROLE_PROFILE_HASH_DOMAIN;
+pub use types::AGENT_ROLE_RECEIPT_HASH_DOMAIN;
+pub use types::AGENT_ROLE_SEPARATION_HASH_DOMAIN;
+pub use types::AgentRoleBudgetPolicy;
+pub use types::AgentRoleBudgetPolicyDraft;
+pub use types::AgentRoleCatalog;
+pub use types::AgentRoleCatalogDraft;
+pub use types::AgentRoleClass;
+pub use types::AgentRoleContextPosture;
+pub use types::AgentRoleError;
+pub use types::AgentRoleEvidencePosture;
+pub use types::AgentRoleIssue;
+pub use types::AgentRoleMutationPosture;
+pub use types::AgentRoleOutputKind;
+pub use types::AgentRoleProfile;
+pub use types::AgentRoleProfileDraft;
+pub use types::AgentRoleSeparationDimension;
+pub use types::AgentRoleSeparationPolicy;
+pub use types::AgentRoleSeparationPolicyDraft;
+pub use types::AgentRoleToolset;
+pub use types::AgentRoleToolsetDraft;
 pub use validation::blake3_agent_role_profile_identity;
 
 #[cfg(test)]

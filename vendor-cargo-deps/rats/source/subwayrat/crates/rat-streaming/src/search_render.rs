@@ -3,12 +3,22 @@
 //! Separated from core search logic to allow UI-independent testing
 //! and different front-end implementations.
 
-use crate::output_search::{OutputSearch, SearchMode};
-use rat_chrome::{OverlayAnchor, OverlayModel, OverlaySize, OverlayStyle, overlay_frame};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use rat_chrome::OverlayAnchor;
+use rat_chrome::OverlayModel;
+use rat_chrome::OverlaySize;
+use rat_chrome::OverlayStyle;
+use rat_chrome::overlay_frame;
+use ratatui::Frame;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
-use ratatui::{Frame, layout::Rect};
+
+use crate::output_search::OutputSearch;
+use crate::output_search::SearchMode;
 
 const SEARCH_OVERLAY_WIDTH: u16 = 60;
 const SEARCH_OVERLAY_HEIGHT: u16 = 3;
@@ -55,18 +65,10 @@ pub fn render_search_overlay(search: &OutputSearch, frame: &mut Frame, area: Rec
     };
 
     let search_line = Line::from(vec![
-        Span::styled(
-            format!(" {} ", mode_label),
-            Style::default().fg(Color::Black).bg(Color::Yellow),
-        ),
+        Span::styled(format!(" {} ", mode_label), Style::default().fg(Color::Black).bg(Color::Yellow)),
         Span::styled(" ", Style::default()),
         Span::styled(&search.query, Style::default().fg(Color::White)),
-        Span::styled(
-            CURSOR_GLYPH,
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::SLOW_BLINK),
-        ),
+        Span::styled(CURSOR_GLYPH, Style::default().fg(Color::Gray).add_modifier(Modifier::SLOW_BLINK)),
         Span::styled(match_info, Style::default().fg(match_color)),
     ]);
 
@@ -74,10 +76,7 @@ pub fn render_search_overlay(search: &OutputSearch, frame: &mut Frame, area: Rec
 }
 
 fn search_overlay_model(area: Rect) -> OverlayModel {
-    let width = area
-        .width
-        .saturating_sub(SEARCH_OVERLAY_MARGIN)
-        .min(SEARCH_OVERLAY_WIDTH);
+    let width = area.width.saturating_sub(SEARCH_OVERLAY_MARGIN).min(SEARCH_OVERLAY_WIDTH);
     let height = SEARCH_OVERLAY_HEIGHT.min(area.height);
 
     OverlayModel::default()
@@ -130,11 +129,7 @@ pub fn apply_search_highlights<'a>(
             _ => continue,
         };
 
-        let base_style = lines[row]
-            .spans
-            .first()
-            .map(|s| s.style)
-            .unwrap_or_default();
+        let base_style = lines[row].spans.first().map(|s| s.style).unwrap_or_default();
         original_styles[row] = Some(base_style);
 
         let mut spans = Vec::new();
@@ -184,11 +179,12 @@ pub fn apply_search_highlights<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 80;
     const VIEWPORT_HEIGHT: u16 = 12;
@@ -282,9 +278,7 @@ mod tests {
     fn no_matches_offset(search: &OutputSearch) -> u16 {
         let mode_segment = MODE_SUBSTRING_LABEL.len() + MODE_SEGMENT_PADDING;
         let query_segment = search.query.len() + QUERY_CURSOR_WIDTH;
-        (mode_segment + MODE_SEPARATOR_WIDTH + query_segment + NO_MATCHES_LEADING_SPACE)
-            .try_into()
-            .unwrap()
+        (mode_segment + MODE_SEPARATOR_WIDTH + query_segment + NO_MATCHES_LEADING_SPACE).try_into().unwrap()
     }
 
     const MODE_SEGMENT_PADDING: usize = 2;

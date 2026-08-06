@@ -13,48 +13,36 @@ mod tests;
 const CONTRACT_IDENTITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_contract_identity");
 const ROLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_role");
-const TOOL_CALL_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_tool_call_id");
+const TOOL_CALL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_tool_call_id");
 const CONTENT_PART_KIND_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_content_part_kind");
-const CONTENT_TEXT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_content_text");
+const CONTENT_TEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_content_text");
 const IMAGE_DESCRIPTOR_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_image_descriptor_id");
 const IMAGE_MEDIA_TYPE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_image_media_type");
-const IMAGE_HASH_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_image_content_hash");
-const TOOL_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_tool_name");
+const IMAGE_HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_image_content_hash");
+const TOOL_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_tool_name");
 const TOOL_DESCRIPTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_tool_description");
-const TOOL_SCHEMA_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_tool_schema_label");
-const STOP_SEQUENCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_stop_sequence");
+const TOOL_SCHEMA_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_tool_schema_label");
+const STOP_SEQUENCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_stop_sequence");
 const RESPONSE_SCHEMA_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_response_schema_label");
 const REASONING_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_reasoning_summary");
-const METADATA_KEY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_metadata_key");
-const METADATA_VALUE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_metadata_value");
-const RESPONSE_TEXT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_response_text");
+const METADATA_KEY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_metadata_key");
+const METADATA_VALUE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_metadata_value");
+const RESPONSE_TEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_response_text");
 const STRUCTURED_PAYLOAD_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_structured_payload_label");
 const TOOL_ARGUMENTS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_tool_arguments_label");
-const REFUSAL_REASON_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_refusal_reason");
-const SAFETY_CATEGORY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_safety_category");
+const REFUSAL_REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_refusal_reason");
+const SAFETY_CATEGORY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_safety_category");
 const MALFORMED_DIAGNOSTIC_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_malformed_diagnostic");
-const FINISH_REASON_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("model_finish_reason");
+const FINISH_REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_finish_reason");
 const RAW_PROVIDER_PAYLOAD_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_raw_provider_payload");
 const HIDDEN_REASONING_FIELD: crate::validation::FieldName =
@@ -95,8 +83,7 @@ const INVALID_TOOL_ROLE_WITHOUT_CALL: &str = "tool role requires a tool-call id"
 const INVALID_NON_TOOL_WITH_CALL: &str = "only tool role may carry a tool-call id";
 const INVALID_TOKEN_BUDGET: &str = "token budget is outside accepted bounds";
 const INVALID_TEMPERATURE: &str = "temperature millis is outside accepted bounds";
-const INVALID_REFUSAL_COMBINATION: &str =
-    "refusal or safety output cannot combine with success output";
+const INVALID_REFUSAL_COMBINATION: &str = "refusal or safety output cannot combine with success output";
 const INVALID_MALFORMED_COMBINATION: &str = "malformed output cannot combine with success output";
 const LOSSY_LEGACY_REQUEST: &str = "canonical request cannot collapse into one legacy prompt";
 const LOSSY_LEGACY_RESPONSE: &str = "canonical response carries non-text semantics";

@@ -1,7 +1,14 @@
-use super::{
-    Collection, EXTERNAL_SERVICE_FIELD, ExternalSubagentProtocol, ID_FIELD, PROFILE_FIELD,
-    SubagentError, TOOL_FIELD, Text, optional_text, required_text, text_collection,
-};
+use super::Collection;
+use super::EXTERNAL_SERVICE_FIELD;
+use super::ExternalSubagentProtocol;
+use super::ID_FIELD;
+use super::PROFILE_FIELD;
+use super::SubagentError;
+use super::TOOL_FIELD;
+use super::Text;
+use super::optional_text;
+use super::required_text;
+use super::text_collection;
 
 /// Untrusted external subagent descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,14 +55,13 @@ impl ExternalSubagentDescriptor {
         }
         let protocol = ExternalSubagentProtocol::parse(draft.protocol)?;
         let identity = required_text(ID_FIELD, draft.identity)?;
-        let service_label = required_text(EXTERNAL_SERVICE_FIELD, draft.service_label).map_err(
-            |error| match error {
+        let service_label =
+            required_text(EXTERNAL_SERVICE_FIELD, draft.service_label).map_err(|error| match error {
                 SubagentError::Contract(crate::AdapterContractError::EmptyField { .. }) => {
                     SubagentError::MissingExternalService
                 }
                 other => other,
-            },
-        )?;
+            })?;
         let declared_tools = text_collection(TOOL_FIELD, draft.declared_tools, true)?;
         let credential_label = optional_text(PROFILE_FIELD, draft.credential_label)?;
         Ok(Self {

@@ -1,0 +1,11 @@
+case	classification	observed_status	reason	next_action
+missing	direct	missing	fresh profile and fixed key absent before production hook mount	repeat when browser or hook changes
+valid-initial-read	direct	available	bounded JSON preseed read by production hook	repeat when browser or codec changes
+explicit-changed-write	direct	available	accepted fixture action writes bounded preference through production hook	repeat when effect scheduling changes
+same-origin-reload	direct	available	second mounted document on identical loopback origin reads prior write	repeat when origin lifecycle changes
+clear	direct	missing	fixed key is cleared before remount and remains absent	repeat when clear setup changes
+malformed-data	direct	decode-failed	malformed source remains byte-identical after mount with fallback in memory	repeat when decode policy changes
+denied-security	simulated	read-denied	unit seam classifies denied read; selected exact browser has no deterministic unprivileged denial setup	add bounded opaque-origin direct case if lifecycle is reliable
+quota	simulated	write-failed	unit seam classifies rejected write without allocating unbounded browser storage	add reviewed bounded browser quota mechanism
+unavailable-storage	simulated	write-failed	target adapter classifies absent backend but selected browser provides localStorage	add a deterministic browser capability-disable case
+wrong-origin	untested	-	profile uses one isolated same-origin loopback server and does not relabel another origin	add explicit two-origin non-transfer scenario before claiming it

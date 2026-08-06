@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,31 +7,42 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use super::{
-    BLAKE3_ALGORITHM, EMPTY_COUNT, FIELD_LEDGER, FIELD_POLICY, FIELD_PROMPT_PRESSURE,
-    FIELD_SUMMARIZER, FIELD_SUMMARY, FIELD_TOOL_ARTIFACT, FULL_BASIS_POINTS, HASH_PART_SEPARATOR,
-    ZERO_BASIS_POINTS, ZEROSTACK_MIDTURN_HASH_DOMAIN,
-    data::{
-        ZerostackCachedTokenRule, ZerostackInjectedServiceState, ZerostackMidturnDecision,
-        ZerostackMidturnDiagnostic, ZerostackMidturnDiagnosticKind, ZerostackMidturnFingerprint,
-        ZerostackMidturnPlan, ZerostackMidturnPolicy, ZerostackMidturnServices,
-        ZerostackMidturnSummary, ZerostackMidturnSummaryKind, ZerostackMidturnValidationResult,
-        ZerostackPromptPressure, ZerostackProviderUsage, ZerostackRouteMetadata,
-        ZerostackToolArtifactDescriptor, ZerostackToolArtifactPolicy,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::EMPTY_COUNT;
+use super::FIELD_LEDGER;
+use super::FIELD_POLICY;
+use super::FIELD_PROMPT_PRESSURE;
+use super::FIELD_SUMMARIZER;
+use super::FIELD_SUMMARY;
+use super::FIELD_TOOL_ARTIFACT;
+use super::FULL_BASIS_POINTS;
+use super::HASH_PART_SEPARATOR;
+use super::ZERO_BASIS_POINTS;
+use super::ZEROSTACK_MIDTURN_HASH_DOMAIN;
+use super::data::ZerostackCachedTokenRule;
+use super::data::ZerostackInjectedServiceState;
+use super::data::ZerostackMidturnDecision;
+use super::data::ZerostackMidturnDiagnostic;
+use super::data::ZerostackMidturnDiagnosticKind;
+use super::data::ZerostackMidturnFingerprint;
+use super::data::ZerostackMidturnPlan;
+use super::data::ZerostackMidturnPolicy;
+use super::data::ZerostackMidturnServices;
+use super::data::ZerostackMidturnSummary;
+use super::data::ZerostackMidturnSummaryKind;
+use super::data::ZerostackMidturnValidationResult;
+use super::data::ZerostackPromptPressure;
+use super::data::ZerostackProviderUsage;
+use super::data::ZerostackRouteMetadata;
+use super::data::ZerostackToolArtifactDescriptor;
+use super::data::ZerostackToolArtifactPolicy;
 
 const MAX_SUMMARY_CHARS: usize = 4096;
 const RAW_CREDENTIAL_MARKER: &str = "API_KEY";
@@ -41,10 +53,7 @@ const WINDOWS_PATH_MARKER: &str = ":\\";
 
 /// Computes a domain-separated BLAKE3 fingerprint for mid-turn compaction.
 #[must_use]
-pub fn blake3_zerostack_midturn_fingerprint(
-    label: &str,
-    bytes: &[u8],
-) -> ZerostackMidturnFingerprint {
+pub fn blake3_zerostack_midturn_fingerprint(label: &str, bytes: &[u8]) -> ZerostackMidturnFingerprint {
     let mut hasher = blake3::Hasher::new();
     hasher.update(ZEROSTACK_MIDTURN_HASH_DOMAIN.as_bytes());
     hasher.update(HASH_PART_SEPARATOR.as_bytes());
@@ -191,9 +200,7 @@ pub fn plan_zerostack_midturn_compaction(
 /// Returns diagnostics when summary text is empty, overlong, has raw unsafe
 /// markers, uses an unsupported kind, has blank or unsafe metadata, or has
 /// missing/non-BLAKE3 hashes.
-pub fn validate_zerostack_midturn_summary(
-    summary: &ZerostackMidturnSummary,
-) -> ZerostackMidturnValidationResult {
+pub fn validate_zerostack_midturn_summary(summary: &ZerostackMidturnSummary) -> ZerostackMidturnValidationResult {
     let mut diagnostics = Vec::new();
     let text_chars = summary.text.chars().count();
     if text_chars == EMPTY_COUNT || text_chars > MAX_SUMMARY_CHARS {
@@ -285,9 +292,7 @@ fn fail_plan(
 }
 
 fn pressure_crosses_threshold(policy: &ZerostackMidturnPolicy, pressure_tokens: u32) -> bool {
-    let usable_tokens = policy
-        .context_window_tokens
-        .saturating_sub(policy.response_reserve_tokens);
+    let usable_tokens = policy.context_window_tokens.saturating_sub(policy.response_reserve_tokens);
     let pressure_scaled = u64::from(pressure_tokens) * u64::from(FULL_BASIS_POINTS);
     let threshold_scaled = u64::from(usable_tokens) * u64::from(policy.threshold_basis_points);
     pressure_scaled >= threshold_scaled
@@ -313,15 +318,11 @@ fn service_state_detail(state: ZerostackInjectedServiceState) -> &'static str {
         ZerostackInjectedServiceState::Missing => "required service is missing",
         ZerostackInjectedServiceState::Denied => "required service denied the request",
         ZerostackInjectedServiceState::Cancelled => "required service was cancelled",
-        ZerostackInjectedServiceState::MalformedOutput => {
-            "required service returned malformed output"
-        }
+        ZerostackInjectedServiceState::MalformedOutput => "required service returned malformed output",
     }
 }
 
-fn to_validation_result(
-    diagnostics: Vec<ZerostackMidturnDiagnostic>,
-) -> ZerostackMidturnValidationResult {
+fn to_validation_result(diagnostics: Vec<ZerostackMidturnDiagnostic>) -> ZerostackMidturnValidationResult {
     if diagnostics.is_empty() {
         Ok(())
     } else {
@@ -344,10 +345,7 @@ fn validate_policy(policy: &ZerostackMidturnPolicy) -> Vec<ZerostackMidturnDiagn
     diagnostics
 }
 
-fn validate_tool_policy(
-    artifact_label: &str,
-    policy: &ZerostackToolArtifactPolicy,
-) -> Vec<ZerostackMidturnDiagnostic> {
+fn validate_tool_policy(artifact_label: &str, policy: &ZerostackToolArtifactPolicy) -> Vec<ZerostackMidturnDiagnostic> {
     let mut diagnostics = Vec::new();
     if artifact_label.trim().is_empty()
         || policy.visible_head == EMPTY_COUNT

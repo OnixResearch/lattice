@@ -1,0 +1,13 @@
+fact	authoritative_owner	generation	sensitivity	bound	idle_cost	evidence_role	consumers	next_action
+component-projection	family Ratcore model	accepted model generation	public structural	family bound	zero	derived projection	Subwayrat and Meteorite	compose directly
+component-diagnostic	family validator	same accepted candidate generation	typed code only	family bound	zero	diagnostic not state	showcase adapters	render codes locally
+semantic-focus-snapshot	Ratcore semantic owner	semantic generation	role identity relation only	semantic bounds	zero	semantic evidence	accessibility adapters	join only on exact generation
+contextual-route-probe	Ratcore action registry	catalog context and focus generations	action and owner IDs	probe bounds	zero when not requested	route explanation not authorization	workspace action surfaces	retain typed route outcome
+binding-introspection	Ratcore binding catalog	catalog layer and context generations	binding source and shadow IDs	sequence bounds	zero when not requested	binding explanation	key help and editors	retain family view
+named-parts	headless family projection	component generation	part and slot IDs	component bound	zero	structural projection	maintained adapters	compose with family renderer
+renderer-capability	renderer target policy	registry and scope identity	status reason next action	fixed matrix	zero	capability not runtime proof	parity and showcase	keep separate evidence role
+state-hash	owning pure model	accepted generation	hash only	64 hexadecimal bytes	zero	determinism identity not runtime	checked evidence	never classify as health
+replay-receipt	replay fixture owner	replay schema and source generations	allowlisted identities	artifact bound	zero outside evidence	replay evidence	tests and docs	link rather than absorb
+simulation-probe	simulation observer	sequence and controlled generation	allowlisted normalized fact	probe bounds	zero without selected observer	simulation evidence	headless tests	keep provider neutral
+renderer-view	renderer adapter	current accepted projection	renderer-local presentation	view bound	on request only	presentation feasibility	Subwayrat or Meteorite	local helper if consumer exists
+downstream-diagnostic	downstream application	separate downstream revision	caller-redacted typed fact	caller policy	zero in Rats	externally supplied observation	downstream frontend	render alongside never poll

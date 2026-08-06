@@ -234,14 +234,8 @@ pub const fn runtime_capability_family_map() -> &'static [RuntimeCapabilityFamil
 pub fn validate_runtime_capability_family_map(
     records: &[RuntimeCapabilityFamilyRecord],
 ) -> Result<(), RuntimeCapabilityFamilyMapError> {
-    assert!(
-        records.len() >= MIN_FAMILY_RECORDS,
-        "family map must contain at least one record"
-    );
-    assert!(
-        FAMILY_MAP.len() >= MIN_FAMILY_RECORDS,
-        "canonical family map must contain records"
-    );
+    assert!(records.len() >= MIN_FAMILY_RECORDS, "family map must contain at least one record");
+    assert!(FAMILY_MAP.len() >= MIN_FAMILY_RECORDS, "canonical family map must contain records");
     let mut families = std::collections::BTreeSet::new();
     for record in records {
         if !families.insert(record.family()) {
@@ -340,8 +334,7 @@ mod tests {
 
     #[test]
     fn capability_family_map_covers_expected_families_once() {
-        validate_runtime_capability_family_map(runtime_capability_family_map())
-            .expect("family map should validate");
+        validate_runtime_capability_family_map(runtime_capability_family_map()).expect("family map should validate");
 
         assert!(
             runtime_capability_family_map()
@@ -365,12 +358,7 @@ mod tests {
     #[test]
     fn capability_family_map_rejects_duplicates_and_bad_metadata() {
         let duplicate = [
-            RuntimeCapabilityFamilyRecord::new(
-                RuntimeCapabilityFamily::Loop,
-                FEATURE_LOOP,
-                AUTHORITY_INJECTED,
-                "loop",
-            ),
+            RuntimeCapabilityFamilyRecord::new(RuntimeCapabilityFamily::Loop, FEATURE_LOOP, AUTHORITY_INJECTED, "loop"),
             RuntimeCapabilityFamilyRecord::new(
                 RuntimeCapabilityFamily::Loop,
                 FEATURE_LOOP,

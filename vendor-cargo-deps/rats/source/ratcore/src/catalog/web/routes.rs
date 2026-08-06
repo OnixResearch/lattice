@@ -4,16 +4,14 @@ pub fn browser_fixture_navigation_rows(
     entry: &super::BrowserShowcaseEntry,
     fixtures: &[super::super::ShowcaseFixture],
 ) -> super::BrowserFixtureNavigation {
-    let fixture_map = fixtures
-        .iter()
-        .map(|fixture| (fixture.id.as_str(), fixture))
-        .collect::<std::collections::BTreeMap<_, _>>();
+    let fixture_map =
+        fixtures.iter().map(|fixture| (&fixture.id, fixture)).collect::<std::collections::BTreeMap<_, _>>();
     let mut rows = Vec::with_capacity(entry.supported_fixture_ids.len());
     let mut issues = Vec::with_capacity(entry.supported_fixture_ids.len());
     debug_assert!(rows.capacity() >= entry.supported_fixture_ids.len());
     debug_assert!(issues.capacity() >= entry.supported_fixture_ids.len());
     for fixture_id in &entry.supported_fixture_ids {
-        match fixture_map.get(fixture_id.as_str()) {
+        match fixture_map.get(fixture_id) {
             Some(fixture) => rows.push(navigation_row(entry, fixture)),
             None => issues.push(super::rules::unknown_fixture_issue(entry, fixture_id)),
         }

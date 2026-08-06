@@ -1,4 +1,5 @@
-use super::{Collection, Text};
+use super::Collection;
+use super::Text;
 
 /// Borrowed compatibility fields before manifest validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

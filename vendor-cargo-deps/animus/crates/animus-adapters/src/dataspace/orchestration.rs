@@ -1,7 +1,5 @@
-const EVENT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_event_id");
-const EVENT_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("dataspace_event_kind");
+const EVENT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_event_id");
+const EVENT_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_event_kind");
 const EVENT_TARGET_OWNER_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("dataspace_event_target_owner");
 
@@ -72,8 +70,7 @@ impl Event {
     /// Returns [`crate::AdapterContractError`] when labels are empty, malformed,
     /// too long, unsupported, or an ownership transfer omits its target owner.
     pub fn new(draft: Draft<'_>) -> Result<Self, crate::AdapterContractError> {
-        let stable_id =
-            crate::validation::normalized_adapter_field(EVENT_ID_FIELD, draft.stable_id)?;
+        let stable_id = crate::validation::normalized_adapter_field(EVENT_ID_FIELD, draft.stable_id)?;
         let kind = EventKind::parse(draft.kind)?;
         let target_owner = super::optional_field(EVENT_TARGET_OWNER_FIELD, draft.target_owner)?;
         if kind == EventKind::OwnershipTransferred && target_owner.is_none() {

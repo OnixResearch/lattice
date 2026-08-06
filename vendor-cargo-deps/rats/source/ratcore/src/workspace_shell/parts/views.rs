@@ -18,7 +18,7 @@ pub struct DiagnosticView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaneView {
     /// Pane live ID used for typed intents.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::PaneId,
     /// User-facing title.
     pub title: String,
     /// Status label.
@@ -35,7 +35,7 @@ pub struct PaneView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TabView {
     /// Tab live ID used for typed intents.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::TabId,
     /// User-facing title.
     pub title: String,
     /// Whether this tab is active.
@@ -50,7 +50,7 @@ pub struct TabView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpaceView {
     /// Workspace live ID used for typed intents.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::WorkspaceId,
     /// User-facing title.
     pub title: String,
     /// Whether this workspace owns active focus.
@@ -76,9 +76,7 @@ pub struct ViewModel {
 
 /// Projects workspace action descriptors through the shared registry.
 #[must_use]
-pub fn project_actions(
-    actions: Vec<super::commands::ActionDescriptor>,
-) -> super::commands::ActionSurfaces {
+pub fn project_actions(actions: Vec<super::commands::ActionDescriptor>) -> super::commands::ActionSurfaces {
     debug_assert!(actions.iter().all(|action| !action.id.is_empty()));
     debug_assert!(actions.iter().all(|action| !action.label.is_empty()));
     let descriptors: Vec<_> = actions.iter().map(descriptor_from_action).collect();
@@ -97,17 +95,10 @@ pub fn project_actions(
 
 /// Builds a renderer-neutral view model.
 #[must_use]
-pub fn build_view_model(
-    model: &super::state::Model,
-    actions: &super::commands::ActionSurfaces,
-) -> ViewModel {
+pub fn build_view_model(model: &super::state::Model, actions: &super::commands::ActionSurfaces) -> ViewModel {
     debug_assert!(model.workspaces.len() <= model.workspaces.capacity());
     debug_assert!(actions.workspace.len() <= actions.workspace.capacity());
-    let workspaces = model
-        .workspaces
-        .iter()
-        .map(|space| space_view(space, model))
-        .collect();
+    let workspaces = model.workspaces.iter().map(|space| space_view(space, model)).collect();
     let diagnostics = model.diagnostics.iter().map(diagnostic_view).collect();
     let status_rollup = super::types::rollup(
         model
@@ -124,9 +115,7 @@ pub fn build_view_model(
     }
 }
 
-fn descriptor_from_action(
-    action: &super::commands::ActionDescriptor,
-) -> crate::action_registry::ActionDescriptor {
+fn descriptor_from_action(action: &super::commands::ActionDescriptor) -> crate::action_registry::ActionDescriptor {
     debug_assert!(!action.id.is_empty());
     debug_assert!(!action.label.is_empty());
     let mut descriptor = crate::action_registry::ActionDescriptor::new(
@@ -142,28 +131,19 @@ fn descriptor_from_action(
         descriptor = descriptor.with_shortcut(shortcut.clone());
     }
     if !action.enabled {
-        descriptor =
-            descriptor.with_enablement(crate::action_registry::ActionEnablement::Disabled {
-                reason: action
-                    .disabled_reason
-                    .clone()
-                    .unwrap_or_else(|| String::from("disabled")),
-            });
+        descriptor = descriptor.with_enablement(crate::action_registry::ActionEnablement::Disabled {
+            reason: action.disabled_reason.clone().unwrap_or_else(|| String::from("disabled")),
+        });
     }
     descriptor
 }
 
-fn action_projection(
-    action: &super::commands::ActionDescriptor,
-) -> super::commands::ActionProjection {
+fn action_projection(action: &super::commands::ActionDescriptor) -> super::commands::ActionProjection {
     debug_assert!(!action.id.is_empty());
     debug_assert!(!action.label.is_empty());
     let is_enabled = action.enabled;
     let diagnostic = disabled_diagnostic(action, is_enabled);
-    let shortcut_label = action
-        .shortcut
-        .as_ref()
-        .map(crate::action_registry::ActionShortcut::display);
+    let shortcut_label = action.shortcut.as_ref().map(crate::action_registry::ActionShortcut::display);
     super::commands::ActionProjection {
         action_id: action.id.clone(),
         label: action.label.clone(),
@@ -185,17 +165,14 @@ fn disabled_diagnostic(
     }
     Some(super::types::Diagnostic::new(
         super::types::DiagnosticCode::DisabledAction,
-        action.id.clone(),
-        action
-            .disabled_reason
-            .clone()
-            .unwrap_or_else(|| String::from("disabled")),
+        action.id.to_string(),
+        action.disabled_reason.clone().unwrap_or_else(|| String::from("disabled")),
     ))
 }
 
 fn shortcut_help(
     snapshot: &crate::action_registry::ActionRegistrySnapshot,
-) -> std::collections::BTreeMap<String, String> {
+) -> std::collections::BTreeMap<crate::action_registry::ActionId, String> {
     snapshot
         .shortcut_help_sections()
         .into_iter()
@@ -205,16 +182,8 @@ fn shortcut_help(
 }
 
 fn space_view(space: &super::state::Space, model: &super::state::Model) -> SpaceView {
-    let is_active = model
-        .focus
-        .as_ref()
-        .map(|focus| focus.workspace == space.live_id)
-        .unwrap_or(false);
-    let tabs = space
-        .tabs
-        .iter()
-        .map(|tab| tab_view(tab, space, model))
-        .collect();
+    let is_active = model.focus.as_ref().map(|focus| focus.workspace == space.live_id).unwrap_or(false);
+    let tabs = space.tabs.iter().map(|tab| tab_view(tab, space, model)).collect();
     SpaceView {
         live_id: space.live_id.clone(),
         title: space.title.clone(),
@@ -224,17 +193,9 @@ fn space_view(space: &super::state::Space, model: &super::state::Model) -> Space
     }
 }
 
-fn tab_view(
-    tab: &super::state::Tab,
-    space: &super::state::Space,
-    model: &super::state::Model,
-) -> TabView {
+fn tab_view(tab: &super::state::Tab, space: &super::state::Space, model: &super::state::Model) -> TabView {
     let is_active = space.active_tab.as_ref() == Some(&tab.live_id);
-    let panes = tab
-        .panes
-        .iter()
-        .map(|pane| pane_view(pane, tab, space, model))
-        .collect();
+    let panes = tab.panes.iter().map(|pane| pane_view(pane, tab, space, model)).collect();
     TabView {
         live_id: tab.live_id.clone(),
         title: tab.title.clone(),
@@ -253,11 +214,7 @@ fn pane_view(
     let is_focused = model
         .focus
         .as_ref()
-        .map(|focus| {
-            focus.workspace == space.live_id
-                && focus.tab == tab.live_id
-                && focus.pane == pane.live_id
-        })
+        .map(|focus| focus.workspace == space.live_id && focus.tab == tab.live_id && focus.pane == pane.live_id)
         .unwrap_or(false);
     PaneView {
         live_id: pane.live_id.clone(),

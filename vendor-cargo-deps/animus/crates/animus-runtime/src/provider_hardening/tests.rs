@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,12 +7,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -52,34 +48,24 @@ const ONE_RECORD_BUDGET: usize = 1;
 const ONE_EVENT_BUDGET: usize = 1;
 const ZERO_COMPLETION_BUDGET: usize = 0;
 const INVALID_UTF8_CHUNK: &[u8] = &[u8::MAX];
-const ORDERED_CONTENT_CHUNK: &[u8] =
-    b"{\"event\":\"content\",\"call_id\":\"call-1\",\"order\":1,\"body\":\"a\"}\n";
+const ORDERED_CONTENT_CHUNK: &[u8] = b"{\"event\":\"content\",\"call_id\":\"call-1\",\"order\":1,\"body\":\"a\"}\n";
 const ORDERED_FINISH_CHUNK: &[u8] = b"{\"event\":\"finish\",\"call_id\":\"call-1\",\"order\":2}\n";
 
 #[test]
 fn api_style_resolution_handles_first_party_gateway_and_ambiguous_cases() {
     // r[agent_harness_runtime.zerostack_provider_hardening.api_style.gateway]
     assert_eq!(
-        resolve_provider_api_style(
-            Some(ProviderApiStyle::Responses),
-            false,
-            ProviderApiStylePolicy::RequireExplicit
-        )
-        .expect("explicit"),
+        resolve_provider_api_style(Some(ProviderApiStyle::Responses), false, ProviderApiStylePolicy::RequireExplicit)
+            .expect("explicit"),
         ProviderApiStyle::Responses
     );
     assert_eq!(
-        resolve_provider_api_style(
-            None,
-            true,
-            ProviderApiStylePolicy::CompatibleGatewayChatDefault
-        )
-        .expect("gateway default"),
+        resolve_provider_api_style(None, true, ProviderApiStylePolicy::CompatibleGatewayChatDefault)
+            .expect("gateway default"),
         ProviderApiStyle::ChatCompletions
     );
     let diagnostics =
-        resolve_provider_api_style(None, true, ProviderApiStylePolicy::RequireExplicit)
-            .expect_err("ambiguous");
+        resolve_provider_api_style(None, true, ProviderApiStylePolicy::RequireExplicit).expect_err("ambiguous");
     assert!(
         diagnostics
             .iter()
@@ -99,8 +85,7 @@ fn header_resolution_redacts_missing_environment_sources() {
     };
     let diagnostics = validate_provider_header(&header).expect_err("missing env");
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ProviderDiagnosticKind::MissingHeaderSecret
-            && !diagnostic.detail.contains("secret-value")
+        diagnostic.kind == ProviderDiagnosticKind::MissingHeaderSecret && !diagnostic.detail.contains("secret-value")
     }));
 
     let invalid = ProviderHeaderDescriptor {
@@ -138,9 +123,11 @@ fn model_filter_rejects_non_agent_model_classes() {
         ProviderModelClass::OtherNonAgent,
     ] {
         let diagnostics = filter_agent_model(&model(class), false).expect_err("non agent");
-        assert!(diagnostics.iter().any(|diagnostic| {
-            diagnostic.kind == ProviderDiagnosticKind::UnsupportedModelClass
-        }));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.kind == ProviderDiagnosticKind::UnsupportedModelClass })
+        );
     }
 }
 
@@ -176,9 +163,12 @@ fn capability_negotiation_admits_supported_requests_and_optional_downgrades() {
     });
     assert_eq!(downgraded.status, ModelCapabilityDecisionStatus::Downgraded);
     assert!(downgraded.issues.is_empty());
-    assert!(downgraded.downgrades.iter().any(|item| {
-        item.feature == "content_parts" && item.policy == "host_optional_downgrade"
-    }));
+    assert!(
+        downgraded
+            .downgrades
+            .iter()
+            .any(|item| { item.feature == "content_parts" && item.policy == "host_optional_downgrade" })
+    );
 }
 
 #[test]
@@ -189,11 +179,7 @@ fn capability_negotiation_denies_unsupported_required_features() {
         roles: vec![animus_adapters::CanonicalModelRole::User],
         ..full_capabilities()
     };
-    assert_issue(
-        &request,
-        &role_limited,
-        ModelCapabilityIssueKind::UnsupportedRole,
-    );
+    assert_issue(&request, &role_limited, ModelCapabilityIssueKind::UnsupportedRole);
 
     let text_only = ProviderModelCapabilityMatrix {
         content_parts: vec![ProviderModelContentPartClass::Text],
@@ -281,11 +267,7 @@ fn provider_stream_parser_inventory_names_entrypoint_and_raw_boundary_review() {
     assert!(entry.input_framing.contains("SSE"));
     assert!(entry.normalized_output.contains("ModelStreamFrame"));
     assert!(entry.budget_policy.contains("pre-buffer"));
-    assert!(
-        entry
-            .receipt_projection
-            .contains("ProviderStreamParserReceipt")
-    );
+    assert!(entry.receipt_projection.contains("ProviderStreamParserReceipt"));
     assert!(entry.raw_boundary_review.contains("budgeted"));
 
     let invalid = vec![ProviderStreamParserInventoryEntry {
@@ -311,11 +293,8 @@ fn provider_stream_parser_accepts_sse_json_split_boundaries_and_safe_receipts() 
         b"{\"event\":\"usage\",\"call_id\":\"call-1\",\"order\":5,\"input_tokens\":7,\"output_tokens\":11}\n",
         b"{\"event\":\"finish\",\"call_id\":\"call-1\",\"order\":6}\n",
     ];
-    let report = parse_provider_stream_chunks(provider_stream_input(
-        chunks,
-        ProviderStreamParserBudget::default(),
-    ))
-    .expect("provider stream should parse");
+    let report = parse_provider_stream_chunks(provider_stream_input(chunks, ProviderStreamParserBudget::default()))
+        .expect("provider stream should parse");
 
     assert_eq!(report.frames.len(), EXPECTED_POSITIVE_STREAM_FRAMES);
     assert_eq!(report.receipt.status, ProviderStreamParserStatus::Success);
@@ -323,27 +302,14 @@ fn provider_stream_parser_accepts_sse_json_split_boundaries_and_safe_receipts() 
     assert_eq!(report.receipt.event_count, EXPECTED_POSITIVE_STREAM_FRAMES);
     assert_eq!(report.receipt.completion_count, EXPECTED_TERMINAL_COUNT);
     assert!(report.receipt.stream_identity.starts_with(BLAKE3_ALGORITHM));
-    assert!(
-        report
-            .receipt
-            .redaction_markers
-            .contains(&"thought:redacted".to_string())
-    );
-    assert!(
-        report
-            .receipt
-            .redaction_markers
-            .contains(&"tool_call:redacted".to_string())
-    );
+    assert!(report.receipt.redaction_markers.contains(&"thought:redacted".to_string()));
+    assert!(report.receipt.redaction_markers.contains(&"tool_call:redacted".to_string()));
     assert!(!format!("{:?}", report.receipt).contains(STREAM_PRIVATE_REASONING));
     assert!(validate_provider_stream_parser_receipt(&report.receipt).is_ok());
     assert_eq!(report.frames[0].call_id().as_str(), STREAM_CALL_ID);
     assert_eq!(report.frames[0].body(), Some("Hel"));
     assert_eq!(report.frames[1].body(), Some("lo"));
-    assert_eq!(
-        report.frames[3].tool_call_id().expect("tool id").as_str(),
-        STREAM_TOOL_ID
-    );
+    assert_eq!(report.frames[3].tool_call_id().expect("tool id").as_str(), STREAM_TOOL_ID);
     assert_eq!(
         report
             .frames
@@ -477,27 +443,18 @@ fn provider_stream_parser_receipt_validation_rejects_leak_markers() {
     // r[agent_harness_runtime.provider_stream_parser_rails.receipts.hidden_reasoning]
     // r[agent_harness_runtime.provider_stream_parser_rails.verification]
     let chunks: &[&[u8]] = &[b"{\"event\":\"finish\",\"call_id\":\"call-1\",\"order\":1}\n"];
-    let report = parse_provider_stream_chunks(provider_stream_input(
-        chunks,
-        ProviderStreamParserBudget::default(),
-    ))
-    .expect("minimal finish should parse");
+    let report = parse_provider_stream_chunks(provider_stream_input(chunks, ProviderStreamParserBudget::default()))
+        .expect("minimal finish should parse");
     let mut forged = report.receipt.clone();
-    forged
-        .redaction_markers
-        .push("hidden_reasoning: private reasoning".to_string());
+    forged.redaction_markers.push("hidden_reasoning: private reasoning".to_string());
 
     let failure = validate_provider_stream_parser_receipt(&forged).expect_err("leak marker");
     assert_eq!(failure.kind, ProviderStreamParseFailureKind::ReceiptLeak);
 
     let mut forged_family = report.receipt.clone();
     forged_family.provider_family = "/home/provider/raw".to_string();
-    let family_failure =
-        validate_provider_stream_parser_receipt(&forged_family).expect_err("unsafe family");
-    assert_eq!(
-        family_failure.kind,
-        ProviderStreamParseFailureKind::ReceiptLeak
-    );
+    let family_failure = validate_provider_stream_parser_receipt(&forged_family).expect_err("unsafe family");
+    assert_eq!(family_failure.kind, ProviderStreamParseFailureKind::ReceiptLeak);
 }
 
 fn ordered_content_finish_chunks() -> &'static [&'static [u8]] {
@@ -521,14 +478,11 @@ fn assert_parse_failure(
     expected: ProviderStreamParseFailureKind,
     expected_budget: Option<ProviderStreamBudgetKind>,
 ) {
-    let report = parse_provider_stream_chunks(provider_stream_input(chunks, budget))
-        .expect_err("parser should fail closed");
+    let report =
+        parse_provider_stream_chunks(provider_stream_input(chunks, budget)).expect_err("parser should fail closed");
     assert_eq!(report.failure.kind, expected);
     assert_eq!(report.failure.budget_kind, expected_budget);
-    assert_eq!(
-        report.receipt.status,
-        ProviderStreamParserStatus::ParserFailure
-    );
+    assert_eq!(report.receipt.status, ProviderStreamParserStatus::ParserFailure);
     assert_eq!(report.receipt.failure_kind, Some(expected));
     assert_eq!(report.receipt.budget_kind, expected_budget);
     assert!(report.receipt.stream_identity.starts_with(BLAKE3_ALGORITHM));
@@ -551,9 +505,7 @@ fn structured_request(
     include_image: bool,
     include_controls: bool,
 ) -> animus_adapters::CanonicalModelRequest {
-    let system_content = [animus_adapters::CanonicalMessageContentPartDraft::Text {
-        text: SYSTEM_PROMPT,
-    }];
+    let system_content = [animus_adapters::CanonicalMessageContentPartDraft::Text { text: SYSTEM_PROMPT }];
     let text_part = animus_adapters::CanonicalMessageContentPartDraft::Text { text: USER_PROMPT };
     let image_part = animus_adapters::CanonicalMessageContentPartDraft::ImageDescriptor {
         descriptor_id: IMAGE_DESCRIPTOR_ID,
@@ -585,36 +537,34 @@ fn structured_request(
         input_schema_label: TOOL_SCHEMA,
     }];
     let selected_tools = if include_tools { tools.as_slice() } else { &[] };
-    animus_adapters::CanonicalModelRequest::from_draft(
-        animus_adapters::CanonicalModelRequestDraft {
-            contract_identity: animus_adapters::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY,
-            messages: &messages,
-            tools: selected_tools,
-            output: animus_adapters::CanonicalModelOutputControlsDraft {
-                max_output_tokens: Some(OUTPUT_BUDGET),
-                temperature_millis: None,
-                stop_sequences: &[],
-                stream: include_controls,
-            },
-            response_format: if include_controls {
-                animus_adapters::CanonicalModelResponseFormatIntentDraft::JsonSchema {
-                    schema_label: RESPONSE_SCHEMA,
-                }
-            } else {
-                animus_adapters::CanonicalModelResponseFormatIntentDraft::Text
-            },
-            reasoning: animus_adapters::CanonicalModelReasoningRequestDraft {
-                enabled: include_controls,
-                effort: if include_controls {
-                    animus_adapters::CanonicalModelReasoningEffort::Medium
-                } else {
-                    animus_adapters::CanonicalModelReasoningEffort::None
-                },
-                summary_label: None,
-            },
-            provenance: &[],
+    animus_adapters::CanonicalModelRequest::from_draft(animus_adapters::CanonicalModelRequestDraft {
+        contract_identity: animus_adapters::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY,
+        messages: &messages,
+        tools: selected_tools,
+        output: animus_adapters::CanonicalModelOutputControlsDraft {
+            max_output_tokens: Some(OUTPUT_BUDGET),
+            temperature_millis: None,
+            stop_sequences: &[],
+            stream: include_controls,
         },
-    )
+        response_format: if include_controls {
+            animus_adapters::CanonicalModelResponseFormatIntentDraft::JsonSchema {
+                schema_label: RESPONSE_SCHEMA,
+            }
+        } else {
+            animus_adapters::CanonicalModelResponseFormatIntentDraft::Text
+        },
+        reasoning: animus_adapters::CanonicalModelReasoningRequestDraft {
+            enabled: include_controls,
+            effort: if include_controls {
+                animus_adapters::CanonicalModelReasoningEffort::Medium
+            } else {
+                animus_adapters::CanonicalModelReasoningEffort::None
+            },
+            summary_label: None,
+        },
+        provenance: &[],
+    })
     .expect("canonical request fixture should validate")
 }
 

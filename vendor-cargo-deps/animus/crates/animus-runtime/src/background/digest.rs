@@ -1,7 +1,4 @@
-pub(crate) fn profile_hash(
-    context: ProfileHashInput<'_>,
-    profile: &super::ProcessJobProfile,
-) -> String {
+pub(crate) fn profile_hash(context: ProfileHashInput<'_>, profile: &super::ProcessJobProfile) -> String {
     debug_assert!(!context.profile_name.is_empty());
     debug_assert!(!context.source_label.is_empty());
     let mut parts = vec![
@@ -10,12 +7,7 @@ pub(crate) fn profile_hash(
         String::from(context.profile_name),
         String::from(super::SOURCE_HASH_PREFIX),
         String::from(context.source_label),
-        String::from(
-            profile
-                .backend
-                .map(super::ProcessJobBackend::as_str)
-                .unwrap_or_default(),
-        ),
+        String::from(profile.backend.map(super::ProcessJobBackend::as_str).unwrap_or_default()),
         profile.command.clone().unwrap_or_default(),
         profile.program.clone().unwrap_or_default(),
         profile.cwd.clone().unwrap_or_default(),
@@ -114,9 +106,7 @@ impl Builder {
     }
 
     fn finish(self) -> String {
-        blake3::hash(self.normalized.as_bytes())
-            .to_hex()
-            .to_string()
+        blake3::hash(self.normalized.as_bytes()).to_hex().to_string()
     }
 }
 
@@ -126,33 +116,18 @@ fn sorted(mut hashes: Vec<String>) -> Vec<String> {
 }
 
 fn optional_u64_part(value: Option<u64>) -> String {
-    value.map_or_else(
-        || String::from(super::EMPTY_HASH_MARKER),
-        |value| value.to_string(),
-    )
+    value.map_or_else(|| String::from(super::EMPTY_HASH_MARKER), |value| value.to_string())
 }
 
 fn env_hashes(env: &[super::ProcessJobEnvironmentVariable]) -> Vec<String> {
     env.iter()
-        .map(|variable| {
-            hash_parts(&[
-                super::ENV_HASH_PREFIX,
-                variable.key.as_str(),
-                variable.value.as_str(),
-            ])
-        })
+        .map(|variable| hash_parts(&[super::ENV_HASH_PREFIX, variable.key.as_str(), variable.value.as_str()]))
         .collect()
 }
 
 fn metadata_hashes(metadata: &[super::ProcessJobMetadataField]) -> Vec<String> {
     metadata
         .iter()
-        .map(|field| {
-            hash_parts(&[
-                super::METADATA_HASH_PREFIX,
-                field.key.as_str(),
-                field.value.as_str(),
-            ])
-        })
+        .map(|field| hash_parts(&[super::METADATA_HASH_PREFIX, field.key.as_str(), field.value.as_str()]))
         .collect()
 }

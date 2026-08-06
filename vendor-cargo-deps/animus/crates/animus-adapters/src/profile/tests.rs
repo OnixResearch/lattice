@@ -10,10 +10,7 @@ const BAD_GUIDANCE_CASE_COUNT: usize = 4;
 #[test]
 fn trusted_global_descriptor_builds_attributed_segment() {
     let profile = checked_descriptor(global_draft()).expect("global profile should validate");
-    let composition = compose_context(
-        alloc::slice::from_ref(&profile),
-        ProjectTrustMode::DenyProjectPolicy,
-    );
+    let composition = compose_context(alloc::slice::from_ref(&profile), ProjectTrustMode::DenyProjectPolicy);
 
     assert_eq!(profile.kind(), Kind::GlobalPosture);
     assert_eq!(profile.scope(), SourceScope::Global);
@@ -40,25 +37,14 @@ fn global_safety_defeats_project_override() {
         ..global_draft()
     })
     .expect("project profile should validate");
-    let composition = compose_context(
-        &[global, project],
-        ProjectTrustMode::AdmitTrustedProjectPolicy,
-    );
+    let composition = compose_context(&[global, project], ProjectTrustMode::AdmitTrustedProjectPolicy);
 
     assert_eq!(composition.segments().len(), 1);
     assert_eq!(composition.segments()[0].provenance(), GLOBAL_PROVENANCE);
     assert_eq!(composition.diagnostics().len(), 1);
-    assert_eq!(
-        composition.diagnostics()[0].kind(),
-        DiagnosticKind::GlobalSafetyPrecedence
-    );
-    assert_eq!(
-        composition.diagnostics()[0].provenance(),
-        PROJECT_PROVENANCE
-    );
-    assert!(
-        !alloc::format!("{:?}", composition.diagnostics()).contains(ALLOW_DESTRUCTIVE_CONSTRAINT)
-    );
+    assert_eq!(composition.diagnostics()[0].kind(), DiagnosticKind::GlobalSafetyPrecedence);
+    assert_eq!(composition.diagnostics()[0].provenance(), PROJECT_PROVENANCE);
+    assert!(!alloc::format!("{:?}", composition.diagnostics()).contains(ALLOW_DESTRUCTIVE_CONSTRAINT));
 }
 
 #[test]
@@ -98,12 +84,7 @@ fn rejects_bad_guidance_text() {
 
     for (draft, expected_issue) in cases {
         let error = checked_descriptor(draft).expect_err("bad policy should fail hygiene");
-        assert_eq!(
-            error,
-            Error::PromptHygiene {
-                issue: expected_issue
-            }
-        );
+        assert_eq!(error, Error::PromptHygiene { issue: expected_issue });
     }
 }
 
@@ -123,10 +104,7 @@ fn omits_untrusted_project_guidance() {
     assert_eq!(composition.segments().len(), 1);
     assert_eq!(composition.segments()[0].provenance(), GLOBAL_PROVENANCE);
     assert_eq!(composition.diagnostics().len(), 1);
-    assert_eq!(
-        composition.diagnostics()[0].kind(),
-        DiagnosticKind::ProjectPolicyOmitted
-    );
+    assert_eq!(composition.diagnostics()[0].kind(), DiagnosticKind::ProjectPolicyOmitted);
 }
 
 #[test]
@@ -137,14 +115,8 @@ fn read_only_guidance_keeps_runtime_guard() {
     })
     .expect("read-only guidance should validate");
 
-    assert_eq!(
-        profile.enforcement_boundary(),
-        EnforcementBoundary::GuidanceOnly
-    );
-    assert_eq!(
-        mutation_requires_runtime_guard(&profile),
-        RuntimeGuardRequirement::Required
-    );
+    assert_eq!(profile.enforcement_boundary(), EnforcementBoundary::GuidanceOnly);
+    assert_eq!(mutation_requires_runtime_guard(&profile), RuntimeGuardRequirement::Required);
 }
 
 fn checked_descriptor(draft: Draft<'_>) -> Result<Descriptor, Error> {

@@ -102,9 +102,7 @@ impl HitMap {
 
     /// Finds a region by target identifier.
     #[must_use]
-    pub fn target(&self, target_id: &str) -> Option<&HitRegion> {
-        self.regions
-            .iter()
-            .find(|region| region.target_id == target_id)
+    pub fn target(&self, target_id: &super::shape::PointerTargetId) -> Option<&HitRegion> {
+        self.regions.iter().find(|region| &region.target_id == target_id)
     }
 }

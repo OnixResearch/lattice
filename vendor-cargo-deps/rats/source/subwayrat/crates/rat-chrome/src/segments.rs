@@ -8,7 +8,8 @@ use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::text::{Line, Span};
+use ratatui::text::Line;
+use ratatui::text::Span;
 
 const STATUS_BAR_HEIGHT: u16 = 1;
 
@@ -83,9 +84,7 @@ pub fn compute_status_bar_layout(area: Rect, status: &StatusBar) -> StatusBarLay
     let right_x = rect_right(area).saturating_sub(right_width);
     let center_available = right_x.saturating_sub(left_end);
     let center_width = center_full.min(center_available);
-    let preferred_center_x = area
-        .x
-        .saturating_add(area.width.saturating_sub(center_width) / 2);
+    let preferred_center_x = area.x.saturating_add(area.width.saturating_sub(center_width) / 2);
     let max_center_x = right_x.saturating_sub(center_width);
     let center_x = preferred_center_x.clamp(left_end, max_center_x.max(left_end));
 
@@ -152,10 +151,11 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::style::Color;
+
+    use super::*;
 
     const AREA_X: u16 = 0;
     const AREA_Y: u16 = 0;
@@ -180,14 +180,8 @@ mod tests {
         let layout = compute_status_bar_layout(area, &status);
 
         assert_eq!(layout.left, Rect::new(AREA_X, AREA_Y, 1, STATUS_HEIGHT));
-        assert_eq!(
-            layout.center,
-            Rect::new(CENTER_X_FOR_ONE_CELL, AREA_Y, 1, STATUS_HEIGHT)
-        );
-        assert_eq!(
-            layout.right,
-            Rect::new(RIGHT_X_FOR_ONE_CELL, AREA_Y, 1, STATUS_HEIGHT)
-        );
+        assert_eq!(layout.center, Rect::new(CENTER_X_FOR_ONE_CELL, AREA_Y, 1, STATUS_HEIGHT));
+        assert_eq!(layout.right, Rect::new(RIGHT_X_FOR_ONE_CELL, AREA_Y, 1, STATUS_HEIGHT));
     }
 
     #[test]

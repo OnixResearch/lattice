@@ -7,3 +7,4 @@ description = "Scrollable data table widget for ratatui with auto column sizing"
 
 [dependencies]
 ratatui = { workspace = true }
+ratcore = { workspace = true }

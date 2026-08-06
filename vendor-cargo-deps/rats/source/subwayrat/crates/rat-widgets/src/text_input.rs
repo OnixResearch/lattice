@@ -6,9 +6,14 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Paragraph;
 
 pub type Completer = Box<dyn Fn(&str) -> Vec<String>>;
 
@@ -47,11 +52,7 @@ impl TextInputModel {
             return;
         }
         // Walk back one char boundary.
-        let prev = self.value[..self.cursor_pos]
-            .char_indices()
-            .next_back()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+        let prev = self.value[..self.cursor_pos].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
         self.value.remove(prev);
         self.cursor_pos = prev;
     }
@@ -67,11 +68,7 @@ impl TextInputModel {
         if self.cursor_pos == 0 {
             return;
         }
-        self.cursor_pos = self.value[..self.cursor_pos]
-            .char_indices()
-            .next_back()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+        self.cursor_pos = self.value[..self.cursor_pos].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
     }
 
     pub fn move_right(&mut self) {
@@ -157,9 +154,7 @@ impl TextInput {
             focused_border: Color::Cyan,
             unfocused_border: Color::DarkGray,
             text_style: Style::default().fg(Color::White),
-            cursor_style: Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::SLOW_BLINK),
+            cursor_style: Style::default().fg(Color::White).add_modifier(Modifier::SLOW_BLINK),
             placeholder: String::new(),
             placeholder_style: Style::default().fg(Color::DarkGray),
         }
@@ -273,11 +268,8 @@ impl TextInput {
             self.unfocused_border
         };
 
-        let block = block.unwrap_or_else(|| {
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-        });
+        let block = block
+            .unwrap_or_else(|| Block::default().borders(Borders::ALL).border_style(Style::default().fg(border_color)));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -310,15 +302,10 @@ impl TextInput {
 
         if self.focused {
             let before: String = visible_chars[..cursor_col].iter().collect();
-            let cursor_char = visible_chars
-                .get(cursor_col)
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| " ".to_string());
+            let cursor_char = visible_chars.get(cursor_col).map(|c| c.to_string()).unwrap_or_else(|| " ".to_string());
             let after_start = (cursor_col + 1).min(visible_chars.len());
-            let after: String = visible_chars[after_start..]
-                .iter()
-                .take(visible_width.saturating_sub(cursor_col + 1))
-                .collect();
+            let after: String =
+                visible_chars[after_start..].iter().take(visible_width.saturating_sub(cursor_col + 1)).collect();
 
             let spans = vec![
                 Span::styled(before, self.text_style),
@@ -545,9 +532,7 @@ mod tests {
 
     #[test]
     fn complete_no_matches_returns_empty() {
-        let mut input = TextInput::new()
-            .with_value("xyz")
-            .with_completer(Box::new(|_| vec![]));
+        let mut input = TextInput::new().with_value("xyz").with_completer(Box::new(|_| vec![]));
         let matches = input.complete();
         assert!(matches.is_empty());
         assert_eq!(input.value(), "xyz");
@@ -555,15 +540,13 @@ mod tests {
 
     #[test]
     fn complete_single_match_replaces_value() {
-        let mut input = TextInput::new()
-            .with_value("he")
-            .with_completer(Box::new(|s| {
-                if s.starts_with("he") {
-                    vec!["hello".to_string()]
-                } else {
-                    vec![]
-                }
-            }));
+        let mut input = TextInput::new().with_value("he").with_completer(Box::new(|s| {
+            if s.starts_with("he") {
+                vec!["hello".to_string()]
+            } else {
+                vec![]
+            }
+        }));
         let matches = input.complete();
         assert_eq!(matches, vec!["hello"]);
         assert_eq!(input.value(), "hello");
@@ -572,19 +555,13 @@ mod tests {
 
     #[test]
     fn complete_multiple_matches_common_prefix() {
-        let mut input = TextInput::new()
-            .with_value("te")
-            .with_completer(Box::new(|s| {
-                if s.starts_with("te") {
-                    vec![
-                        "test".to_string(),
-                        "testing".to_string(),
-                        "temp".to_string(),
-                    ]
-                } else {
-                    vec![]
-                }
-            }));
+        let mut input = TextInput::new().with_value("te").with_completer(Box::new(|s| {
+            if s.starts_with("te") {
+                vec!["test".to_string(), "testing".to_string(), "temp".to_string()]
+            } else {
+                vec![]
+            }
+        }));
         let matches = input.complete();
         assert_eq!(matches, vec!["test", "testing", "temp"]);
         assert_eq!(input.value(), "te"); // common prefix is just "te"
@@ -592,15 +569,13 @@ mod tests {
 
     #[test]
     fn complete_multiple_matches_longer_prefix() {
-        let mut input = TextInput::new()
-            .with_value("test")
-            .with_completer(Box::new(|s| {
-                if s.starts_with("test") {
-                    vec!["testing".to_string(), "tester".to_string()]
-                } else {
-                    vec![]
-                }
-            }));
+        let mut input = TextInput::new().with_value("test").with_completer(Box::new(|s| {
+            if s.starts_with("test") {
+                vec!["testing".to_string(), "tester".to_string()]
+            } else {
+                vec![]
+            }
+        }));
         let matches = input.complete();
         assert_eq!(matches, vec!["testing", "tester"]);
         assert_eq!(input.value(), "test"); // common prefix is still just "test"
@@ -618,21 +593,11 @@ mod tests {
 
     #[test]
     fn longest_common_prefix_multiple() {
-        assert_eq!(
-            longest_common_prefix(&[
-                "test".to_string(),
-                "testing".to_string(),
-                "tester".to_string()
-            ]),
-            "test"
-        );
+        assert_eq!(longest_common_prefix(&["test".to_string(), "testing".to_string(), "tester".to_string()]), "test");
     }
 
     #[test]
     fn longest_common_prefix_no_common() {
-        assert_eq!(
-            longest_common_prefix(&["abc".to_string(), "def".to_string()]),
-            ""
-        );
+        assert_eq!(longest_common_prefix(&["abc".to_string(), "def".to_string()]), "");
     }
 }

@@ -3,7 +3,7 @@ name = "rat-inline"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-description = "Inline scrollback renderer for ratatui — frame diffing, terminal growth, reconciliation via ratcore"
+description = "Native terminal adapter for inline ratatui scrollback rendering"
 
 [dependencies]
 ratcore = { workspace = true }

@@ -35,18 +35,9 @@ fn full_mouse_matrix_rejects_missing_proof_and_unactionable_gaps() {
         .with_event_class(EVENT_DRAG)
         .with_surface_family(SURFACE_DOCKING)
         .with_shared_core_owner(OWNER_POINTER)
-        .with_renderer(FullMouseRendererStatus::new(
-            RENDERER_SUBWAYRAT_TERMINAL,
-            STATUS_COMPLETE,
-        ))
-        .with_renderer(FullMouseRendererStatus::new(
-            RENDERER_SUBWAYRAT_RATZILLA,
-            STATUS_UNSUPPORTED,
-        ))
-        .with_renderer(FullMouseRendererStatus::new(
-            RENDERER_METEORITE_DOM,
-            "ready",
-        ));
+        .with_renderer(FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE))
+        .with_renderer(FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_RATZILLA, STATUS_UNSUPPORTED))
+        .with_renderer(FullMouseRendererStatus::new(RENDERER_METEORITE_DOM, "ready"));
 
     let report = validate_full_mouse_support_matrix(&[duplicate.clone(), duplicate]);
 
@@ -55,10 +46,7 @@ fn full_mouse_matrix_rejects_missing_proof_and_unactionable_gaps() {
     assert_issue(&report, FullMouseSupportIssueCode::MissingEvidence);
     assert_issue(&report, FullMouseSupportIssueCode::MissingReason);
     assert_issue(&report, FullMouseSupportIssueCode::UnknownStatus);
-    assert_issue(
-        &report,
-        FullMouseSupportIssueCode::MissingDiagnosticsCoverage,
-    );
+    assert_issue(&report, FullMouseSupportIssueCode::MissingDiagnosticsCoverage);
     assert_issue(&report, FullMouseSupportIssueCode::MissingNextAction);
 }
 
@@ -71,14 +59,41 @@ fn full_mouse_matrix_reports_missing_renderer_labels() {
         .with_diagnostics_coverage(DIAGNOSTICS)
         .with_next_action(NEXT_KEEP_FRESH)
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         );
 
     let report = validate_full_mouse_support_matrix(&[row]);
 
     assert!(!report.is_valid());
     assert_issue(&report, FullMouseSupportIssueCode::MissingRenderer);
+}
+
+#[test]
+fn experimental_native_target_does_not_expand_full_mouse_without_opt_in() {
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let row = complete_row(CAPABILITY_CLICK, EVENT_CLICK, SURFACE_CHROME);
+    assert!(validate_full_mouse_support_matrix(&[row.clone()]).is_valid());
+
+    let mut pilot =
+        crate::targeting_core::built_in_renderer_scope(crate::targeting_core::BuiltInRendererScope::FullMouseTargets);
+    pilot.id = crate::targeting_core::RendererScopeId::new("full-mouse.pilot");
+    pilot.completion = crate::targeting_core::RendererScopeCompletion::Experimental;
+    pilot
+        .members
+        .push(crate::targeting_core::RendererSubject::Target(crate::targeting_core::RendererTargetId::new(
+            "iced-native",
+        )));
+    let missing = validate_full_mouse_support_matrix_with_policy(&[row.clone()], &registry, &pilot);
+    assert_issue(&missing, FullMouseSupportIssueCode::MissingRenderer);
+
+    let extra = row.with_renderer(
+        FullMouseRendererStatus::new("iced-native", STATUS_UNSUPPORTED)
+            .with_reason("pilot is outside maintained full-mouse scope"),
+    );
+    let default_scope =
+        crate::targeting_core::built_in_renderer_scope(crate::targeting_core::BuiltInRendererScope::FullMouseTargets);
+    let default = validate_full_mouse_support_matrix_with_policy(&[extra], &registry, &default_scope);
+    assert_issue(&default, FullMouseSupportIssueCode::OutOfScopeRenderer);
 }
 
 fn complete_row(capability: &str, event_class: &str, surface: &str) -> FullMouseSupportRow {
@@ -89,16 +104,13 @@ fn complete_row(capability: &str, event_class: &str, surface: &str) -> FullMouse
         .with_diagnostics_coverage(DIAGNOSTICS)
         .with_next_action(NEXT_KEEP_FRESH)
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         )
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_RATZILLA, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_RATZILLA, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         )
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_METEORITE_DOM, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_METEORITE_DOM, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         )
 }
 
@@ -110,8 +122,7 @@ fn partial_wheel_row() -> FullMouseSupportRow {
         .with_diagnostics_coverage(DIAGNOSTICS)
         .with_next_action(NEXT_KEEP_FRESH)
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_TERMINAL, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         )
         .with_renderer(
             FullMouseRendererStatus::new(RENDERER_SUBWAYRAT_RATZILLA, STATUS_PARTIAL)
@@ -119,8 +130,7 @@ fn partial_wheel_row() -> FullMouseSupportRow {
                 .with_reason(REASON_WHEEL),
         )
         .with_renderer(
-            FullMouseRendererStatus::new(RENDERER_METEORITE_DOM, STATUS_COMPLETE)
-                .with_evidence(EVIDENCE_REPLAY),
+            FullMouseRendererStatus::new(RENDERER_METEORITE_DOM, STATUS_COMPLETE).with_evidence(EVIDENCE_REPLAY),
         )
 }
 

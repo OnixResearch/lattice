@@ -5,39 +5,27 @@
 const ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_id");
 const ROLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_role");
 const TASK_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_task");
-const RECIPE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_recipe");
-const PROFILE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_profile");
-const PARAMETER_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_parameter_binding");
+const RECIPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_recipe");
+const PROFILE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_profile");
+const PARAMETER_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_parameter_binding");
 const TOOL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_tool");
-const WORKSPACE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_workspace_scope");
-const MODEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_model_profile");
-const TIMEOUT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_timeout");
-const RETURN_MODE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_return_mode");
-const SUMMARY_SCHEMA_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_summary_schema");
-const SOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_delegation_source");
-const CAPABILITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_capability");
+const WORKSPACE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_workspace_scope");
+const MODEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_model_profile");
+const TIMEOUT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_timeout");
+const RETURN_MODE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_return_mode");
+const SUMMARY_SCHEMA_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_summary_schema");
+const SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_delegation_source");
+const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_capability");
 const EXTERNAL_PROTOCOL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("subagent_external_protocol");
 const EXTERNAL_SERVICE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("subagent_external_service");
-const HANDOFF_STATUS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_handoff_status");
+const HANDOFF_STATUS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_handoff_status");
 const HANDOFF_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("subagent_handoff_summary");
 const HANDOFF_DETAIL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("subagent_handoff_detail_ref");
-const OUTCOME_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("subagent_outcome_kind");
+const OUTCOME_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("subagent_outcome_kind");
 
 const SOURCE_USER: &str = "user";
 const SOURCE_TRUSTED_SKILL: &str = "trusted_skill";
@@ -129,18 +117,27 @@ mod summary;
 #[cfg(test)]
 mod tests;
 
-pub use access::{
-    SubagentCapabilityDenial, SubagentCapabilityInput, SubagentCapabilityResolution,
-    resolve_subagent_capabilities,
-};
-pub use enums::{ExternalSubagentProtocol, SubagentDelegationSource, SubagentReturnMode};
-pub use external::{ExternalSubagentDescriptor, ExternalSubagentDescriptorDraft};
-pub use parent::{SubagentHandoff, SubagentHandoffDraft, build_subagent_handoff};
-pub use request::{SubagentDelegation, SubagentDelegationDraft};
-pub use summary::{
-    SubagentAggregateReport, SubagentEvent, SubagentEventDraft, SubagentEventKind,
-    SubagentOutcomeDraft, SubagentOutcomeKind, aggregate_subagent_outcomes,
-};
+pub use access::SubagentCapabilityDenial;
+pub use access::SubagentCapabilityInput;
+pub use access::SubagentCapabilityResolution;
+pub use access::resolve_subagent_capabilities;
+pub use enums::ExternalSubagentProtocol;
+pub use enums::SubagentDelegationSource;
+pub use enums::SubagentReturnMode;
+pub use external::ExternalSubagentDescriptor;
+pub use external::ExternalSubagentDescriptorDraft;
+pub use parent::SubagentHandoff;
+pub use parent::SubagentHandoffDraft;
+pub use parent::build_subagent_handoff;
+pub use request::SubagentDelegation;
+pub use request::SubagentDelegationDraft;
+pub use summary::SubagentAggregateReport;
+pub use summary::SubagentEvent;
+pub use summary::SubagentEventDraft;
+pub use summary::SubagentEventKind;
+pub use summary::SubagentOutcomeDraft;
+pub use summary::SubagentOutcomeKind;
+pub use summary::aggregate_subagent_outcomes;
 fn parse_value<T>(
     field_name: crate::validation::FieldName,
     value: &str,
@@ -153,20 +150,12 @@ fn parse_value<T>(
     })
 }
 
-fn required_text(
-    field_name: crate::validation::FieldName,
-    value: &str,
-) -> Result<Text, SubagentError> {
+fn required_text(field_name: crate::validation::FieldName, value: &str) -> Result<Text, SubagentError> {
     crate::validation::normalized_adapter_field(field_name, value).map_err(SubagentError::from)
 }
 
-fn optional_text(
-    field_name: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<Option<Text>, SubagentError> {
-    value
-        .map(|text| required_text(field_name, text))
-        .transpose()
+fn optional_text(field_name: crate::validation::FieldName, value: Option<&str>) -> Result<Option<Text>, SubagentError> {
+    value.map(|text| required_text(field_name, text)).transpose()
 }
 
 fn text_collection(

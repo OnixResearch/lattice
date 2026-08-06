@@ -49,43 +49,24 @@ fn tail_gap_plans_applies_and_projects_canonical_failure() {
     let request = interrupted_tool_repair_application_request(&plan);
     let outcome = passing_application(&plan);
     let gate = evaluate_interrupted_tool_provider_gate(&diagnosis, Some(&plan), Some(&outcome));
-    let messages =
-        project_interrupted_tool_repair_results(&plan, &outcome).expect("provider projection");
+    let messages = project_interrupted_tool_repair_results(&plan, &outcome).expect("provider projection");
 
-    assert_eq!(
-        diagnosis.status(),
-        InterruptedToolDiagnosisStatus::Repairable
-    );
+    assert_eq!(diagnosis.status(), InterruptedToolDiagnosisStatus::Repairable);
     assert_eq!(plan.mode(), InterruptedToolRepairMode::TailAppend);
     assert_eq!(plan.actions().len(), ONE_ACTION);
-    assert_eq!(
-        plan.actions()[0].reason(),
-        InterruptedToolReason::UnknownInterruption
-    );
-    assert_eq!(
-        request.effect,
-        InterruptedToolRepairEffect::AppendSyntheticFailures
-    );
+    assert_eq!(plan.actions()[0].reason(), InterruptedToolReason::UnknownInterruption);
+    assert_eq!(request.effect, InterruptedToolRepairEffect::AppendSyntheticFailures);
     assert_eq!(request.session_id, SESSION_ID);
     assert_eq!(request.branch_id, BRANCH_ID);
     assert_eq!(request.repair_anchor_entry_id, ENTRY_CALL);
     assert_eq!(request.actions.len(), ONE_ACTION);
     assert_eq!(request.actions[0].call_id(), CALL_ONE);
     assert_eq!(request.action_hashes.len(), ONE_ACTION);
-    assert_eq!(
-        outcome.status(),
-        InterruptedToolRepairApplicationStatus::Applied
-    );
-    assert_eq!(
-        gate.status(),
-        InterruptedToolProviderGateStatus::ReadyRepaired
-    );
+    assert_eq!(outcome.status(), InterruptedToolRepairApplicationStatus::Applied);
+    assert_eq!(gate.status(), InterruptedToolProviderGateStatus::ReadyRepaired);
     assert!(gate.provider_dispatch_allowed());
     assert_eq!(messages.len(), ONE_ACTION);
-    assert_eq!(
-        messages[0].role(),
-        animus_adapters::CanonicalModelRole::Tool
-    );
+    assert_eq!(messages[0].role(), animus_adapters::CanonicalModelRole::Tool);
     assert_eq!(messages[0].tool_call_id(), Some(CALL_ONE));
 }
 
@@ -114,10 +95,7 @@ fn multiple_missing_calls_have_transcript_ordered_stable_actions() {
     assert_eq!(first.actions().len(), TWO_ACTIONS);
     assert_eq!(first.actions()[0].call_id(), CALL_ONE);
     assert_eq!(first.actions()[1].call_id(), CALL_TWO);
-    assert_ne!(
-        first.actions()[0].action_hash(),
-        first.actions()[1].action_hash()
-    );
+    assert_ne!(first.actions()[0].action_hash(), first.actions()[1].action_hash());
 }
 
 #[test]
@@ -127,18 +105,9 @@ fn interruption_reasons_require_exact_correlated_evidence() {
     let diagnosis = diagnose_interrupted_tool_branch(&snapshot).expect("gap");
     let gap = &diagnosis.unmatched()[0];
     let cases = [
-        (
-            InterruptedToolObservationKind::UserCancellation,
-            InterruptedToolReason::UserCancelled,
-        ),
-        (
-            InterruptedToolObservationKind::HostCancellation,
-            InterruptedToolReason::HostCancelled,
-        ),
-        (
-            InterruptedToolObservationKind::UncleanShutdown,
-            InterruptedToolReason::UncleanShutdown,
-        ),
+        (InterruptedToolObservationKind::UserCancellation, InterruptedToolReason::UserCancelled),
+        (InterruptedToolObservationKind::HostCancellation, InterruptedToolReason::HostCancelled),
+        (InterruptedToolObservationKind::UncleanShutdown, InterruptedToolReason::UncleanShutdown),
     ];
     for (kind, expected) in cases {
         let observation = observation(kind, (RUN_ID, CALL_ONE));
@@ -182,13 +151,9 @@ fn repeated_application_is_idempotent() {
         replay_state: InterruptedToolReplayState::Clean,
         executor_observation: InterruptedToolExecutorObservation::NotInvoked,
     };
-    let outcome = evaluate_interrupted_tool_repair_application(&plan, &draft)
-        .expect("idempotent application");
+    let outcome = evaluate_interrupted_tool_repair_application(&plan, &draft).expect("idempotent application");
 
-    assert_eq!(
-        outcome.status(),
-        InterruptedToolRepairApplicationStatus::AlreadyApplied
-    );
+    assert_eq!(outcome.status(), InterruptedToolRepairApplicationStatus::AlreadyApplied);
     assert!(outcome.status().permits_provider_continuation());
 }
 
@@ -197,9 +162,8 @@ fn application_evidence_collections_are_bounded() {
     let snapshot = tail_gap_snapshot();
     let diagnosis = diagnose_interrupted_tool_branch(&snapshot).expect("gap");
     let plan = plan_interrupted_tool_repair(&snapshot, &diagnosis, &[]).expect("plan");
-    let excessive_action_count = super::data::MAX_TOTAL_TOOL_CALLS
-        .checked_add(ONE_EXCESS_ITEM)
-        .expect("bounded test action count");
+    let excessive_action_count =
+        super::data::MAX_TOTAL_TOOL_CALLS.checked_add(ONE_EXCESS_ITEM).expect("bounded test action count");
     let excessive_plan_count = super::data::MAX_PREVIOUSLY_APPLIED_PLANS
         .checked_add(ONE_EXCESS_ITEM)
         .expect("bounded test plan count");
@@ -246,26 +210,17 @@ fn plan_and_receipt_hashes_are_stable_and_metadata_only() {
     let diagnosis = diagnose_interrupted_tool_branch(&snapshot).expect("gap");
     let plan = plan_interrupted_tool_repair(&snapshot, &diagnosis, &[]).expect("plan");
     let outcome = passing_application(&plan);
-    let first = project_interrupted_tool_repair_receipt(
-        &plan,
-        &outcome,
-        InterruptedToolRepairSensitiveDraft::default(),
-    )
-    .expect("first receipt");
-    let second = project_interrupted_tool_repair_receipt(
-        &plan,
-        &outcome,
-        InterruptedToolRepairSensitiveDraft::default(),
-    )
-    .expect("second receipt");
+    let first =
+        project_interrupted_tool_repair_receipt(&plan, &outcome, InterruptedToolRepairSensitiveDraft::default())
+            .expect("first receipt");
+    let second =
+        project_interrupted_tool_repair_receipt(&plan, &outcome, InterruptedToolRepairSensitiveDraft::default())
+            .expect("second receipt");
 
     assert_eq!(first, second);
     assert_eq!(first.schema(), INTERRUPTED_TOOL_REPAIR_SCHEMA);
     assert_eq!(first.action_count(), ONE_ACTION_COUNT);
-    assert_eq!(
-        first.reason_classes(),
-        &[InterruptedToolReason::UnknownInterruption]
-    );
+    assert_eq!(first.reason_classes(), &[InterruptedToolReason::UnknownInterruption]);
     assert!(first.redaction_marker().contains("omitted"));
     assert!(first.non_claim().contains("does not prove"));
     assert_eq!(first.receipt_hash().len(), BLAKE3_HEX_CHARS);
@@ -287,15 +242,11 @@ fn duplicate_call_and_result_bindings_fail_closed() {
     ]);
 
     assert_eq!(
-        diagnose_interrupted_tool_branch(&duplicate_call)
-            .expect_err("duplicate call")
-            .issue(),
+        diagnose_interrupted_tool_branch(&duplicate_call).expect_err("duplicate call").issue(),
         InterruptedToolRepairIssue::DuplicateCall
     );
     assert_eq!(
-        diagnose_interrupted_tool_branch(&duplicate_result)
-            .expect_err("duplicate result")
-            .issue(),
+        diagnose_interrupted_tool_branch(&duplicate_result).expect_err("duplicate result").issue(),
         InterruptedToolRepairIssue::DuplicateResult
     );
 }
@@ -315,21 +266,15 @@ fn reversed_and_mismatched_results_fail_closed() {
     let wrong_run = snapshot(vec![call_entry(ENTRY_CALL, &[CALL_ONE]), wrong_run_result]);
 
     assert_eq!(
-        diagnose_interrupted_tool_branch(&reversed)
-            .expect_err("result before call")
-            .issue(),
+        diagnose_interrupted_tool_branch(&reversed).expect_err("result before call").issue(),
         InterruptedToolRepairIssue::ResultBeforeCall
     );
     assert_eq!(
-        diagnose_interrupted_tool_branch(&mismatched)
-            .expect_err("mismatched tool")
-            .issue(),
+        diagnose_interrupted_tool_branch(&mismatched).expect_err("mismatched tool").issue(),
         InterruptedToolRepairIssue::ToolMismatch
     );
     assert_eq!(
-        diagnose_interrupted_tool_branch(&wrong_run)
-            .expect_err("mismatched run")
-            .issue(),
+        diagnose_interrupted_tool_branch(&wrong_run).expect_err("mismatched run").issue(),
         InterruptedToolRepairIssue::RunMismatch
     );
 }
@@ -339,9 +284,7 @@ fn stale_leaf_unsupported_entry_and_missing_anchor_fail_closed() {
     let mut stale = tail_gap_snapshot();
     stale.snapshot_leaf_hash = hash("stale.leaf");
     assert_eq!(
-        diagnose_interrupted_tool_branch(&stale)
-            .expect_err("stale leaf")
-            .issue(),
+        diagnose_interrupted_tool_branch(&stale).expect_err("stale leaf").issue(),
         InterruptedToolRepairIssue::StaleLeaf
     );
 
@@ -350,9 +293,7 @@ fn stale_leaf_unsupported_entry_and_missing_anchor_fail_closed() {
         ..simple_entry(ENTRY_USER, InterruptedToolEntryKind::UserMessage)
     }]);
     assert_eq!(
-        diagnose_interrupted_tool_branch(&invalid_entry_case)
-            .expect_err("unsupported entry")
-            .issue(),
+        diagnose_interrupted_tool_branch(&invalid_entry_case).expect_err("unsupported entry").issue(),
         InterruptedToolRepairIssue::UnsupportedEntry
     );
 
@@ -375,29 +316,18 @@ fn conflicting_and_false_user_cancellation_do_not_invent_cause() {
     let snapshot = tail_gap_snapshot();
     let diagnosis = diagnose_interrupted_tool_branch(&snapshot).expect("gap");
     let gap = &diagnosis.unmatched()[0];
-    let unrelated = observation(
-        InterruptedToolObservationKind::UserCancellation,
-        (OTHER_RUN_ID, CALL_ONE),
-    );
+    let unrelated = observation(InterruptedToolObservationKind::UserCancellation, (OTHER_RUN_ID, CALL_ONE));
     assert_eq!(
         reduce_interrupted_tool_reason(gap, &[unrelated]).expect("unrelated evidence"),
         InterruptedToolReason::UnknownInterruption
     );
 
     let conflict = [
-        observation(
-            InterruptedToolObservationKind::UserCancellation,
-            (RUN_ID, CALL_ONE),
-        ),
-        observation(
-            InterruptedToolObservationKind::HostCancellation,
-            (RUN_ID, CALL_ONE),
-        ),
+        observation(InterruptedToolObservationKind::UserCancellation, (RUN_ID, CALL_ONE)),
+        observation(InterruptedToolObservationKind::HostCancellation, (RUN_ID, CALL_ONE)),
     ];
     assert_eq!(
-        reduce_interrupted_tool_reason(gap, &conflict)
-            .expect_err("conflicting cause")
-            .issue(),
+        reduce_interrupted_tool_reason(gap, &conflict).expect_err("conflicting cause").issue(),
         InterruptedToolRepairIssue::ConflictingEvidence
     );
 }
@@ -410,42 +340,30 @@ fn partial_store_replay_and_tool_execution_block_provider_dispatch() {
     let plan = plan_interrupted_tool_repair(&snapshot, &diagnosis, &[]).expect("plan");
     let action_hashes = action_hash_refs(&plan);
     let statuses = [
-        application_with(
-            &plan,
-            ApplicationObservation {
-                committed_action_hashes: &[],
-                durability: InterruptedToolDurability::Partial,
-                replay_state: InterruptedToolReplayState::NotValidated,
-                executor_observation: InterruptedToolExecutorObservation::NotInvoked,
-            },
-        ),
-        application_with(
-            &plan,
-            ApplicationObservation {
-                committed_action_hashes: &[],
-                durability: InterruptedToolDurability::StoreFailure,
-                replay_state: InterruptedToolReplayState::NotValidated,
-                executor_observation: InterruptedToolExecutorObservation::NotInvoked,
-            },
-        ),
-        application_with(
-            &plan,
-            ApplicationObservation {
-                committed_action_hashes: action_hashes.as_slice(),
-                durability: InterruptedToolDurability::Durable,
-                replay_state: InterruptedToolReplayState::Invalid,
-                executor_observation: InterruptedToolExecutorObservation::NotInvoked,
-            },
-        ),
-        application_with(
-            &plan,
-            ApplicationObservation {
-                committed_action_hashes: action_hashes.as_slice(),
-                durability: InterruptedToolDurability::Durable,
-                replay_state: InterruptedToolReplayState::Clean,
-                executor_observation: InterruptedToolExecutorObservation::Invoked,
-            },
-        ),
+        application_with(&plan, ApplicationObservation {
+            committed_action_hashes: &[],
+            durability: InterruptedToolDurability::Partial,
+            replay_state: InterruptedToolReplayState::NotValidated,
+            executor_observation: InterruptedToolExecutorObservation::NotInvoked,
+        }),
+        application_with(&plan, ApplicationObservation {
+            committed_action_hashes: &[],
+            durability: InterruptedToolDurability::StoreFailure,
+            replay_state: InterruptedToolReplayState::NotValidated,
+            executor_observation: InterruptedToolExecutorObservation::NotInvoked,
+        }),
+        application_with(&plan, ApplicationObservation {
+            committed_action_hashes: action_hashes.as_slice(),
+            durability: InterruptedToolDurability::Durable,
+            replay_state: InterruptedToolReplayState::Invalid,
+            executor_observation: InterruptedToolExecutorObservation::NotInvoked,
+        }),
+        application_with(&plan, ApplicationObservation {
+            committed_action_hashes: action_hashes.as_slice(),
+            durability: InterruptedToolDurability::Durable,
+            replay_state: InterruptedToolReplayState::Clean,
+            executor_observation: InterruptedToolExecutorObservation::Invoked,
+        }),
     ];
     let expected = [
         InterruptedToolRepairApplicationStatus::BlockedPartial,
@@ -468,10 +386,7 @@ fn unrepaired_branch_is_rejected_before_provider_projection() {
     let diagnosis = diagnose_interrupted_tool_branch(&snapshot).expect("gap");
     let gate = evaluate_interrupted_tool_provider_gate(&diagnosis, None, None);
 
-    assert_eq!(
-        gate.status(),
-        InterruptedToolProviderGateStatus::BlockedRepairRequired
-    );
+    assert_eq!(gate.status(), InterruptedToolProviderGateStatus::BlockedRepairRequired);
     assert!(!gate.provider_dispatch_allowed());
 }
 
@@ -516,8 +431,8 @@ fn receipt_rejects_every_private_material_class() {
         },
     ];
     for leak in leaks {
-        let error = project_interrupted_tool_repair_receipt(&plan, &outcome, leak)
-            .expect_err("private receipt material");
+        let error =
+            project_interrupted_tool_repair_receipt(&plan, &outcome, leak).expect_err("private receipt material");
         assert_eq!(error.issue(), InterruptedToolRepairIssue::ReceiptLeak);
         let rendered = format!("{error:?}");
         for private in [
@@ -569,9 +484,7 @@ fn historical_gap_snapshot() -> InterruptedToolBranchSnapshot {
 }
 
 fn snapshot(entries: Vec<InterruptedToolBranchEntry>) -> InterruptedToolBranchSnapshot {
-    let active_leaf_hash = entries
-        .last()
-        .map_or_else(|| hash("missing"), |entry| entry.entry_hash.clone());
+    let active_leaf_hash = entries.last().map_or_else(|| hash("missing"), |entry| entry.entry_hash.clone());
     InterruptedToolBranchSnapshot {
         session_id: SESSION_ID.to_string(),
         branch_id: BRANCH_ID.to_string(),
@@ -618,10 +531,7 @@ fn result_entry(entry_id: &str, result: (&str, String)) -> InterruptedToolBranch
     }
 }
 
-fn observation(
-    kind: InterruptedToolObservationKind,
-    target: (&str, &str),
-) -> InterruptedToolObservation {
+fn observation(kind: InterruptedToolObservationKind, target: (&str, &str)) -> InterruptedToolObservation {
     let (run_id, call_id) = target;
     InterruptedToolObservation {
         kind,
@@ -630,19 +540,14 @@ fn observation(
     }
 }
 
-fn passing_application(
-    plan: &InterruptedToolRepairPlan,
-) -> InterruptedToolRepairApplicationOutcome {
+fn passing_application(plan: &InterruptedToolRepairPlan) -> InterruptedToolRepairApplicationOutcome {
     let action_hashes = action_hash_refs(plan);
-    application_with(
-        plan,
-        ApplicationObservation {
-            committed_action_hashes: action_hashes.as_slice(),
-            durability: InterruptedToolDurability::Durable,
-            replay_state: InterruptedToolReplayState::Clean,
-            executor_observation: InterruptedToolExecutorObservation::NotInvoked,
-        },
-    )
+    application_with(plan, ApplicationObservation {
+        committed_action_hashes: action_hashes.as_slice(),
+        durability: InterruptedToolDurability::Durable,
+        replay_state: InterruptedToolReplayState::Clean,
+        executor_observation: InterruptedToolExecutorObservation::NotInvoked,
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -657,27 +562,21 @@ fn application_with(
     plan: &InterruptedToolRepairPlan,
     observation: ApplicationObservation<'_>,
 ) -> InterruptedToolRepairApplicationOutcome {
-    evaluate_interrupted_tool_repair_application(
-        plan,
-        &InterruptedToolRepairApplicationDraft {
-            plan_hash: plan.plan_hash(),
-            observed_old_leaf_hash: plan.old_leaf_hash(),
-            observed_new_leaf_hash: plan.proposed_new_leaf_hash(),
-            committed_action_hashes: observation.committed_action_hashes,
-            previously_applied_plan_hashes: &[],
-            durability: observation.durability,
-            replay_state: observation.replay_state,
-            executor_observation: observation.executor_observation,
-        },
-    )
+    evaluate_interrupted_tool_repair_application(plan, &InterruptedToolRepairApplicationDraft {
+        plan_hash: plan.plan_hash(),
+        observed_old_leaf_hash: plan.old_leaf_hash(),
+        observed_new_leaf_hash: plan.proposed_new_leaf_hash(),
+        committed_action_hashes: observation.committed_action_hashes,
+        previously_applied_plan_hashes: &[],
+        durability: observation.durability,
+        replay_state: observation.replay_state,
+        executor_observation: observation.executor_observation,
+    })
     .expect("application evidence should validate")
 }
 
 fn action_hash_refs(plan: &InterruptedToolRepairPlan) -> Vec<&str> {
-    plan.actions()
-        .iter()
-        .map(InterruptedToolRepairAction::action_hash)
-        .collect()
+    plan.actions().iter().map(InterruptedToolRepairAction::action_hash).collect()
 }
 
 fn tool_hash(call_id: &str) -> String {

@@ -157,15 +157,9 @@ impl ReplayTarget for TreeReplayTarget {
             ("active_node".to_string(), option_id(self.active_node_id())),
             ("cancelled".to_string(), self.cancelled.to_string()),
             ("expanded".to_string(), join_ids(self.expanded.iter())),
-            (
-                "selected_node".to_string(),
-                option_id(self.selected_node.clone()),
-            ),
+            ("selected_node".to_string(), option_id(self.selected_node.clone())),
             ("surface".to_string(), TARGET_TREE.to_string()),
-            (
-                "visible_rows".to_string(),
-                join_ids(self.visible_node_ids().iter()),
-            ),
+            ("visible_rows".to_string(), join_ids(self.visible_node_ids().iter())),
         ])
     }
 }
@@ -173,9 +167,7 @@ impl ReplayTarget for TreeReplayTarget {
 impl TreeReplayTarget {
     fn validate_key(&self, key: &str) -> Vec<ReplayIssue> {
         match key {
-            KEY_ARROW_DOWN
-                if self.active_index.saturating_add(1) >= self.visible_node_ids().len() =>
-            {
+            KEY_ARROW_DOWN if self.active_index.saturating_add(1) >= self.visible_node_ids().len() => {
                 vec![ReplayIssue::new(
                     ReplayIssueCode::OutOfBoundsMovement,
                     FIELD_MOVEMENT,
@@ -187,8 +179,7 @@ impl TreeReplayTarget {
                 FIELD_MOVEMENT,
                 "tree replay cannot move above the first visible row",
             )],
-            KEY_ARROW_DOWN | KEY_ARROW_UP | KEY_ARROW_RIGHT | KEY_ARROW_LEFT | KEY_ENTER
-            | KEY_ESCAPE => Vec::new(),
+            KEY_ARROW_DOWN | KEY_ARROW_UP | KEY_ARROW_RIGHT | KEY_ARROW_LEFT | KEY_ENTER | KEY_ESCAPE => Vec::new(),
             _ => vec![ReplayIssue::new(
                 ReplayIssueCode::UnsupportedEvent,
                 FIELD_TREE_KEY,
@@ -201,39 +192,26 @@ impl TreeReplayTarget {
 /// Returns the committed tree navigation replay fixture.
 #[must_use]
 pub fn tree_navigation_replay_script() -> ReplayScript {
-    ReplayScript::new(ReplayMetadata::new(
-        "tree.navigation.baseline",
-        "Tree navigation baseline",
-        "tree",
-    ))
-    .with_event(ReplayEvent::Key {
-        target: TARGET_TREE.to_string(),
-        key: KEY_ARROW_RIGHT.to_string(),
-    })
-    .with_event(ReplayEvent::Key {
-        target: TARGET_TREE.to_string(),
-        key: KEY_ARROW_DOWN.to_string(),
-    })
-    .with_event(ReplayEvent::Key {
-        target: TARGET_TREE.to_string(),
-        key: KEY_ENTER.to_string(),
-    })
-    .with_assertion(ReplayAssertion::new("selected_node", "src/lib.rs"))
-    .with_assertion(ReplayAssertion::new("expanded", "src"))
-    .with_assertion(ReplayAssertion::new(
-        "visible_rows",
-        "src,src/lib.rs,README.md",
-    ))
-    .with_snapshot(ReplaySnapshotExpectation::new(
-        "state",
-        state_snapshot_hash(&accepted_tree_state()),
-    ))
+    ReplayScript::new(ReplayMetadata::new("tree.navigation.baseline", "Tree navigation baseline", "tree"))
+        .with_event(ReplayEvent::Key {
+            target: TARGET_TREE.to_string(),
+            key: KEY_ARROW_RIGHT.to_string(),
+        })
+        .with_event(ReplayEvent::Key {
+            target: TARGET_TREE.to_string(),
+            key: KEY_ARROW_DOWN.to_string(),
+        })
+        .with_event(ReplayEvent::Key {
+            target: TARGET_TREE.to_string(),
+            key: KEY_ENTER.to_string(),
+        })
+        .with_assertion(ReplayAssertion::new("selected_node", "src/lib.rs"))
+        .with_assertion(ReplayAssertion::new("expanded", "src"))
+        .with_assertion(ReplayAssertion::new("visible_rows", "src,src/lib.rs,README.md"))
+        .with_snapshot(ReplaySnapshotExpectation::new("state", state_snapshot_hash(&accepted_tree_state())))
 }
 
-fn visible_node_ids(
-    nodes: &[ReplayTreeNode],
-    expanded: &std::collections::BTreeSet<String>,
-) -> Vec<String> {
+fn visible_node_ids(nodes: &[ReplayTreeNode], expanded: &std::collections::BTreeSet<String>) -> Vec<String> {
     let mut visible = Vec::with_capacity(visible_node_bound(nodes));
     let mut stack = nodes.iter().rev().collect::<Vec<_>>();
     while let Some(node) = stack.pop() {
@@ -275,9 +253,6 @@ fn accepted_tree_state() -> std::collections::BTreeMap<String, String> {
         ("expanded".to_string(), "src".to_string()),
         ("selected_node".to_string(), "src/lib.rs".to_string()),
         ("surface".to_string(), TARGET_TREE.to_string()),
-        (
-            "visible_rows".to_string(),
-            "src,src/lib.rs,README.md".to_string(),
-        ),
+        ("visible_rows".to_string(), "src,src/lib.rs,README.md".to_string()),
     ])
 }

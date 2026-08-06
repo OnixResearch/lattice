@@ -2,372 +2,963 @@
 
 #![allow(unknown_lints, excessive_file_length)]
 
-pub use crate::admission::{
-    MODEL_PROVIDER_NEUTRAL_CONTRACT_IDENTITY, ModelDispatchCancellationPosture,
-    ModelDispatchFallbackPolicy, ModelDispatchPlan, ModelDispatchPlanIssue,
-    ModelDispatchPlanRequest, ModelDispatchPlanStatus, ModelDispatchPolicyDraft,
-    ModelDispatchReceiptPolicy, ModelDispatchStreamPolicy, ModelDispatchTimeoutPosture,
-    plan_model_dispatch,
-};
-pub use crate::background::{
-    ProcessJobBackend, ProcessJobEnvironmentVariable, ProcessJobMetadataField,
-    ProcessJobNotificationPolicy, ProcessJobProfile, ProcessJobProfileError,
-    ProcessJobProfileErrorKind, ProcessJobProfileIdentity, ProcessJobProfileManifest,
-    ProcessJobProfilePolicy, ProcessJobProfileResolveRequest, ProcessJobProfileSource,
-    ProcessJobProfileSourcePrecedence, ProcessJobResourceLimits, ResolvedProcessJobProfile,
-    StartProcessJobRequest, resolve_process_job_profile,
-};
-pub use crate::batch::{
-    BatchConcurrencyPolicy, BatchError, BatchExecutionMode, BatchExecutionService, BatchJob,
-    BatchJobDraft, BatchJobOutcome, BatchJobOutcomeDraft, BatchJobReceipt, BatchJobReceiptDraft,
-    BatchJobStatus, BatchOutputFormat, BatchOutputLabel, BatchOutputRecord, BatchReceipt,
-    BatchReceiptDraft, BatchRedactionPolicy, BatchRenderer, BatchRequestDraft, BatchResumeAction,
-    BatchResumeDecision, BatchResumePlan, BatchRunIdentity, ResumeCompletedJobDraft,
-    ResumeManifestDraft, ResumeStaleReason, evaluate_resume_manifest, execute_batch_plan,
-    render_plan_order_records,
-};
-pub use crate::boundary::{evaluate_sandbox_escalation, sandbox_escalation_event};
-pub use crate::branching::{
-    SessionBranchCheckpointStatus, SessionBranchContinuationTarget, SessionBranchDiagnostic,
-    SessionBranchDiagnosticKind, SessionBranchError, SessionBranchErrorKind,
-    SessionBranchOperation, SessionBranchPlan, SessionBranchPlanStatus, SessionBranchPlannerInput,
-    SessionBranchPolicy, SessionBranchPolicyAdmission, SessionBranchPolicyDraft,
-    SessionBranchReceipt, SessionBranchRequest, SessionBranchRequestDraft, SessionCopyDescriptor,
-    SessionCopyDescriptorClass, SessionCopyDescriptorDraft, SessionLedgerEntry,
-    SessionLedgerEntryDraft, plan_session_branch, validate_session_branch_receipt_text,
-};
-pub use crate::capmap::{
-    RuntimeCapabilityFamily, RuntimeCapabilityFamilyMapError, RuntimeCapabilityFamilyRecord,
-    runtime_capability_family_map, validate_runtime_capability_family_map,
-};
-pub use crate::caps::{
-    DEFAULT_MODEL_CAPABILITY_LABEL, DEFAULT_TOOL_CAPABILITY_LABEL, RuntimeCapabilityDescriptor,
-    RuntimeCapabilityDescriptorDraft, RuntimeCapabilityError, RuntimeCapabilityErrorKind,
-    RuntimeCapabilityOutcome, RuntimeCapabilityRegistry, RuntimeCapabilityResolution,
-    RuntimeCapabilityServiceKind,
-};
-pub use crate::checkpoint::{
-    VcsSnapshotBackendKind, VcsSnapshotConfirmationStatus, VcsSnapshotDiagnostic,
-    VcsSnapshotDiagnosticKind, VcsSnapshotError, VcsSnapshotErrorKind, VcsSnapshotFreshness,
-    VcsSnapshotIntent, VcsSnapshotOperation, VcsSnapshotPlan, VcsSnapshotPlanRequest,
-    VcsSnapshotPlanRequestDraft, VcsSnapshotPlanStatus, VcsSnapshotPlannerInput,
-    VcsSnapshotProtectedAction, VcsSnapshotReceipt, VcsSnapshotRecord, VcsSnapshotRecordDraft,
-    VcsSnapshotServiceStatus, plan_vcs_snapshot_operation, validate_vcs_snapshot_receipt_text,
-};
-pub use crate::composition_conformance::{
-    CompositionCaseKind, CompositionDiagnostic, CompositionDiagnosticKind,
-    CompositionEvidenceRecord, CompositionRailReport, CompositionScenario, CompositionSurface,
-    composition_conformance_matrix, render_composition_evidence, run_composition_conformance,
-    validate_composition_evidence_text, validate_composition_matrix,
-};
-pub use crate::context_layering::{
-    ContextLayerAdmissionPolicy, ContextLayerBoundaryEffect, ContextLayerClass,
-    ContextLayerDescriptor, ContextLayerDiagnostic, ContextLayerDiagnosticKind,
-    ContextLayerDiscoveryBoundary, ContextLayerFreshness, ContextLayerInclusionPolicy,
-    ContextLayerPlan, ContextLayerPolicySwitch, ContextLayerReceipt, ContextLayerReceiptEntry,
-    ContextLayerRedaction, ContextLayerSourceKind, ContextLayerTrust, ContextLayerValidationResult,
-    assemble_context_layers, blake3_context_layer_fingerprint, validate_context_descriptor,
-};
-pub use crate::contract::{
-    DEFAULT_MAX_TURNS, MIN_MAX_TURNS, MaxTurns, RunReport, RuntimeConfig, RuntimeError,
-    RuntimeFailure, RuntimeInput, RuntimeStatus,
-};
-pub use crate::controller::{
-    CompletionAcknowledgement, ContinuationAction, ContinuationCandidate,
-    ContinuationCompletionRecord, ContinuationDecision, ContinuationDispatch, ContinuationError,
-    ContinuationPolicy, ContinuationPriority, ContinuationReason, ContinuationReceipt,
-    ContinuationReceiptDraft, ContinuationState, ContinuationStateClass, ContinuationWorkKind,
-    DispatchAcknowledgement, DispatchAcknowledgementOutcome, PendingContinuationDispatch,
-    PendingContinuationWork, select_next_continuation,
-};
-pub use crate::dataset_export::{
-    DatasetChatMessage, DatasetChatRow, DatasetDiagnostic, DatasetDiagnosticKind,
-    DatasetExportPolicy, DatasetExportResult, DatasetFingerprint, DatasetInspectionReport,
-    DatasetMetadataProjection, DatasetPreferenceExample, DatasetPreferenceRow, DatasetReplayEntry,
-    DatasetReplayRole, DatasetRlStep, DatasetRlStepKind, DatasetRlTrajectory,
-    DatasetRlTrajectoryRow, DatasetSessionSource, DatasetSkippedRow, DatasetTarget,
-    blake3_dataset_export_fingerprint, export_chat_messages_row, export_preference_row,
-    export_rl_trajectory_row, inspect_dataset_exports, render_chat_row_jsonl,
-    render_chat_rows_jsonl,
-};
-pub use crate::engine::{
-    ApproachRecord, ApproachState, AuditOutcome, GapStrength, PortfolioAudit,
-    PortfolioAuditFinding, PortfolioAuditRisk, PortfolioBlocker, PortfolioBlockerClass,
-    PortfolioBudget, PortfolioContract, PortfolioDispatch, PortfolioError, PortfolioErrorKind,
-    PortfolioFingerprint, PortfolioPhase, PortfolioReceipt, PortfolioResult, PortfolioState,
-    PortfolioUsage, PortfolioValidationReceipt, PortfolioValidationStatus, ReopenNovelty,
-    begin_adversarial_audit, begin_independent_exploration, begin_synthesis,
-    begin_targeted_redirection, begin_validation, blake3_portfolio_fingerprint, block_approach,
-    block_portfolio, exhaust_portfolio, initialize_portfolio, is_portfolio_budget_exhausted,
-    portfolio_contract_fingerprint, portfolio_evidence_fingerprint, project_portfolio_receipt,
-    record_adversarial_audit, record_portfolio_dispatch, register_approach, reopen_approach,
-    underexplored_live_families, validate_approach_record, validate_portfolio_contract,
-    validate_portfolio_dispatch, validate_portfolio_receipt, validate_portfolio_result,
-};
-pub use crate::eval_feedback::{
-    EvalFeedbackCandidate, EvalFeedbackCandidateKind, EvalFeedbackDiagnostic,
-    EvalFeedbackDiagnosticKind, EvalFeedbackFingerprint, EvalFeedbackFreshnessDecision,
-    EvalFeedbackFreshnessPolicy, EvalFeedbackOutputFormat, EvalFeedbackPlan, EvalFeedbackReceipt,
-    EvalFeedbackReceiptLeak, EvalFeedbackRedactionState, EvalFeedbackReviewDecision,
-    EvalFeedbackReviewOutcome, EvalFeedbackRunStatus, EvalFeedbackScopeRequest,
-    EvalFeedbackTaskSet, EvalFeedbackTaskSetKind, EvalFeedbackValidationResult,
-    EvalFeedbackVerifierIdentity, blake3_eval_feedback_fingerprint,
-    classify_eval_feedback_freshness, evaluate_feedback_review, validate_eval_feedback_plan,
-    validate_eval_feedback_receipt,
-};
+pub use crate::admission::MODEL_PROVIDER_NEUTRAL_CONTRACT_IDENTITY;
+pub use crate::admission::ModelDispatchCancellationPosture;
+pub use crate::admission::ModelDispatchFallbackPolicy;
+pub use crate::admission::ModelDispatchPlan;
+pub use crate::admission::ModelDispatchPlanIssue;
+pub use crate::admission::ModelDispatchPlanRequest;
+pub use crate::admission::ModelDispatchPlanStatus;
+pub use crate::admission::ModelDispatchPolicyDraft;
+pub use crate::admission::ModelDispatchReceiptPolicy;
+pub use crate::admission::ModelDispatchStreamPolicy;
+pub use crate::admission::ModelDispatchTimeoutPosture;
+pub use crate::admission::plan_model_dispatch;
+pub use crate::background::ProcessJobBackend;
+pub use crate::background::ProcessJobEnvironmentVariable;
+pub use crate::background::ProcessJobMetadataField;
+pub use crate::background::ProcessJobNotificationPolicy;
+pub use crate::background::ProcessJobProfile;
+pub use crate::background::ProcessJobProfileError;
+pub use crate::background::ProcessJobProfileErrorKind;
+pub use crate::background::ProcessJobProfileIdentity;
+pub use crate::background::ProcessJobProfileManifest;
+pub use crate::background::ProcessJobProfilePolicy;
+pub use crate::background::ProcessJobProfileResolveRequest;
+pub use crate::background::ProcessJobProfileSource;
+pub use crate::background::ProcessJobProfileSourcePrecedence;
+pub use crate::background::ProcessJobResourceLimits;
+pub use crate::background::ResolvedProcessJobProfile;
+pub use crate::background::StartProcessJobRequest;
+pub use crate::background::resolve_process_job_profile;
+pub use crate::batch::BatchConcurrencyPolicy;
+pub use crate::batch::BatchError;
+pub use crate::batch::BatchExecutionMode;
+pub use crate::batch::BatchExecutionService;
+pub use crate::batch::BatchJob;
+pub use crate::batch::BatchJobDraft;
+pub use crate::batch::BatchJobOutcome;
+pub use crate::batch::BatchJobOutcomeDraft;
+pub use crate::batch::BatchJobReceipt;
+pub use crate::batch::BatchJobReceiptDraft;
+pub use crate::batch::BatchJobStatus;
+pub use crate::batch::BatchOutputFormat;
+pub use crate::batch::BatchOutputLabel;
+pub use crate::batch::BatchOutputRecord;
+pub use crate::batch::BatchReceipt;
+pub use crate::batch::BatchReceiptDraft;
+pub use crate::batch::BatchRedactionPolicy;
+pub use crate::batch::BatchRenderer;
+pub use crate::batch::BatchRequestDraft;
+pub use crate::batch::BatchResumeAction;
+pub use crate::batch::BatchResumeDecision;
+pub use crate::batch::BatchResumePlan;
+pub use crate::batch::BatchRunIdentity;
+pub use crate::batch::ResumeCompletedJobDraft;
+pub use crate::batch::ResumeManifestDraft;
+pub use crate::batch::ResumeStaleReason;
+pub use crate::batch::evaluate_resume_manifest;
+pub use crate::batch::execute_batch_plan;
+pub use crate::batch::render_plan_order_records;
+pub use crate::boundary::evaluate_sandbox_escalation;
+pub use crate::boundary::sandbox_escalation_event;
+pub use crate::branching::SessionBranchCheckpointStatus;
+pub use crate::branching::SessionBranchContinuationTarget;
+pub use crate::branching::SessionBranchDiagnostic;
+pub use crate::branching::SessionBranchDiagnosticKind;
+pub use crate::branching::SessionBranchError;
+pub use crate::branching::SessionBranchErrorKind;
+pub use crate::branching::SessionBranchOperation;
+pub use crate::branching::SessionBranchPlan;
+pub use crate::branching::SessionBranchPlanStatus;
+pub use crate::branching::SessionBranchPlannerInput;
+pub use crate::branching::SessionBranchPolicy;
+pub use crate::branching::SessionBranchPolicyAdmission;
+pub use crate::branching::SessionBranchPolicyDraft;
+pub use crate::branching::SessionBranchReceipt;
+pub use crate::branching::SessionBranchRequest;
+pub use crate::branching::SessionBranchRequestDraft;
+pub use crate::branching::SessionCopyDescriptor;
+pub use crate::branching::SessionCopyDescriptorClass;
+pub use crate::branching::SessionCopyDescriptorDraft;
+pub use crate::branching::SessionLedgerEntry;
+pub use crate::branching::SessionLedgerEntryDraft;
+pub use crate::branching::plan_session_branch;
+pub use crate::branching::validate_session_branch_receipt_text;
+pub use crate::capmap::RuntimeCapabilityFamily;
+pub use crate::capmap::RuntimeCapabilityFamilyMapError;
+pub use crate::capmap::RuntimeCapabilityFamilyRecord;
+pub use crate::capmap::runtime_capability_family_map;
+pub use crate::capmap::validate_runtime_capability_family_map;
+pub use crate::caps::DEFAULT_MODEL_CAPABILITY_LABEL;
+pub use crate::caps::DEFAULT_TOOL_CAPABILITY_LABEL;
+pub use crate::caps::RuntimeCapabilityDescriptor;
+pub use crate::caps::RuntimeCapabilityDescriptorDraft;
+pub use crate::caps::RuntimeCapabilityError;
+pub use crate::caps::RuntimeCapabilityErrorKind;
+pub use crate::caps::RuntimeCapabilityOutcome;
+pub use crate::caps::RuntimeCapabilityRegistry;
+pub use crate::caps::RuntimeCapabilityResolution;
+pub use crate::caps::RuntimeCapabilityServiceKind;
+pub use crate::checkpoint::VcsSnapshotBackendKind;
+pub use crate::checkpoint::VcsSnapshotConfirmationStatus;
+pub use crate::checkpoint::VcsSnapshotDiagnostic;
+pub use crate::checkpoint::VcsSnapshotDiagnosticKind;
+pub use crate::checkpoint::VcsSnapshotError;
+pub use crate::checkpoint::VcsSnapshotErrorKind;
+pub use crate::checkpoint::VcsSnapshotFreshness;
+pub use crate::checkpoint::VcsSnapshotIntent;
+pub use crate::checkpoint::VcsSnapshotOperation;
+pub use crate::checkpoint::VcsSnapshotPlan;
+pub use crate::checkpoint::VcsSnapshotPlanRequest;
+pub use crate::checkpoint::VcsSnapshotPlanRequestDraft;
+pub use crate::checkpoint::VcsSnapshotPlanStatus;
+pub use crate::checkpoint::VcsSnapshotPlannerInput;
+pub use crate::checkpoint::VcsSnapshotProtectedAction;
+pub use crate::checkpoint::VcsSnapshotReceipt;
+pub use crate::checkpoint::VcsSnapshotRecord;
+pub use crate::checkpoint::VcsSnapshotRecordDraft;
+pub use crate::checkpoint::VcsSnapshotServiceStatus;
+pub use crate::checkpoint::plan_vcs_snapshot_operation;
+pub use crate::checkpoint::validate_vcs_snapshot_receipt_text;
+pub use crate::composition_conformance::CompositionCaseKind;
+pub use crate::composition_conformance::CompositionDiagnostic;
+pub use crate::composition_conformance::CompositionDiagnosticKind;
+pub use crate::composition_conformance::CompositionEvidenceRecord;
+pub use crate::composition_conformance::CompositionRailReport;
+pub use crate::composition_conformance::CompositionScenario;
+pub use crate::composition_conformance::CompositionSurface;
+pub use crate::composition_conformance::composition_conformance_matrix;
+pub use crate::composition_conformance::render_composition_evidence;
+pub use crate::composition_conformance::run_composition_conformance;
+pub use crate::composition_conformance::validate_composition_evidence_text;
+pub use crate::composition_conformance::validate_composition_matrix;
+pub use crate::context_layering::ContextLayerAdmissionPolicy;
+pub use crate::context_layering::ContextLayerBoundaryEffect;
+pub use crate::context_layering::ContextLayerClass;
+pub use crate::context_layering::ContextLayerDescriptor;
+pub use crate::context_layering::ContextLayerDiagnostic;
+pub use crate::context_layering::ContextLayerDiagnosticKind;
+pub use crate::context_layering::ContextLayerDiscoveryBoundary;
+pub use crate::context_layering::ContextLayerFreshness;
+pub use crate::context_layering::ContextLayerInclusionPolicy;
+pub use crate::context_layering::ContextLayerPlan;
+pub use crate::context_layering::ContextLayerPolicySwitch;
+pub use crate::context_layering::ContextLayerReceipt;
+pub use crate::context_layering::ContextLayerReceiptEntry;
+pub use crate::context_layering::ContextLayerRedaction;
+pub use crate::context_layering::ContextLayerSourceKind;
+pub use crate::context_layering::ContextLayerTrust;
+pub use crate::context_layering::ContextLayerValidationResult;
+pub use crate::context_layering::assemble_context_layers;
+pub use crate::context_layering::blake3_context_layer_fingerprint;
+pub use crate::context_layering::validate_context_descriptor;
+pub use crate::contract::DEFAULT_MAX_TURNS;
+pub use crate::contract::MIN_MAX_TURNS;
+pub use crate::contract::MaxTurns;
+pub use crate::contract::RunReport;
+pub use crate::contract::RuntimeConfig;
+pub use crate::contract::RuntimeError;
+pub use crate::contract::RuntimeFailure;
+pub use crate::contract::RuntimeInput;
+pub use crate::contract::RuntimeStatus;
+pub use crate::controller::CompletionAcknowledgement;
+pub use crate::controller::ContinuationAction;
+pub use crate::controller::ContinuationCandidate;
+pub use crate::controller::ContinuationCompletionRecord;
+pub use crate::controller::ContinuationDecision;
+pub use crate::controller::ContinuationDispatch;
+pub use crate::controller::ContinuationError;
+pub use crate::controller::ContinuationPolicy;
+pub use crate::controller::ContinuationPriority;
+pub use crate::controller::ContinuationReason;
+pub use crate::controller::ContinuationReceipt;
+pub use crate::controller::ContinuationReceiptDraft;
+pub use crate::controller::ContinuationState;
+pub use crate::controller::ContinuationStateClass;
+pub use crate::controller::ContinuationWorkKind;
+pub use crate::controller::DispatchAcknowledgement;
+pub use crate::controller::DispatchAcknowledgementOutcome;
+pub use crate::controller::PendingContinuationDispatch;
+pub use crate::controller::PendingContinuationWork;
+pub use crate::controller::select_next_continuation;
+pub use crate::dataset_export::DatasetChatMessage;
+pub use crate::dataset_export::DatasetChatRow;
+pub use crate::dataset_export::DatasetDiagnostic;
+pub use crate::dataset_export::DatasetDiagnosticKind;
+pub use crate::dataset_export::DatasetExportPolicy;
+pub use crate::dataset_export::DatasetExportResult;
+pub use crate::dataset_export::DatasetFingerprint;
+pub use crate::dataset_export::DatasetInspectionReport;
+pub use crate::dataset_export::DatasetMetadataProjection;
+pub use crate::dataset_export::DatasetPreferenceExample;
+pub use crate::dataset_export::DatasetPreferenceRow;
+pub use crate::dataset_export::DatasetReplayEntry;
+pub use crate::dataset_export::DatasetReplayRole;
+pub use crate::dataset_export::DatasetRlStep;
+pub use crate::dataset_export::DatasetRlStepKind;
+pub use crate::dataset_export::DatasetRlTrajectory;
+pub use crate::dataset_export::DatasetRlTrajectoryRow;
+pub use crate::dataset_export::DatasetSessionSource;
+pub use crate::dataset_export::DatasetSkippedRow;
+pub use crate::dataset_export::DatasetTarget;
+pub use crate::dataset_export::blake3_dataset_export_fingerprint;
+pub use crate::dataset_export::export_chat_messages_row;
+pub use crate::dataset_export::export_preference_row;
+pub use crate::dataset_export::export_rl_trajectory_row;
+pub use crate::dataset_export::inspect_dataset_exports;
+pub use crate::dataset_export::render_chat_row_jsonl;
+pub use crate::dataset_export::render_chat_rows_jsonl;
+pub use crate::engine::ApproachRecord;
+pub use crate::engine::ApproachState;
+pub use crate::engine::AuditOutcome;
+pub use crate::engine::GapStrength;
+pub use crate::engine::PortfolioAudit;
+pub use crate::engine::PortfolioAuditFinding;
+pub use crate::engine::PortfolioAuditRisk;
+pub use crate::engine::PortfolioBlocker;
+pub use crate::engine::PortfolioBlockerClass;
+pub use crate::engine::PortfolioBudget;
+pub use crate::engine::PortfolioContract;
+pub use crate::engine::PortfolioDispatch;
+pub use crate::engine::PortfolioError;
+pub use crate::engine::PortfolioErrorKind;
+pub use crate::engine::PortfolioFingerprint;
+pub use crate::engine::PortfolioPhase;
+pub use crate::engine::PortfolioReceipt;
+pub use crate::engine::PortfolioResult;
+pub use crate::engine::PortfolioState;
+pub use crate::engine::PortfolioUsage;
+pub use crate::engine::PortfolioValidationReceipt;
+pub use crate::engine::PortfolioValidationStatus;
+pub use crate::engine::ReopenNovelty;
+pub use crate::engine::begin_adversarial_audit;
+pub use crate::engine::begin_independent_exploration;
+pub use crate::engine::begin_synthesis;
+pub use crate::engine::begin_targeted_redirection;
+pub use crate::engine::begin_validation;
+pub use crate::engine::blake3_portfolio_fingerprint;
+pub use crate::engine::block_approach;
+pub use crate::engine::block_portfolio;
+pub use crate::engine::exhaust_portfolio;
+pub use crate::engine::initialize_portfolio;
+pub use crate::engine::is_portfolio_budget_exhausted;
+pub use crate::engine::portfolio_contract_fingerprint;
+pub use crate::engine::portfolio_evidence_fingerprint;
+pub use crate::engine::project_portfolio_receipt;
+pub use crate::engine::record_adversarial_audit;
+pub use crate::engine::record_portfolio_dispatch;
+pub use crate::engine::register_approach;
+pub use crate::engine::reopen_approach;
+pub use crate::engine::underexplored_live_families;
+pub use crate::engine::validate_approach_record;
+pub use crate::engine::validate_portfolio_contract;
+pub use crate::engine::validate_portfolio_dispatch;
+pub use crate::engine::validate_portfolio_receipt;
+pub use crate::engine::validate_portfolio_result;
+pub use crate::eval_feedback::EvalFeedbackCandidate;
+pub use crate::eval_feedback::EvalFeedbackCandidateKind;
+pub use crate::eval_feedback::EvalFeedbackDiagnostic;
+pub use crate::eval_feedback::EvalFeedbackDiagnosticKind;
+pub use crate::eval_feedback::EvalFeedbackFingerprint;
+pub use crate::eval_feedback::EvalFeedbackFreshnessDecision;
+pub use crate::eval_feedback::EvalFeedbackFreshnessPolicy;
+pub use crate::eval_feedback::EvalFeedbackOutputFormat;
+pub use crate::eval_feedback::EvalFeedbackPlan;
+pub use crate::eval_feedback::EvalFeedbackReceipt;
+pub use crate::eval_feedback::EvalFeedbackReceiptLeak;
+pub use crate::eval_feedback::EvalFeedbackRedactionState;
+pub use crate::eval_feedback::EvalFeedbackReviewDecision;
+pub use crate::eval_feedback::EvalFeedbackReviewOutcome;
+pub use crate::eval_feedback::EvalFeedbackRunStatus;
+pub use crate::eval_feedback::EvalFeedbackScopeRequest;
+pub use crate::eval_feedback::EvalFeedbackTaskSet;
+pub use crate::eval_feedback::EvalFeedbackTaskSetKind;
+pub use crate::eval_feedback::EvalFeedbackValidationResult;
+pub use crate::eval_feedback::EvalFeedbackVerifierIdentity;
+pub use crate::eval_feedback::blake3_eval_feedback_fingerprint;
+pub use crate::eval_feedback::classify_eval_feedback_freshness;
+pub use crate::eval_feedback::evaluate_feedback_review;
+pub use crate::eval_feedback::validate_eval_feedback_plan;
+pub use crate::eval_feedback::validate_eval_feedback_receipt;
 pub use crate::fabric::LoopFabric;
-pub use crate::fresh_context_tasks::{
-    FreshTaskActionKind, FreshTaskBudget, FreshTaskCancellationReason, FreshTaskDescriptor,
-    FreshTaskDiagnostic, FreshTaskDiagnosticKind, FreshTaskDispatchDecision, FreshTaskFingerprint,
-    FreshTaskInheritance, FreshTaskIsolation, FreshTaskMode, FreshTaskReceipt, FreshTaskResult,
-    FreshTaskResultStatus, FreshTaskSchedulerState, FreshTaskValidationResult,
-    blake3_fresh_task_fingerprint, evaluate_fresh_task_dispatch, evaluate_side_question_action,
-    validate_fresh_task_descriptor, validate_fresh_task_result,
-};
-pub use crate::headless::{
-    AutomationEnvelope, AutomationError, AutomationEventDraft, AutomationEventKind,
-    CompletionReceipt, CompletionReceiptDraft, CompletionStatus, EventPayloadSummary,
-    EventProjection, EventRedaction, EventSequence, FinalOutput, HeadlessCommand,
-    HeadlessCommandDraft, HeadlessCommandKind, HeadlessProtocolError, HeadlessProtocolErrorKind,
-    HeadlessProtocolEvent, HeadlessProtocolEventClass, HeadlessQueueing, HeadlessRecordBatch,
-    HeadlessResponse, HeadlessResponseStatus, HeadlessRuntimePhase, NoninteractiveBehavior,
-    OutputPreference, RunIdentity, RunRequest, RunRequestDraft, RuntimeThreadController,
-    SandboxProfile, StructuredOutputDraft, StructuredOutputFailure, StructuredOutputReport,
-    StructuredOutputStatus, StructuredSchemaDraft, ThreadResume, ThreadResumeDraft, ThreadSnapshot,
-    ThreadStatus, acknowledge_headless_command, build_automation_stream,
-    map_runtime_events_to_headless, parse_headless_command_record, project_event,
-    prompt_required_completion, select_final_output, split_lf_records, summarize_event_payload,
-    validate_structured_output, validate_thread_cancellation, validate_thread_resume,
-};
-pub use crate::hooks::{
-    HookAction, HookBoundary, HookDecision, LifecycleHookCapability, LifecycleHookDefinition,
-    LifecycleHookDefinitionDraft, LifecycleHookDefinitionSource, LifecycleHookEffect,
-    LifecycleHookEffectDraft, LifecycleHookError, LifecycleHookErrorKind, LifecycleHookEventKind,
-    LifecycleHookFailureClass, LifecycleHookInput, LifecycleHookInputDraft,
-    LifecycleHookInputReportDraft, LifecycleHookOutcome, LifecycleHookOutcomeClass,
-    LifecycleHookOutcomeDraft, LifecycleHookOutcomeReportDraft, LifecycleHookOutput,
-    LifecycleHookOutputDraft, LifecycleHookPolicyStatus, LifecycleHookRedaction,
-    LifecycleHookRequest, LifecycleHookRoutePlan, LifecycleHookTrustDecision,
-    LifecycleHookTrustRecord, LifecycleHookTrustRecordDraft, LifecycleHookTrustScope,
-    LifecycleHookTrustStatus, MiddlewareError, RuntimeMiddleware, RuntimeMiddlewareStack,
-    TurnHookEffect, TurnHookError, TurnHookErrorKind, TurnHookEvent, TurnHookOutcome,
-    TurnHookState, TurnHookTransition, advance_turn_hooks, bind_lifecycle_hook_output_to_policy,
-    evaluate_lifecycle_hook_trust, route_lifecycle_hook_requests,
-};
-pub use crate::mailbox::{
-    ActiveWorkReference, ActiveWorkStatus, CancellationHandleClass, CancellationRequest,
-    DispatchAcknowledgementDraft, ImmediateDispatchRequest, InterruptKeyword,
-    InterruptQueueAdmission, InterruptSendMode, InterruptSignalDraft, MessageBudgetClass,
-    MessageDispatch, MessageDispatchAcknowledgementOutcome, MessageEditDraft,
-    MessageItemOperationDraft, MessageQueueError, MessageQueueErrorKind, MessageQueueEvent,
-    MessageQueueOperation, MessageQueueOperationKind, MessageQueuePolicy, MessageQueuePolicyDraft,
-    MessageQueueReceipt, MessageQueueReceiptDraft, MessageQueueState, MessageQueueTransition,
-    MessageRedactionState, MessageReorderDraft, MessageSafetyClass, MessageScopeOperationDraft,
-    PauseRequest, QueueItemEvent, QueuedMessage, QueuedMessageDraft, RedirectionPayload,
-    RedirectionPayloadDraft, UserControlEvent, apply_message_queue_operation,
-    blake3_message_queue_hash, classify_interrupt_signal, validate_message_queue_receipt_text,
-};
-pub use crate::modelprofiles::{
-    MODEL_INVOCATION_PLAN_HASH_DOMAIN, MODEL_INVOCATION_RECEIPT_HASH_DOMAIN,
-    MODEL_RUNTIME_PROFILE_HASH_DOMAIN, MODEL_RUNTIME_PROFILE_SCHEMA,
-    MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN, ModelInvocationAuthority,
-    ModelInvocationCompositionInput, ModelInvocationDiagnostic, ModelInvocationIdentitySnapshot,
-    ModelInvocationOmissionClass, ModelInvocationPlan, ModelInvocationReceipt,
-    ModelInvocationReceiptLeak, ModelInvocationReceiptSensitiveDraft,
-    ModelInvocationSkillReceiptEntry, ModelInvocationToolReceiptEntry,
-    ModelInvocationTransitionDecision, ModelInvocationTransitionKind,
-    ModelInvocationTransitionRequest, ModelMemoryAccessMode, ModelNamedResourceReference,
-    ModelNamedResourceReferenceDraft, ModelProfileAdmissionStatus, ModelProfileEnablementPolicy,
-    ModelProfileSourceScope, ModelProfileSpecificity, ModelProfileTrustStatus,
-    ModelPromptSourceReference, ModelPromptSourceReferenceDraft, ModelResourceCeiling,
-    ModelRuntimeBinding, ModelRuntimeBindingDraft, ModelRuntimeBudgetPolicy,
-    ModelRuntimeBudgetPolicyDraft, ModelRuntimeProfile, ModelRuntimeProfileDraft,
-    ModelRuntimeProfileError, ModelRuntimeProfileIssue, ModelRuntimeProfileResolution,
-    ModelRuntimeProfileSet, ModelRuntimeProfileSetDraft, ModelRuntimeTarget,
-    ModelRuntimeTargetDraft, ModelSkillCompositionResource, ModelSkillPlanEntry,
-    ModelSkillReference, ModelSkillReferenceDraft, ModelSkillResourcePosture, ModelToolCallBinding,
-    ModelToolCallBindingDraft, ModelToolDeclaration, ModelToolset, ModelToolsetDraft,
-    NativeToolCallingMode, ProfileBoundModelDispatchPlan, ResolvedModelRuntimeProfile,
-    bind_model_dispatch_plan, blake3_model_runtime_profile_identity, compose_model_invocation_plan,
-    evaluate_model_invocation_transition, project_model_invocation_receipt,
-    resolve_model_runtime_profile, validate_model_tool_call_binding,
-};
-pub use crate::orchestration::{
-    KanbanBlockRecord, KanbanBoardService, KanbanComment, KanbanCompletion, KanbanContextAssembly,
-    KanbanContextHandoff, KanbanContextItem, KanbanError, KanbanErrorKind, KanbanHeartbeat,
-    KanbanMutationIntent, KanbanPriority, KanbanPromotionDecision, KanbanPromotionOutcome,
-    KanbanQuarantinedHandoff, KanbanTask, KanbanTaskDraft, KanbanTaskGraph, KanbanTaskGraphDraft,
-    KanbanTaskState, KanbanTenantPolicy, KanbanWorkspaceAdmission, KanbanWorkspaceKind,
-    KanbanWorkspaceScope, OrchestrationAdapterBoardService, append_kanban_handoff,
-    assemble_kanban_context, evaluate_kanban_promotion, load_kanban_graph, validate_kanban_graph,
-    validate_kanban_workspace_mutation,
-};
-pub use crate::pi_compaction::{
-    PiBranchHandoffPlan, PiBranchHandoffRequest, PiBranchSummaryMode, PiCompactionDecision,
-    PiCompactionDiagnostic, PiCompactionDiagnosticKind, PiCompactionFingerprint, PiCompactionPlan,
-    PiCompactionPolicy, PiCompactionRedactionBehavior, PiCompactionReplayEntry,
-    PiCompactionReplayEntryKind, PiCompactionSummarizerRequest, PiCompactionSummarizerSelection,
-    PiCompactionSummarizerState, PiCompactionSummaryEntry, PiCompactionSummaryFormat,
-    PiCompactionToolBinding, PiCompactionTrigger, PiCompactionValidationResult,
-    blake3_pi_compaction_fingerprint, evaluate_pi_compaction_trigger,
-    evaluate_required_pi_summarizer, prepare_pi_branch_handoff_summary, prepare_pi_compaction,
-    validate_pi_summary_entry,
-};
-pub use crate::provenance::{
-    ProvenanceActor, ProvenanceArtifact, ProvenanceArtifactDraft, ProvenanceArtifactKind,
-    ProvenanceAuthorizationStatus, ProvenanceBackendRequirement, ProvenanceBranchReport,
-    ProvenanceContentObservation, ProvenanceContentObservationDraft, ProvenanceDiffHunk,
-    ProvenanceError, ProvenanceErrorKind, ProvenanceFact, ProvenanceFactArtifact,
-    ProvenanceFactAuthorization, ProvenanceFactError, ProvenanceFactModelActivity,
-    ProvenanceFactObservation, ProvenanceFactQuery, ProvenanceFactRuntimeBlock,
-    ProvenanceFactToolActivity, ProvenanceFileIdentity, ProvenanceFileIdentityDraft,
-    ProvenanceGitAiAuthorshipLog, ProvenanceGitAiAuthorshipLogDraft,
-    ProvenanceGitAiFileAttestation, ProvenanceGitAiFileAttestationDraft, ProvenanceGitAiMetadata,
-    ProvenanceGitAiMetadataDraft, ProvenanceGraphEntry, ProvenanceLedgerEntry, ProvenanceLineRange,
-    ProvenanceMessageEntry, ProvenanceMutationKind, ProvenanceOpaqueFact, ProvenanceRangeTransform,
-    ProvenanceReceipt, ProvenanceReceiptDraft, ProvenanceRedactionClass, ProvenanceReplay,
-    ProvenanceReplayMessage, ProvenanceReplayMetadata, ProvenanceReplayRole, ProvenanceSafeField,
-    ProvenanceSummaryEntry, ProvenanceToolCheckpoint, ProvenanceToolCheckpointDraft,
-    ProvenanceToolCheckpointReceipt, ProvenanceToolEffect, ProvenanceToolEffectDraft,
-    ProvenanceToolEffectStatus, ProvenanceToolPolicy, ProvenanceToolPolicyDraft,
-    ProvenanceUnsupportedEntry, ProvenanceUsageEntry, ToolpathExportPolicy, ToolpathProjection,
-    ToolpathStep, VersionControlProvenanceBackend, classify_provenance_tool_policy,
-    compress_line_ranges, export_toolpath_projection, query_provenance_facts,
-    record_provenance_checkpoint, remove_line_ranges, replay_provenance_ledger,
-    transform_line_ranges, validate_provenance_graph, validate_vcs_neutral_field_names,
-};
-pub use crate::provider_hardening::{
-    ModelCapabilityDecisionStatus, ModelCapabilityDowngrade, ModelCapabilityDowngradePolicy,
-    ModelCapabilityIssue, ModelCapabilityIssueKind, ModelCapabilityNegotiationDecision,
-    ModelCapabilityNegotiationInput, ProviderApiStyle, ProviderApiStylePolicy, ProviderDiagnostic,
-    ProviderDiagnosticKind, ProviderEndpointSensitivity, ProviderExtraBodyDescriptor,
-    ProviderHeaderDescriptor, ProviderHeaderResolution, ProviderHeaderValueSource,
-    ProviderModelCapabilityMatrix, ProviderModelClass, ProviderModelContentPartClass,
-    ProviderModelMetadata, ProviderPrivacyPosture, ProviderSecretSourceReference,
-    ProviderSelectionReceipt, ProviderSelectionReceiptInput, ProviderStreamBudgetKind,
-    ProviderStreamChannel, ProviderStreamParseFailure, ProviderStreamParseFailureKind,
-    ProviderStreamParseFailureReport, ProviderStreamParseReport, ProviderStreamParserBudget,
-    ProviderStreamParserInput, ProviderStreamParserInventoryEntry, ProviderStreamParserReceipt,
-    ProviderStreamParserStatus, ProviderStructuredOutputMode, ProviderValidationResult,
-    blake3_provider_hardening_fingerprint, filter_agent_model, negotiate_model_capability,
-    parse_provider_stream_chunks, provider_selection_receipt, provider_stream_parser_inventory,
-    resolve_extra_body_descriptor, resolve_provider_api_style, validate_model_capability_matrix,
-    validate_provider_header, validate_provider_stream_parser_inventory,
-    validate_provider_stream_parser_receipt,
-};
-pub use crate::quality_records::{
-    QualityAgentsGuidanceError, QualityAgentsGuidancePage, QualityAnnotationBody,
-    QualityDependencyIsolationReport, QualityDependencyRequirement, QualityDiagnostic,
-    QualityDiagnosticKind, QualityEditReport, QualityFingerprint, QualityFreshness,
-    QualityIssuerClassification, QualityLifecycleReport, QualityMetadataField, QualityRecordBody,
-    QualityRecordEnvelope, QualityRecordKind, QualitySidecarExport, QualitySpan,
-    QualitySpanFreshnessReport, QualityUnknownSidecarRecord, QualityValidationResult,
-    active_quality_records, blake3_quality_fingerprint, classify_quality_span_freshness,
-    export_quality_sidecar_record, quality_dependency_isolation_report, quality_record_id,
-    report_quality_after_edit, resolve_quality_agents_guidance, roundtrip_unknown_sidecar_record,
-    validate_quality_record,
-};
-pub use crate::researchspec::{
-    ResearchSpecArchiveConclusion, ResearchSpecBaselineEvidence, ResearchSpecCheckResult,
-    ResearchSpecCheckStatus, ResearchSpecDiagnostic, ResearchSpecDiagnosticKind,
-    ResearchSpecFingerprint, ResearchSpecGuardedFingerprint, ResearchSpecHypothesis,
-    ResearchSpecHypothesisDecision, ResearchSpecKeepDecision, ResearchSpecKeepOutcome,
-    ResearchSpecMeasurementRisk, ResearchSpecMetricDirection, ResearchSpecMetricSample,
-    ResearchSpecMetricValue, ResearchSpecPromotionDecision, ResearchSpecPromotionGroup,
-    ResearchSpecPromotionOutcome, ResearchSpecProvenance, ResearchSpecRunEvidence,
-    ResearchSpecRunStatus, ResearchSpecStudyContract, ResearchSpecThresholdPolicy,
-    ResearchSpecValidationResult, ResearchSpecWorkloadIdentity, blake3_researchspec_fingerprint,
-    evaluate_research_keep_gate, evaluate_research_promotion_groups, validate_research_archive,
-    validate_research_baseline, validate_research_hypothesis, validate_research_run,
-    validate_research_study_contract,
-};
-pub use crate::runtime_dag::{
-    RuntimeDagBlockedNode, RuntimeDagBounds, RuntimeDagEdge, RuntimeDagGraph, RuntimeDagIssueKind,
-    RuntimeDagNode, RuntimeDagReceipt, RuntimeDagReceiptLeak, RuntimeDagRedactionStatus,
-    RuntimeDagTopologicalBatch, RuntimeDagTopologicalPlan, RuntimeDagValidationIssue,
-    RuntimeDagValidationReport, blake3_runtime_dag_fingerprint, explain_runtime_dag_blocked_nodes,
-    plan_runtime_dag_topology, project_runtime_dag_receipt, validate_runtime_dag_graph,
-    validate_runtime_dag_receipt,
-};
-pub use crate::scaffold::{
-    ScaffoldAdmissionDecision, ScaffoldAdmissionEffect, ScaffoldAdmissionOutcome,
-    ScaffoldAdmissionRequest, ScaffoldDiagnostic, ScaffoldDiagnosticKind, ScaffoldFingerprint,
-    ScaffoldInfluenceReceipt, ScaffoldInfluenceValidationOutcome, ScaffoldProfile,
-    ScaffoldProfileProvenance, ScaffoldReceiptSensitiveEvidence, ScaffoldReviewStatus,
-    ScaffoldRevision, ScaffoldRevisionProposal, ScaffoldSelectionOutcome, ScaffoldSelectionPlan,
-    ScaffoldSelectionRequest, ScaffoldStrategyKnob, ScaffoldValidationResult,
-    apply_scaffold_admission, blake3_scaffold_fingerprint, select_scaffold_profile,
-    validate_scaffold_influence_receipt, validate_scaffold_profile,
-};
-pub use crate::shell::{RuntimeAdapters, run_agent_loop};
+pub use crate::fresh_context_tasks::FreshTaskActionKind;
+pub use crate::fresh_context_tasks::FreshTaskBudget;
+pub use crate::fresh_context_tasks::FreshTaskCancellationReason;
+pub use crate::fresh_context_tasks::FreshTaskDescriptor;
+pub use crate::fresh_context_tasks::FreshTaskDiagnostic;
+pub use crate::fresh_context_tasks::FreshTaskDiagnosticKind;
+pub use crate::fresh_context_tasks::FreshTaskDispatchDecision;
+pub use crate::fresh_context_tasks::FreshTaskFingerprint;
+pub use crate::fresh_context_tasks::FreshTaskInheritance;
+pub use crate::fresh_context_tasks::FreshTaskIsolation;
+pub use crate::fresh_context_tasks::FreshTaskMode;
+pub use crate::fresh_context_tasks::FreshTaskReceipt;
+pub use crate::fresh_context_tasks::FreshTaskResult;
+pub use crate::fresh_context_tasks::FreshTaskResultStatus;
+pub use crate::fresh_context_tasks::FreshTaskSchedulerState;
+pub use crate::fresh_context_tasks::FreshTaskValidationResult;
+pub use crate::fresh_context_tasks::blake3_fresh_task_fingerprint;
+pub use crate::fresh_context_tasks::evaluate_fresh_task_dispatch;
+pub use crate::fresh_context_tasks::evaluate_side_question_action;
+pub use crate::fresh_context_tasks::validate_fresh_task_descriptor;
+pub use crate::fresh_context_tasks::validate_fresh_task_result;
+pub use crate::headless::AutomationEnvelope;
+pub use crate::headless::AutomationError;
+pub use crate::headless::AutomationEventDraft;
+pub use crate::headless::AutomationEventKind;
+pub use crate::headless::CompletionReceipt;
+pub use crate::headless::CompletionReceiptDraft;
+pub use crate::headless::CompletionStatus;
+pub use crate::headless::EventPayloadSummary;
+pub use crate::headless::EventProjection;
+pub use crate::headless::EventRedaction;
+pub use crate::headless::EventSequence;
+pub use crate::headless::FinalOutput;
+pub use crate::headless::HeadlessCommand;
+pub use crate::headless::HeadlessCommandDraft;
+pub use crate::headless::HeadlessCommandKind;
+pub use crate::headless::HeadlessProtocolError;
+pub use crate::headless::HeadlessProtocolErrorKind;
+pub use crate::headless::HeadlessProtocolEvent;
+pub use crate::headless::HeadlessProtocolEventClass;
+pub use crate::headless::HeadlessQueueing;
+pub use crate::headless::HeadlessRecordBatch;
+pub use crate::headless::HeadlessResponse;
+pub use crate::headless::HeadlessResponseStatus;
+pub use crate::headless::HeadlessRuntimePhase;
+pub use crate::headless::NoninteractiveBehavior;
+pub use crate::headless::OutputPreference;
+pub use crate::headless::RunIdentity;
+pub use crate::headless::RunRequest;
+pub use crate::headless::RunRequestDraft;
+pub use crate::headless::RuntimeThreadController;
+pub use crate::headless::SandboxProfile;
+pub use crate::headless::StructuredOutputDraft;
+pub use crate::headless::StructuredOutputFailure;
+pub use crate::headless::StructuredOutputReport;
+pub use crate::headless::StructuredOutputStatus;
+pub use crate::headless::StructuredSchemaDraft;
+pub use crate::headless::ThreadResume;
+pub use crate::headless::ThreadResumeDraft;
+pub use crate::headless::ThreadSnapshot;
+pub use crate::headless::ThreadStatus;
+pub use crate::headless::acknowledge_headless_command;
+pub use crate::headless::build_automation_stream;
+pub use crate::headless::map_runtime_events_to_headless;
+pub use crate::headless::parse_headless_command_record;
+pub use crate::headless::project_event;
+pub use crate::headless::prompt_required_completion;
+pub use crate::headless::select_final_output;
+pub use crate::headless::split_lf_records;
+pub use crate::headless::summarize_event_payload;
+pub use crate::headless::validate_structured_output;
+pub use crate::headless::validate_thread_cancellation;
+pub use crate::headless::validate_thread_resume;
+pub use crate::hooks::HookAction;
+pub use crate::hooks::HookBoundary;
+pub use crate::hooks::HookDecision;
+pub use crate::hooks::LifecycleHookCapability;
+pub use crate::hooks::LifecycleHookDefinition;
+pub use crate::hooks::LifecycleHookDefinitionDraft;
+pub use crate::hooks::LifecycleHookDefinitionSource;
+pub use crate::hooks::LifecycleHookEffect;
+pub use crate::hooks::LifecycleHookEffectDraft;
+pub use crate::hooks::LifecycleHookError;
+pub use crate::hooks::LifecycleHookErrorKind;
+pub use crate::hooks::LifecycleHookEventKind;
+pub use crate::hooks::LifecycleHookFailureClass;
+pub use crate::hooks::LifecycleHookInput;
+pub use crate::hooks::LifecycleHookInputDraft;
+pub use crate::hooks::LifecycleHookInputReportDraft;
+pub use crate::hooks::LifecycleHookOutcome;
+pub use crate::hooks::LifecycleHookOutcomeClass;
+pub use crate::hooks::LifecycleHookOutcomeDraft;
+pub use crate::hooks::LifecycleHookOutcomeReportDraft;
+pub use crate::hooks::LifecycleHookOutput;
+pub use crate::hooks::LifecycleHookOutputDraft;
+pub use crate::hooks::LifecycleHookPolicyStatus;
+pub use crate::hooks::LifecycleHookRedaction;
+pub use crate::hooks::LifecycleHookRequest;
+pub use crate::hooks::LifecycleHookRoutePlan;
+pub use crate::hooks::LifecycleHookTrustDecision;
+pub use crate::hooks::LifecycleHookTrustRecord;
+pub use crate::hooks::LifecycleHookTrustRecordDraft;
+pub use crate::hooks::LifecycleHookTrustScope;
+pub use crate::hooks::LifecycleHookTrustStatus;
+pub use crate::hooks::MiddlewareError;
+pub use crate::hooks::RuntimeMiddleware;
+pub use crate::hooks::RuntimeMiddlewareStack;
+pub use crate::hooks::TurnHookEffect;
+pub use crate::hooks::TurnHookError;
+pub use crate::hooks::TurnHookErrorKind;
+pub use crate::hooks::TurnHookEvent;
+pub use crate::hooks::TurnHookOutcome;
+pub use crate::hooks::TurnHookState;
+pub use crate::hooks::TurnHookTransition;
+pub use crate::hooks::advance_turn_hooks;
+pub use crate::hooks::bind_lifecycle_hook_output_to_policy;
+pub use crate::hooks::evaluate_lifecycle_hook_trust;
+pub use crate::hooks::route_lifecycle_hook_requests;
+pub use crate::mailbox::ActiveWorkReference;
+pub use crate::mailbox::ActiveWorkStatus;
+pub use crate::mailbox::CancellationHandleClass;
+pub use crate::mailbox::CancellationRequest;
+pub use crate::mailbox::DispatchAcknowledgementDraft;
+pub use crate::mailbox::ImmediateDispatchRequest;
+pub use crate::mailbox::InterruptKeyword;
+pub use crate::mailbox::InterruptQueueAdmission;
+pub use crate::mailbox::InterruptSendMode;
+pub use crate::mailbox::InterruptSignalDraft;
+pub use crate::mailbox::MessageBudgetClass;
+pub use crate::mailbox::MessageDispatch;
+pub use crate::mailbox::MessageDispatchAcknowledgementOutcome;
+pub use crate::mailbox::MessageEditDraft;
+pub use crate::mailbox::MessageItemOperationDraft;
+pub use crate::mailbox::MessageQueueError;
+pub use crate::mailbox::MessageQueueErrorKind;
+pub use crate::mailbox::MessageQueueEvent;
+pub use crate::mailbox::MessageQueueOperation;
+pub use crate::mailbox::MessageQueueOperationKind;
+pub use crate::mailbox::MessageQueuePolicy;
+pub use crate::mailbox::MessageQueuePolicyDraft;
+pub use crate::mailbox::MessageQueueReceipt;
+pub use crate::mailbox::MessageQueueReceiptDraft;
+pub use crate::mailbox::MessageQueueState;
+pub use crate::mailbox::MessageQueueTransition;
+pub use crate::mailbox::MessageRedactionState;
+pub use crate::mailbox::MessageReorderDraft;
+pub use crate::mailbox::MessageSafetyClass;
+pub use crate::mailbox::MessageScopeOperationDraft;
+pub use crate::mailbox::PauseRequest;
+pub use crate::mailbox::QueueItemEvent;
+pub use crate::mailbox::QueuedMessage;
+pub use crate::mailbox::QueuedMessageDraft;
+pub use crate::mailbox::RedirectionPayload;
+pub use crate::mailbox::RedirectionPayloadDraft;
+pub use crate::mailbox::UserControlEvent;
+pub use crate::mailbox::apply_message_queue_operation;
+pub use crate::mailbox::blake3_message_queue_hash;
+pub use crate::mailbox::classify_interrupt_signal;
+pub use crate::mailbox::validate_message_queue_receipt_text;
+pub use crate::modelprofiles::MODEL_INVOCATION_PLAN_HASH_DOMAIN;
+pub use crate::modelprofiles::MODEL_INVOCATION_RECEIPT_HASH_DOMAIN;
+pub use crate::modelprofiles::MODEL_RUNTIME_PROFILE_HASH_DOMAIN;
+pub use crate::modelprofiles::MODEL_RUNTIME_PROFILE_SCHEMA;
+pub use crate::modelprofiles::MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN;
+pub use crate::modelprofiles::ModelInvocationAuthority;
+pub use crate::modelprofiles::ModelInvocationCompositionInput;
+pub use crate::modelprofiles::ModelInvocationDiagnostic;
+pub use crate::modelprofiles::ModelInvocationIdentitySnapshot;
+pub use crate::modelprofiles::ModelInvocationOmissionClass;
+pub use crate::modelprofiles::ModelInvocationPlan;
+pub use crate::modelprofiles::ModelInvocationReceipt;
+pub use crate::modelprofiles::ModelInvocationReceiptLeak;
+pub use crate::modelprofiles::ModelInvocationReceiptSensitiveDraft;
+pub use crate::modelprofiles::ModelInvocationSkillReceiptEntry;
+pub use crate::modelprofiles::ModelInvocationToolReceiptEntry;
+pub use crate::modelprofiles::ModelInvocationTransitionDecision;
+pub use crate::modelprofiles::ModelInvocationTransitionKind;
+pub use crate::modelprofiles::ModelInvocationTransitionRequest;
+pub use crate::modelprofiles::ModelMemoryAccessMode;
+pub use crate::modelprofiles::ModelNamedResourceReference;
+pub use crate::modelprofiles::ModelNamedResourceReferenceDraft;
+pub use crate::modelprofiles::ModelProfileAdmissionStatus;
+pub use crate::modelprofiles::ModelProfileEnablementPolicy;
+pub use crate::modelprofiles::ModelProfileSourceScope;
+pub use crate::modelprofiles::ModelProfileSpecificity;
+pub use crate::modelprofiles::ModelProfileTrustStatus;
+pub use crate::modelprofiles::ModelPromptSourceReference;
+pub use crate::modelprofiles::ModelPromptSourceReferenceDraft;
+pub use crate::modelprofiles::ModelResourceCeiling;
+pub use crate::modelprofiles::ModelRuntimeBinding;
+pub use crate::modelprofiles::ModelRuntimeBindingDraft;
+pub use crate::modelprofiles::ModelRuntimeBudgetPolicy;
+pub use crate::modelprofiles::ModelRuntimeBudgetPolicyDraft;
+pub use crate::modelprofiles::ModelRuntimeProfile;
+pub use crate::modelprofiles::ModelRuntimeProfileDraft;
+pub use crate::modelprofiles::ModelRuntimeProfileError;
+pub use crate::modelprofiles::ModelRuntimeProfileIssue;
+pub use crate::modelprofiles::ModelRuntimeProfileResolution;
+pub use crate::modelprofiles::ModelRuntimeProfileSet;
+pub use crate::modelprofiles::ModelRuntimeProfileSetDraft;
+pub use crate::modelprofiles::ModelRuntimeTarget;
+pub use crate::modelprofiles::ModelRuntimeTargetDraft;
+pub use crate::modelprofiles::ModelSkillCompositionResource;
+pub use crate::modelprofiles::ModelSkillPlanEntry;
+pub use crate::modelprofiles::ModelSkillReference;
+pub use crate::modelprofiles::ModelSkillReferenceDraft;
+pub use crate::modelprofiles::ModelSkillResourcePosture;
+pub use crate::modelprofiles::ModelToolCallBinding;
+pub use crate::modelprofiles::ModelToolCallBindingDraft;
+pub use crate::modelprofiles::ModelToolDeclaration;
+pub use crate::modelprofiles::ModelToolset;
+pub use crate::modelprofiles::ModelToolsetDraft;
+pub use crate::modelprofiles::NativeToolCallingMode;
+pub use crate::modelprofiles::ProfileBoundModelDispatchPlan;
+pub use crate::modelprofiles::ResolvedModelRuntimeProfile;
+pub use crate::modelprofiles::bind_model_dispatch_plan;
+pub use crate::modelprofiles::blake3_model_runtime_profile_identity;
+pub use crate::modelprofiles::compose_model_invocation_plan;
+pub use crate::modelprofiles::evaluate_model_invocation_transition;
+pub use crate::modelprofiles::project_model_invocation_receipt;
+pub use crate::modelprofiles::resolve_model_runtime_profile;
+pub use crate::modelprofiles::validate_model_tool_call_binding;
+pub use crate::orchestration::KanbanBlockRecord;
+pub use crate::orchestration::KanbanBoardService;
+pub use crate::orchestration::KanbanComment;
+pub use crate::orchestration::KanbanCompletion;
+pub use crate::orchestration::KanbanContextAssembly;
+pub use crate::orchestration::KanbanContextHandoff;
+pub use crate::orchestration::KanbanContextItem;
+pub use crate::orchestration::KanbanError;
+pub use crate::orchestration::KanbanErrorKind;
+pub use crate::orchestration::KanbanHeartbeat;
+pub use crate::orchestration::KanbanMutationIntent;
+pub use crate::orchestration::KanbanPriority;
+pub use crate::orchestration::KanbanPromotionDecision;
+pub use crate::orchestration::KanbanPromotionOutcome;
+pub use crate::orchestration::KanbanQuarantinedHandoff;
+pub use crate::orchestration::KanbanTask;
+pub use crate::orchestration::KanbanTaskDraft;
+pub use crate::orchestration::KanbanTaskGraph;
+pub use crate::orchestration::KanbanTaskGraphDraft;
+pub use crate::orchestration::KanbanTaskState;
+pub use crate::orchestration::KanbanTenantPolicy;
+pub use crate::orchestration::KanbanWorkspaceAdmission;
+pub use crate::orchestration::KanbanWorkspaceKind;
+pub use crate::orchestration::KanbanWorkspaceScope;
+pub use crate::orchestration::OrchestrationAdapterBoardService;
+pub use crate::orchestration::append_kanban_handoff;
+pub use crate::orchestration::assemble_kanban_context;
+pub use crate::orchestration::evaluate_kanban_promotion;
+pub use crate::orchestration::load_kanban_graph;
+pub use crate::orchestration::validate_kanban_graph;
+pub use crate::orchestration::validate_kanban_workspace_mutation;
+pub use crate::pi_compaction::PiBranchHandoffPlan;
+pub use crate::pi_compaction::PiBranchHandoffRequest;
+pub use crate::pi_compaction::PiBranchSummaryMode;
+pub use crate::pi_compaction::PiCompactionDecision;
+pub use crate::pi_compaction::PiCompactionDiagnostic;
+pub use crate::pi_compaction::PiCompactionDiagnosticKind;
+pub use crate::pi_compaction::PiCompactionFingerprint;
+pub use crate::pi_compaction::PiCompactionPlan;
+pub use crate::pi_compaction::PiCompactionPolicy;
+pub use crate::pi_compaction::PiCompactionRedactionBehavior;
+pub use crate::pi_compaction::PiCompactionReplayEntry;
+pub use crate::pi_compaction::PiCompactionReplayEntryKind;
+pub use crate::pi_compaction::PiCompactionSummarizerRequest;
+pub use crate::pi_compaction::PiCompactionSummarizerSelection;
+pub use crate::pi_compaction::PiCompactionSummarizerState;
+pub use crate::pi_compaction::PiCompactionSummaryEntry;
+pub use crate::pi_compaction::PiCompactionSummaryFormat;
+pub use crate::pi_compaction::PiCompactionToolBinding;
+pub use crate::pi_compaction::PiCompactionTrigger;
+pub use crate::pi_compaction::PiCompactionValidationResult;
+pub use crate::pi_compaction::blake3_pi_compaction_fingerprint;
+pub use crate::pi_compaction::evaluate_pi_compaction_trigger;
+pub use crate::pi_compaction::evaluate_required_pi_summarizer;
+pub use crate::pi_compaction::prepare_pi_branch_handoff_summary;
+pub use crate::pi_compaction::prepare_pi_compaction;
+pub use crate::pi_compaction::validate_pi_summary_entry;
+pub use crate::provenance::ProvenanceActor;
+pub use crate::provenance::ProvenanceArtifact;
+pub use crate::provenance::ProvenanceArtifactDraft;
+pub use crate::provenance::ProvenanceArtifactKind;
+pub use crate::provenance::ProvenanceAuthorizationStatus;
+pub use crate::provenance::ProvenanceBackendRequirement;
+pub use crate::provenance::ProvenanceBranchReport;
+pub use crate::provenance::ProvenanceContentObservation;
+pub use crate::provenance::ProvenanceContentObservationDraft;
+pub use crate::provenance::ProvenanceDiffHunk;
+pub use crate::provenance::ProvenanceError;
+pub use crate::provenance::ProvenanceErrorKind;
+pub use crate::provenance::ProvenanceFact;
+pub use crate::provenance::ProvenanceFactArtifact;
+pub use crate::provenance::ProvenanceFactAuthorization;
+pub use crate::provenance::ProvenanceFactError;
+pub use crate::provenance::ProvenanceFactModelActivity;
+pub use crate::provenance::ProvenanceFactObservation;
+pub use crate::provenance::ProvenanceFactQuery;
+pub use crate::provenance::ProvenanceFactRuntimeBlock;
+pub use crate::provenance::ProvenanceFactToolActivity;
+pub use crate::provenance::ProvenanceFileIdentity;
+pub use crate::provenance::ProvenanceFileIdentityDraft;
+pub use crate::provenance::ProvenanceGitAiAuthorshipLog;
+pub use crate::provenance::ProvenanceGitAiAuthorshipLogDraft;
+pub use crate::provenance::ProvenanceGitAiFileAttestation;
+pub use crate::provenance::ProvenanceGitAiFileAttestationDraft;
+pub use crate::provenance::ProvenanceGitAiMetadata;
+pub use crate::provenance::ProvenanceGitAiMetadataDraft;
+pub use crate::provenance::ProvenanceGraphEntry;
+pub use crate::provenance::ProvenanceLedgerEntry;
+pub use crate::provenance::ProvenanceLineRange;
+pub use crate::provenance::ProvenanceMessageEntry;
+pub use crate::provenance::ProvenanceMutationKind;
+pub use crate::provenance::ProvenanceOpaqueFact;
+pub use crate::provenance::ProvenanceRangeTransform;
+pub use crate::provenance::ProvenanceReceipt;
+pub use crate::provenance::ProvenanceReceiptDraft;
+pub use crate::provenance::ProvenanceRedactionClass;
+pub use crate::provenance::ProvenanceReplay;
+pub use crate::provenance::ProvenanceReplayMessage;
+pub use crate::provenance::ProvenanceReplayMetadata;
+pub use crate::provenance::ProvenanceReplayRole;
+pub use crate::provenance::ProvenanceSafeField;
+pub use crate::provenance::ProvenanceSummaryEntry;
+pub use crate::provenance::ProvenanceToolCheckpoint;
+pub use crate::provenance::ProvenanceToolCheckpointDraft;
+pub use crate::provenance::ProvenanceToolCheckpointReceipt;
+pub use crate::provenance::ProvenanceToolEffect;
+pub use crate::provenance::ProvenanceToolEffectDraft;
+pub use crate::provenance::ProvenanceToolEffectStatus;
+pub use crate::provenance::ProvenanceToolPolicy;
+pub use crate::provenance::ProvenanceToolPolicyDraft;
+pub use crate::provenance::ProvenanceUnsupportedEntry;
+pub use crate::provenance::ProvenanceUsageEntry;
+pub use crate::provenance::ToolpathExportPolicy;
+pub use crate::provenance::ToolpathProjection;
+pub use crate::provenance::ToolpathStep;
+pub use crate::provenance::VersionControlProvenanceBackend;
+pub use crate::provenance::classify_provenance_tool_policy;
+pub use crate::provenance::compress_line_ranges;
+pub use crate::provenance::export_toolpath_projection;
+pub use crate::provenance::query_provenance_facts;
+pub use crate::provenance::record_provenance_checkpoint;
+pub use crate::provenance::remove_line_ranges;
+pub use crate::provenance::replay_provenance_ledger;
+pub use crate::provenance::transform_line_ranges;
+pub use crate::provenance::validate_provenance_graph;
+pub use crate::provenance::validate_vcs_neutral_field_names;
+pub use crate::provider_hardening::ModelCapabilityDecisionStatus;
+pub use crate::provider_hardening::ModelCapabilityDowngrade;
+pub use crate::provider_hardening::ModelCapabilityDowngradePolicy;
+pub use crate::provider_hardening::ModelCapabilityIssue;
+pub use crate::provider_hardening::ModelCapabilityIssueKind;
+pub use crate::provider_hardening::ModelCapabilityNegotiationDecision;
+pub use crate::provider_hardening::ModelCapabilityNegotiationInput;
+pub use crate::provider_hardening::ProviderApiStyle;
+pub use crate::provider_hardening::ProviderApiStylePolicy;
+pub use crate::provider_hardening::ProviderDiagnostic;
+pub use crate::provider_hardening::ProviderDiagnosticKind;
+pub use crate::provider_hardening::ProviderEndpointSensitivity;
+pub use crate::provider_hardening::ProviderExtraBodyDescriptor;
+pub use crate::provider_hardening::ProviderHeaderDescriptor;
+pub use crate::provider_hardening::ProviderHeaderResolution;
+pub use crate::provider_hardening::ProviderHeaderValueSource;
+pub use crate::provider_hardening::ProviderModelCapabilityMatrix;
+pub use crate::provider_hardening::ProviderModelClass;
+pub use crate::provider_hardening::ProviderModelContentPartClass;
+pub use crate::provider_hardening::ProviderModelMetadata;
+pub use crate::provider_hardening::ProviderPrivacyPosture;
+pub use crate::provider_hardening::ProviderSecretSourceReference;
+pub use crate::provider_hardening::ProviderSelectionReceipt;
+pub use crate::provider_hardening::ProviderSelectionReceiptInput;
+pub use crate::provider_hardening::ProviderStreamBudgetKind;
+pub use crate::provider_hardening::ProviderStreamChannel;
+pub use crate::provider_hardening::ProviderStreamParseFailure;
+pub use crate::provider_hardening::ProviderStreamParseFailureKind;
+pub use crate::provider_hardening::ProviderStreamParseFailureReport;
+pub use crate::provider_hardening::ProviderStreamParseReport;
+pub use crate::provider_hardening::ProviderStreamParserBudget;
+pub use crate::provider_hardening::ProviderStreamParserInput;
+pub use crate::provider_hardening::ProviderStreamParserInventoryEntry;
+pub use crate::provider_hardening::ProviderStreamParserReceipt;
+pub use crate::provider_hardening::ProviderStreamParserStatus;
+pub use crate::provider_hardening::ProviderStructuredOutputMode;
+pub use crate::provider_hardening::ProviderValidationResult;
+pub use crate::provider_hardening::blake3_provider_hardening_fingerprint;
+pub use crate::provider_hardening::filter_agent_model;
+pub use crate::provider_hardening::negotiate_model_capability;
+pub use crate::provider_hardening::parse_provider_stream_chunks;
+pub use crate::provider_hardening::provider_selection_receipt;
+pub use crate::provider_hardening::provider_stream_parser_inventory;
+pub use crate::provider_hardening::resolve_extra_body_descriptor;
+pub use crate::provider_hardening::resolve_provider_api_style;
+pub use crate::provider_hardening::validate_model_capability_matrix;
+pub use crate::provider_hardening::validate_provider_header;
+pub use crate::provider_hardening::validate_provider_stream_parser_inventory;
+pub use crate::provider_hardening::validate_provider_stream_parser_receipt;
+pub use crate::quality_records::QualityAgentsGuidanceError;
+pub use crate::quality_records::QualityAgentsGuidancePage;
+pub use crate::quality_records::QualityAnnotationBody;
+pub use crate::quality_records::QualityDependencyIsolationReport;
+pub use crate::quality_records::QualityDependencyRequirement;
+pub use crate::quality_records::QualityDiagnostic;
+pub use crate::quality_records::QualityDiagnosticKind;
+pub use crate::quality_records::QualityEditReport;
+pub use crate::quality_records::QualityFingerprint;
+pub use crate::quality_records::QualityFreshness;
+pub use crate::quality_records::QualityIssuerClassification;
+pub use crate::quality_records::QualityLifecycleReport;
+pub use crate::quality_records::QualityMetadataField;
+pub use crate::quality_records::QualityRecordBody;
+pub use crate::quality_records::QualityRecordEnvelope;
+pub use crate::quality_records::QualityRecordKind;
+pub use crate::quality_records::QualitySidecarExport;
+pub use crate::quality_records::QualitySpan;
+pub use crate::quality_records::QualitySpanFreshnessReport;
+pub use crate::quality_records::QualityUnknownSidecarRecord;
+pub use crate::quality_records::QualityValidationResult;
+pub use crate::quality_records::active_quality_records;
+pub use crate::quality_records::blake3_quality_fingerprint;
+pub use crate::quality_records::classify_quality_span_freshness;
+pub use crate::quality_records::export_quality_sidecar_record;
+pub use crate::quality_records::quality_dependency_isolation_report;
+pub use crate::quality_records::quality_record_id;
+pub use crate::quality_records::report_quality_after_edit;
+pub use crate::quality_records::resolve_quality_agents_guidance;
+pub use crate::quality_records::roundtrip_unknown_sidecar_record;
+pub use crate::quality_records::validate_quality_record;
+pub use crate::researchspec::ResearchSpecArchiveConclusion;
+pub use crate::researchspec::ResearchSpecBaselineEvidence;
+pub use crate::researchspec::ResearchSpecCheckResult;
+pub use crate::researchspec::ResearchSpecCheckStatus;
+pub use crate::researchspec::ResearchSpecDiagnostic;
+pub use crate::researchspec::ResearchSpecDiagnosticKind;
+pub use crate::researchspec::ResearchSpecFingerprint;
+pub use crate::researchspec::ResearchSpecGuardedFingerprint;
+pub use crate::researchspec::ResearchSpecHypothesis;
+pub use crate::researchspec::ResearchSpecHypothesisDecision;
+pub use crate::researchspec::ResearchSpecKeepDecision;
+pub use crate::researchspec::ResearchSpecKeepOutcome;
+pub use crate::researchspec::ResearchSpecMeasurementRisk;
+pub use crate::researchspec::ResearchSpecMetricDirection;
+pub use crate::researchspec::ResearchSpecMetricSample;
+pub use crate::researchspec::ResearchSpecMetricValue;
+pub use crate::researchspec::ResearchSpecPromotionDecision;
+pub use crate::researchspec::ResearchSpecPromotionGroup;
+pub use crate::researchspec::ResearchSpecPromotionOutcome;
+pub use crate::researchspec::ResearchSpecProvenance;
+pub use crate::researchspec::ResearchSpecRunEvidence;
+pub use crate::researchspec::ResearchSpecRunStatus;
+pub use crate::researchspec::ResearchSpecStudyContract;
+pub use crate::researchspec::ResearchSpecThresholdPolicy;
+pub use crate::researchspec::ResearchSpecValidationResult;
+pub use crate::researchspec::ResearchSpecWorkloadIdentity;
+pub use crate::researchspec::blake3_researchspec_fingerprint;
+pub use crate::researchspec::evaluate_research_keep_gate;
+pub use crate::researchspec::evaluate_research_promotion_groups;
+pub use crate::researchspec::validate_research_archive;
+pub use crate::researchspec::validate_research_baseline;
+pub use crate::researchspec::validate_research_hypothesis;
+pub use crate::researchspec::validate_research_run;
+pub use crate::researchspec::validate_research_study_contract;
+pub use crate::runstate::AgentControlCheckpointDecision;
+pub use crate::runstate::AgentControlCheckpointTransition;
+pub use crate::runstate::AgentControlCommandDisposition;
+pub use crate::runstate::AgentControlCommandTransition;
+pub use crate::runstate::AgentControlReductionError;
+pub use crate::runstate::AgentControlState;
+pub use crate::runstate::AgentControlTerminalTransition;
+pub use crate::runstate::reduce_agent_control_checkpoint;
+pub use crate::runstate::reduce_agent_control_command;
+pub use crate::runstate::reduce_agent_control_terminal;
+pub use crate::runtime_dag::RuntimeDagBlockedNode;
+pub use crate::runtime_dag::RuntimeDagBounds;
+pub use crate::runtime_dag::RuntimeDagEdge;
+pub use crate::runtime_dag::RuntimeDagGraph;
+pub use crate::runtime_dag::RuntimeDagIssueKind;
+pub use crate::runtime_dag::RuntimeDagNode;
+pub use crate::runtime_dag::RuntimeDagReceipt;
+pub use crate::runtime_dag::RuntimeDagReceiptLeak;
+pub use crate::runtime_dag::RuntimeDagRedactionStatus;
+pub use crate::runtime_dag::RuntimeDagTopologicalBatch;
+pub use crate::runtime_dag::RuntimeDagTopologicalPlan;
+pub use crate::runtime_dag::RuntimeDagValidationIssue;
+pub use crate::runtime_dag::RuntimeDagValidationReport;
+pub use crate::runtime_dag::blake3_runtime_dag_fingerprint;
+pub use crate::runtime_dag::explain_runtime_dag_blocked_nodes;
+pub use crate::runtime_dag::plan_runtime_dag_topology;
+pub use crate::runtime_dag::project_runtime_dag_receipt;
+pub use crate::runtime_dag::validate_runtime_dag_graph;
+pub use crate::runtime_dag::validate_runtime_dag_receipt;
+pub use crate::scaffold::ScaffoldAdmissionDecision;
+pub use crate::scaffold::ScaffoldAdmissionEffect;
+pub use crate::scaffold::ScaffoldAdmissionOutcome;
+pub use crate::scaffold::ScaffoldAdmissionRequest;
+pub use crate::scaffold::ScaffoldDiagnostic;
+pub use crate::scaffold::ScaffoldDiagnosticKind;
+pub use crate::scaffold::ScaffoldFingerprint;
+pub use crate::scaffold::ScaffoldInfluenceReceipt;
+pub use crate::scaffold::ScaffoldInfluenceValidationOutcome;
+pub use crate::scaffold::ScaffoldProfile;
+pub use crate::scaffold::ScaffoldProfileProvenance;
+pub use crate::scaffold::ScaffoldReceiptSensitiveEvidence;
+pub use crate::scaffold::ScaffoldReviewStatus;
+pub use crate::scaffold::ScaffoldRevision;
+pub use crate::scaffold::ScaffoldRevisionProposal;
+pub use crate::scaffold::ScaffoldSelectionOutcome;
+pub use crate::scaffold::ScaffoldSelectionPlan;
+pub use crate::scaffold::ScaffoldSelectionRequest;
+pub use crate::scaffold::ScaffoldStrategyKnob;
+pub use crate::scaffold::ScaffoldValidationResult;
+pub use crate::scaffold::apply_scaffold_admission;
+pub use crate::scaffold::blake3_scaffold_fingerprint;
+pub use crate::scaffold::select_scaffold_profile;
+pub use crate::scaffold::validate_scaffold_influence_receipt;
+pub use crate::scaffold::validate_scaffold_profile;
+pub use crate::shell::RuntimeAdapters;
 #[cfg(feature = "steel")]
-pub use crate::shell::{SteelPolicyRuntime, run_with_steel_policy, run_with_steel_program};
-pub use crate::telemetry::{
-    AdapterComponent, LoopDecisionKind, RuntimeEvent, RuntimeEventKind,
-    RuntimeObservabilityProjection, RuntimeTerminalKind, project_model_stream_events,
-    project_run_report_observability, project_runtime_event_observability,
-};
-pub use crate::tool_admission::{
-    TOOL_DISPATCH_NEUTRAL_CONTRACT_IDENTITY, ToolDispatchCancellationPosture,
-    ToolDispatchFallbackPolicy, ToolDispatchOutputBoundary, ToolDispatchPlan,
-    ToolDispatchPlanIssue, ToolDispatchPlanRequest, ToolDispatchPlanStatus,
-    ToolDispatchPolicyDraft, ToolDispatchTimeoutPosture, plan_tool_dispatch,
-};
+pub use crate::shell::SteelPolicyRuntime;
+pub use crate::shell::run_agent_loop;
+#[cfg(feature = "steel")]
+pub use crate::shell::run_with_steel_policy;
+#[cfg(feature = "steel")]
+pub use crate::shell::run_with_steel_program;
+pub use crate::telemetry::AdapterComponent;
+pub use crate::telemetry::LoopDecisionKind;
+pub use crate::telemetry::RuntimeEvent;
+pub use crate::telemetry::RuntimeEventKind;
+pub use crate::telemetry::RuntimeObservabilityProjection;
+pub use crate::telemetry::RuntimeTerminalKind;
+pub use crate::telemetry::project_model_stream_events;
+pub use crate::telemetry::project_run_report_observability;
+pub use crate::telemetry::project_runtime_event_observability;
+pub use crate::tool_admission::TOOL_DISPATCH_NEUTRAL_CONTRACT_IDENTITY;
+pub use crate::tool_admission::ToolDispatchCancellationPosture;
+pub use crate::tool_admission::ToolDispatchFallbackPolicy;
+pub use crate::tool_admission::ToolDispatchOutputBoundary;
+pub use crate::tool_admission::ToolDispatchPlan;
+pub use crate::tool_admission::ToolDispatchPlanIssue;
+pub use crate::tool_admission::ToolDispatchPlanRequest;
+pub use crate::tool_admission::ToolDispatchPlanStatus;
+pub use crate::tool_admission::ToolDispatchPolicyDraft;
+pub use crate::tool_admission::ToolDispatchTimeoutPosture;
+pub use crate::tool_admission::plan_tool_dispatch;
+pub use crate::transition::AdapterOutcome;
+pub use crate::transition::AdapterRequest;
+pub use crate::transition::AdapterStep;
+pub use crate::transition::DecisionStep;
+pub use crate::transition::TurnPlan;
+pub use crate::transition::TurnState;
+pub use crate::transition::apply_adapter_outcome;
+pub use crate::transition::apply_decision;
+pub use crate::transition::complete_with_fabric_error;
+pub use crate::transition::complete_with_guard_block;
+pub use crate::transition::complete_with_guard_failure;
 #[cfg(feature = "steel")]
 pub use crate::transition::complete_with_steel_policy_denial;
-pub use crate::transition::{
-    AdapterOutcome, AdapterRequest, AdapterStep, DecisionStep, TurnPlan, TurnState,
-    apply_adapter_outcome, apply_decision, complete_with_fabric_error, complete_with_guard_block,
-    complete_with_guard_failure, plan_next_turn,
-};
-pub use crate::trust_boundary::{
-    TrustBoundaryAction, TrustBoundaryActionKind, TrustBoundaryDescriptor, TrustBoundaryDiagnostic,
-    TrustBoundaryDiagnosticKind, TrustBoundaryEvidencePolicy, TrustBoundaryFingerprint,
-    TrustBoundaryIssueCode, TrustBoundaryJudgeBinding, TrustBoundaryJudgeOutcome,
-    TrustBoundaryJudgeVeto, TrustBoundaryMonitorDecision, TrustBoundaryReceiptLeak,
-    TrustBoundaryRedactionStatus, TrustBoundaryValidationResult, TrustBoundaryVerifierArtifact,
-    TrustBoundaryViolationReceipt, bind_trust_boundary_judge, blake3_trust_boundary_fingerprint,
-    monitor_trust_boundary_action, validate_trust_boundary_descriptor,
-    validate_trust_boundary_receipt,
-};
-pub use crate::turns::{
-    RuntimeLoopContractError, RuntimeLoopDecision, RuntimeLoopDecisionDraft, RuntimeLoopTurn,
-};
-pub use crate::workcmd::{
-    WorkflowCommandArgumentType, WorkflowCommandArgumentValue, WorkflowCommandArgumentValueDraft,
-    WorkflowCommandCapability, WorkflowCommandDuplicatePolicy, WorkflowCommandError,
-    WorkflowCommandErrorKind, WorkflowCommandInputField, WorkflowCommandInputFieldDraft,
-    WorkflowCommandManifest, WorkflowCommandManifestDraft, WorkflowCommandOutput,
-    WorkflowCommandOutputContract, WorkflowCommandOutputContractDraft, WorkflowCommandOutputDraft,
-    WorkflowCommandOutputKind, WorkflowCommandPolicy, WorkflowCommandProvenance,
-    WorkflowCommandProvenanceDraft, WorkflowCommandRegistry, WorkflowCommandRegistryDiagnostic,
-    WorkflowCommandRegistryDiagnosticKind, WorkflowCommandRegistryPolicy,
-    WorkflowCommandSideEffectPosture, WorkflowCommandSourceScope, WorkflowCommandTrustStatus,
-    WorkflowInvocationArgument, WorkflowInvocationArgumentDraft, WorkflowInvocationBinding,
-    WorkflowInvocationPlan, WorkflowValidationStatus, bind_workflow_command_arguments,
-    build_workflow_command_registry, prepare_workflow_command_invocation,
-    validate_workflow_command_output,
-};
-pub use crate::worker_team::{
-    Claim, Conflict, ConflictReport, ContextAdmissionPolicy, DelegationFailure, EvidenceReference,
-    FailureKind, MutationIntent, ParentTrace, Report, ReportMergeOutcome, WorkerAuthority,
-    WorkerBudgets, WorkerCancelOutcome, WorkerCapability, WorkerContextItem, WorkerContextItemKind,
-    WorkerContextPacket, WorkerContextRedaction, WorkerHandle, WorkerMergedReport,
-    WorkerOutputSchema, WorkerScope, WorkerService, WorkerStatus, WorkerTask, WorkerTaskDraft,
-    collect_report, enqueue_task, merge_reports, request_cancel, request_status,
-    validate_context_packet, validate_report, validate_task,
-};
-pub use crate::zerostack_midturn::{
-    ZerostackCachedTokenRule, ZerostackInjectedServiceState, ZerostackMidturnDecision,
-    ZerostackMidturnDiagnostic, ZerostackMidturnDiagnosticKind, ZerostackMidturnFingerprint,
-    ZerostackMidturnPlan, ZerostackMidturnPolicy, ZerostackMidturnServices,
-    ZerostackMidturnSummary, ZerostackMidturnSummaryKind, ZerostackMidturnValidationResult,
-    ZerostackPromptPressure, ZerostackProviderUsage, ZerostackRouteMetadata,
-    ZerostackToolArtifactDescriptor, ZerostackToolArtifactPolicy,
-    artifactize_zerostack_tool_output, blake3_zerostack_midturn_fingerprint,
-    calculate_zerostack_prompt_pressure, plan_zerostack_midturn_compaction,
-    validate_zerostack_midturn_summary,
-};
+pub use crate::transition::plan_next_turn;
+pub use crate::trust_boundary::TrustBoundaryAction;
+pub use crate::trust_boundary::TrustBoundaryActionKind;
+pub use crate::trust_boundary::TrustBoundaryDescriptor;
+pub use crate::trust_boundary::TrustBoundaryDiagnostic;
+pub use crate::trust_boundary::TrustBoundaryDiagnosticKind;
+pub use crate::trust_boundary::TrustBoundaryEvidencePolicy;
+pub use crate::trust_boundary::TrustBoundaryFingerprint;
+pub use crate::trust_boundary::TrustBoundaryIssueCode;
+pub use crate::trust_boundary::TrustBoundaryJudgeBinding;
+pub use crate::trust_boundary::TrustBoundaryJudgeOutcome;
+pub use crate::trust_boundary::TrustBoundaryJudgeVeto;
+pub use crate::trust_boundary::TrustBoundaryMonitorDecision;
+pub use crate::trust_boundary::TrustBoundaryReceiptLeak;
+pub use crate::trust_boundary::TrustBoundaryRedactionStatus;
+pub use crate::trust_boundary::TrustBoundaryValidationResult;
+pub use crate::trust_boundary::TrustBoundaryVerifierArtifact;
+pub use crate::trust_boundary::TrustBoundaryViolationReceipt;
+pub use crate::trust_boundary::bind_trust_boundary_judge;
+pub use crate::trust_boundary::blake3_trust_boundary_fingerprint;
+pub use crate::trust_boundary::monitor_trust_boundary_action;
+pub use crate::trust_boundary::validate_trust_boundary_descriptor;
+pub use crate::trust_boundary::validate_trust_boundary_receipt;
+pub use crate::turns::RuntimeCompletionCandidate;
+pub use crate::turns::RuntimeLoopContractError;
+pub use crate::turns::RuntimeLoopDecision;
+pub use crate::turns::RuntimeLoopDecisionDraft;
+pub use crate::turns::RuntimeLoopTurn;
+pub use crate::workcmd::WorkflowCommandArgumentType;
+pub use crate::workcmd::WorkflowCommandArgumentValue;
+pub use crate::workcmd::WorkflowCommandArgumentValueDraft;
+pub use crate::workcmd::WorkflowCommandCapability;
+pub use crate::workcmd::WorkflowCommandDuplicatePolicy;
+pub use crate::workcmd::WorkflowCommandError;
+pub use crate::workcmd::WorkflowCommandErrorKind;
+pub use crate::workcmd::WorkflowCommandInputField;
+pub use crate::workcmd::WorkflowCommandInputFieldDraft;
+pub use crate::workcmd::WorkflowCommandManifest;
+pub use crate::workcmd::WorkflowCommandManifestDraft;
+pub use crate::workcmd::WorkflowCommandOutput;
+pub use crate::workcmd::WorkflowCommandOutputContract;
+pub use crate::workcmd::WorkflowCommandOutputContractDraft;
+pub use crate::workcmd::WorkflowCommandOutputDraft;
+pub use crate::workcmd::WorkflowCommandOutputKind;
+pub use crate::workcmd::WorkflowCommandPolicy;
+pub use crate::workcmd::WorkflowCommandProvenance;
+pub use crate::workcmd::WorkflowCommandProvenanceDraft;
+pub use crate::workcmd::WorkflowCommandRegistry;
+pub use crate::workcmd::WorkflowCommandRegistryDiagnostic;
+pub use crate::workcmd::WorkflowCommandRegistryDiagnosticKind;
+pub use crate::workcmd::WorkflowCommandRegistryPolicy;
+pub use crate::workcmd::WorkflowCommandSideEffectPosture;
+pub use crate::workcmd::WorkflowCommandSourceScope;
+pub use crate::workcmd::WorkflowCommandTrustStatus;
+pub use crate::workcmd::WorkflowInvocationArgument;
+pub use crate::workcmd::WorkflowInvocationArgumentDraft;
+pub use crate::workcmd::WorkflowInvocationBinding;
+pub use crate::workcmd::WorkflowInvocationPlan;
+pub use crate::workcmd::WorkflowValidationStatus;
+pub use crate::workcmd::bind_workflow_command_arguments;
+pub use crate::workcmd::build_workflow_command_registry;
+pub use crate::workcmd::prepare_workflow_command_invocation;
+pub use crate::workcmd::validate_workflow_command_output;
+pub use crate::worker_team::Claim;
+pub use crate::worker_team::Conflict;
+pub use crate::worker_team::ConflictReport;
+pub use crate::worker_team::ContextAdmissionPolicy;
+pub use crate::worker_team::DelegationFailure;
+pub use crate::worker_team::EvidenceReference;
+pub use crate::worker_team::FailureKind;
+pub use crate::worker_team::MutationIntent;
+pub use crate::worker_team::ParentTrace;
+pub use crate::worker_team::Report;
+pub use crate::worker_team::ReportMergeOutcome;
+pub use crate::worker_team::WorkerAuthority;
+pub use crate::worker_team::WorkerBudgets;
+pub use crate::worker_team::WorkerCancelOutcome;
+pub use crate::worker_team::WorkerCapability;
+pub use crate::worker_team::WorkerContextItem;
+pub use crate::worker_team::WorkerContextItemKind;
+pub use crate::worker_team::WorkerContextPacket;
+pub use crate::worker_team::WorkerContextRedaction;
+pub use crate::worker_team::WorkerHandle;
+pub use crate::worker_team::WorkerMergedReport;
+pub use crate::worker_team::WorkerOutputSchema;
+pub use crate::worker_team::WorkerScope;
+pub use crate::worker_team::WorkerService;
+pub use crate::worker_team::WorkerStatus;
+pub use crate::worker_team::WorkerTask;
+pub use crate::worker_team::WorkerTaskDraft;
+pub use crate::worker_team::collect_report;
+pub use crate::worker_team::enqueue_task;
+pub use crate::worker_team::merge_reports;
+pub use crate::worker_team::request_cancel;
+pub use crate::worker_team::request_status;
+pub use crate::worker_team::validate_context_packet;
+pub use crate::worker_team::validate_report;
+pub use crate::worker_team::validate_task;
+pub use crate::zerostack_midturn::ZerostackCachedTokenRule;
+pub use crate::zerostack_midturn::ZerostackInjectedServiceState;
+pub use crate::zerostack_midturn::ZerostackMidturnDecision;
+pub use crate::zerostack_midturn::ZerostackMidturnDiagnostic;
+pub use crate::zerostack_midturn::ZerostackMidturnDiagnosticKind;
+pub use crate::zerostack_midturn::ZerostackMidturnFingerprint;
+pub use crate::zerostack_midturn::ZerostackMidturnPlan;
+pub use crate::zerostack_midturn::ZerostackMidturnPolicy;
+pub use crate::zerostack_midturn::ZerostackMidturnServices;
+pub use crate::zerostack_midturn::ZerostackMidturnSummary;
+pub use crate::zerostack_midturn::ZerostackMidturnSummaryKind;
+pub use crate::zerostack_midturn::ZerostackMidturnValidationResult;
+pub use crate::zerostack_midturn::ZerostackPromptPressure;
+pub use crate::zerostack_midturn::ZerostackProviderUsage;
+pub use crate::zerostack_midturn::ZerostackRouteMetadata;
+pub use crate::zerostack_midturn::ZerostackToolArtifactDescriptor;
+pub use crate::zerostack_midturn::ZerostackToolArtifactPolicy;
+pub use crate::zerostack_midturn::artifactize_zerostack_tool_output;
+pub use crate::zerostack_midturn::blake3_zerostack_midturn_fingerprint;
+pub use crate::zerostack_midturn::calculate_zerostack_prompt_pressure;
+pub use crate::zerostack_midturn::plan_zerostack_midturn_compaction;
+pub use crate::zerostack_midturn::validate_zerostack_midturn_summary;
 
 /// Pure status-selection result.
 pub type AgentStatusSelection = crate::status::choose::Selection;

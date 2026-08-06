@@ -123,19 +123,14 @@ impl PromptAssembly {
     /// Returns true when at least one image part is included.
     #[must_use]
     pub fn has_images(&self) -> bool {
-        self.parts
-            .iter()
-            .any(|part| matches!(part, super::ContentPart::Image(_image)))
+        self.parts.iter().any(|part| matches!(part, super::ContentPart::Image(_image)))
     }
 
     /// Returns the included image count.
     #[must_use]
     pub fn image_count(&self) -> u64 {
         super::check::usize_to_u64(
-            self.parts
-                .iter()
-                .filter(|part| matches!(part, super::ContentPart::Image(_image)))
-                .count(),
+            self.parts.iter().filter(|part| matches!(part, super::ContentPart::Image(_image))).count(),
         )
     }
 }
@@ -162,8 +157,7 @@ pub fn assemble_prompt_parts(
             super::ContentPart::Text(text) => parts.push(super::ContentPart::Text(text)),
             super::ContentPart::Image(image) => {
                 if image.byte_count() > policy.max_image_bytes() {
-                    image_outcomes
-                        .push(ImageOutcome::rejected(&image, "image_byte_budget_exceeded"));
+                    image_outcomes.push(ImageOutcome::rejected(&image, "image_byte_budget_exceeded"));
                 } else {
                     image_outcomes.push(ImageOutcome::included(&image));
                     parts.push(super::ContentPart::Image(image));
@@ -173,8 +167,5 @@ pub fn assemble_prompt_parts(
     }
     assert!(parts.len() <= drafts.len());
     assert!(image_outcomes.len() <= drafts.len());
-    Ok(PromptAssembly {
-        parts,
-        image_outcomes,
-    })
+    Ok(PromptAssembly { parts, image_outcomes })
 }

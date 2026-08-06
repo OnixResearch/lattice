@@ -1,0 +1,21 @@
+prefix_or_field	classification	authority	pilot_status	version_or_bound	mapping_or_reason
+theme-choice	durable	Rat-showcase shell	piloted	v2 closed enum	stored as ThemeChoice; unknown values reject
+reduced-motion	durable	Rat-showcase shell	piloted	v2 boolean	frontend-local preference
+workspace-durable-id	durable	application shell	piloted	16 items;128-byte IDs	restored with fresh live session IDs
+workspace-name	durable	application shell	piloted	128 bytes non-control	bounded display preference
+external-view-wrap-preference	durable-reference-only	downstream object owner plus frontend preference	piloted	current stable reference required	stale reference rejects; does not persist object
+keybinding-overrides	durable candidate	application shell	deferred	unowned	no named pilot consumer; downstream keymap policy excluded
+docking-presets	durable candidate	met-docking DTO owner	deferred	existing v1 wire DTO	docking change owns conversion; no second storage model
+command-history	sensitive candidate	application shell	deferred	bounded widget buffer	requires explicit retention export deletion and sensitive-input policy
+theme-token-overrides	durable candidate	application shell	deferred	unowned	no named reset UI in pilot
+focused-part	transient	renderer/application lifecycle	excluded	none	regenerated; never encoded
+pointer-capture	transient	renderer lifecycle	excluded	none	never encoded
+renderer-cache	transient	renderer	excluded	none	reset to empty
+animation-progress	transient	renderer clock	excluded	none	never encoded
+diagnostics	observation	diagnostic producer	excluded	none	not canonical state
+terminal-process-handle	sensitive live-only	application runtime	excluded	none	never encoded
+credentials-tokens	sensitive	security owner	excluded	none	no approved storage policy
+raw-terminal-output	sensitive	terminal session owner	excluded	none	no approved storage policy
+daemon-resource-view-state	externally authoritative	downstream daemon	rejected	external revision	protocol refresh after restart
+action-keymap-policy	externally authoritative	downstream service	rejected	external revision	never shadow persisted
+process-job-recovery-authorization	externally authoritative	downstream service	rejected	external revision	never restored or authorized locally

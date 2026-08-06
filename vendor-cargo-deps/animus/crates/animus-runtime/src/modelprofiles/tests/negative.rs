@@ -21,38 +21,26 @@ fn contract_rejects_stale_duplicate_unsafe_and_unadmitted_profiles() {
         ALTERNATE_HASH,
     );
     let stale_error = validate_set_result(&[stale], None).expect_err("stale profile hash");
-    assert_eq!(
-        stale_error.issue(),
-        ModelRuntimeProfileIssue::StaleProfileIdentity
-    );
+    assert_eq!(stale_error.issue(), ModelRuntimeProfileIssue::StaleProfileIdentity);
 
-    let provisional =
-        composition_profile_draft(NativeToolCallingMode::Disabled, &skills, &[], ZERO_HASH);
-    let valid_hash =
-        blake3_model_runtime_profile_identity(&provisional).expect("valid profile material");
-    let valid =
-        composition_profile_draft(NativeToolCallingMode::Disabled, &skills, &[], &valid_hash);
-    let duplicate_error =
-        validate_set_result(&[valid, valid], None).expect_err("duplicate profile identity");
-    assert_eq!(
-        duplicate_error.issue(),
-        ModelRuntimeProfileIssue::DuplicateIdentity
-    );
+    let provisional = composition_profile_draft(NativeToolCallingMode::Disabled, &skills, &[], ZERO_HASH);
+    let valid_hash = blake3_model_runtime_profile_identity(&provisional).expect("valid profile material");
+    let valid = composition_profile_draft(NativeToolCallingMode::Disabled, &skills, &[], &valid_hash);
+    let duplicate_error = validate_set_result(&[valid, valid], None).expect_err("duplicate profile identity");
+    assert_eq!(duplicate_error.issue(), ModelRuntimeProfileIssue::DuplicateIdentity);
 
     let malformed_memory = ModelRuntimeProfileDraft {
         memory_policy_hash: "not-a-hash",
         ..provisional
     };
-    let memory_error =
-        validate_set_result(&[malformed_memory], None).expect_err("malformed memory policy hash");
+    let memory_error = validate_set_result(&[malformed_memory], None).expect_err("malformed memory policy hash");
     assert_eq!(memory_error.issue(), ModelRuntimeProfileIssue::InvalidHash);
 
     let unsafe_profile = ModelRuntimeProfileDraft {
         profile_id: "unsafe profile",
         ..provisional
     };
-    let unsafe_error =
-        validate_set_result(&[unsafe_profile], None).expect_err("unsafe profile label");
+    let unsafe_error = validate_set_result(&[unsafe_profile], None).expect_err("unsafe profile label");
     assert_eq!(unsafe_error.issue(), ModelRuntimeProfileIssue::UnsafeLabel);
 
     let unadmitted_project = ModelRuntimeProfileDraft {
@@ -60,38 +48,25 @@ fn contract_rejects_stale_duplicate_unsafe_and_unadmitted_profiles() {
         project_profile_admitted: false,
         ..provisional
     };
-    let project_error =
-        validate_set_result(&[unadmitted_project], None).expect_err("unadmitted project profile");
-    assert_eq!(
-        project_error.issue(),
-        ModelRuntimeProfileIssue::UntrustedProfile
-    );
+    let project_error = validate_set_result(&[unadmitted_project], None).expect_err("unadmitted project profile");
+    assert_eq!(project_error.issue(), ModelRuntimeProfileIssue::UntrustedProfile);
 }
 
 #[test]
 fn required_resolution_has_no_ambient_fallback_and_rejects_stale_capabilities() {
     // r[verify agent_harness_runtime.model_runtime_profiles.resolution.missing]
-    let set = composition_profile_set(
-        NativeToolCallingMode::Disabled,
-        ModelSkillResourcePosture::MetadataOnly,
-    );
-    let missing = resolve_model_runtime_profile(
-        &set,
-        ModelRuntimeTargetDraft {
-            provider_id: "unknown",
-            model_id: "unknown-model",
-            router_role: None,
-            capability_identity: CAPABILITY_HASH,
-        },
-    )
+    let set = composition_profile_set(NativeToolCallingMode::Disabled, ModelSkillResourcePosture::MetadataOnly);
+    let missing = resolve_model_runtime_profile(&set, ModelRuntimeTargetDraft {
+        provider_id: "unknown",
+        model_id: "unknown-model",
+        router_role: None,
+        capability_identity: CAPABILITY_HASH,
+    })
     .expect_err("required mode must not infer a fallback");
-    let stale = resolve_model_runtime_profile(
-        &set,
-        ModelRuntimeTargetDraft {
-            capability_identity: ALTERNATE_HASH,
-            ..target(None)
-        },
-    )
+    let stale = resolve_model_runtime_profile(&set, ModelRuntimeTargetDraft {
+        capability_identity: ALTERNATE_HASH,
+        ..target(None)
+    })
     .expect_err("stale capability binding");
 
     assert_eq!(missing.issue(), ModelRuntimeProfileIssue::MissingProfile);
@@ -157,19 +132,10 @@ fn every_authority_ceiling_can_deny_model_prompt_skill_memory_or_tool_requests()
     })
     .expect_err("required tool denied");
 
-    assert_eq!(
-        model_denied.issue(),
-        ModelRuntimeProfileIssue::AuthorityDenied
-    );
-    assert_eq!(
-        prompt_denied.issue(),
-        ModelRuntimeProfileIssue::PromptDenied
-    );
+    assert_eq!(model_denied.issue(), ModelRuntimeProfileIssue::AuthorityDenied);
+    assert_eq!(prompt_denied.issue(), ModelRuntimeProfileIssue::PromptDenied);
     assert_eq!(skill_denied.issue(), ModelRuntimeProfileIssue::SkillDenied);
-    assert_eq!(
-        memory_denied.issue(),
-        ModelRuntimeProfileIssue::MemoryDenied
-    );
+    assert_eq!(memory_denied.issue(), ModelRuntimeProfileIssue::MemoryDenied);
     assert_eq!(tool_denied.issue(), ModelRuntimeProfileIssue::ToolDenied);
 }
 
@@ -193,19 +159,13 @@ fn required_skill_and_tool_modes_fail_when_existing_admission_is_absent() {
         stale_skill_binding: true,
     })
     .expect_err("cross-profile selected skill body");
-    let unsupported_tools = composed_plan(
-        NativeToolCallingMode::CapabilityRequired,
-        ModelSkillResourcePosture::MetadataOnly,
-        false,
-    )
-    .expect_err("required native tool calls unsupported");
+    let unsupported_tools =
+        composed_plan(NativeToolCallingMode::CapabilityRequired, ModelSkillResourcePosture::MetadataOnly, false)
+            .expect_err("required native tool calls unsupported");
 
     assert_eq!(missing_skill.issue(), ModelRuntimeProfileIssue::SkillDenied);
     assert_eq!(stale_skill.issue(), ModelRuntimeProfileIssue::StaleBinding);
-    assert_eq!(
-        unsupported_tools.issue(),
-        ModelRuntimeProfileIssue::ToolDenied
-    );
+    assert_eq!(unsupported_tools.issue(), ModelRuntimeProfileIssue::ToolDenied);
 }
 
 #[test]
@@ -218,12 +178,10 @@ fn memory_access_requires_an_exact_existing_policy_and_cannot_widen_controls() {
         include_skill: true,
         stale_skill_binding: false,
     };
-    let missing = compose_case_with_memory(input, MemoryPolicyFixture::Missing)
-        .expect_err("missing memory policy");
-    let disabled = compose_case_with_memory(input, MemoryPolicyFixture::Disabled)
-        .expect_err("memory policy use disabled");
-    let stale = compose_case_with_memory(input, MemoryPolicyFixture::Stale)
-        .expect_err("stale memory policy identity");
+    let missing = compose_case_with_memory(input, MemoryPolicyFixture::Missing).expect_err("missing memory policy");
+    let disabled =
+        compose_case_with_memory(input, MemoryPolicyFixture::Disabled).expect_err("memory policy use disabled");
+    let stale = compose_case_with_memory(input, MemoryPolicyFixture::Stale).expect_err("stale memory policy identity");
 
     assert_eq!(missing.issue(), ModelRuntimeProfileIssue::MemoryDenied);
     assert_eq!(disabled.issue(), ModelRuntimeProfileIssue::MemoryDenied);
@@ -232,12 +190,8 @@ fn memory_access_requires_an_exact_existing_policy_and_cannot_widen_controls() {
 
 #[test]
 fn stale_retry_cross_target_resume_and_carried_identity_are_rejected() {
-    let (_resolved, plan) = composed_plan(
-        NativeToolCallingMode::Optional,
-        ModelSkillResourcePosture::Selectable,
-        true,
-    )
-    .expect("admitted invocation plan");
+    let (_resolved, plan) = composed_plan(NativeToolCallingMode::Optional, ModelSkillResourcePosture::Selectable, true)
+        .expect("admitted invocation plan");
     let stale_snapshot = ModelInvocationIdentitySnapshot {
         prompt_plan_hash: ALTERNATE_HASH,
         ..ModelInvocationIdentitySnapshot::from(&plan)
@@ -269,81 +223,53 @@ fn stale_retry_cross_target_resume_and_carried_identity_are_rejected() {
 
     assert_eq!(stale.issue(), ModelRuntimeProfileIssue::StaleBinding);
     assert_eq!(stale_memory.issue(), ModelRuntimeProfileIssue::StaleBinding);
-    assert_eq!(
-        cross_target.issue(),
-        ModelRuntimeProfileIssue::RecompositionRequired
-    );
+    assert_eq!(cross_target.issue(), ModelRuntimeProfileIssue::RecompositionRequired);
 }
 
 #[test]
 fn tool_calls_reject_unadvertised_prompt_emulated_and_stale_bindings() {
     // r[verify agent_harness_runtime.model_runtime_profiles.dispatch_binding.tool_call]
-    let (_resolved, plan) = composed_plan(
-        NativeToolCallingMode::Optional,
-        ModelSkillResourcePosture::MetadataOnly,
-        true,
-    )
-    .expect("admitted invocation plan");
-    let unadvertised = validate_model_tool_call_binding(
-        &plan,
-        ModelToolCallBindingDraft {
-            tool_name: "unknown-tool",
-            ..tool_call_draft(&plan)
-        },
-    )
+    let (_resolved, plan) =
+        composed_plan(NativeToolCallingMode::Optional, ModelSkillResourcePosture::MetadataOnly, true)
+            .expect("admitted invocation plan");
+    let unadvertised = validate_model_tool_call_binding(&plan, ModelToolCallBindingDraft {
+        tool_name: "unknown-tool",
+        ..tool_call_draft(&plan)
+    })
     .expect_err("unadvertised tool");
-    let emulated = validate_model_tool_call_binding(
-        &plan,
-        ModelToolCallBindingDraft {
-            prompt_emulated: true,
-            ..tool_call_draft(&plan)
-        },
-    )
+    let emulated = validate_model_tool_call_binding(&plan, ModelToolCallBindingDraft {
+        prompt_emulated: true,
+        ..tool_call_draft(&plan)
+    })
     .expect_err("prompt-emulated call");
-    let stale = validate_model_tool_call_binding(
-        &plan,
-        ModelToolCallBindingDraft {
-            profile_hash: ALTERNATE_HASH,
-            ..tool_call_draft(&plan)
-        },
-    )
+    let stale = validate_model_tool_call_binding(&plan, ModelToolCallBindingDraft {
+        profile_hash: ALTERNATE_HASH,
+        ..tool_call_draft(&plan)
+    })
     .expect_err("stale profile call");
-    let stale_memory = validate_model_tool_call_binding(
-        &plan,
-        ModelToolCallBindingDraft {
-            memory_plan_hash: ALTERNATE_HASH,
-            ..tool_call_draft(&plan)
-        },
-    )
+    let stale_memory = validate_model_tool_call_binding(&plan, ModelToolCallBindingDraft {
+        memory_plan_hash: ALTERNATE_HASH,
+        ..tool_call_draft(&plan)
+    })
     .expect_err("stale memory plan call");
-    let stale_catalog = validate_model_tool_call_binding(
-        &plan,
-        ModelToolCallBindingDraft {
-            tool_catalog_identity: ALTERNATE_HASH,
-            ..tool_call_draft(&plan)
-        },
-    )
+    let stale_catalog = validate_model_tool_call_binding(&plan, ModelToolCallBindingDraft {
+        tool_catalog_identity: ALTERNATE_HASH,
+        ..tool_call_draft(&plan)
+    })
     .expect_err("stale tool catalog call");
 
     assert_eq!(unadvertised.issue(), ModelRuntimeProfileIssue::ToolDenied);
     assert_eq!(emulated.issue(), ModelRuntimeProfileIssue::ToolDenied);
     assert_eq!(stale.issue(), ModelRuntimeProfileIssue::StaleBinding);
     assert_eq!(stale_memory.issue(), ModelRuntimeProfileIssue::StaleBinding);
-    assert_eq!(
-        stale_catalog.issue(),
-        ModelRuntimeProfileIssue::StaleBinding
-    );
+    assert_eq!(stale_catalog.issue(), ModelRuntimeProfileIssue::StaleBinding);
 }
 
 #[test]
 fn receipt_projection_rejects_every_sensitive_material_class() {
     // r[verify agent_harness_runtime.model_runtime_profiles.receipts.rejects_leaks]
-    let (resolved, plan) = composed_plan(
-        NativeToolCallingMode::Optional,
-        ModelSkillResourcePosture::Selectable,
-        true,
-    )
-    .expect("admitted invocation plan");
+    let (resolved, plan) = composed_plan(NativeToolCallingMode::Optional, ModelSkillResourcePosture::Selectable, true)
+        .expect("admitted invocation plan");
     let candidates = [
         ModelInvocationReceiptSensitiveDraft {
             raw_prompt: Some("raw"),
@@ -400,8 +326,8 @@ fn receipt_projection_rejects_every_sensitive_material_class() {
     ];
 
     for candidate in candidates {
-        let error = project_model_invocation_receipt(&resolved, &plan, candidate)
-            .expect_err("sensitive receipt material");
+        let error =
+            project_model_invocation_receipt(&resolved, &plan, candidate).expect_err("sensitive receipt material");
         assert_eq!(error.issue(), ModelRuntimeProfileIssue::ReceiptLeak);
     }
 }
@@ -409,20 +335,13 @@ fn receipt_projection_rejects_every_sensitive_material_class() {
 #[test]
 fn dispatch_binding_does_not_cross_required_and_compatibility_modes() {
     let dispatch = admitted_dispatch_plan();
-    let (_resolved, plan) = composed_plan(
-        NativeToolCallingMode::Disabled,
-        ModelSkillResourcePosture::MetadataOnly,
-        false,
-    )
-    .expect("admitted invocation plan");
+    let (_resolved, plan) =
+        composed_plan(NativeToolCallingMode::Disabled, ModelSkillResourcePosture::MetadataOnly, false)
+            .expect("admitted invocation plan");
     let missing = bind_model_dispatch_plan(&dispatch, ModelProfileEnablementPolicy::Required, None)
         .expect_err("required mode missing plan");
-    let carried = bind_model_dispatch_plan(
-        &dispatch,
-        ModelProfileEnablementPolicy::CompatibilityDisabled,
-        Some(&plan),
-    )
-    .expect_err("compatibility mode carrying profile");
+    let carried = bind_model_dispatch_plan(&dispatch, ModelProfileEnablementPolicy::CompatibilityDisabled, Some(&plan))
+        .expect_err("compatibility mode carrying profile");
 
     assert_eq!(missing.issue(), ModelRuntimeProfileIssue::MissingProfile);
     assert_eq!(carried.issue(), ModelRuntimeProfileIssue::StaleBinding);
@@ -502,9 +421,7 @@ fn compose_case_with_memory(
     })
 }
 
-fn memory_policy_fixture(
-    fixture: MemoryPolicyFixture,
-) -> Option<animus_adapters::OptInMemoryPolicy> {
+fn memory_policy_fixture(fixture: MemoryPolicyFixture) -> Option<animus_adapters::OptInMemoryPolicy> {
     if fixture == MemoryPolicyFixture::Missing {
         return None;
     }

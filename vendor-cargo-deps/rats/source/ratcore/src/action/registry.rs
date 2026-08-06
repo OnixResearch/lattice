@@ -44,6 +44,21 @@ const FIELD_SHORTCUT_KEY: &str = "shortcut.key";
 const FIELD_SHORTCUT_MODIFIER: &str = "shortcut.modifier";
 const BLOCKED_CONFLICT_REASON: &str = "shortcut conflict";
 
+semantic_string_id! {
+    /// Canonical identifier for an action registered with the shared action registry.
+    ///
+    /// This is a role-only identity: malformed text remains representable until
+    /// registry validation reports it. It is compiler-distinct from item and target
+    /// identities even when their textual values match.
+    ///
+    /// ```compile_fail
+    /// use ratcore::action_registry::{ActionDescriptor, ActionSource, DesktopMenuItemId};
+    /// let item = DesktopMenuItemId::new("file.save");
+    /// let _ = ActionDescriptor::new(item, "Save", ActionSource::new("test"));
+    /// ```
+    pub struct ActionId;
+}
+
 /// Metadata describing where an action came from.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ActionSource {
@@ -141,7 +156,7 @@ impl ActionShortcut {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDescriptor {
     /// Stable action ID.
-    pub id: String,
+    pub id: ActionId,
     /// Display label.
     pub label: String,
     /// Optional longer description.
@@ -161,7 +176,7 @@ pub struct ActionDescriptor {
 impl ActionDescriptor {
     /// Creates a descriptor with the required stable metadata.
     #[must_use]
-    pub fn new(id: impl Into<String>, label: impl Into<String>, source: ActionSource) -> Self {
+    pub fn new(id: impl Into<ActionId>, label: impl Into<String>, source: ActionSource) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -211,31 +226,57 @@ impl ActionDescriptor {
 }
 
 mod assembly;
+#[path = "key_sequence.rs"]
+mod binding_core;
+mod compatibility;
+mod contextual;
 mod desktop_menu;
 mod diagnostics;
 mod keybinding_editor;
 mod surfaces;
 pub use assembly::build_registry;
-pub use desktop_menu::{
-    DesktopMenuCheckedState, DesktopMenuDiagnostic, DesktopMenuDiagnosticCode, DesktopMenuEntry,
-    DesktopMenuFocusNode, DesktopMenuFocusProjection, DesktopMenuFocusRole, DesktopMenuItemKind,
-    DesktopMenuItemProjection, DesktopMenuProjection, DesktopMenuRenderer,
-    DesktopMenuRendererProjection, build_desktop_menu_projection, project_desktop_menu_focus,
-    project_desktop_menu_renderer,
-};
-pub use diagnostics::{ActionRegistryIssue, ActionRegistryIssueCode};
-pub use keybinding_editor::{
-    KeybindingDefault, KeybindingEditorDiagnostic, KeybindingEditorDiagnosticCode,
-    KeybindingEditorModel, KeybindingEditorRenderer, KeybindingEditorRendererProjection,
-    KeybindingEditorRow, KeybindingOverride, ReservedShortcut, ShortcutEditCommand,
-    ShortcutEditOutcome, apply_shortcut_edit, build_keybinding_editor_model,
-    project_keybinding_editor_renderer,
-};
-pub use surfaces::{
-    ActionRegistrySnapshot, CommandPaletteItemProjection, KeymapBindingProjection,
-    LeaderEntryProjection, MenuItemProjection, ShortcutHelpEntryProjection,
-    ShortcutHelpSectionProjection, ToolbarItemProjection,
-};
+pub use binding_core::*;
+pub use compatibility::*;
+pub use contextual::*;
+pub use desktop_menu::DesktopMenuCheckedState;
+pub use desktop_menu::DesktopMenuDiagnostic;
+pub use desktop_menu::DesktopMenuDiagnosticCode;
+pub use desktop_menu::DesktopMenuEntry;
+pub use desktop_menu::DesktopMenuFocusNode;
+pub use desktop_menu::DesktopMenuFocusProjection;
+pub use desktop_menu::DesktopMenuFocusRole;
+pub use desktop_menu::DesktopMenuItemKind;
+pub use desktop_menu::DesktopMenuItemProjection;
+pub use desktop_menu::DesktopMenuProjection;
+pub use desktop_menu::DesktopMenuRenderer;
+pub use desktop_menu::DesktopMenuRendererProjection;
+pub use desktop_menu::build_desktop_menu_projection;
+pub use desktop_menu::project_desktop_menu_focus;
+pub use desktop_menu::project_desktop_menu_renderer;
+pub use diagnostics::ActionRegistryIssue;
+pub use diagnostics::ActionRegistryIssueCode;
+pub use keybinding_editor::KeybindingDefault;
+pub use keybinding_editor::KeybindingEditorDiagnostic;
+pub use keybinding_editor::KeybindingEditorDiagnosticCode;
+pub use keybinding_editor::KeybindingEditorModel;
+pub use keybinding_editor::KeybindingEditorRenderer;
+pub use keybinding_editor::KeybindingEditorRendererProjection;
+pub use keybinding_editor::KeybindingEditorRow;
+pub use keybinding_editor::KeybindingOverride;
+pub use keybinding_editor::ReservedShortcut;
+pub use keybinding_editor::ShortcutEditCommand;
+pub use keybinding_editor::ShortcutEditOutcome;
+pub use keybinding_editor::apply_shortcut_edit;
+pub use keybinding_editor::build_keybinding_editor_model;
+pub use keybinding_editor::project_keybinding_editor_renderer;
+pub use surfaces::ActionRegistrySnapshot;
+pub use surfaces::CommandPaletteItemProjection;
+pub use surfaces::KeymapBindingProjection;
+pub use surfaces::LeaderEntryProjection;
+pub use surfaces::MenuItemProjection;
+pub use surfaces::ShortcutHelpEntryProjection;
+pub use surfaces::ShortcutHelpSectionProjection;
+pub use surfaces::ToolbarItemProjection;
 
 /// Result of building an action registry.
 #[derive(Debug, Clone, PartialEq, Eq)]

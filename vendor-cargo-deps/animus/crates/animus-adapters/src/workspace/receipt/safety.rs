@@ -74,9 +74,7 @@ pub fn validate_text(text: &str) -> Result<(), Leak> {
 }
 
 fn first_leak(text: &str) -> Option<Leak> {
-    LEAK_MARKERS
-        .iter()
-        .find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
+    LEAK_MARKERS.iter().find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
 }
 
 fn contains_marker(text: &str, markers: &[&str]) -> bool {

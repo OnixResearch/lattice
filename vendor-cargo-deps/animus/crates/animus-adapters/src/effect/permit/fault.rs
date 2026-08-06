@@ -49,23 +49,13 @@ impl core::fmt::Display for Error {
             Self::MissingField { field } => write!(formatter, "{field} is required"),
             Self::Contract(error) => write!(formatter, "{error}"),
             Self::UnsupportedValue { field, value } => {
-                write!(
-                    formatter,
-                    "{field} has unsupported permission value {value}"
-                )
+                write!(formatter, "{field} has unsupported permission value {value}")
             }
             Self::UntrustedDescriptor { trust_scope } => {
-                write!(
-                    formatter,
-                    "{} permission descriptor is untrusted",
-                    trust_scope.as_str()
-                )
+                write!(formatter, "{} permission descriptor is untrusted", trust_scope.as_str())
             }
             Self::PrecedenceOutOfRange { min, max, actual } => {
-                write!(
-                    formatter,
-                    "permission precedence must be between {min} and {max}; got {actual}"
-                )
+                write!(formatter, "permission precedence must be between {min} and {max}; got {actual}")
             }
             Self::InvalidPattern { field } => {
                 write!(formatter, "{field} has malformed permission pattern syntax")
@@ -73,10 +63,7 @@ impl core::fmt::Display for Error {
             Self::TooManyRedactions {
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "permission receipts support at most {max_items} redactions; got {actual_items}"
-            ),
+            } => write!(formatter, "permission receipts support at most {max_items} redactions; got {actual_items}"),
         }
     }
 }

@@ -31,13 +31,10 @@ impl PromptRequest {
     ///
     /// Returns [`super::Error`] when labels or summary text are malformed.
     pub fn new(draft: PromptRequestDraft<'_>) -> Result<Self, super::Error> {
-        let resource_label =
-            super::required_text_value(super::RESOURCE_FIELD, draft.resource_label)?;
+        let resource_label = super::required_text_value(super::RESOURCE_FIELD, draft.resource_label)?;
         let session_label = super::required_text_value(super::SESSION_FIELD, draft.session_label)?;
-        let policy_hash =
-            super::required_text_value(super::PROMPT_POLICY_FIELD, draft.policy_hash)?;
-        let redacted_summary =
-            super::required_text_value(super::PROMPT_SUMMARY_FIELD, draft.redacted_summary)?;
+        let policy_hash = super::required_text_value(super::PROMPT_POLICY_FIELD, draft.policy_hash)?;
+        let redacted_summary = super::required_text_value(super::PROMPT_SUMMARY_FIELD, draft.redacted_summary)?;
         let decision_token = super::hash_parts(&[
             super::HASH_SCHEMA,
             draft.action.as_str(),
@@ -129,10 +126,7 @@ impl Decision {
     pub fn new(draft: DecisionDraft<'_>) -> Result<Self, super::Error> {
         Ok(Self {
             action: draft.action,
-            resource_label: super::required_text_value(
-                super::RESOURCE_FIELD,
-                draft.resource_label,
-            )?,
+            resource_label: super::required_text_value(super::RESOURCE_FIELD, draft.resource_label)?,
             session_label: super::required_text_value(super::SESSION_FIELD, draft.session_label)?,
             hash: super::required_text_value(super::PROMPT_POLICY_FIELD, draft.policy_hash)?,
             token: super::required_text_value(super::TOKEN_FIELD, draft.decision_token)?,

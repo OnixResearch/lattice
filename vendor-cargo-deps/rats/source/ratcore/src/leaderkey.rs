@@ -136,7 +136,9 @@ pub type HiddenSet = std::collections::HashSet<(char, MenuPlacement)>;
 
 mod assembly;
 mod state;
-pub use assembly::{BuildResult, build, build_from_items};
+pub use assembly::BuildResult;
+pub use assembly::build;
+pub use assembly::build_from_items;
 pub use state::LeaderMenu;
 
 // ═══════════════════════════════════════════════════════════════════

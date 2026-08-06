@@ -1,0 +1,49 @@
+{
+  "schema": "rats.meteorite-ratzilla-embedding-receipt.v1",
+  "profile": "meteorite-ratzilla-embedding",
+  "target": "wasm32-unknown-unknown",
+  "browser": "Chromium 149.0.7827.53",
+  "dioxus_renderer": "dioxus-web-0.7.9",
+  "embedded_renderer": "ratzilla-dom-0.3.1",
+  "verdict": "PASS",
+  "source_sha256": "c2fc295b07255ecbaa3e425642cdedabf77ecf703cce07308876f11eada322f1",
+  "command_sha256": "030060b728ca408c8f81d6b70dfaa5854b706e21f730cb34546eebfe2857d86d",
+  "scenarios_sha256": "86b3c3f1b3cdc89137650f3feb5f5f1772a09a372900af120a555366a762bd31",
+  "direct_scenarios": [
+    "embedded-render",
+    "embedded-input",
+    "embedded-resize",
+    "embedded-fixture",
+    "embedded-remount",
+    "embedded-cleanup"
+  ],
+  "negative_scenarios": [
+    "descriptor-only",
+    "missing-grid",
+    "duplicate-grid",
+    "label-only",
+    "post-unmount-input",
+    "native-dom-relabel",
+    "missing-bundle",
+    "missing-browser"
+  ],
+  "non_claims": [
+    "native-dioxus-component-parity",
+    "accessibility-parity",
+    "canvas-or-webgl",
+    "multiple-production-surfaces",
+    "other-browsers",
+    "other-targets",
+    "whole-subwayrat-parity",
+    "visual-or-pixel-parity",
+    "downstream-support",
+    "release-readiness"
+  ],
+  "privacy": {
+    "content_free": true,
+    "absolute_paths": false,
+    "random_ports": false,
+    "raw_dom": false,
+    "terminal_cells": false
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=harbor_evaluation_profile"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.harbor-evaluation-profile",
+      "source": {
+        "path": "config/harbor-evaluation-profile.ncl",
+        "identity": "b3:4a4718a9171a04015d251684089004e3b08acf657cad73faeab4ca3c16f14d13",
+        "bytes": 2530
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "harbor_evaluation_profile",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/harbor-evaluation-profile.json",
+        "identity": "b3:ac0dbb3495fd59afd1ab7c5d1d750014053a6cbb5f42aec3294f3215d3045936",
+        "bytes": 1429
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=harbor_evaluation_profile"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:4884a5832f84e102198ce8fd5bb777801653f17be28473afe4e0a22e0608499d"
+}

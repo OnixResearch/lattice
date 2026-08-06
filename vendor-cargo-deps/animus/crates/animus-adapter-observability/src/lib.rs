@@ -48,9 +48,7 @@ impl core::fmt::Display for Error {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::EmptyName => formatter.write_str("observability name must not be empty"),
-            Self::InvalidLabelCount => {
-                formatter.write_str("observability labels are out of bounds")
-            }
+            Self::InvalidLabelCount => formatter.write_str("observability labels are out of bounds"),
             Self::UnsafeMetadata(error) => write!(formatter, "{error}"),
             Self::UnboundedMessage => formatter.write_str("observability message is unbounded"),
             Self::SinkUnavailable => formatter.write_str("observability sink is unavailable"),
@@ -230,11 +228,7 @@ impl MetricLabel {
     }
 
     fn joined(&self) -> alloc::string::String {
-        let capacity_bytes = self
-            .key
-            .len()
-            .saturating_add(self.value.len())
-            .saturating_add(LABEL_JOINER_WIDTH);
+        let capacity_bytes = self.key.len().saturating_add(self.value.len()).saturating_add(LABEL_JOINER_WIDTH);
         let mut joined = alloc::string::String::with_capacity(capacity_bytes);
         joined.push_str(self.key.as_str());
         joined.push(LABEL_JOINER);
@@ -277,12 +271,7 @@ impl MetricSample {
     pub fn new(draft: MetricSampleDraft<'_>) -> Result<Self, Error> {
         ensure_name(draft.name)?;
         ensure_label_count(draft.labels.len())?;
-        let labels = draft
-            .labels
-            .iter()
-            .copied()
-            .map(MetricLabel::new)
-            .collect::<Result<alloc::vec::Vec<_>, _>>()?;
+        let labels = draft.labels.iter().copied().map(MetricLabel::new).collect::<Result<alloc::vec::Vec<_>, _>>()?;
         let label_storage = label_strings(labels.as_slice());
         let label_refs = label_refs(label_storage.as_slice());
         validate_safe_label_envelope(&SafeLabelEnvelope {
@@ -346,12 +335,7 @@ pub struct LogRecordDraft<'a> {
 impl<'a> LogRecordDraft<'a> {
     /// Builds a log record draft.
     #[must_use]
-    pub const fn new(
-        target: &'a str,
-        level: LogLevel,
-        message: &'a str,
-        labels: &'a [MetricLabelDraft<'a>],
-    ) -> Self {
+    pub const fn new(target: &'a str, level: LogLevel, message: &'a str, labels: &'a [MetricLabelDraft<'a>]) -> Self {
         Self {
             target,
             level,
@@ -383,12 +367,7 @@ impl LogRecord {
             return Err(Error::UnboundedMessage);
         }
         ensure_label_count(draft.labels.len())?;
-        let labels = draft
-            .labels
-            .iter()
-            .copied()
-            .map(MetricLabel::new)
-            .collect::<Result<alloc::vec::Vec<_>, _>>()?;
+        let labels = draft.labels.iter().copied().map(MetricLabel::new).collect::<Result<alloc::vec::Vec<_>, _>>()?;
         let label_storage = label_strings(labels.as_slice());
         let label_refs = label_refs(label_storage.as_slice());
         validate_safe_label_envelope(&SafeLabelEnvelope {
@@ -492,14 +471,13 @@ impl GuardDecision {
 #[must_use]
 pub fn evaluate_delivery(policy: DeliveryPolicy, outcome: &SinkOutcome) -> GuardDecision {
     match (policy, outcome) {
-        (DeliveryPolicy::BestEffort, _)
-        | (DeliveryPolicy::AuditRequired, SinkOutcome::Delivered) => GuardDecision::Continue,
-        (DeliveryPolicy::AuditRequired, SinkOutcome::Failed { class, reason }) => {
-            GuardDecision::Blocked {
-                class: *class,
-                reason: reason.clone(),
-            }
+        (DeliveryPolicy::BestEffort, _) | (DeliveryPolicy::AuditRequired, SinkOutcome::Delivered) => {
+            GuardDecision::Continue
         }
+        (DeliveryPolicy::AuditRequired, SinkOutcome::Failed { class, reason }) => GuardDecision::Blocked {
+            class: *class,
+            reason: reason.clone(),
+        },
     }
 }
 
@@ -558,12 +536,7 @@ struct SafeLabelEnvelope<'a> {
 }
 
 fn validate_safe_label_envelope(envelope: &SafeLabelEnvelope<'_>) -> Result<(), Error> {
-    let mut combined = alloc::vec::Vec::with_capacity(
-        envelope
-            .labels
-            .len()
-            .saturating_add(SAFE_LABEL_PREFIX_COUNT),
-    );
+    let mut combined = alloc::vec::Vec::with_capacity(envelope.labels.len().saturating_add(SAFE_LABEL_PREFIX_COUNT));
     combined.push(envelope.schema);
     combined.push(OBSERVABILITY_OPERATION_LABEL);
     combined.push(envelope.name);
@@ -612,12 +585,7 @@ mod tests {
         assert_eq!(metric.kind(), MetricKind::Counter);
         assert_eq!(metric.labels().len(), labels.len());
 
-        let log = LogRecord::new(LogRecordDraft::new(
-            LOG_TARGET,
-            LogLevel::Info,
-            MESSAGE,
-            &labels,
-        ))?;
+        let log = LogRecord::new(LogRecordDraft::new(LOG_TARGET, LogLevel::Info, MESSAGE, &labels))?;
         assert_eq!(log.target(), LOG_TARGET);
         assert_eq!(log.level(), LogLevel::Info);
         assert_eq!(log.message(), MESSAGE);
@@ -654,21 +622,11 @@ mod tests {
             Err(Error::UnsafeMetadata(_))
         ));
         assert!(matches!(
-            LogRecord::new(LogRecordDraft::new(
-                LOG_TARGET,
-                LogLevel::Error,
-                PRIVATE_PATH,
-                &labels,
-            )),
+            LogRecord::new(LogRecordDraft::new(LOG_TARGET, LogLevel::Error, PRIVATE_PATH, &labels,)),
             Err(Error::UnsafeMetadata(_))
         ));
         assert_eq!(
-            LogRecord::new(LogRecordDraft::new(
-                LOG_TARGET,
-                LogLevel::Warning,
-                MESSAGE,
-                &[]
-            )),
+            LogRecord::new(LogRecordDraft::new(LOG_TARGET, LogLevel::Warning, MESSAGE, &[])),
             Err(Error::InvalidLabelCount)
         );
     }

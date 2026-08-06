@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,12 +7,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -20,21 +16,45 @@
 )]
 use std::collections::BTreeSet;
 
-use super::{
-    BLAKE3_ALGORITHM, DEFAULT_FALLBACK_TASK_CLASS, FIELD_ACTIVE_REVISION, FIELD_BASE_REVISION,
-    FIELD_CONTENT_HASH, FIELD_PROFILE_ENABLED, FIELD_PROFILE_ID, FIELD_PROFILE_PROVENANCE,
-    FIELD_RECEIPT_HASH, FIELD_RECEIPT_PROFILE, FIELD_RECEIPT_ROUTE, FIELD_RECEIPT_SENSITIVE,
-    FIELD_RECEIPT_TASK, FIELD_REVISION_HASH_MATCH, FIELD_REVISION_ID, FIELD_REVISION_STATUS,
-    FIELD_ROUTE_CONSTRAINTS, FIELD_SELECTION_PROFILE, FIELD_STRATEGY_KNOBS, FIELD_TASK_CLASS,
-    HASH_PART_SEPARATOR, SCAFFOLD_HASH_DOMAIN,
-    data::{
-        ScaffoldAdmissionDecision, ScaffoldAdmissionEffect, ScaffoldAdmissionOutcome,
-        ScaffoldAdmissionRequest, ScaffoldDiagnostic, ScaffoldDiagnosticKind, ScaffoldFingerprint,
-        ScaffoldInfluenceReceipt, ScaffoldProfile, ScaffoldReceiptSensitiveEvidence,
-        ScaffoldReviewStatus, ScaffoldRevision, ScaffoldSelectionOutcome, ScaffoldSelectionPlan,
-        ScaffoldSelectionRequest, ScaffoldStrategyKnob, ScaffoldValidationResult,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::DEFAULT_FALLBACK_TASK_CLASS;
+use super::FIELD_ACTIVE_REVISION;
+use super::FIELD_BASE_REVISION;
+use super::FIELD_CONTENT_HASH;
+use super::FIELD_PROFILE_ENABLED;
+use super::FIELD_PROFILE_ID;
+use super::FIELD_PROFILE_PROVENANCE;
+use super::FIELD_RECEIPT_HASH;
+use super::FIELD_RECEIPT_PROFILE;
+use super::FIELD_RECEIPT_ROUTE;
+use super::FIELD_RECEIPT_SENSITIVE;
+use super::FIELD_RECEIPT_TASK;
+use super::FIELD_REVISION_HASH_MATCH;
+use super::FIELD_REVISION_ID;
+use super::FIELD_REVISION_STATUS;
+use super::FIELD_ROUTE_CONSTRAINTS;
+use super::FIELD_SELECTION_PROFILE;
+use super::FIELD_STRATEGY_KNOBS;
+use super::FIELD_TASK_CLASS;
+use super::HASH_PART_SEPARATOR;
+use super::SCAFFOLD_HASH_DOMAIN;
+use super::data::ScaffoldAdmissionDecision;
+use super::data::ScaffoldAdmissionEffect;
+use super::data::ScaffoldAdmissionOutcome;
+use super::data::ScaffoldAdmissionRequest;
+use super::data::ScaffoldDiagnostic;
+use super::data::ScaffoldDiagnosticKind;
+use super::data::ScaffoldFingerprint;
+use super::data::ScaffoldInfluenceReceipt;
+use super::data::ScaffoldProfile;
+use super::data::ScaffoldReceiptSensitiveEvidence;
+use super::data::ScaffoldReviewStatus;
+use super::data::ScaffoldRevision;
+use super::data::ScaffoldSelectionOutcome;
+use super::data::ScaffoldSelectionPlan;
+use super::data::ScaffoldSelectionRequest;
+use super::data::ScaffoldStrategyKnob;
+use super::data::ScaffoldValidationResult;
 
 const MIN_ID_SEGMENT_COUNT: usize = 2;
 const ID_SEGMENT_SEPARATOR: char = '.';
@@ -62,21 +82,9 @@ pub fn validate_scaffold_profile(profile: &ScaffoldProfile) -> ScaffoldValidatio
     let mut diagnostics = Vec::new();
     require_id(&profile.profile_id, FIELD_PROFILE_ID, &mut diagnostics);
     require_collection(&profile.task_classes, FIELD_TASK_CLASS, &mut diagnostics);
-    require_id(
-        &profile.active_revision_id,
-        FIELD_ACTIVE_REVISION,
-        &mut diagnostics,
-    );
-    require_collection(
-        &profile.route_constraints,
-        FIELD_ROUTE_CONSTRAINTS,
-        &mut diagnostics,
-    );
-    require_text(
-        &profile.provenance.source,
-        FIELD_PROFILE_PROVENANCE,
-        &mut diagnostics,
-    );
+    require_id(&profile.active_revision_id, FIELD_ACTIVE_REVISION, &mut diagnostics);
+    require_collection(&profile.route_constraints, FIELD_ROUTE_CONSTRAINTS, &mut diagnostics);
+    require_text(&profile.provenance.source, FIELD_PROFILE_PROVENANCE, &mut diagnostics);
     validate_revisions(profile, &mut diagnostics);
     if !profile.enabled {
         diagnostics.push(ScaffoldDiagnostic::new(
@@ -95,10 +103,7 @@ pub fn select_scaffold_profile(
     request: &ScaffoldSelectionRequest,
 ) -> ScaffoldSelectionPlan {
     let mut diagnostics = Vec::new();
-    let fallback_task_class = request
-        .fallback_task_class
-        .as_deref()
-        .unwrap_or(DEFAULT_FALLBACK_TASK_CLASS);
+    let fallback_task_class = request.fallback_task_class.as_deref().unwrap_or(DEFAULT_FALLBACK_TASK_CLASS);
     let exact = select_by_task_class(profiles, request, &request.task_class, &mut diagnostics);
     if let Some((profile_id, revision_id)) = exact {
         return ScaffoldSelectionPlan {
@@ -175,9 +180,7 @@ pub fn apply_scaffold_admission(
 ///
 /// Returns diagnostics when required receipt metadata is missing, hashes are not
 /// BLAKE3, or unsafe sensitive evidence classes appear in the receipt.
-pub fn validate_scaffold_influence_receipt(
-    receipt: &ScaffoldInfluenceReceipt,
-) -> ScaffoldValidationResult {
+pub fn validate_scaffold_influence_receipt(receipt: &ScaffoldInfluenceReceipt) -> ScaffoldValidationResult {
     let mut diagnostics = Vec::new();
     require_id(&receipt.profile_id, FIELD_RECEIPT_PROFILE, &mut diagnostics);
     require_id(&receipt.revision_id, FIELD_REVISION_ID, &mut diagnostics);
@@ -196,10 +199,7 @@ pub fn validate_scaffold_influence_receipt(
 }
 
 fn active_revision(profile: &ScaffoldProfile) -> Option<&ScaffoldRevision> {
-    profile
-        .revisions
-        .iter()
-        .find(|revision| revision.revision_id == profile.active_revision_id)
+    profile.revisions.iter().find(|revision| revision.revision_id == profile.active_revision_id)
 }
 
 fn blank(text: &str) -> bool {
@@ -241,40 +241,20 @@ fn collect_revision_ids<'a>(
     ids
 }
 
-fn profile_disabled_by_request(
-    profile: &ScaffoldProfile,
-    request: &ScaffoldSelectionRequest,
-) -> bool {
-    request
-        .disabled_profile_ids
-        .iter()
-        .any(|disabled_id| disabled_id == &profile.profile_id)
+fn profile_disabled_by_request(profile: &ScaffoldProfile, request: &ScaffoldSelectionRequest) -> bool {
+    request.disabled_profile_ids.iter().any(|disabled_id| disabled_id == &profile.profile_id)
 }
 
 fn profile_route_matches(profile: &ScaffoldProfile, request: &ScaffoldSelectionRequest) -> bool {
-    let route_labels = request
-        .route_capability_labels
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    profile
-        .route_constraints
-        .iter()
-        .all(|constraint| route_labels.contains(constraint.as_str()))
+    let route_labels = request.route_capability_labels.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    profile.route_constraints.iter().all(|constraint| route_labels.contains(constraint.as_str()))
 }
 
 fn profile_task_matches(profile: &ScaffoldProfile, task_class: &str) -> bool {
-    profile
-        .task_classes
-        .iter()
-        .any(|candidate_task_class| candidate_task_class == task_class)
+    profile.task_classes.iter().any(|candidate_task_class| candidate_task_class == task_class)
 }
 
-fn require_blake3(
-    fingerprint: &ScaffoldFingerprint,
-    field: &str,
-    diagnostics: &mut Vec<ScaffoldDiagnostic>,
-) {
+fn require_blake3(fingerprint: &ScaffoldFingerprint, field: &str, diagnostics: &mut Vec<ScaffoldDiagnostic>) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM {
         diagnostics.push(ScaffoldDiagnostic::new(
             ScaffoldDiagnosticKind::ContentHashInvalid,
@@ -370,9 +350,7 @@ fn sensitive_detail(sensitive: &ScaffoldReceiptSensitiveEvidence) -> &'static st
         ScaffoldReceiptSensitiveEvidence::ProviderPayload => "receipt contains provider payload",
         ScaffoldReceiptSensitiveEvidence::Credential => "receipt contains credential-looking value",
         ScaffoldReceiptSensitiveEvidence::FullPath => "receipt contains full host path",
-        ScaffoldReceiptSensitiveEvidence::UnboundedToolOutput => {
-            "receipt contains unbounded tool output"
-        }
+        ScaffoldReceiptSensitiveEvidence::UnboundedToolOutput => "receipt contains unbounded tool output",
     }
 }
 
@@ -389,9 +367,7 @@ fn valid_id(id: &str) -> bool {
     segments.len() >= MIN_ID_SEGMENT_COUNT
         && segments.iter().all(|segment| {
             !segment.is_empty()
-                && segment
-                    .chars()
-                    .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+                && segment.chars().all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
         })
 }
 

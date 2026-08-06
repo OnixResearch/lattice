@@ -172,9 +172,7 @@ pub struct OverlayLayout {
 pub fn layout(viewport: ratatui::layout::Rect, model: &OverlayModel) -> OverlayLayout {
     let outer = geometry::compute_outer_rect(viewport, model);
     let inner = if model.border {
-        ratatui::widgets::Block::new()
-            .borders(ratatui::widgets::Borders::ALL)
-            .inner(outer)
+        ratatui::widgets::Block::new().borders(ratatui::widgets::Borders::ALL).inner(outer)
     } else {
         outer
     };
@@ -228,11 +226,7 @@ fn paint_overlay(
     paint_border(buf, model, style, layout.outer);
 }
 
-fn paint_inner(
-    buf: &mut ratatui::buffer::Buffer,
-    inner: ratatui::layout::Rect,
-    style: ratatui::style::Style,
-) {
+fn paint_inner(buf: &mut ratatui::buffer::Buffer, inner: ratatui::layout::Rect, style: ratatui::style::Style) {
     if inner.width > 0 && inner.height > 0 {
         paint::rect(buf, inner, style);
     }
@@ -248,14 +242,9 @@ fn paint_border(
         return;
     }
 
-    let mut block = ratatui::widgets::Block::new()
-        .borders(ratatui::widgets::Borders::ALL)
-        .border_style(style.border);
+    let mut block = ratatui::widgets::Block::new().borders(ratatui::widgets::Borders::ALL).border_style(style.border);
     if let Some(title) = &model.title {
-        block = block.title(ratatui::text::Line::from(ratatui::text::Span::styled(
-            title.clone(),
-            style.title,
-        )));
+        block = block.title(ratatui::text::Line::from(ratatui::text::Span::styled(title.clone(), style.title)));
     }
     block.render(outer, buf);
 }

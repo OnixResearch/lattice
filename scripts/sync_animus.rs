@@ -9,7 +9,8 @@ use std::process::ExitCode;
 const EXPECTED_ARGUMENT_COUNT: usize = 3;
 const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
-const EXPECTED_REVISION: &str = "37256d392d75fab519dcc18cff8b3abc2d162bd4";
+const EXPECTED_REVISION: &str = "f1662a8ed290b170c3986d2ddf2909b36d7e5fdc";
+const HOST_CONTROL_REVISION: &str = "7735faf3d8895b0bfa89f563184c4321b3b144a1";
 const GIT_PROGRAM: &str = "git";
 const FAILURE_EXIT_CODE: u8 = 1;
 const README_FILE_NAME: &str = "README.md";
@@ -19,6 +20,27 @@ const POLICY_DIRECTORY_NAME: &str = "policy";
 const CARGO_MANIFEST_FILE_NAME: &str = "Cargo.toml";
 const SOURCE_METADATA_FILE_NAME: &str = "source.ncl";
 const CRATES_DIRECTORY_NAME: &str = "crates";
+const ANIMUS_ADAPTERS_CRATE_NAME: &str = "animus-adapters";
+const HOST_CONTROL_DIRECTORY_NAME: &str = "host-control";
+const HOST_CONTROL_SOURCE_FILE_NAME: &str = "SOURCE";
+const HOST_CONTROL_CORE_MANIFEST: &str = "crates/host-control-core/Cargo.toml";
+const HOST_CONTROL_NORMALIZATION_MARKER: &str = "normalized-manifest: crates/host-control-core/Cargo.toml";
+const HOST_CONTROL_CRATE_EDITION: &str = "edition = \"2021\"";
+const HOST_CONTROL_CRATE_LICENSE: &str = "license = \"MIT OR Apache-2.0\"";
+const HOST_CONTROL_CRATE_RUST_VERSION: &str = "rust-version = \"1.85\"";
+const HOST_CONTROL_CRATE_VERSION: &str = "version = \"0.1.0\"";
+const HOST_CONTROL_LINT_BLOCK: &str = r#"[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"
+"#;
+const HOST_CONTROL_SOURCE_DEPENDENCY: &str = r#"host-control-core = { git = "ssh://git@github.com/OnixResearch/host-control.git", rev = "e359ccb80a52efb860307278510fa5297ac970ed" }"#;
+const HOST_CONTROL_PATH_DEPENDENCY: &str =
+    r#"host-control-core = { path = "../../../host-control/crates/host-control-core" }"#;
 const CRATE_EDITION: &str = "edition = \"2024\"";
 const CRATE_LICENSE: &str = "license = \"MIT OR Apache-2.0\"";
 const CRATE_README: &str = "readme = \"../../README.md\"";
@@ -40,6 +62,7 @@ const STAGING_PREFIX: &str = ".animus-sync-stage";
 const WORKTREE_PREFIX: &str = "lattice-animus-sync-worktree";
 const REQUIRED_CRATES: &[&str] = &[
     "animus-adapter-observability",
+    "animus-adapter-rlm-kernel",
     "animus-adapter-safe",
     "animus-adapters",
     "animus-core",
@@ -51,6 +74,7 @@ const REQUIRED_CRATES: &[&str] = &[
 const NORMALIZED_WORKSPACE_MANIFEST: &str = r#"[workspace]
 members = [
   "crates/animus-adapter-observability",
+  "crates/animus-adapter-rlm-kernel",
   "crates/animus-adapter-safe",
   "crates/animus-adapters",
   "crates/animus-core",
@@ -60,6 +84,7 @@ members = [
 ]
 default-members = [
   "crates/animus-adapter-observability",
+  "crates/animus-adapter-rlm-kernel",
   "crates/animus-adapter-safe",
   "crates/animus-adapters",
   "crates/animus-core",
@@ -108,6 +133,8 @@ fn run() -> Result<(), String> {
         .parent()
         .ok_or_else(|| "Animus destination must have a parent directory".to_string())?;
     let staging_root = destination_parent.join(format!("{STAGING_PREFIX}-{process_id}"));
+    verify_host_control_snapshot(destination_parent)?;
+    normalize_host_control_snapshot(destination_parent)?;
     clean_path(&worktree_root)?;
     clean_path(&staging_root)?;
     add_worktree(&source_root, &worktree_root)?;
@@ -134,6 +161,74 @@ fn parse_arguments(arguments: &[String]) -> Result<(PathBuf, PathBuf), String> {
 
 fn verify_revision_exists(source_root: &Path) -> Result<(), String> {
     run_git(source_root, &["cat-file", "-e", &format!("{EXPECTED_REVISION}^{{commit}}")])
+}
+
+fn verify_host_control_snapshot(destination_parent: &Path) -> Result<(), String> {
+    let host_control_root = destination_parent.join(HOST_CONTROL_DIRECTORY_NAME);
+    let source_path = host_control_root.join(HOST_CONTROL_SOURCE_FILE_NAME);
+    let source = fs::read_to_string(&source_path)
+        .map_err(|error| format!("read Host Control source identity {}: {error}", source_path.display()))?;
+    let expected_revision = format!("revision: {HOST_CONTROL_REVISION}");
+    if !source.lines().any(|line| line == expected_revision) {
+        return Err(format!("Host Control snapshot must use revision {HOST_CONTROL_REVISION}"));
+    }
+    let manifest = host_control_root.join(HOST_CONTROL_CORE_MANIFEST);
+    if !manifest.is_file() {
+        return Err(format!("Host Control core manifest is missing: {}", manifest.display()));
+    }
+    Ok(())
+}
+
+fn normalize_host_control_snapshot(destination_parent: &Path) -> Result<(), String> {
+    let host_control_root = destination_parent.join(HOST_CONTROL_DIRECTORY_NAME);
+    let manifest_path = host_control_root.join(HOST_CONTROL_CORE_MANIFEST);
+    let source = fs::read_to_string(&manifest_path)
+        .map_err(|error| format!("read Host Control manifest {}: {error}", manifest_path.display()))?;
+    let normalized = normalize_host_control_manifest(&source)?;
+    fs::write(&manifest_path, normalized)
+        .map_err(|error| format!("write Host Control manifest {}: {error}", manifest_path.display()))?;
+
+    let source_path = host_control_root.join(HOST_CONTROL_SOURCE_FILE_NAME);
+    let mut identity = fs::read_to_string(&source_path)
+        .map_err(|error| format!("read Host Control source identity {}: {error}", source_path.display()))?;
+    if !identity.lines().any(|line| line == HOST_CONTROL_NORMALIZATION_MARKER) {
+        identity.push_str(HOST_CONTROL_NORMALIZATION_MARKER);
+        identity.push('\n');
+        fs::write(&source_path, identity)
+            .map_err(|error| format!("write Host Control source identity {}: {error}", source_path.display()))?;
+    }
+    Ok(())
+}
+
+fn normalize_host_control_manifest(source: &str) -> Result<String, String> {
+    let workspace_replacements = [
+        ("edition.workspace = true", HOST_CONTROL_CRATE_EDITION),
+        ("license.workspace = true", HOST_CONTROL_CRATE_LICENSE),
+        ("rust-version.workspace = true", HOST_CONTROL_CRATE_RUST_VERSION),
+        ("version.workspace = true", HOST_CONTROL_CRATE_VERSION),
+        (WORKSPACE_LINT_BLOCK, HOST_CONTROL_LINT_BLOCK),
+    ];
+    let explicit_values = [
+        HOST_CONTROL_CRATE_EDITION,
+        HOST_CONTROL_CRATE_LICENSE,
+        HOST_CONTROL_CRATE_RUST_VERSION,
+        HOST_CONTROL_CRATE_VERSION,
+        HOST_CONTROL_LINT_BLOCK,
+    ];
+    let has_explicit_values = explicit_values.iter().all(|explicit_value| source.matches(explicit_value).count() == 1);
+    if has_explicit_values
+        && !workspace_replacements.iter().any(|(workspace_value, _)| source.contains(workspace_value))
+    {
+        return Ok(source.to_string());
+    }
+    let mut normalized = source.to_string();
+    for (workspace_value, explicit_value) in workspace_replacements {
+        if normalized.matches(workspace_value).count() != 1 {
+            return Err("Host Control manifest does not match the reviewed workspace or normalized shape".to_string());
+        }
+        normalized = normalized.replacen(workspace_value, explicit_value, 1);
+    }
+    Ok(normalized)
 }
 
 fn add_worktree(source_root: &Path, worktree_root: &Path) -> Result<(), String> {
@@ -169,7 +264,7 @@ fn stage_snapshot(worktree_root: &Path, staging_root: &Path) -> Result<(), Strin
     for crate_name in REQUIRED_CRATES {
         let staging_crate = staging_crates.join(crate_name);
         copy_directory(&worktree_root.join(CRATES_DIRECTORY_NAME).join(crate_name), &staging_crate)?;
-        normalize_copied_manifest(&staging_crate.join(CARGO_MANIFEST_FILE_NAME))?;
+        normalize_copied_manifest(crate_name, &staging_crate.join(CARGO_MANIFEST_FILE_NAME))?;
     }
     fs::write(staging_root.join(CARGO_MANIFEST_FILE_NAME), NORMALIZED_WORKSPACE_MANIFEST)
         .map_err(|error| format!("write normalized Animus workspace manifest: {error}"))?;
@@ -178,14 +273,14 @@ fn stage_snapshot(worktree_root: &Path, staging_root: &Path) -> Result<(), Strin
     Ok(())
 }
 
-fn normalize_copied_manifest(manifest_path: &Path) -> Result<(), String> {
+fn normalize_copied_manifest(crate_name: &str, manifest_path: &Path) -> Result<(), String> {
     let source =
         fs::read_to_string(manifest_path).map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
-    let normalized = normalize_manifest(&source)?;
+    let normalized = normalize_manifest(crate_name, &source)?;
     fs::write(manifest_path, normalized).map_err(|error| format!("write {}: {error}", manifest_path.display()))
 }
 
-fn normalize_manifest(source: &str) -> Result<String, String> {
+fn normalize_manifest(crate_name: &str, source: &str) -> Result<String, String> {
     let replacements = [
         ("edition.workspace = true", CRATE_EDITION),
         ("license.workspace = true", CRATE_LICENSE),
@@ -200,6 +295,14 @@ fn normalize_manifest(source: &str) -> Result<String, String> {
             return Err(format!("expected one manifest field {workspace_value:?}"));
         }
         normalized = normalized.replacen(workspace_value, explicit_value, 1);
+    }
+    if crate_name == ANIMUS_ADAPTERS_CRATE_NAME {
+        if normalized.matches(HOST_CONTROL_SOURCE_DEPENDENCY).count() != 1 {
+            return Err("Animus adapters must contain one exact Host Control dependency".to_string());
+        }
+        normalized = normalized.replacen(HOST_CONTROL_SOURCE_DEPENDENCY, HOST_CONTROL_PATH_DEPENDENCY, 1);
+    } else if normalized.contains(HOST_CONTROL_SOURCE_DEPENDENCY) {
+        return Err(format!("unexpected Host Control dependency in {crate_name}"));
     }
     Ok(normalized)
 }
@@ -260,21 +363,70 @@ fn source_metadata() -> String {
         r#"let Source = {{
   repository | String,
   revision | String,
+  host_control_revision | String,
   crates | Array String,
   normalized_workspace_manifest | Bool,
   normalized_crate_manifests | Bool,
+  host_control_path_dependency | Bool,
   includes_compile_time_assets | Bool,
 }} in
 {{
   repository = "ssh://git@github.com/OnixResearch/animus.git",
   revision = "{EXPECTED_REVISION}",
+  host_control_revision = "{HOST_CONTROL_REVISION}",
   crates = [
 {crate_rows}
   ],
   normalized_workspace_manifest = true,
   normalized_crate_manifests = true,
+  host_control_path_dependency = true,
   includes_compile_time_assets = true,
 }} | Source
 "#
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn workspace_manifest(extra_dependency: &str) -> String {
+        format!(
+            "[package]\nedition.workspace = true\nlicense.workspace = true\nreadme.workspace = true\nrust-version.workspace = true\nversion.workspace = true\n\n[lints]\nworkspace = true\n\n[dependencies]\n{extra_dependency}\n"
+        )
+    }
+
+    #[test]
+    fn normalization_uses_the_vendored_host_control_core() {
+        let source = workspace_manifest(HOST_CONTROL_SOURCE_DEPENDENCY);
+        let normalized = normalize_manifest(ANIMUS_ADAPTERS_CRATE_NAME, &source).expect("normalize adapters manifest");
+
+        assert!(normalized.contains(HOST_CONTROL_PATH_DEPENDENCY));
+        assert!(!normalized.contains(HOST_CONTROL_SOURCE_DEPENDENCY));
+        assert!(normalized.contains(CRATE_EDITION));
+    }
+
+    #[test]
+    fn normalization_rejects_missing_or_misplaced_host_control_dependencies() {
+        let missing = workspace_manifest("");
+        assert!(normalize_manifest(ANIMUS_ADAPTERS_CRATE_NAME, &missing).is_err());
+
+        let misplaced = workspace_manifest(HOST_CONTROL_SOURCE_DEPENDENCY);
+        assert!(normalize_manifest("animus-core", &misplaced).is_err());
+    }
+
+    #[test]
+    fn host_control_normalization_is_reproducible() {
+        let source = "[package]\nname = \"host-control-core\"\nedition.workspace = true\nlicense.workspace = true\nrust-version.workspace = true\nversion.workspace = true\n\n[lints]\nworkspace = true\n";
+        let normalized = normalize_host_control_manifest(source).expect("normalize Host Control manifest");
+
+        assert!(normalized.contains(HOST_CONTROL_CRATE_EDITION));
+        assert!(normalized.contains(HOST_CONTROL_LINT_BLOCK));
+        assert_eq!(normalize_host_control_manifest(&normalized), Ok(normalized));
+    }
+
+    #[test]
+    fn host_control_normalization_rejects_an_unknown_manifest_shape() {
+        assert!(normalize_host_control_manifest("[package]\nname = \"host-control-core\"\n").is_err());
+    }
 }

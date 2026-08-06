@@ -3,19 +3,17 @@
 #[path = "matrix/checks.rs"]
 mod checks;
 
-const RENDERER_SUBWAYRAT_TERMINAL: &str = "subwayrat-terminal";
-const RENDERER_SUBWAYRAT_RATZILLA: &str = "subwayrat-ratzilla";
-const RENDERER_METEORITE_DOM: &str = "meteorite-dom";
+#[cfg(test)]
+const RENDERER_SUBWAYRAT_TERMINAL: &str = crate::targeting_core::TARGET_SUBWAYRAT_TERMINAL;
+#[cfg(test)]
+const RENDERER_SUBWAYRAT_RATZILLA: &str = crate::targeting_core::TARGET_SUBWAYRAT_RATZILLA;
+#[cfg(test)]
+const RENDERER_METEORITE_DOM: &str = crate::targeting_core::TARGET_METEORITE_DOM;
 const STATUS_COMPLETE: &str = "complete";
 const STATUS_PARTIAL: &str = "partial";
 const STATUS_UNSUPPORTED: &str = "unsupported";
 const STATUS_BLOCKED: &str = "blocked";
 const STATUS_DIVERGENT: &str = "divergent";
-const REQUIRED_RENDERERS: &[&str] = &[
-    RENDERER_SUBWAYRAT_TERMINAL,
-    RENDERER_SUBWAYRAT_RATZILLA,
-    RENDERER_METEORITE_DOM,
-];
 const KNOWN_STATUSES: &[&str] = &[
     STATUS_COMPLETE,
     STATUS_PARTIAL,
@@ -23,12 +21,7 @@ const KNOWN_STATUSES: &[&str] = &[
     STATUS_BLOCKED,
     STATUS_DIVERGENT,
 ];
-const GAP_STATUSES: &[&str] = &[
-    STATUS_PARTIAL,
-    STATUS_UNSUPPORTED,
-    STATUS_BLOCKED,
-    STATUS_DIVERGENT,
-];
+const GAP_STATUSES: &[&str] = &[STATUS_PARTIAL, STATUS_UNSUPPORTED, STATUS_BLOCKED, STATUS_DIVERGENT];
 
 /// One renderer status in the full mouse support matrix.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -166,6 +159,14 @@ pub enum FullMouseSupportIssueCode {
     MissingDiagnosticsCoverage,
     /// A gap row lacks a next action.
     MissingNextAction,
+    /// Renderer registry or scope policy is invalid.
+    InvalidRendererScope,
+    /// A renderer status cell is duplicated.
+    DuplicateRenderer,
+    /// A renderer target is unknown.
+    UnknownRenderer,
+    /// A renderer target is outside this specialized scope.
+    OutOfScopeRenderer,
 }
 
 /// Deterministic full mouse matrix validation issue.
@@ -214,12 +215,26 @@ impl FullMouseSupportReport {
     }
 }
 
-/// Validates full mouse support matrix rows.
+/// Validates full mouse rows against the fixed maintained target scope.
 #[must_use]
 pub fn validate_full_mouse_support_matrix(rows: &[FullMouseSupportRow]) -> FullMouseSupportReport {
-    let mut issues = Vec::with_capacity(rows.len());
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let scope =
+        crate::targeting_core::built_in_renderer_scope(crate::targeting_core::BuiltInRendererScope::FullMouseTargets);
+    validate_full_mouse_support_matrix_with_policy(rows, &registry, &scope)
+}
+
+/// Validates full mouse rows against an explicit concrete-target scope.
+#[must_use]
+pub fn validate_full_mouse_support_matrix_with_policy(
+    rows: &[FullMouseSupportRow],
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> FullMouseSupportReport {
+    let scope_validation = crate::targeting_core::validate_renderer_scope(registry, scope);
+    let mut issues = checks::scope_issues(scope, &scope_validation);
     let mut seen = std::collections::BTreeSet::new();
-    debug_assert!(issues.capacity() >= rows.len());
+    debug_assert!(issues.capacity() >= scope_validation.issues.len());
     for row in rows {
         if !seen.insert(row.capability_id.clone()) {
             issues.push(FullMouseSupportIssue::new(
@@ -229,7 +244,7 @@ pub fn validate_full_mouse_support_matrix(rows: &[FullMouseSupportRow]) -> FullM
                 "duplicate full mouse capability ID",
             ));
         }
-        issues.extend(checks::row_issues(row));
+        issues.extend(checks::row_issues(row, registry, scope));
     }
     let mut sorted_rows = rows.to_vec();
     sorted_rows.sort_by(|left, right| left.capability_id.cmp(&right.capability_id));

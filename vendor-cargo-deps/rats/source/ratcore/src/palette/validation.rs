@@ -1,17 +1,8 @@
 use super::*;
 
-pub(super) fn token_issues(
-    preset: &crate::generated_theme_tokens::GeneratedThemePreset,
-) -> Vec<ThemeIssue> {
-    let roles = preset
-        .colors
-        .iter()
-        .map(|color| color.role)
-        .collect::<std::collections::BTreeSet<_>>();
-    let issue_bound = REQUIRED_ROLES
-        .len()
-        .saturating_add(preset.colors.len())
-        .saturating_add(1);
+pub(super) fn token_issues(preset: &crate::generated_theme_tokens::GeneratedThemePreset) -> Vec<ThemeIssue> {
+    let roles = preset.colors.iter().map(|color| color.role).collect::<std::collections::BTreeSet<_>>();
+    let issue_bound = REQUIRED_ROLES.len().saturating_add(preset.colors.len()).saturating_add(1);
     let mut issues = Vec::with_capacity(issue_bound);
     debug_assert!(roles.len() <= preset.colors.len());
     debug_assert!(issues.capacity() >= issue_bound);
@@ -43,9 +34,7 @@ pub(super) fn token_issues(
     issues
 }
 
-pub(super) fn css_freshness_issues(
-    preset: &crate::generated_theme_tokens::GeneratedThemePreset,
-) -> Vec<ThemeIssue> {
+pub(super) fn css_freshness_issues(preset: &crate::generated_theme_tokens::GeneratedThemePreset) -> Vec<ThemeIssue> {
     let expected = export_css(preset);
     if expected == preset.css {
         Vec::new()

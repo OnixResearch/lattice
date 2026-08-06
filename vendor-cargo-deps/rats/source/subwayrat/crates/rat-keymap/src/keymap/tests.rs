@@ -1,3 +1,11 @@
+use ratcore::action_registry::BindingCatalogLimits;
+use ratcore::action_registry::KeyModifier;
+use ratcore::action_registry::KeySequence;
+use ratcore::action_registry::LogicalKey;
+use ratcore::action_registry::LogicalKeystroke;
+
+use super::LocalSequenceResolution;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum TestMode {
     Normal,
@@ -12,14 +20,12 @@ enum TestAction {
     Quit,
 }
 
-const EXPECTED_DESCRIBED_BINDINGS: usize = 2;
-const EMPTY_MODE_COUNT: usize = 0;
-const ONE_MODE_COUNT: usize = 1;
-const EMPTY_BINDING_COUNT: u64 = 0;
-const ONE_BINDING_COUNT: u64 = 1;
+fn stroke(key: LogicalKey, modifiers: Vec<KeyModifier>) -> LogicalKeystroke {
+    LogicalKeystroke::try_new(key, modifiers).expect("test stroke is valid")
+}
 
-fn test_parse_action(s: &str) -> Option<TestAction> {
-    match s {
+fn test_parse_action(value: &str) -> Option<TestAction> {
+    match value {
         "move_up" => Some(TestAction::MoveUp),
         "move_down" => Some(TestAction::MoveDown),
         "submit" => Some(TestAction::Submit),
@@ -29,187 +35,88 @@ fn test_parse_action(s: &str) -> Option<TestAction> {
 }
 
 #[test]
-fn basic_resolve() {
+fn resolves_only_equal_logical_identity_in_the_requested_mode() {
     let mut keymap = super::Map::new();
-    keymap.set(
-        TestMode::Normal,
-        crate::combo::Chord::new(crate::combo::Code::Char('k'), false, false, false),
-        TestAction::MoveUp,
-    );
+    let up = stroke(LogicalKey::Character('k'), Vec::new());
+    keymap.set(TestMode::Normal, up.clone(), TestAction::MoveUp);
 
-    let event =
-        crate::combo::Event::new(crate::combo::Code::Char('k'), crate::combo::Modifiers::NONE);
-    assert_eq!(
-        keymap.resolve(&TestMode::Normal, &event),
-        Some(TestAction::MoveUp)
-    );
-
-    // Different mode should return None.
-    assert_eq!(keymap.resolve(&TestMode::Insert, &event), None);
-
-    // Different key should return None.
-    let other_event =
-        crate::combo::Event::new(crate::combo::Code::Char('j'), crate::combo::Modifiers::NONE);
-    assert_eq!(keymap.resolve(&TestMode::Normal, &other_event), None);
+    assert_eq!(keymap.resolve(&TestMode::Normal, &up), Some(TestAction::MoveUp));
+    assert_eq!(keymap.resolve(&TestMode::Insert, &up), None);
+    assert_eq!(keymap.resolve(&TestMode::Normal, &stroke(LogicalKey::Character('j'), Vec::new())), None);
 }
 
 #[test]
-fn build_with_overrides() {
+fn builds_with_valid_overrides_and_rejects_malformed_entries() {
     let mode_bindings = vec![
         (TestMode::Normal, {
             let mut map = std::collections::HashMap::new();
-            map.insert(
-                crate::combo::Chord::new(crate::combo::Code::Char('k'), false, false, false),
-                TestAction::MoveUp,
-            );
-            map.insert(
-                crate::combo::Chord::new(crate::combo::Code::Char('j'), false, false, false),
-                TestAction::MoveDown,
-            );
+            map.insert(stroke(LogicalKey::Character('k'), Vec::new()), TestAction::MoveUp);
+            map.insert(stroke(LogicalKey::Character('j'), Vec::new()), TestAction::MoveDown);
             map
         }),
         (TestMode::Insert, {
             let mut map = std::collections::HashMap::new();
-            map.insert(
-                crate::combo::Chord::new(crate::combo::Code::Enter, false, false, false),
-                TestAction::Submit,
-            );
+            map.insert(stroke(LogicalKey::Enter, Vec::new()), TestAction::Submit);
             map
         }),
     ];
-
     let overrides = vec![(TestMode::Normal, {
         let mut map = std::collections::HashMap::new();
         map.insert("q".to_string(), "quit".to_string());
+        map.insert("Hyper+x".to_string(), "quit".to_string());
+        map.insert("x".to_string(), "not-an-action".to_string());
         map
     })];
 
     let keymap = super::Map::build(mode_bindings, &overrides, test_parse_action);
-
-    // Test original binding.
-    let k_event =
-        crate::combo::Event::new(crate::combo::Code::Char('k'), crate::combo::Modifiers::NONE);
     assert_eq!(
-        keymap.resolve(&TestMode::Normal, &k_event),
-        Some(TestAction::MoveUp)
-    );
-
-    // Test override.
-    let q_event =
-        crate::combo::Event::new(crate::combo::Code::Char('q'), crate::combo::Modifiers::NONE);
-    assert_eq!(
-        keymap.resolve(&TestMode::Normal, &q_event),
+        keymap.resolve(&TestMode::Normal, &stroke(LogicalKey::Character('q'), Vec::new())),
         Some(TestAction::Quit)
     );
-
-    // Test insert mode binding.
-    let enter_event =
-        crate::combo::Event::new(crate::combo::Code::Enter, crate::combo::Modifiers::NONE);
-    assert_eq!(
-        keymap.resolve(&TestMode::Insert, &enter_event),
-        Some(TestAction::Submit)
-    );
+    assert_eq!(keymap.resolve(&TestMode::Insert, &stroke(LogicalKey::Enter, Vec::new())), Some(TestAction::Submit));
+    assert_eq!(keymap.mode_binding_count(&TestMode::Normal), 3);
 }
 
 #[test]
-fn build_ignores_invalid_override_key_and_action() {
-    let mode_bindings = vec![(TestMode::Normal, std::collections::HashMap::new())];
-    let overrides = vec![(TestMode::Normal, {
-        let mut map = std::collections::HashMap::new();
-        map.insert("not-a-real-key".to_string(), "quit".to_string());
-        map.insert("q".to_string(), "not-a-real-action".to_string());
-        map
-    })];
-
-    let keymap = super::Map::build(mode_bindings, &overrides, test_parse_action);
-    let q_event =
-        crate::combo::Event::new(crate::combo::Code::Char('q'), crate::combo::Modifiers::NONE);
-
-    assert_eq!(keymap.resolve(&TestMode::Normal, &q_event), None);
-    assert_eq!(
-        keymap.mode_binding_count(&TestMode::Normal),
-        EMPTY_BINDING_COUNT
-    );
-}
-
-#[test]
-fn describe() {
+fn descriptions_are_deterministic_and_use_canonical_modifier_order() {
     let mut keymap = super::Map::new();
-    keymap.set(
-        TestMode::Normal,
-        crate::combo::Chord::new(crate::combo::Code::Char('k'), false, false, false),
-        TestAction::MoveUp,
-    );
-    keymap.set(
-        TestMode::Normal,
-        crate::combo::Chord::new(crate::combo::Code::Char('q'), true, false, false),
-        TestAction::Quit,
-    );
+    keymap.set(TestMode::Normal, stroke(LogicalKey::Character('q'), vec![KeyModifier::Control]), TestAction::Quit);
+    keymap.set(TestMode::Normal, stroke(LogicalKey::Character('k'), Vec::new()), TestAction::MoveUp);
 
-    let bindings = keymap.describe(&TestMode::Normal);
-    assert_eq!(bindings.len(), EXPECTED_DESCRIBED_BINDINGS);
-
-    // Check that we have the expected bindings (order may vary due to HashMap).
-    let binding_map: std::collections::HashMap<String, TestAction> = bindings.into_iter().collect();
-    assert_eq!(binding_map.get("k"), Some(&TestAction::MoveUp));
-    assert_eq!(binding_map.get("Ctrl+q"), Some(&TestAction::Quit));
-
-    // Empty mode should return empty list.
-    let empty_bindings = keymap.describe(&TestMode::Insert);
-    assert!(empty_bindings.is_empty());
+    assert_eq!(keymap.describe(&TestMode::Normal), vec![
+        ("Ctrl+q".to_string(), TestAction::Quit),
+        ("k".to_string(), TestAction::MoveUp),
+    ]);
+    assert!(keymap.describe(&TestMode::Insert).is_empty());
 }
 
 #[test]
-fn mode_management() {
+fn multi_stroke_sequences_are_handed_to_the_layered_resolver() {
+    let local = stroke(LogicalKey::Character('k'), Vec::new());
+    let continuation = stroke(LogicalKey::Character('c'), Vec::new());
+    let one = KeySequence::try_new(vec![local.clone()], &BindingCatalogLimits::default()).expect("one stroke sequence");
+    let two = KeySequence::try_new(vec![local.clone(), continuation], &BindingCatalogLimits::default())
+        .expect("two stroke sequence");
     let mut keymap = super::Map::new();
+    keymap.set(TestMode::Normal, local, TestAction::MoveUp);
 
-    // Initially no modes.
-    assert_eq!(keymap.modes().count(), EMPTY_MODE_COUNT);
+    assert_eq!(
+        keymap.resolve_local_sequence(&TestMode::Normal, &one),
+        LocalSequenceResolution::Local(TestAction::MoveUp)
+    );
+    assert_eq!(
+        keymap.resolve_local_sequence(&TestMode::Normal, &two),
+        LocalSequenceResolution::LayeredResolutionRequired
+    );
+}
+
+#[test]
+fn modes_and_clear_are_bounded_local_state() {
+    let mut keymap = super::Map::new();
     assert!(!keymap.has_mode(&TestMode::Normal));
-    assert_eq!(
-        keymap.mode_binding_count(&TestMode::Normal),
-        EMPTY_BINDING_COUNT
-    );
-
-    // Add a binding.
-    keymap.set(
-        TestMode::Normal,
-        crate::combo::Chord::new(crate::combo::Code::Char('k'), false, false, false),
-        TestAction::MoveUp,
-    );
-
-    assert_eq!(keymap.modes().count(), ONE_MODE_COUNT);
+    keymap.set(TestMode::Normal, stroke(LogicalKey::Character('k'), Vec::new()), TestAction::MoveUp);
     assert!(keymap.has_mode(&TestMode::Normal));
-    assert_eq!(
-        keymap.mode_binding_count(&TestMode::Normal),
-        ONE_BINDING_COUNT
-    );
-
-    // Clear the mode.
+    assert_eq!(keymap.modes().count(), 1);
     keymap.clear_mode(&TestMode::Normal);
-    assert_eq!(keymap.modes().count(), EMPTY_MODE_COUNT);
     assert!(!keymap.has_mode(&TestMode::Normal));
-}
-
-#[test]
-fn modifier_keys() {
-    let mut keymap = super::Map::new();
-    keymap.set(
-        TestMode::Normal,
-        crate::combo::Chord::new(crate::combo::Code::Char('c'), true, false, false),
-        TestAction::Quit,
-    );
-
-    let ctrl_c = crate::combo::Event::new(
-        crate::combo::Code::Char('c'),
-        crate::combo::Modifiers::CONTROL,
-    );
-    assert_eq!(
-        keymap.resolve(&TestMode::Normal, &ctrl_c),
-        Some(TestAction::Quit)
-    );
-
-    let plain_c =
-        crate::combo::Event::new(crate::combo::Code::Char('c'), crate::combo::Modifiers::NONE);
-    assert_eq!(keymap.resolve(&TestMode::Normal, &plain_c), None);
 }

@@ -1,14 +1,16 @@
 use super::carrier::ContextReferenceFragment;
 use super::failure::ContextReferenceError;
 use super::forms::ContextReferenceKind;
-use super::rules::{
-    ContextReferencePolicyDecision, ContextReferenceStatus, ContextResolverKind,
-    ContextTruncationState,
-};
-use crate::prompt::base::{
-    BYTE_COUNT_LABEL, CONTEXT_BOUNDS_FIELD, LINE_COUNT_LABEL, VISIBLE_BYTE_COUNT_LABEL,
-    VISIBLE_LINE_COUNT_LABEL, ZERO_COUNT,
-};
+use super::rules::ContextReferencePolicyDecision;
+use super::rules::ContextReferenceStatus;
+use super::rules::ContextResolverKind;
+use super::rules::ContextTruncationState;
+use crate::prompt::base::BYTE_COUNT_LABEL;
+use crate::prompt::base::CONTEXT_BOUNDS_FIELD;
+use crate::prompt::base::LINE_COUNT_LABEL;
+use crate::prompt::base::VISIBLE_BYTE_COUNT_LABEL;
+use crate::prompt::base::VISIBLE_LINE_COUNT_LABEL;
+use crate::prompt::base::ZERO_COUNT;
 
 /// Original and model-visible context-reference count metadata.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,12 +24,7 @@ pub struct ContextReferenceCounts {
 impl ContextReferenceCounts {
     /// Builds count metadata for provenance validation.
     #[must_use]
-    pub const fn new(
-        byte_count: u32,
-        line_count: u32,
-        visible_byte_count: u32,
-        visible_line_count: u32,
-    ) -> Self {
+    pub const fn new(byte_count: u32, line_count: u32, visible_byte_count: u32, visible_line_count: u32) -> Self {
         Self {
             total_bytes: byte_count,
             total_lines: line_count,
@@ -156,14 +153,8 @@ impl ContextReferenceProvenance {
         let counts = [
             crate::safe::receipt::BoundedCountDraft::new(BYTE_COUNT_LABEL, draft.byte_count),
             crate::safe::receipt::BoundedCountDraft::new(LINE_COUNT_LABEL, draft.line_count),
-            crate::safe::receipt::BoundedCountDraft::new(
-                VISIBLE_BYTE_COUNT_LABEL,
-                draft.visible_byte_count,
-            ),
-            crate::safe::receipt::BoundedCountDraft::new(
-                VISIBLE_LINE_COUNT_LABEL,
-                draft.visible_line_count,
-            ),
+            crate::safe::receipt::BoundedCountDraft::new(VISIBLE_BYTE_COUNT_LABEL, draft.visible_byte_count),
+            crate::safe::receipt::BoundedCountDraft::new(VISIBLE_LINE_COUNT_LABEL, draft.visible_line_count),
         ];
         let redactions = [
             crate::safe::receipt::Redaction::OutputBounded,
@@ -203,21 +194,16 @@ impl ContextReferenceProvenance {
     }
 }
 
-fn reject_unbounded_output(
-    draft: &ContextReferenceProvenanceDraft<'_>,
-) -> Result<(), ContextReferenceError> {
-    let is_visible_smaller =
-        draft.visible_byte_count < draft.byte_count || draft.visible_line_count < draft.line_count;
+fn reject_unbounded_output(draft: &ContextReferenceProvenanceDraft<'_>) -> Result<(), ContextReferenceError> {
+    let is_visible_smaller = draft.visible_byte_count < draft.byte_count || draft.visible_line_count < draft.line_count;
     if draft.status == ContextReferenceStatus::Included
         && draft.truncation == ContextTruncationState::None
         && is_visible_smaller
     {
-        return Err(ContextReferenceError::SafeMetadata(
-            crate::safe::receipt::Error::UnsafeMetadata {
-                field: CONTEXT_BOUNDS_FIELD,
-                class: crate::safe::receipt::LeakClass::UnboundedOutput,
-            },
-        ));
+        return Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata {
+            field: CONTEXT_BOUNDS_FIELD,
+            class: crate::safe::receipt::LeakClass::UnboundedOutput,
+        }));
     }
     Ok(())
 }
@@ -226,9 +212,7 @@ fn receipt_status(status: ContextReferenceStatus) -> crate::safe::receipt::Statu
     match status {
         ContextReferenceStatus::Included => crate::safe::receipt::Status::Completed,
         ContextReferenceStatus::Truncated => crate::safe::receipt::Status::Redacted,
-        ContextReferenceStatus::Rejected | ContextReferenceStatus::Denied => {
-            crate::safe::receipt::Status::Denied
-        }
+        ContextReferenceStatus::Rejected | ContextReferenceStatus::Denied => crate::safe::receipt::Status::Denied,
         ContextReferenceStatus::MissingResolver => crate::safe::receipt::Status::Blocked,
         ContextReferenceStatus::Unavailable => crate::safe::receipt::Status::Failed,
     }

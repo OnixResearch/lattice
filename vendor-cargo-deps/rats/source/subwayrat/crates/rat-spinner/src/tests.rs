@@ -5,14 +5,8 @@ fn preset_defaults_match_expected_intervals() {
     let dots = SpinnerSpec::dots();
     let pulse = SpinnerSpec::pulse();
 
-    assert_eq!(
-        dots.interval(),
-        core::time::Duration::from_millis(DOTS_INTERVAL_MS)
-    );
-    assert_eq!(
-        pulse.interval(),
-        core::time::Duration::from_millis(PULSE_INTERVAL_MS)
-    );
+    assert_eq!(dots.interval(), core::time::Duration::from_millis(DOTS_INTERVAL_MS));
+    assert_eq!(pulse.interval(), core::time::Duration::from_millis(PULSE_INTERVAL_MS));
     assert_eq!(dots.frames()[0], "⠋");
     assert_eq!(pulse.frames()[0], "∙∙∙");
 }
@@ -47,8 +41,7 @@ fn reverse_reads_frames_from_end() {
 
 #[test]
 fn advance_respects_interval() {
-    let spec =
-        SpinnerSpec::line().with_interval(core::time::Duration::from_millis(PULSE_INTERVAL_MS));
+    let spec = SpinnerSpec::line().with_interval(core::time::Duration::from_millis(PULSE_INTERVAL_MS));
     let mut state = SpinnerState::new();
 
     state.advance(&spec, core::time::Duration::from_millis(99));

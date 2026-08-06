@@ -1,18 +1,18 @@
 #![allow(unknown_lints)]
-#![allow(
-    non_trait_imports,
-    path_segment_repetition,
-    underscore_in_module_filename
-)]
+#![allow(non_trait_imports, path_segment_repetition, underscore_in_module_filename)]
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::num::NonZeroU32;
 
-use super::{
-    GuidanceError, MAX_SKILL_DESCRIPTOR_ITEMS, SKILL_DEPENDENCY_FIELD, SKILL_SOURCE_FIELD,
-    SkillManifest, contains_dependency, normalize, normalize_list,
-};
+use super::GuidanceError;
+use super::MAX_SKILL_DESCRIPTOR_ITEMS;
+use super::SKILL_DEPENDENCY_FIELD;
+use super::SKILL_SOURCE_FIELD;
+use super::SkillManifest;
+use super::contains_dependency;
+use super::normalize;
+use super::normalize_list;
 
 /// Skill invocation policy for deferred full-instruction loading.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -68,11 +68,10 @@ impl SkillDiscoveryMetadata {
     /// too many dependency hints are supplied, or the budget cost is zero.
     // r[impl agent_harness_runtime.openai_codex_guidance_skill_budget.skill_metadata]
     pub fn validate(draft: &SkillDiscoveryDraft<'_>) -> Result<Self, GuidanceError> {
-        let context_budget_cost = NonZeroU32::new(draft.context_budget_cost).ok_or_else(|| {
-            GuidanceError::ZeroBudgetCost {
+        let context_budget_cost =
+            NonZeroU32::new(draft.context_budget_cost).ok_or_else(|| GuidanceError::ZeroBudgetCost {
                 source: String::from(draft.manifest.name()),
-            }
-        })?;
+            })?;
         Ok(Self {
             name: String::from(draft.manifest.name()),
             description: String::from(draft.manifest.description()),
@@ -174,10 +173,7 @@ pub enum SkillLoadDenial {
 /// Decides whether full skill instructions may be loaded.
 #[must_use]
 // r[impl agent_harness_runtime.openai_codex_guidance_skill_budget.deferred_loading]
-pub fn decide_skill_loading(
-    metadata: &[SkillDiscoveryMetadata],
-    request: SkillLoadRequest<'_>,
-) -> SkillLoadDecision {
+pub fn decide_skill_loading(metadata: &[SkillDiscoveryMetadata], request: SkillLoadRequest<'_>) -> SkillLoadDecision {
     let candidate = match unique_skill_candidate(metadata, request.name) {
         Ok(candidate) => candidate,
         Err(denial) => return SkillLoadDecision::Deny(denial),
@@ -199,29 +195,19 @@ fn unique_skill_candidate<'a>(
     Ok(first_candidate)
 }
 
-fn skill_policy_denial(
-    candidate: &SkillDiscoveryMetadata,
-    request: SkillLoadRequest<'_>,
-) -> Option<SkillLoadDenial> {
+fn skill_policy_denial(candidate: &SkillDiscoveryMetadata, request: SkillLoadRequest<'_>) -> Option<SkillLoadDenial> {
     if candidate.invocation_policy() == SkillInvocationPolicy::Disabled {
         return Some(SkillLoadDenial::Disabled);
     }
-    if request.mode == SkillInvocationMode::Implicit
-        && !candidate.invocation_policy().allows_implicit()
-    {
+    if request.mode == SkillInvocationMode::Implicit && !candidate.invocation_policy().allows_implicit() {
         return Some(SkillLoadDenial::ImplicitInvocationDenied);
     }
-    missing_dependency(candidate, request.available_dependencies).map(|dependency| {
-        SkillLoadDenial::MissingDependency {
-            dependency: String::from(dependency),
-        }
+    missing_dependency(candidate, request.available_dependencies).map(|dependency| SkillLoadDenial::MissingDependency {
+        dependency: String::from(dependency),
     })
 }
 
-fn missing_dependency<'a>(
-    candidate: &'a SkillDiscoveryMetadata,
-    available_dependencies: &[&str],
-) -> Option<&'a str> {
+fn missing_dependency<'a>(candidate: &'a SkillDiscoveryMetadata, available_dependencies: &[&str]) -> Option<&'a str> {
     candidate
         .dependency_hints()
         .iter()

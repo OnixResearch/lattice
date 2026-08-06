@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "field": "cohort",
+      "id": "unknown-cohort",
+      "value": "unknown"
+    },
+    {
+      "field": "trust_source",
+      "id": "project-local-policy",
+      "value": "project-local"
+    },
+    {
+      "field": "roots.mode",
+      "id": "implicit-writable",
+      "value": "implicit"
+    },
+    {
+      "field": "devices",
+      "id": "broad-devices",
+      "value": "true"
+    },
+    {
+      "field": "host_sockets",
+      "id": "host-sockets",
+      "value": "true"
+    },
+    {
+      "field": "network",
+      "id": "filtered-network-claim",
+      "value": "filtered"
+    },
+    {
+      "field": "escape_hatches.raw_arguments",
+      "id": "raw-arguments",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.command_prefix",
+      "id": "command-prefix",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.passthrough",
+      "id": "passthrough",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.command_environment_source",
+      "id": "command-source",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.implicit_shell",
+      "id": "implicit-shell",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.unguarded_fallback",
+      "id": "unguarded-fallback",
+      "value": "true"
+    },
+    {
+      "field": "escape_hatches.privileged_sidecar",
+      "id": "privileged-sidecar",
+      "value": "true"
+    },
+    {
+      "field": "bounds.max_roots",
+      "id": "zero-bound",
+      "value": "0"
+    },
+    {
+      "field": "label",
+      "id": "unsafe-label",
+      "value": "/private/profile"
+    },
+    {
+      "field": "redaction.raw_payloads",
+      "id": "weakened-redaction",
+      "value": "true"
+    },
+    {
+      "field": "non_claims",
+      "id": "weakened-non-claims",
+      "value": "empty"
+    }
+  ],
+  "schema": "animus.agent-guardrail.negative-cases.v1"
+}

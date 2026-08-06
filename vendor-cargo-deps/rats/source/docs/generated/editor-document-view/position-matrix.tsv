@@ -1,0 +1,8 @@
+unit	canonical_for	conversion_owner	strength	failure_or_cost	decision
+UTF-8-byte	Rust string slicing/storage adapters	content owner with boundary validation	exact encoded offset and cheap	invalid inside-codepoint boundaries;changes under edits	possible application-local canonical unit
+Unicode-scalar	character iteration	text engine/application	valid scalar boundaries	combining sequences are multiple units;linear conversion	not universal
+grapheme-cluster	user-perceived cursor movement	text engine with Unicode segmentation	better visible editing unit	versioned Unicode tables;dependency and linear/index cost	unresolved;no dependency added
+line-plus-intra-line	protocol/UI navigation	application adapter	readable and line-local	intra-line unit must be named;CRLF policy	requires explicit unit parameter
+UTF-16-unit	DOM/LSP interoperability	browser/LSP adapter	matches external protocols	surrogate pairs;not Rust or terminal canonical	boundary-only
+terminal-display-cell	Ratatui placement	renderer	matches terminal columns	width tables,tabs,zero-width,wide/emoji ambiguity	renderer-only never document offset
+revision-plus-range	stale update detection	application/document owner	prevents silent remap	needs edit mapping or rejection policy	required for any follow-up

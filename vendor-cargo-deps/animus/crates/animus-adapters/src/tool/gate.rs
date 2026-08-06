@@ -123,18 +123,12 @@ const fn dispatch_failure(request: DispatchRequest<'_>) -> Option<FailureClass> 
     if request.definition.is_none() {
         return Some(FailureClass::InvalidInput);
     }
-    match (
-        request.capability_status,
-        request.executor_status,
-        request.output_boundary_status,
-    ) {
+    match (request.capability_status, request.executor_status, request.output_boundary_status) {
         (CapabilityStatus::Denied, _, _) => Some(FailureClass::DeniedCapability),
         (_, ExecutorStatus::Missing, _) => Some(FailureClass::MissingExecutor),
         (_, ExecutorStatus::Unavailable, _) => Some(FailureClass::UnavailableService),
         (_, _, OutputBoundaryStatus::UnsafeReference) => Some(FailureClass::UnsafeOutputReference),
-        (_, _, OutputBoundaryStatus::UnboundedOversized) => {
-            Some(FailureClass::UnboundedOversizedOutput)
-        }
+        (_, _, OutputBoundaryStatus::UnboundedOversized) => Some(FailureClass::UnboundedOversizedOutput),
         _ready => None,
     }
 }

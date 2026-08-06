@@ -26,7 +26,9 @@
 use alloc::format;
 
 use crate::artifact::Hash;
-use crate::validation::{self, AdapterContractError, FieldName};
+use crate::validation::AdapterContractError;
+use crate::validation::FieldName;
+use crate::validation::{self};
 
 const ASSET_ID_FIELD: FieldName = FieldName::new("asset_id");
 const STORE_LABEL_FIELD: FieldName = FieldName::new("asset_store_label");
@@ -718,9 +720,7 @@ impl HostAssetReconciliationReceipt {
 ///
 /// Returns [`HostAssetDiagnostic`] when a field is unsafe, malformed, duplicate,
 /// stale beyond the validation boundary, or outside bounded collection limits.
-pub fn validate_host_asset_inventory(
-    draft: &HostAssetInventoryDraft<'_>,
-) -> AssetResult<HostAssetInventory> {
+pub fn validate_host_asset_inventory(draft: &HostAssetInventoryDraft<'_>) -> AssetResult<HostAssetInventory> {
     validate_collection_limit("asset_manifests", draft.manifests.len())?;
     validate_collection_limit("asset_observations", draft.observations.len())?;
     if draft.manifests.is_empty() && draft.observations.is_empty() {
@@ -765,18 +765,11 @@ pub fn validate_host_asset_inventory(
 
 /// Classifies manifest and installed observation drift deterministically.
 #[must_use]
-pub fn classify_host_asset_drift(
-    inventory: &HostAssetInventory,
-) -> Collection<HostAssetDriftReport> {
-    let mut reports =
-        Collection::with_capacity(inventory.manifests.len() + inventory.observations.len());
+pub fn classify_host_asset_drift(inventory: &HostAssetInventory) -> Collection<HostAssetDriftReport> {
+    let mut reports = Collection::with_capacity(inventory.manifests.len() + inventory.observations.len());
     for manifest in &inventory.manifests {
         let matching = find_observation(inventory.observations.as_slice(), manifest.asset_id());
-        reports.push(classify_manifest_asset(
-            manifest,
-            matching,
-            inventory.current_epoch,
-        ));
+        reports.push(classify_manifest_asset(manifest, matching, inventory.current_epoch));
     }
     for observation in &inventory.observations {
         if find_manifest(inventory.manifests.as_slice(), observation.asset_id()).is_none() {
@@ -796,9 +789,7 @@ pub fn classify_host_asset_drift(
 
 /// Builds a dry-run reconciliation plan. No host store is read or mutated.
 #[must_use]
-pub fn plan_host_asset_reconciliation(
-    reports: &[HostAssetDriftReport],
-) -> HostAssetReconciliationPlan {
+pub fn plan_host_asset_reconciliation(reports: &[HostAssetDriftReport]) -> HostAssetReconciliationPlan {
     let mut diagnostics = Collection::new();
     let mut actions = Collection::new();
 
@@ -930,10 +921,7 @@ pub fn validate_host_asset_receipt(
 ) -> AssetResult<HostAssetReconciliationReceipt> {
     validate_non_empty_collection_bound("asset_receipt_hashes", draft.action_hashes.len())?;
     let status = safe_text(RECEIPT_STATUS_FIELD, draft.status)?;
-    let issue_code = draft
-        .issue_code
-        .map(|issue| safe_text(ISSUE_CODE_FIELD, issue))
-        .transpose()?;
+    let issue_code = draft.issue_code.map(|issue| safe_text(ISSUE_CODE_FIELD, issue)).transpose()?;
     let mut hashes = Collection::with_capacity(draft.action_hashes.len());
     for hash in draft.action_hashes {
         hashes.push(safe_hash(CONTENT_IDENTITY_FIELD, hash)?);
@@ -945,9 +933,7 @@ pub fn validate_host_asset_receipt(
     })
 }
 
-fn validate_manifest_entry(
-    draft: &HostAssetManifestEntryDraft<'_>,
-) -> AssetResult<HostAssetManifestEntry> {
+fn validate_manifest_entry(draft: &HostAssetManifestEntryDraft<'_>) -> AssetResult<HostAssetManifestEntry> {
     let asset_id = safe_text(ASSET_ID_FIELD, draft.asset_id)?;
     let store_label = safe_store_label(draft.store_label)?;
     let content_identity = safe_hash(CONTENT_IDENTITY_FIELD, draft.content_identity)?;
@@ -1091,30 +1077,18 @@ fn classify_installed_pair(
 
 fn action_for_report(report: &HostAssetDriftReport) -> Option<HostAssetAction> {
     match report.class() {
-        HostAssetDriftClass::ManifestOnly => Some(action(
-            report,
-            HostAssetActionKind::Install,
-            "asset-install",
-            report.manifest_identity(),
-        )),
-        HostAssetDriftClass::IdentityMismatch => Some(action(
-            report,
-            HostAssetActionKind::Update,
-            "asset-update",
-            report.manifest_identity(),
-        )),
-        HostAssetDriftClass::InstalledDisabled => Some(action(
-            report,
-            HostAssetActionKind::Enable,
-            "asset-enable",
-            report.manifest_identity(),
-        )),
-        HostAssetDriftClass::HostOnly => Some(action(
-            report,
-            HostAssetActionKind::Remove,
-            "asset-remove",
-            report.installed_identity(),
-        )),
+        HostAssetDriftClass::ManifestOnly => {
+            Some(action(report, HostAssetActionKind::Install, "asset-install", report.manifest_identity()))
+        }
+        HostAssetDriftClass::IdentityMismatch => {
+            Some(action(report, HostAssetActionKind::Update, "asset-update", report.manifest_identity()))
+        }
+        HostAssetDriftClass::InstalledDisabled => {
+            Some(action(report, HostAssetActionKind::Enable, "asset-enable", report.manifest_identity()))
+        }
+        HostAssetDriftClass::HostOnly => {
+            Some(action(report, HostAssetActionKind::Remove, "asset-remove", report.installed_identity()))
+        }
         HostAssetDriftClass::InstalledMatchesManifest
         | HostAssetDriftClass::DuplicateAsset
         | HostAssetDriftClass::StaleObservation
@@ -1151,18 +1125,10 @@ fn action_id_for(asset_id: &str, kind: HostAssetActionKind) -> Text {
 }
 
 fn safe_text(field: FieldName, value: &str) -> AssetResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value)
-        .map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_LABEL_MARKERS
-        .iter()
-        .any(|marker| lower.contains(marker))
-    {
-        return Err(diagnostic(
-            HostAssetDiagnosticCode::UnsafeMetadata,
-            None,
-            "asset metadata contains unsafe marker",
-        ));
+    if UNSAFE_LABEL_MARKERS.iter().any(|marker| lower.contains(marker)) {
+        return Err(diagnostic(HostAssetDiagnosticCode::UnsafeMetadata, None, "asset metadata contains unsafe marker"));
     }
     Ok(normalized)
 }
@@ -1172,25 +1138,16 @@ fn safe_store_label(value: &str) -> AssetResult<Text> {
     if SUPPORTED_STORE_LABELS.contains(&store.as_str()) {
         Ok(store)
     } else {
-        Err(diagnostic(
-            HostAssetDiagnosticCode::UnsupportedStore,
-            None,
-            "unsupported asset store label",
-        ))
+        Err(diagnostic(HostAssetDiagnosticCode::UnsupportedStore, None, "unsupported asset store label"))
     }
 }
 
 fn safe_hash(field: FieldName, value: &str) -> AssetResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value)
-        .map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(
-            HostAssetDiagnosticCode::InvalidHash,
-            None,
-            "hash must be lowercase BLAKE3 hex",
-        ))
+        Err(diagnostic(HostAssetDiagnosticCode::InvalidHash, None, "hash must be lowercase BLAKE3 hex"))
     }
 }
 
@@ -1224,17 +1181,11 @@ fn contains_observation_id(entries: &[HostAssetObservation], asset_id: &str) -> 
     entries.iter().any(|entry| entry.asset_id() == asset_id)
 }
 
-fn find_manifest<'a>(
-    entries: &'a [HostAssetManifestEntry],
-    asset_id: &str,
-) -> Option<&'a HostAssetManifestEntry> {
+fn find_manifest<'a>(entries: &'a [HostAssetManifestEntry], asset_id: &str) -> Option<&'a HostAssetManifestEntry> {
     entries.iter().find(|entry| entry.asset_id() == asset_id)
 }
 
-fn find_observation<'a>(
-    entries: &'a [HostAssetObservation],
-    asset_id: &str,
-) -> Option<&'a HostAssetObservation> {
+fn find_observation<'a>(entries: &'a [HostAssetObservation], asset_id: &str) -> Option<&'a HostAssetObservation> {
     entries.iter().find(|entry| entry.asset_id() == asset_id)
 }
 
@@ -1275,11 +1226,7 @@ fn report(input: HostAssetReportInput<'_>) -> HostAssetDriftReport {
     }
 }
 
-fn diagnostic(
-    code: HostAssetDiagnosticCode,
-    asset_id: Option<&str>,
-    message: &str,
-) -> HostAssetDiagnostic {
+fn diagnostic(code: HostAssetDiagnosticCode, asset_id: Option<&str>, message: &str) -> HostAssetDiagnostic {
     HostAssetDiagnostic {
         code,
         asset_id: asset_id.map(Text::from),
@@ -1289,9 +1236,7 @@ fn diagnostic(
 
 fn map_adapter_error(error: &AdapterContractError) -> HostAssetDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => {
-            diagnostic(HostAssetDiagnosticCode::EmptyField, None, field)
-        }
+        AdapterContractError::EmptyField { field } => diagnostic(HostAssetDiagnosticCode::EmptyField, None, field),
         AdapterContractError::FieldTooLong { field, .. } => {
             diagnostic(HostAssetDiagnosticCode::FieldTooLong, None, field)
         }
@@ -1407,11 +1352,7 @@ mod tests {
         // r[verify agent_harness_runtime.hermes_asset_reconcile.inventory]
         // r[verify agent_harness_runtime.hermes_asset_reconcile.drift]
         let manifests = [manifest(ASSET_ID, ASSET_HASH_A)];
-        let observations = [observation(
-            ASSET_ID,
-            ASSET_HASH_A,
-            HostAssetEnablement::Enabled,
-        )];
+        let observations = [observation(ASSET_ID, ASSET_HASH_A, HostAssetEnablement::Enabled)];
         let inventory = inventory(&manifests, &observations);
         let reports = classify_host_asset_drift(&inventory);
         let plan = plan_host_asset_reconciliation(&reports);
@@ -1419,10 +1360,7 @@ mod tests {
         assert_eq!(inventory.manifests().len(), 1);
         assert_eq!(inventory.observations().len(), 1);
         assert_eq!(reports.len(), 1);
-        assert_eq!(
-            reports[0].class(),
-            HostAssetDriftClass::InstalledMatchesManifest
-        );
+        assert_eq!(reports[0].class(), HostAssetDriftClass::InstalledMatchesManifest);
         assert_eq!(plan.status(), HostAssetPlanStatus::Noop);
         assert!(PROHIBITED_ASSET_RECONCILIATION_EFFECTS.contains(&"symlink resolution"));
     }
@@ -1445,12 +1383,16 @@ mod tests {
 
         assert_eq!(plan.status(), HostAssetPlanStatus::DryRun);
         assert_eq!(plan.actions().len(), 2);
-        assert!(plan.actions().iter().any(|action| {
-            action.asset_id() == ASSET_ID && action.kind() == HostAssetActionKind::Install
-        }));
-        assert!(plan.actions().iter().any(|action| {
-            action.asset_id() == "skill-disabled" && action.kind() == HostAssetActionKind::Enable
-        }));
+        assert!(
+            plan.actions()
+                .iter()
+                .any(|action| { action.asset_id() == ASSET_ID && action.kind() == HostAssetActionKind::Install })
+        );
+        assert!(
+            plan.actions().iter().any(|action| {
+                action.asset_id() == "skill-disabled" && action.kind() == HostAssetActionKind::Enable
+            })
+        );
     }
 
     #[test]
@@ -1459,11 +1401,7 @@ mod tests {
         let manifests = [manifest(ASSET_ID, ASSET_HASH_A)];
         let observations = [
             observation(ASSET_ID, ASSET_HASH_B, HostAssetEnablement::Enabled),
-            observation(
-                HOST_ONLY_ASSET_ID,
-                ASSET_HASH_A,
-                HostAssetEnablement::Enabled,
-            ),
+            observation(HOST_ONLY_ASSET_ID, ASSET_HASH_A, HostAssetEnablement::Enabled),
         ];
         let inventory = inventory(&manifests, &observations);
         let reports = classify_host_asset_drift(&inventory);
@@ -1473,16 +1411,10 @@ mod tests {
             report.asset_id() == ASSET_ID && report.class() == HostAssetDriftClass::IdentityMismatch
         }));
         assert!(reports.iter().any(|report| {
-            report.asset_id() == HOST_ONLY_ASSET_ID
-                && report.class() == HostAssetDriftClass::HostOnly
+            report.asset_id() == HOST_ONLY_ASSET_ID && report.class() == HostAssetDriftClass::HostOnly
         }));
         assert_eq!(plan.status(), HostAssetPlanStatus::Blocked);
-        assert!(
-            !plan
-                .actions()
-                .iter()
-                .any(|action| { action.kind() == HostAssetActionKind::WriteManifest })
-        );
+        assert!(!plan.actions().iter().any(|action| { action.kind() == HostAssetActionKind::WriteManifest }));
     }
 
     #[test]
@@ -1498,17 +1430,10 @@ mod tests {
             current_epoch: CURRENT_EPOCH,
         })
         .expect_err("global paths must be rejected");
-        let duplicate_manifests = [
-            manifest(ASSET_ID, ASSET_HASH_A),
-            manifest(ASSET_ID, ASSET_HASH_A),
-        ];
+        let duplicate_manifests = [manifest(ASSET_ID, ASSET_HASH_A), manifest(ASSET_ID, ASSET_HASH_A)];
         let duplicate_error = validate_host_asset_inventory(&HostAssetInventoryDraft {
             manifests: &duplicate_manifests,
-            observations: &[observation(
-                ASSET_ID,
-                ASSET_HASH_A,
-                HostAssetEnablement::Enabled,
-            )],
+            observations: &[observation(ASSET_ID, ASSET_HASH_A, HostAssetEnablement::Enabled)],
             current_epoch: CURRENT_EPOCH,
         })
         .expect_err("duplicate asset ids must fail");
@@ -1526,14 +1451,8 @@ mod tests {
         let stale_plan = plan_host_asset_reconciliation(&stale_reports);
 
         assert_eq!(unsafe_error.code(), HostAssetDiagnosticCode::UnsafeMetadata);
-        assert_eq!(
-            duplicate_error.code(),
-            HostAssetDiagnosticCode::DuplicateAsset
-        );
-        assert_eq!(
-            stale_reports[0].class(),
-            HostAssetDriftClass::StaleObservation
-        );
+        assert_eq!(duplicate_error.code(), HostAssetDiagnosticCode::DuplicateAsset);
+        assert_eq!(stale_reports[0].class(), HostAssetDriftClass::StaleObservation);
         assert_eq!(stale_plan.status(), HostAssetPlanStatus::Blocked);
     }
 
@@ -1565,10 +1484,7 @@ mod tests {
         );
 
         assert_eq!(admitted.status(), HostAssetMutationStatus::Admitted);
-        assert_eq!(
-            missing.status(),
-            HostAssetMutationStatus::ServiceUnavailable
-        );
+        assert_eq!(missing.status(), HostAssetMutationStatus::ServiceUnavailable);
         assert_eq!(mismatched.status(), HostAssetMutationStatus::PlanMismatch);
     }
 

@@ -18,14 +18,20 @@ mod web;
 pub use web::*;
 mod metrics;
 mod showcase;
-pub use showcase::{
-    FixtureParitySummary, FixtureParitySummaryRow, build_fixture_parity_summary,
-    built_in_fixture_parity_rows, built_in_fixture_parity_summary, built_in_fixtures,
-};
+pub use showcase::FixtureParitySummary;
+pub use showcase::FixtureParitySummaryCell;
+pub use showcase::FixtureParitySummaryRow;
+pub use showcase::build_fixture_parity_summary;
+pub use showcase::build_fixture_parity_summary_with_policy;
+pub use showcase::built_in_fixture_parity_rows;
+pub use showcase::built_in_fixture_parity_summary;
+pub use showcase::built_in_fixtures;
 mod validation;
-pub use validation::{
-    fixtures_for_renderer, validate_fixture_parity_baseline, validate_showcase_fixtures,
-};
+pub use validation::fixtures_for_renderer;
+pub use validation::validate_fixture_parity_baseline;
+pub use validation::validate_fixture_parity_baseline_with_policy;
+pub use validation::validate_showcase_fixtures;
+pub use validation::validate_showcase_fixtures_with_policy;
 
 mod model;
 pub use model::*;

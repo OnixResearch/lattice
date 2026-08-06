@@ -8,7 +8,13 @@ pub mod streaming_render;
 #[cfg(feature = "inline")]
 mod inline_widget;
 
-pub use output_search::{OutputSearch, SearchMatch, SearchMode};
-pub use search_render::{apply_search_highlights, render_search_overlay};
-pub use streaming_output::{StreamingConfig, StreamingOutput, StreamingOutputManager};
-pub use streaming_render::{render_streaming_lines, render_streaming_stats};
+pub use output_search::OutputSearch;
+pub use output_search::SearchMatch;
+pub use output_search::SearchMode;
+pub use search_render::apply_search_highlights;
+pub use search_render::render_search_overlay;
+pub use streaming_output::StreamingConfig;
+pub use streaming_output::StreamingOutput;
+pub use streaming_output::StreamingOutputManager;
+pub use streaming_render::render_streaming_lines;
+pub use streaming_render::render_streaming_stats;

@@ -4,7 +4,7 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AriaProjection {
     /// Active node ID.
-    pub active_id: String,
+    pub active_id: FocusNodeId,
     /// ARIA-like role label.
     pub role: String,
     /// Accessible label.
@@ -21,7 +21,7 @@ pub struct AriaProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TuiFocusProjection {
     /// Active node ID.
-    pub active_id: String,
+    pub active_id: FocusNodeId,
     /// Focus label.
     pub label: String,
     /// Renderer-neutral style state token.
@@ -68,17 +68,14 @@ impl FocusGraph {
 
     fn active_node(&self) -> Result<&FocusNode, FocusError> {
         self.validate()?;
-        let active_id = self.active.as_ref().ok_or_else(|| {
-            FocusError::new(
-                FocusErrorCode::NoEligibleTarget,
-                None,
-                "no active focus node",
-            )
-        })?;
+        let active_id = self
+            .active
+            .as_ref()
+            .ok_or_else(|| FocusError::new(FocusErrorCode::NoEligibleTarget, None, "no active focus node"))?;
         self.nodes.get(active_id).ok_or_else(|| {
             FocusError::new(
                 FocusErrorCode::UnknownNode,
-                Some(active_id.clone()),
+                Some(FocusErrorId::Node(active_id.clone())),
                 "active focus node is missing",
             )
         })

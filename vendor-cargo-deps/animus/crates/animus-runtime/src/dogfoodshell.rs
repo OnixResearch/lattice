@@ -197,10 +197,7 @@ pub fn run_fake_dogfood_shell(
     Ok((events, receipt))
 }
 
-pub fn admit_dogfood_run(
-    request: &DogfoodRunRequest,
-    services: &DogfoodFakeServices,
-) -> DogfoodValidationReport {
+pub fn admit_dogfood_run(request: &DogfoodRunRequest, services: &DogfoodFakeServices) -> DogfoodValidationReport {
     let mut issues = Vec::new();
     validate_hash(request.prompt_hash.as_str(), &mut issues);
     validate_label(request.policy_profile.as_str(), &mut issues);
@@ -219,16 +216,10 @@ pub fn admit_dogfood_run(
     if request.tool_metadata.is_some() && services.tool_service != DogfoodServiceState::Available {
         issues.push(DogfoodIssue::MissingToolService);
     }
-    if !services
-        .allowed_capabilities
-        .iter()
-        .any(|capability| capability == &request.model_capability)
-    {
+    if !services.allowed_capabilities.iter().any(|capability| capability == &request.model_capability) {
         issues.push(DogfoodIssue::DeniedCapability);
     }
-    if services.model_response_summary.trim().is_empty()
-        || services.model_response_summary.contains("MALFORMED")
-    {
+    if services.model_response_summary.trim().is_empty() || services.model_response_summary.contains("MALFORMED") {
         issues.push(DogfoodIssue::MalformedOutput);
     }
     validation_report(issues)
@@ -282,11 +273,7 @@ pub fn validate_dogfood_receipt(receipt: &DogfoodReceipt) -> DogfoodValidationRe
         validate_label(label.as_str(), &mut issues);
     }
     for surface in required_non_claims() {
-        if !receipt
-            .omitted_surfaces
-            .iter()
-            .any(|omitted| omitted == &surface)
-        {
+        if !receipt.omitted_surfaces.iter().any(|omitted| omitted == &surface) {
             issues.push(DogfoodIssue::Overclaim);
         }
     }
@@ -294,11 +281,7 @@ pub fn validate_dogfood_receipt(receipt: &DogfoodReceipt) -> DogfoodValidationRe
 }
 
 fn event_kinds(include_tool: bool) -> Vec<&'static str> {
-    let mut kinds = vec![
-        PROMPT_ADMISSION_EVENT,
-        MODEL_REQUEST_EVENT,
-        MODEL_RESPONSE_EVENT,
-    ];
+    let mut kinds = vec![PROMPT_ADMISSION_EVENT, MODEL_REQUEST_EVENT, MODEL_RESPONSE_EVENT];
     if include_tool {
         kinds.push(TOOL_ADMISSION_EVENT);
     }
@@ -346,10 +329,7 @@ fn validate_event_order(events: &[DogfoodEvent], include_tool: bool) -> DogfoodV
         issues.push(DogfoodIssue::EventOrder);
     }
     for (index, expected_kind) in expected.iter().enumerate() {
-        if events
-            .get(index)
-            .is_none_or(|event| event.kind.as_str() != *expected_kind)
-        {
+        if events.get(index).is_none_or(|event| event.kind.as_str() != *expected_kind) {
             issues.push(DogfoodIssue::EventOrder);
         }
     }
@@ -440,16 +420,8 @@ mod tests {
         assert_eq!(receipt.status, DogfoodStatus::Completed);
         assert_eq!(receipt.event_count, REQUIRED_EVENT_COUNT_WITH_TOOL);
         assert_eq!(receipt.evidence_rung, FAKE_BACKED_RUNG);
-        assert!(
-            receipt
-                .omitted_surfaces
-                .contains(&LIVE_PROVIDER_SURFACE.to_owned())
-        );
-        assert!(
-            receipt
-                .omitted_surfaces
-                .contains(&PRODUCTION_SURFACE.to_owned())
-        );
+        assert!(receipt.omitted_surfaces.contains(&LIVE_PROVIDER_SURFACE.to_owned()));
+        assert!(receipt.omitted_surfaces.contains(&PRODUCTION_SURFACE.to_owned()));
         assert!(validate_dogfood_receipt(&receipt).valid);
     }
 
@@ -461,29 +433,17 @@ mod tests {
         let mut missing = services();
         missing.model_service = DogfoodServiceState::Missing;
         let missing_report = admit_dogfood_run(&request, &missing);
-        assert!(
-            missing_report
-                .issues
-                .contains(&DogfoodIssue::MissingModelService)
-        );
+        assert!(missing_report.issues.contains(&DogfoodIssue::MissingModelService));
 
         let mut denied = services();
         denied.allowed_capabilities.clear();
         let denied_report = admit_dogfood_run(&request, &denied);
-        assert!(
-            denied_report
-                .issues
-                .contains(&DogfoodIssue::DeniedCapability)
-        );
+        assert!(denied_report.issues.contains(&DogfoodIssue::DeniedCapability));
 
         let mut malformed = services();
         malformed.model_response_summary = "MALFORMED".to_owned();
         let malformed_report = admit_dogfood_run(&request, &malformed);
-        assert!(
-            malformed_report
-                .issues
-                .contains(&DogfoodIssue::MalformedOutput)
-        );
+        assert!(malformed_report.issues.contains(&DogfoodIssue::MalformedOutput));
     }
 
     #[test]
@@ -505,9 +465,7 @@ mod tests {
         receipt.adapter_labels.push("RAW_PROMPT:secret".to_owned());
         receipt.redaction = DogfoodRedaction::Unsafe;
         receipt.evidence_rung = "production-ready".to_owned();
-        receipt
-            .omitted_surfaces
-            .retain(|surface| surface != LIVE_PROVIDER_SURFACE);
+        receipt.omitted_surfaces.retain(|surface| surface != LIVE_PROVIDER_SURFACE);
 
         let report = validate_dogfood_receipt(&receipt);
 

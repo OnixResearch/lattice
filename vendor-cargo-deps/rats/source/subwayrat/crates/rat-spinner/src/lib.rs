@@ -181,8 +181,7 @@ impl SpinnerState {
         self.elapsed_ms = checked_remainder_u128(elapsed);
 
         if steps > 0 {
-            self.frame =
-                advance_frame_index(FrameIndex(self.frame), steps, FrameCount(frame_count));
+            self.frame = advance_frame_index(FrameIndex(self.frame), steps, FrameCount(frame_count));
         }
     }
 
@@ -287,9 +286,7 @@ fn next_frame_index(frame: FrameIndex, frame_count: FrameCount) -> usize {
 }
 
 fn advance_frame_index(frame: FrameIndex, steps: u128, frame_count: FrameCount) -> usize {
-    let advanced = frame
-        .0
-        .saturating_add(bounded_step_offset(steps, frame_count));
+    let advanced = frame.0.saturating_add(bounded_step_offset(steps, frame_count));
     checked_remainder_usize(UsizeDivision {
         value: advanced,
         divisor: frame_count.0,

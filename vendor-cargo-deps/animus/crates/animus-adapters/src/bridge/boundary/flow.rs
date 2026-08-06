@@ -64,17 +64,11 @@ impl McpDispatchDecision {
 #[must_use]
 pub const fn evaluate_mcp_dispatch(request: McpDispatchRequest<'_>) -> McpDispatchDecision {
     assert!(
-        matches!(
-            request.argument_status,
-            McpArgumentStatus::Valid | McpArgumentStatus::Invalid
-        ),
+        matches!(request.argument_status, McpArgumentStatus::Valid | McpArgumentStatus::Invalid),
         "argument status is exhaustive"
     );
     assert!(
-        matches!(
-            request.mutation_status,
-            McpMutationStatus::Independent | McpMutationStatus::Serialized
-        ),
+        matches!(request.mutation_status, McpMutationStatus::Independent | McpMutationStatus::Serialized),
         "mutation status is exhaustive"
     );
     let dispatch = dispatch_after_argument_check(request);
@@ -86,9 +80,7 @@ pub const fn evaluate_mcp_dispatch(request: McpDispatchRequest<'_>) -> McpDispat
     }
 }
 
-const fn dispatch_after_argument_check(
-    request: McpDispatchRequest<'_>,
-) -> crate::tool::DispatchDecision {
+const fn dispatch_after_argument_check(request: McpDispatchRequest<'_>) -> crate::tool::DispatchDecision {
     if matches!(request.argument_status, McpArgumentStatus::Invalid) {
         return crate::tool::evaluate_dispatch(crate::tool::DispatchRequest {
             definition: None,

@@ -43,9 +43,7 @@ pub(super) fn text_collection(
     policy: CollectionPolicy,
 ) -> Result<super::Collection<super::Text>, super::DiffReviewError> {
     if policy.required && values.is_empty() {
-        return Err(super::DiffReviewError::EmptyCollection {
-            field: field.as_str(),
-        });
+        return Err(super::DiffReviewError::EmptyCollection { field: field.as_str() });
     }
     collection_size(CollectionSize {
         field,
@@ -126,12 +124,8 @@ pub(super) fn span_lines(lines: LineRange) -> Result<(), super::DiffReviewError>
 pub(super) fn span_columns(columns: ColumnRange) -> Result<(), super::DiffReviewError> {
     assert!(columns.lines.start_line >= super::MIN_REVIEW_LINE);
     assert!(columns.lines.end_line >= super::MIN_REVIEW_LINE);
-    if columns
-        .start_column
-        .is_some_and(|column| column < super::MIN_REVIEW_COLUMN)
-        || columns
-            .end_column
-            .is_some_and(|column| column < super::MIN_REVIEW_COLUMN)
+    if columns.start_column.is_some_and(|column| column < super::MIN_REVIEW_COLUMN)
+        || columns.end_column.is_some_and(|column| column < super::MIN_REVIEW_COLUMN)
     {
         return Err(super::DiffReviewError::InvalidSpan {
             reason: "columns are one-based",
@@ -147,9 +141,7 @@ pub(super) fn span_columns(columns: ColumnRange) -> Result<(), super::DiffReview
     Ok(())
 }
 
-pub(super) fn evidence_kind(
-    kind: super::issue::DiffReviewEvidenceKind,
-) -> Result<(), super::DiffReviewError> {
+pub(super) fn evidence_kind(kind: super::issue::DiffReviewEvidenceKind) -> Result<(), super::DiffReviewError> {
     match kind {
         super::issue::DiffReviewEvidenceKind::FileSpan
         | super::issue::DiffReviewEvidenceKind::PatchHunk
@@ -176,18 +168,9 @@ pub(super) fn evidence_bounds(bounds: EvidenceBounds<'_>) -> Result<(), super::D
             actual_value: bounds.byte_count,
         });
     }
-    assert!(
-        bounds.line_count >= super::MIN_REVIEW_LINE,
-        "minimum line count bound is enforced"
-    );
-    assert!(
-        bounds.line_count <= super::MAX_EVIDENCE_LINES,
-        "maximum line count bound is enforced"
-    );
-    assert!(
-        bounds.byte_count <= super::MAX_EVIDENCE_BYTES,
-        "byte count bounds are enforced"
-    );
+    assert!(bounds.line_count >= super::MIN_REVIEW_LINE, "minimum line count bound is enforced");
+    assert!(bounds.line_count <= super::MAX_EVIDENCE_LINES, "maximum line count bound is enforced");
+    assert!(bounds.byte_count <= super::MAX_EVIDENCE_BYTES, "byte count bounds are enforced");
     let snippet_bytes = match u64::try_from(bounds.snippet.len()) {
         Ok(value) => value,
         Err(_overflow) => return snippet_length_overflow(),
@@ -216,15 +199,8 @@ pub(super) fn contains_text(values: &[super::Text], needle: &str) -> bool {
     values.iter().any(|value| value == needle)
 }
 
-fn reject_raw_material(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<(), super::DiffReviewError> {
-    if let Some(marker) = super::RAW_MATERIAL_MARKERS
-        .iter()
-        .copied()
-        .find(|marker| value.contains(marker))
-    {
+fn reject_raw_material(field: crate::validation::FieldName, value: &str) -> Result<(), super::DiffReviewError> {
+    if let Some(marker) = super::RAW_MATERIAL_MARKERS.iter().copied().find(|marker| value.contains(marker)) {
         return Err(super::DiffReviewError::UnsafeEvidence {
             field: field.as_str(),
             marker,

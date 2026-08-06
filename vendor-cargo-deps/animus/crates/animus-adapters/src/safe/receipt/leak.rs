@@ -25,11 +25,7 @@ const USER_PATH_MARKER: &str = "\\users\\";
 const JSON_OBJECT_PREFIX: &str = "{";
 
 const PROMPT_MARKERS: &[&str] = &[RAW_PROMPT_MARKER, SYSTEM_PROMPT_MARKER, USER_PROMPT_MARKER];
-const PROVIDER_MARKERS: &[&str] = &[
-    PROVIDER_CHOICES_MARKER,
-    PROVIDER_MESSAGES_MARKER,
-    PROVIDER_MODEL_MARKER,
-];
+const PROVIDER_MARKERS: &[&str] = &[PROVIDER_CHOICES_MARKER, PROVIDER_MESSAGES_MARKER, PROVIDER_MODEL_MARKER];
 const CREDENTIAL_MARKERS: &[&str] = &[
     TOKEN_PREFIX,
     GITHUB_TOKEN_PREFIX,
@@ -38,26 +34,14 @@ const CREDENTIAL_MARKERS: &[&str] = &[
     API_KEY_DASH_MARKER,
     BEARER_MARKER,
 ];
-const PATH_MARKERS: &[&str] = &[
-    HOME_PATH_MARKER,
-    TMP_PATH_MARKER,
-    ETC_PATH_MARKER,
-    USER_PATH_MARKER,
-];
+const PATH_MARKERS: &[&str] = &[HOME_PATH_MARKER, TMP_PATH_MARKER, ETC_PATH_MARKER, USER_PATH_MARKER];
 const TOOL_INPUT_MARKERS: &[&str] = &[TOOL_INPUT_MARKER, TOOL_INPUT_TEXT_MARKER];
 const TOOL_OUTPUT_MARKERS: &[&str] = &[TOOL_OUTPUT_MARKER, TOOL_OUTPUT_TEXT_MARKER];
-const MODEL_OUTPUT_MARKERS: &[&str] = &[
-    MODEL_OUTPUT_MARKER,
-    MODEL_OUTPUT_TEXT_MARKER,
-    ASSISTANT_OUTPUT_MARKER,
-];
+const MODEL_OUTPUT_MARKERS: &[&str] = &[MODEL_OUTPUT_MARKER, MODEL_OUTPUT_TEXT_MARKER, ASSISTANT_OUTPUT_MARKER];
 
 pub(super) fn class(value: &str) -> Option<super::LeakClass> {
     assert!(!value.is_empty(), "safe metadata value must not be empty");
-    assert!(
-        value.len() >= value.chars().count(),
-        "byte length covers chars"
-    );
+    assert!(value.len() >= value.chars().count(), "byte length covers chars");
     let lower = value.to_ascii_lowercase();
     let trimmed = lower.trim();
     if contains_any(trimmed, PROMPT_MARKERS) {
@@ -108,9 +92,6 @@ fn is_path_like(value: &str) -> bool {
 
 fn contains_any(value: &str, markers: &[&str]) -> bool {
     assert!(!markers.is_empty(), "marker list must not be empty");
-    assert!(
-        value.len() >= value.chars().count(),
-        "byte length covers chars"
-    );
+    assert!(value.len() >= value.chars().count(), "byte length covers chars");
     markers.iter().any(|marker| value.contains(marker))
 }

@@ -13,50 +13,59 @@ mod schedule;
 #[cfg(test)]
 mod tests;
 
-pub use args::{
-    ArgumentCompatibilityRule, ArgumentField, ArgumentFieldDraft, ArgumentPreparationRequest,
-    PreparedArguments,
-};
-pub use defs::{
-    Definition, DefinitionDraft, DefinitionStatus, PromptContextEntry, PromptContextKind,
-    build_prompt_context,
-};
+pub use args::ArgumentCompatibilityRule;
+pub use args::ArgumentField;
+pub use args::ArgumentFieldDraft;
+pub use args::ArgumentPreparationRequest;
+pub use args::PreparedArguments;
+pub use defs::Definition;
+pub use defs::DefinitionDraft;
+pub use defs::DefinitionStatus;
+pub use defs::PromptContextEntry;
+pub use defs::PromptContextKind;
+pub use defs::build_prompt_context;
 pub use fault::ContractError;
-pub use gate::{
-    CapabilityStatus, DispatchDecision, DispatchRequest, DispatchStatus, ExecutorStatus,
-    FailureClass, OutputBoundaryStatus, evaluate_dispatch,
-};
-pub use limit::{
-    BoundedOutput, BoundedOutputMetadataDraft, HashRequirement, OutputDraft, OutputPolicy,
-    OutputStatus,
-};
-pub use message::{ApprovalPosture, OutputRedactionClass, Request, RequestDraft, Response};
+pub use gate::CapabilityStatus;
+pub use gate::DispatchDecision;
+pub use gate::DispatchRequest;
+pub use gate::DispatchStatus;
+pub use gate::ExecutorStatus;
+pub use gate::FailureClass;
+pub use gate::OutputBoundaryStatus;
+pub use gate::evaluate_dispatch;
+pub use limit::BoundedOutput;
+pub use limit::BoundedOutputMetadataDraft;
+pub use limit::HashRequirement;
+pub use limit::OutputDraft;
+pub use limit::OutputPolicy;
+pub use limit::OutputStatus;
+pub use message::ApprovalPosture;
+pub use message::OutputRedactionClass;
+pub use message::Request;
+pub use message::RequestDraft;
+pub use message::Response;
 // Internal planning names stay short under `tool::planning`; these aliases preserve
 // the root-level public DTO names documented for embedders.
 #[cfg_attr(animus_octet, allow(tigerstyle::renamed_imports))]
 pub use planning::{
     DiscoveryCeilings as ToolDiscoveryCeilings, DiscoveryDetail as ToolDiscoveryDetail,
     DiscoveryRequestDraft as ToolDiscoveryRequestDraft, DiscoverySet as ToolDiscoverySet,
-    DiscoverySummary as ToolDiscoverySummary, Plan as ToolPlan,
-    PlanAdmissionContext as ToolPlanAdmissionContext, PlanBatchPolicy as ToolPlanBatchPolicy,
-    PlanCancellationPosture as ToolPlanCancellationPosture, PlanDraft as ToolPlanDraft,
-    PlanFabricAdmission as ToolPlanFabricAdmission, PlanFabricDraft as ToolPlanFabricDraft,
+    DiscoverySummary as ToolDiscoverySummary, Plan as ToolPlan, PlanAdmissionContext as ToolPlanAdmissionContext,
+    PlanBatchPolicy as ToolPlanBatchPolicy, PlanCancellationPosture as ToolPlanCancellationPosture,
+    PlanDraft as ToolPlanDraft, PlanFabricAdmission as ToolPlanFabricAdmission, PlanFabricDraft as ToolPlanFabricDraft,
     PlanFabricIssue as ToolPlanFabricIssue, PlanFabricKind as ToolPlanFabricKind,
-    PlanFabricStatus as ToolPlanFabricStatus,
-    PlanIntermediateBinding as ToolPlanIntermediateBinding,
-    PlanIntermediateBindingDraft as ToolPlanIntermediateBindingDraft,
-    PlanIntermediateKind as ToolPlanIntermediateKind,
-    PlanIntermediateUse as ToolPlanIntermediateUse, PlanIssue as ToolPlanIssue,
-    PlanReceipt as ToolPlanReceipt, PlanReceiptDraft as ToolPlanReceiptDraft,
-    PlanStatus as ToolPlanStatus, PlanStepAdmission as ToolPlanStepAdmission,
-    PlanStepDraft as ToolPlanStepDraft, PlanTimeoutPosture as ToolPlanTimeoutPosture,
-    TOOL_DISCOVERY_CONTRACT_IDENTITY, TOOL_PLAN_CONTRACT_IDENTITY,
-    TOOL_PLAN_RECEIPT_CONTRACT_IDENTITY, admit_plan as admit_tool_plan,
+    PlanFabricStatus as ToolPlanFabricStatus, PlanIntermediateBinding as ToolPlanIntermediateBinding,
+    PlanIntermediateBindingDraft as ToolPlanIntermediateBindingDraft, PlanIntermediateKind as ToolPlanIntermediateKind,
+    PlanIntermediateUse as ToolPlanIntermediateUse, PlanIssue as ToolPlanIssue, PlanReceipt as ToolPlanReceipt,
+    PlanReceiptDraft as ToolPlanReceiptDraft, PlanStatus as ToolPlanStatus, PlanStepAdmission as ToolPlanStepAdmission,
+    PlanStepDraft as ToolPlanStepDraft, PlanTimeoutPosture as ToolPlanTimeoutPosture, TOOL_DISCOVERY_CONTRACT_IDENTITY,
+    TOOL_PLAN_CONTRACT_IDENTITY, TOOL_PLAN_RECEIPT_CONTRACT_IDENTITY, admit_plan as admit_tool_plan,
     admit_plan_fabric as admit_tool_plan_fabric, discover_tools,
 };
-pub use schedule::{
-    MutationCallDraft, MutationWindow, MutationWindowStatus, plan_mutation_windows,
-};
+pub use schedule::MutationCallDraft;
+pub use schedule::MutationWindow;
+pub use schedule::MutationWindowStatus;
+pub use schedule::plan_mutation_windows;
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
@@ -64,38 +73,23 @@ type Collection<T> = alloc::vec::Vec<T>;
 const NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_name");
 const OUTPUT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_output");
 const LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_label");
-const DESCRIPTION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_description");
-const SCHEMA_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_parameter_schema_identity");
-const PROMPT_SNIPPET_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_prompt_snippet");
-const PROMPT_GUIDELINE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_prompt_guideline");
-const SOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_source_identity");
-const PROVENANCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_provenance");
-const CAPABILITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_capability_label");
+const DESCRIPTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_description");
+const SCHEMA_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_parameter_schema_identity");
+const PROMPT_SNIPPET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_prompt_snippet");
+const PROMPT_GUIDELINE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_prompt_guideline");
+const SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_source_identity");
+const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_provenance");
+const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_capability_label");
 const RESULT_SHAPE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("tool_result_metadata_shape");
-const ARGUMENT_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_argument_name");
-const ARGUMENT_VALUE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_argument_value");
-const MUTATION_CALL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_mutation_call_id");
-const MUTATION_TARGET_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_mutation_target");
-const OUTPUT_REFERENCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_output_reference");
-const OUTPUT_HASH_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_output_content_hash");
-const CORRELATION_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_call_correlation_id");
-const APPROVAL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("tool_approval_posture");
+const ARGUMENT_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_argument_name");
+const ARGUMENT_VALUE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_argument_value");
+const MUTATION_CALL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_mutation_call_id");
+const MUTATION_TARGET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_mutation_target");
+const OUTPUT_REFERENCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_output_reference");
+const OUTPUT_HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_output_content_hash");
+const CORRELATION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_call_correlation_id");
+const APPROVAL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_approval_posture");
 
 const MAX_TOOL_METADATA_ITEMS: usize = 32;
 const MIN_VISIBLE_OUTPUT_CHARS: u32 = 1;
@@ -126,34 +120,20 @@ const NUL_CHARACTER: char = '\0';
 const _: () = assert!(MAX_TOOL_METADATA_ITEMS > 0);
 const _: () = assert!(MAX_VISIBLE_OUTPUT_CHARS >= MIN_VISIBLE_OUTPUT_CHARS);
 
-fn required_text(
-    field: crate::validation::FieldName,
-    value: Option<&str>,
-) -> Result<Text, ContractError> {
+fn required_text(field: crate::validation::FieldName, value: Option<&str>) -> Result<Text, ContractError> {
     match value {
         Some(raw) => required_text_value(field, raw),
-        None => Err(ContractError::MissingField {
-            field: field.as_str(),
-        }),
+        None => Err(ContractError::MissingField { field: field.as_str() }),
     }
 }
 
-fn required_text_value(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<Text, ContractError> {
+fn required_text_value(field: crate::validation::FieldName, value: &str) -> Result<Text, ContractError> {
     crate::validation::normalized_adapter_field(field, value).map_err(ContractError::from)
 }
 
-fn required_texts(
-    field: crate::validation::FieldName,
-    values: &[&str],
-) -> Result<Collection<Text>, ContractError> {
+fn required_texts(field: crate::validation::FieldName, values: &[&str]) -> Result<Collection<Text>, ContractError> {
     if values.is_empty() {
-        return Err(crate::AdapterContractError::EmptyCollection {
-            field: field.as_str(),
-        }
-        .into());
+        return Err(crate::AdapterContractError::EmptyCollection { field: field.as_str() }.into());
     }
     collect_texts(field, values)
 }
@@ -168,10 +148,7 @@ fn normalized_label_set(
     Ok(labels)
 }
 
-fn collect_texts(
-    field: crate::validation::FieldName,
-    values: &[&str],
-) -> Result<Collection<Text>, ContractError> {
+fn collect_texts(field: crate::validation::FieldName, values: &[&str]) -> Result<Collection<Text>, ContractError> {
     validate_item_count(field, values.len())?;
     let mut normalized = Collection::with_capacity(values.len());
     for value in values {
@@ -180,10 +157,7 @@ fn collect_texts(
     Ok(normalized)
 }
 
-fn validate_item_count(
-    field: crate::validation::FieldName,
-    item_count: usize,
-) -> Result<(), ContractError> {
+fn validate_item_count(field: crate::validation::FieldName, item_count: usize) -> Result<(), ContractError> {
     if item_count > MAX_TOOL_METADATA_ITEMS {
         return Err(ContractError::TooManyItems {
             field: field.as_str(),
@@ -195,9 +169,8 @@ fn validate_item_count(
 }
 
 fn validate_no_nul(field: crate::validation::FieldName, value: &str) -> Result<(), ContractError> {
-    if let Some((byte_index, _character)) = value
-        .char_indices()
-        .find(|(_byte_index, character)| *character == NUL_CHARACTER)
+    if let Some((byte_index, _character)) =
+        value.char_indices().find(|(_byte_index, character)| *character == NUL_CHARACTER)
     {
         return Err(crate::AdapterContractError::NulCharacter {
             field: field.as_str(),

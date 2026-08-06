@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=mesh_provider_profile"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.mesh-provider-profile",
+      "source": {
+        "path": "config/mesh-provider-profile.ncl",
+        "identity": "b3:5374a0a2d2e2a4be5049bac0cbc76d4339b485af0254f795783a6c7e384012fd",
+        "bytes": 1735
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "mesh_provider_profile",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/mesh-provider-profile.json",
+        "identity": "b3:2f413a270a4a1a4e0398a59187473d507609f9cc737e7418c9bd492d28fe6e04",
+        "bytes": 747
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=mesh_provider_profile"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:b844096b602c199b4e1e97d824b558a5691944f0d91f2e0d960f042965540daf"
+}

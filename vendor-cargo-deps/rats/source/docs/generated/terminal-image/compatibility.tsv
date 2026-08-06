@@ -1,0 +1,9 @@
+behavior	legacy	checked_authority	status	evidence_boundary
+Kitty	base64 APC 4096-byte chunks and requested rows	complete bounded staged APC payload	preserved for admitted valid fixtures	no live terminal or visual claim
+iTerm2	OSC 1337 inline and width-based rows capped at 20	complete bounded staged OSC payload	preserved for admitted valid fixtures	no live terminal or visual claim
+Sixel	decode resize palette DCS; malformed silently became placeholder	bounded metadata/decode/resize/palette/index/DCS; malformed rejected	valid path preserved; implicit malformed fallback intentionally removed	no live terminal or visual claim
+placeholder	content-derived byte-count label for None	content-free byte-count label only for explicit None	preserved under explicit fallback policy	no accessibility or description claim
+row-estimation	Kitty height;iTerm width cap;Sixel resized pixels	identical formulas after checked bounds	preserved	metadata estimate only
+protocol-detection	environment precedence	pure caller-supplied ProtocolEnvironmentSnapshot	precedence preserved; ambient acquisition removed	supplied facts are not authorization
+controlling-terminal	/dev/tty then stdout fallback	no acquisition; caller supplies writer capability and writer	ambient convenience removed	terminal availability not protocol support
+legacy-Option	direct protocol processing and effect	removed; prepare then explicit supplied writer	source-breaking ownership correction	checked API is conformance authority

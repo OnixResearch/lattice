@@ -98,6 +98,11 @@ pub enum RuntimeEvent {
         /// Validated final model response.
         response: animus_adapters::ModelResponse,
     },
+    /// The loop fabric requested host-owned completion evaluation.
+    CompletionCandidateRequested {
+        /// BLAKE3 identity of the exact request spelling.
+        request_hash: String,
+    },
     /// The loop fabric selected a stop decision without a final response.
     Stopped,
     /// The configured maximum-turn limit was reached before completion.
@@ -187,6 +192,62 @@ pub enum RuntimeEvent {
         /// Safe compaction summary.
         summary: String,
     },
+    /// Coding-session lifecycle state changed without exposing transcript bodies.
+    SessionStateChanged {
+        /// Stable session identity.
+        session_id: String,
+        /// Active run identity when one exists.
+        run_id: Option<String>,
+        /// Safe lifecycle status.
+        status: String,
+        /// Bounded pending queue count.
+        queue_count: u32,
+    },
+    /// A coding-session message crossed its declared durable boundary.
+    SessionCommitObserved {
+        /// Stable session identity.
+        session_id: String,
+        /// Correlated run identity.
+        run_id: String,
+        /// Committed entry identity.
+        entry_id: String,
+        /// Safe committed message kind.
+        message_kind: String,
+        /// Committed BLAKE3 head identity.
+        head_hash: String,
+        /// Logical durable cursor after commit.
+        durable_cursor: u64,
+    },
+    /// Coding-session recovery produced one validated metadata-only observation.
+    SessionRecoveryObserved {
+        /// Stable session identity.
+        session_id: String,
+        /// Safe recovery status.
+        status: String,
+        /// Committed BLAKE3 head identity.
+        head_hash: String,
+        /// Recovered active leaf identity when present.
+        active_leaf_id: Option<String>,
+    },
+    /// Session authority-profile continuity or binding was observed.
+    SessionAuthorityProfileObserved {
+        /// Stable session identity.
+        session_id: String,
+        /// Stable branch identity.
+        branch_id: String,
+        /// Safe admission or binding status.
+        status: String,
+        /// Current requested profile BLAKE3 identity.
+        profile_identity: String,
+        /// Durable binding identity when one exists.
+        binding_identity: Option<String>,
+        /// Safe authorization decision identity when one exists.
+        authorization_identity: Option<String>,
+        /// Current realized-enforcement observation identity when one exists.
+        enforcement_observation_identity: Option<String>,
+        /// Bounded safe component classes that changed.
+        changed_components: Vec<String>,
+    },
     /// Runtime completed and emitted a terminal status class.
     Shutdown {
         /// Terminal status class.
@@ -216,11 +277,10 @@ impl RuntimeEvent {
             Self::ToolResponded { .. } => super::RuntimeEventKind::ToolResponded,
             Self::ToolDenied { .. } => super::RuntimeEventKind::ToolDenied,
             Self::FinalResponse { .. } => super::RuntimeEventKind::FinalResponse,
+            Self::CompletionCandidateRequested { .. } => super::RuntimeEventKind::CompletionCandidateRequested,
             Self::Stopped => super::RuntimeEventKind::Stopped,
             Self::MaxTurnsExceeded { .. } => super::RuntimeEventKind::MaxTurnsExceeded,
-            Self::AdapterOutcomeClassified { .. } => {
-                super::RuntimeEventKind::AdapterOutcomeClassified
-            }
+            Self::AdapterOutcomeClassified { .. } => super::RuntimeEventKind::AdapterOutcomeClassified,
             Self::AdapterError { .. } => super::RuntimeEventKind::AdapterError,
             Self::FabricError { .. } => super::RuntimeEventKind::FabricError,
             Self::HookBlocked { .. } => super::RuntimeEventKind::HookBlocked,
@@ -230,6 +290,10 @@ impl RuntimeEvent {
             Self::SandboxEscalation { .. } => super::RuntimeEventKind::SandboxEscalation,
             Self::Cancelled { .. } => super::RuntimeEventKind::Cancelled,
             Self::CompactionRequested { .. } => super::RuntimeEventKind::CompactionRequested,
+            Self::SessionStateChanged { .. } => super::RuntimeEventKind::SessionStateChanged,
+            Self::SessionCommitObserved { .. } => super::RuntimeEventKind::SessionCommitObserved,
+            Self::SessionRecoveryObserved { .. } => super::RuntimeEventKind::SessionRecoveryObserved,
+            Self::SessionAuthorityProfileObserved { .. } => super::RuntimeEventKind::SessionAuthorityProfileObserved,
             Self::Shutdown { .. } => super::RuntimeEventKind::Shutdown,
         }
     }
@@ -269,22 +333,19 @@ fn project_stream_frame_event(frame: &animus_adapters::ModelStreamFrame) -> Runt
             call_id: frame.call_id().clone(),
             reason: terminal_reason(frame),
         },
-        animus_adapters::ModelStreamFrameKind::Finish
-        | animus_adapters::ModelStreamFrameKind::Cancelled => RuntimeEvent::ModelStreamEnded {
-            call_id: frame.call_id().clone(),
-            status: frame.kind(),
-        },
+        animus_adapters::ModelStreamFrameKind::Finish | animus_adapters::ModelStreamFrameKind::Cancelled => {
+            RuntimeEvent::ModelStreamEnded {
+                call_id: frame.call_id().clone(),
+                status: frame.kind(),
+            }
+        }
         animus_adapters::ModelStreamFrameKind::ContentDelta
         | animus_adapters::ModelStreamFrameKind::ThoughtDelta
         | animus_adapters::ModelStreamFrameKind::ToolCallDelta
-        | animus_adapters::ModelStreamFrameKind::Usage => RuntimeEvent::ModelStreamFrame {
-            frame: frame.clone(),
-        },
+        | animus_adapters::ModelStreamFrameKind::Usage => RuntimeEvent::ModelStreamFrame { frame: frame.clone() },
     }
 }
 
 fn terminal_reason(frame: &animus_adapters::ModelStreamFrame) -> String {
-    frame
-        .body()
-        .map_or_else(|| String::from(frame.kind().as_str()), String::from)
+    frame.body().map_or_else(|| String::from(frame.kind().as_str()), String::from)
 }

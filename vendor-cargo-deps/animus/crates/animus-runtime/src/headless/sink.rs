@@ -45,17 +45,13 @@ impl CompletionReceipt {
                 value: draft.status,
             })
         })?;
-        let evidence_references = super::required_unique_texts(
-            super::EVIDENCE_REFERENCE_FIELD,
-            draft.evidence_references,
-        )?;
+        let evidence_references =
+            super::required_unique_texts(super::EVIDENCE_REFERENCE_FIELD, draft.evidence_references)?;
         let final_response = match status {
-            CompletionStatus::Success => {
-                Some(super::required_optional_text(super::OptionalTextField {
-                    field: super::FINAL_RESPONSE_FIELD,
-                    value: draft.final_response,
-                })?)
-            }
+            CompletionStatus::Success => Some(super::required_optional_text(super::OptionalTextField {
+                field: super::FINAL_RESPONSE_FIELD,
+                value: draft.final_response,
+            })?),
             _terminal_failure => super::optional_text(super::OptionalTextField {
                 field: super::FINAL_RESPONSE_FIELD,
                 value: draft.final_response,
@@ -150,9 +146,7 @@ impl CompletionStatus {
 /// # Errors
 ///
 /// Returns [`super::AutomationError`] when the evidence reference is empty.
-pub fn prompt_required_completion(
-    evidence_reference: &str,
-) -> Result<CompletionReceipt, super::AutomationError> {
+pub fn prompt_required_completion(evidence_reference: &str) -> Result<CompletionReceipt, super::AutomationError> {
     CompletionReceipt::validate(&CompletionReceiptDraft {
         status: super::STATUS_PROMPT_REQUIRED,
         evidence_references: &[evidence_reference],
@@ -171,9 +165,7 @@ pub fn prompt_required_completion(
 ///
 /// Panics if terminal-event counting exceeds the supplied stream length, which
 /// would indicate corrupted iteration state.
-pub fn select_final_output(
-    stream: &[super::AutomationEnvelope],
-) -> Result<FinalOutput, super::AutomationError> {
+pub fn select_final_output(stream: &[super::AutomationEnvelope]) -> Result<FinalOutput, super::AutomationError> {
     let mut final_content: Option<&str> = None;
     let mut terminal_events_seen = 0usize;
     for envelope in stream {

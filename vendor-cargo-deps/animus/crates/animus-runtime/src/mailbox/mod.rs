@@ -13,23 +13,48 @@ mod digest;
 mod errors;
 mod record;
 
-pub use core::{apply_message_queue_operation, classify_interrupt_signal};
-pub use data::{
-    ActiveWorkReference, ActiveWorkStatus, CancellationHandleClass, CancellationRequest,
-    DispatchAcknowledgementDraft, ImmediateDispatchRequest, InterruptKeyword,
-    InterruptQueueAdmission, InterruptSendMode, InterruptSignalDraft, MessageBudgetClass,
-    MessageDispatch, MessageDispatchAcknowledgementOutcome, MessageEditDraft,
-    MessageItemOperationDraft, MessageQueueEvent, MessageQueueOperation, MessageQueueOperationKind,
-    MessageQueuePolicy, MessageQueuePolicyDraft, MessageQueueState, MessageQueueTransition,
-    MessageRedactionState, MessageReorderDraft, MessageSafetyClass, MessageScopeOperationDraft,
-    PauseRequest, QueueItemEvent, QueuedMessage, QueuedMessageDraft, RedirectionPayload,
-    RedirectionPayloadDraft, UserControlEvent,
-};
+pub use core::apply_message_queue_operation;
+pub use core::classify_interrupt_signal;
+
+pub use data::ActiveWorkReference;
+pub use data::ActiveWorkStatus;
+pub use data::CancellationHandleClass;
+pub use data::CancellationRequest;
+pub use data::DispatchAcknowledgementDraft;
+pub use data::ImmediateDispatchRequest;
+pub use data::InterruptKeyword;
+pub use data::InterruptQueueAdmission;
+pub use data::InterruptSendMode;
+pub use data::InterruptSignalDraft;
+pub use data::MessageBudgetClass;
+pub use data::MessageDispatch;
+pub use data::MessageDispatchAcknowledgementOutcome;
+pub use data::MessageEditDraft;
+pub use data::MessageItemOperationDraft;
+pub use data::MessageQueueEvent;
+pub use data::MessageQueueOperation;
+pub use data::MessageQueueOperationKind;
+pub use data::MessageQueuePolicy;
+pub use data::MessageQueuePolicyDraft;
+pub use data::MessageQueueState;
+pub use data::MessageQueueTransition;
+pub use data::MessageRedactionState;
+pub use data::MessageReorderDraft;
+pub use data::MessageSafetyClass;
+pub use data::MessageScopeOperationDraft;
+pub use data::PauseRequest;
+pub use data::QueueItemEvent;
+pub use data::QueuedMessage;
+pub use data::QueuedMessageDraft;
+pub use data::RedirectionPayload;
+pub use data::RedirectionPayloadDraft;
+pub use data::UserControlEvent;
 pub use digest::blake3_message_queue_hash;
-pub use errors::{MessageQueueError, MessageQueueErrorKind};
-pub use record::{
-    MessageQueueReceipt, MessageQueueReceiptDraft, validate_message_queue_receipt_text,
-};
+pub use errors::MessageQueueError;
+pub use errors::MessageQueueErrorKind;
+pub use record::MessageQueueReceipt;
+pub use record::MessageQueueReceiptDraft;
+pub use record::validate_message_queue_receipt_text;
 
 pub(crate) const MESSAGE_QUEUE_SCHEMA: &str = "animus.message-queue-control.v1";
 pub(crate) const MESSAGE_QUEUE_RECEIPT_SCHEMA: &str = "animus.message-queue-receipt.v1";

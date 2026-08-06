@@ -31,10 +31,7 @@ impl ProviderSerializationPolicy {
     /// Returns [`super::Error`] when the provider label is unsafe.
     pub fn from_draft(draft: ProviderSerializationPolicyDraft<'_>) -> Result<Self, super::Error> {
         Ok(Self {
-            provider_label: super::check::normalized_safe_text(
-                super::PROVIDER_LABEL_FIELD,
-                draft.provider_label,
-            )?,
+            provider_label: super::check::normalized_safe_text(super::PROVIDER_LABEL_FIELD, draft.provider_label)?,
             mode: draft.mode,
         })
     }
@@ -100,7 +97,8 @@ impl ProviderNativeRequest {
 ///
 /// # Errors
 ///
-/// Returns [`super::Error`] when image support would require a generic conversion, missing service, live provider call, or unsafe handle.
+/// Returns [`super::Error`] when image support would require a generic conversion, missing service,
+/// live provider call, or unsafe handle.
 pub fn serialize_provider_native_fixture(
     assembly: &super::PromptAssembly,
     policy: &ProviderSerializationPolicy,
@@ -171,9 +169,7 @@ fn resolve_handle(
     let Some(service) = service else {
         return Err(super::Error::MissingImageService);
     };
-    service
-        .resolve_image_payload(image)
-        .map_err(image_payload_error)
+    service.resolve_image_payload(image).map_err(image_payload_error)
 }
 
 fn image_payload_error(error: super::ImagePayloadError) -> super::Error {
@@ -181,12 +177,8 @@ fn image_payload_error(error: super::ImagePayloadError) -> super::Error {
         super::ImagePayloadError::Unavailable => super::Error::AdapterUnavailable {
             label: alloc::string::String::from("image_payload_service"),
         },
-        super::ImagePayloadError::LiveProviderCallRequired => {
-            super::Error::LiveProviderCallRequired
-        }
-        super::ImagePayloadError::InvalidHandle { field, reason } => {
-            super::Error::InvalidImageHandle { field, reason }
-        }
+        super::ImagePayloadError::LiveProviderCallRequired => super::Error::LiveProviderCallRequired,
+        super::ImagePayloadError::InvalidHandle { field, reason } => super::Error::InvalidImageHandle { field, reason },
     }
 }
 

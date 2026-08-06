@@ -106,17 +106,14 @@ fn backdrop_styles_only_outside_cells() -> Result<(), core::convert::Infallible>
         .with_height(super::OverlaySize::Fixed(3))
         .with_border(false)
         .with_backdrop(true);
-    let style = super::OverlayStyle::default()
-        .with_backdrop(ratatui::style::Style::new().bg(ratatui::style::Color::Blue));
+    let style =
+        super::OverlayStyle::default().with_backdrop(ratatui::style::Style::new().bg(ratatui::style::Color::Blue));
 
     let buffer = render_sample(area_rect, &model, &style)?;
     let layout = super::layout(area_rect, &model);
 
     assert_eq!(buffer[(0, 0)].bg, ratatui::style::Color::Blue);
-    assert_eq!(
-        buffer[(layout.inner.x, layout.inner.y)].bg,
-        ratatui::style::Color::Black
-    );
+    assert_eq!(buffer[(layout.inner.x, layout.inner.y)].bg, ratatui::style::Color::Black);
     assert_eq!(buffer[(0, 0)].symbol(), "x");
     Ok(())
 }
@@ -138,14 +135,8 @@ fn buffer_renderer_draws_chrome_without_frame() {
     let layout = super::render_frame(&mut buffer, area_rect, &model, &style);
 
     assert_eq!(layout, super::layout(area_rect, &model));
-    assert_eq!(
-        buffer[(layout.outer.x, layout.outer.y)].fg,
-        ratatui::style::Color::Red
-    );
-    assert_eq!(
-        buffer[(layout.inner.x, layout.inner.y)].bg,
-        ratatui::style::Color::Green
-    );
+    assert_eq!(buffer[(layout.outer.x, layout.outer.y)].fg, ratatui::style::Color::Red);
+    assert_eq!(buffer[(layout.inner.x, layout.inner.y)].bg, ratatui::style::Color::Green);
     assert_eq!(buffer[(0, 0)].symbol(), "x");
 }
 
@@ -155,12 +146,7 @@ fn buffer_renderer_zero_area_is_noop() {
     let model = super::OverlayModel::default().with_clear(true);
     let mut buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 1, 1));
 
-    let layout = super::render_frame(
-        &mut buffer,
-        zero_area_rect,
-        &model,
-        &super::OverlayStyle::default(),
-    );
+    let layout = super::render_frame(&mut buffer, zero_area_rect, &model, &super::OverlayStyle::default());
 
     assert_eq!(layout.outer, ratatui::layout::Rect::new(0, 0, 0, 0));
     assert_eq!(buffer[(0, 0)].symbol(), " ");
@@ -179,10 +165,7 @@ fn render_sample(
     terminal.draw(|frame| {
         let frame_area_rect = frame.area();
         let background = test_background(frame_area_rect);
-        frame.render_widget(
-            ratatui::widgets::Paragraph::new(background),
-            frame_area_rect,
-        );
+        frame.render_widget(ratatui::widgets::Paragraph::new(background), frame_area_rect);
         super::frame(frame, area_rect, model, style);
     })?;
     Ok(terminal.backend().buffer().clone())
@@ -196,7 +179,5 @@ fn test_background(area_rect: ratatui::layout::Rect) -> Vec<ratatui::text::Line<
     let columns_cells = usize::from(area_rect.width).min(MAX_BACKGROUND_COLUMNS_CELLS);
     let rows_cells = usize::from(area_rect.height).min(MAX_BACKGROUND_ROWS_CELLS);
     let row_text = "x".repeat(columns_cells);
-    std::iter::repeat_with(|| ratatui::text::Line::from(row_text.clone()))
-        .take(rows_cells)
-        .collect()
+    std::iter::repeat_with(|| ratatui::text::Line::from(row_text.clone())).take(rows_cells).collect()
 }

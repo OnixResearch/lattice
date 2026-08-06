@@ -43,11 +43,7 @@ impl crate::RuntimeMiddleware for FailingToolHook {
         &mut self,
         _request: animus_adapters::ToolRequest,
     ) -> Result<crate::HookDecision<animus_adapters::ToolRequest>, crate::MiddlewareError> {
-        Err(crate::MiddlewareError::new(
-            crate::HookBoundary::ToolDispatch,
-            TOOL_GUARD_LABEL,
-            TOOL_HOOK_FAILURE,
-        ))
+        Err(crate::MiddlewareError::new(crate::HookBoundary::ToolDispatch, TOOL_GUARD_LABEL, TOOL_HOOK_FAILURE))
     }
 }
 
@@ -64,8 +60,7 @@ impl crate::RuntimeMiddleware for AppendModelHook {
     ) -> Result<crate::HookDecision<animus_adapters::ModelRequest>, crate::MiddlewareError> {
         let prompt = format!("{}{FIRST_MODEL_SUFFIX}", request.prompt());
         Ok(crate::HookDecision::Continue {
-            value: animus_adapters::ModelRequest::new(&prompt)
-                .expect("mutated model prompt should be valid"),
+            value: animus_adapters::ModelRequest::new(&prompt).expect("mutated model prompt should be valid"),
         })
     }
 }
@@ -99,11 +94,7 @@ impl crate::RuntimeMiddleware for FailingObserverHook {
     }
 
     fn observe(&mut self, _event: &crate::RuntimeEvent) -> Result<(), crate::MiddlewareError> {
-        Err(crate::MiddlewareError::new(
-            crate::HookBoundary::Observe,
-            OBSERVER_LABEL,
-            OBSERVER_FAILURE,
-        ))
+        Err(crate::MiddlewareError::new(crate::HookBoundary::Observe, OBSERVER_LABEL, OBSERVER_FAILURE))
     }
 }
 
@@ -119,19 +110,14 @@ impl crate::RuntimeMiddleware for ObserveAndReplaceModelHook {
         self.observed.push(String::from(request.prompt()));
         let prompt = format!("{}{SECOND_MODEL_SUFFIX}", request.prompt());
         Ok(crate::HookDecision::Replace {
-            value: animus_adapters::ModelRequest::new(&prompt)
-                .expect("replacement model prompt should be valid"),
+            value: animus_adapters::ModelRequest::new(&prompt).expect("replacement model prompt should be valid"),
         })
     }
 }
 
 fn run_with_tool_hook(
     hook: &mut dyn crate::RuntimeMiddleware,
-) -> (
-    crate::RunReport,
-    super::support::ModelStub,
-    super::support::ToolStub,
-) {
+) -> (crate::RunReport, super::support::ModelStub, super::support::ToolStub) {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
     let hooks: Vec<&mut dyn crate::RuntimeMiddleware> = vec![hook];
@@ -146,11 +132,7 @@ fn run_with_tool_hook(
 }
 
 fn event_kinds(report: &crate::RunReport) -> Vec<crate::RuntimeEventKind> {
-    report
-        .events()
-        .iter()
-        .map(crate::RuntimeEvent::kind)
-        .collect()
+    report.events().iter().map(crate::RuntimeEvent::kind).collect()
 }
 
 #[test]
@@ -163,22 +145,19 @@ fn model_run_events_preserve_turn_order() {
         &mut tool,
     );
 
-    assert_eq!(
-        event_kinds(&result),
-        vec![
-            crate::RuntimeEventKind::RuntimeStarted,
-            crate::RuntimeEventKind::ContextReplayed,
-            crate::RuntimeEventKind::LoopStarted,
-            crate::RuntimeEventKind::TurnStarted,
-            crate::RuntimeEventKind::LoopDecision,
-            crate::RuntimeEventKind::ModelRequested,
-            crate::RuntimeEventKind::ModelResponded,
-            crate::RuntimeEventKind::TurnStarted,
-            crate::RuntimeEventKind::LoopDecision,
-            crate::RuntimeEventKind::FinalResponse,
-            crate::RuntimeEventKind::Shutdown,
-        ]
-    );
+    assert_eq!(event_kinds(&result), vec![
+        crate::RuntimeEventKind::RuntimeStarted,
+        crate::RuntimeEventKind::ContextReplayed,
+        crate::RuntimeEventKind::LoopStarted,
+        crate::RuntimeEventKind::TurnStarted,
+        crate::RuntimeEventKind::LoopDecision,
+        crate::RuntimeEventKind::ModelRequested,
+        crate::RuntimeEventKind::ModelResponded,
+        crate::RuntimeEventKind::TurnStarted,
+        crate::RuntimeEventKind::LoopDecision,
+        crate::RuntimeEventKind::FinalResponse,
+        crate::RuntimeEventKind::Shutdown,
+    ]);
     assert_eq!(model.calls, super::support::EXPECTED_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
 }
@@ -192,25 +171,14 @@ fn headless_subscriber_receives_mode_neutral_lifecycle_facts() {
         &mut model,
         &mut tool,
     );
-    let labels: Vec<&str> = event_kinds(&result)
-        .iter()
-        .map(|kind| kind.as_str())
-        .collect();
+    let labels: Vec<&str> = event_kinds(&result).iter().map(|kind| kind.as_str()).collect();
 
     assert!(labels.contains(&crate::RuntimeEventKind::RuntimeStarted.as_str()));
     assert!(labels.contains(&crate::RuntimeEventKind::ToolRequested.as_str()));
     assert!(labels.contains(&crate::RuntimeEventKind::ToolResponded.as_str()));
     assert!(labels.contains(&crate::RuntimeEventKind::Shutdown.as_str()));
-    assert!(
-        labels
-            .iter()
-            .all(|label| !label.contains(MODE_NEUTRAL_FORBIDDEN_TUI))
-    );
-    assert!(
-        labels
-            .iter()
-            .all(|label| !label.contains(MODE_NEUTRAL_FORBIDDEN_TERMINAL))
-    );
+    assert!(labels.iter().all(|label| !label.contains(MODE_NEUTRAL_FORBIDDEN_TUI)));
+    assert!(labels.iter().all(|label| !label.contains(MODE_NEUTRAL_FORBIDDEN_TERMINAL)));
 }
 
 #[test]
@@ -237,12 +205,7 @@ fn tool_guard_denies_before_adapter_dispatch() {
         event,
         crate::RuntimeEvent::ToolDenied { reason, .. } if reason == TOOL_BLOCK_REASON
     )));
-    assert!(
-        result
-            .events()
-            .iter()
-            .all(|event| { !matches!(event, crate::RuntimeEvent::ToolResponded { .. }) })
-    );
+    assert!(result.events().iter().all(|event| { !matches!(event, crate::RuntimeEvent::ToolResponded { .. }) }));
 }
 
 #[test]
@@ -308,10 +271,7 @@ fn observe_only_middleware_failure_is_best_effort_and_bounded() {
         )
     };
 
-    assert!(matches!(
-        result.status(),
-        crate::RuntimeStatus::FinalResponse { .. }
-    ));
+    assert!(matches!(result.status(), crate::RuntimeStatus::FinalResponse { .. }));
     assert_eq!(model.calls, super::support::EXPECTED_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
     assert!(result.events().iter().any(|event| matches!(
@@ -335,18 +295,15 @@ fn hook_chain_applies_mutate_then_replace_in_order() {
     let mut second = ObserveAndReplaceModelHook::default();
     let hooks: Vec<&mut dyn crate::RuntimeMiddleware> = vec![&mut first, &mut second];
     let mut stack = crate::RuntimeMiddlewareStack::from_hooks(hooks);
-    let request = animus_adapters::ModelRequest::new(super::support::SUMMARY)
-        .expect("base model request should be valid");
+    let request =
+        animus_adapters::ModelRequest::new(super::support::SUMMARY).expect("base model request should be valid");
     let outcome = stack.prepare_model_dispatch(request);
 
     let crate::hooks::chain::MiddlewareOutcome::Accepted(request) = outcome else {
         panic!("model hook chain should accept the final request");
     };
     assert_eq!(request.prompt(), FINAL_MODEL_PROMPT);
-    assert_eq!(
-        second.observed.as_slice(),
-        &[String::from(FIRST_MODEL_PROMPT)]
-    );
+    assert_eq!(second.observed.as_slice(), &[String::from(FIRST_MODEL_PROMPT)]);
 }
 
 #[test]
@@ -376,8 +333,5 @@ fn lifecycle_dtos_cover_cancellation_and_compaction() {
     };
 
     assert_eq!(cancelled.kind(), crate::RuntimeEventKind::Cancelled);
-    assert_eq!(
-        compaction.kind(),
-        crate::RuntimeEventKind::CompactionRequested
-    );
+    assert_eq!(compaction.kind(), crate::RuntimeEventKind::CompactionRequested);
 }

@@ -13,7 +13,7 @@ const EXPECTED_NEGATIVE_ISSUES: usize = 6;
 fn valid_rows_name_visible_states() {
     let fixtures = vec![valid_fixture()];
 
-    let outcome = super::validate(&fixtures, &[FIXTURE_DIALOG]);
+    let outcome = super::validate(&fixtures, &[super::super::FixtureId::new(FIXTURE_DIALOG)]);
 
     assert!(outcome.is_valid(), "issues: {:?}", outcome.issues);
     assert_eq!(outcome.fixtures[0].fixture_id, FIXTURE_DIALOG);
@@ -24,26 +24,18 @@ fn valid_rows_name_visible_states() {
 fn malformed_rows_fail_with_deterministic_diagnostics() {
     let duplicate = super::Fixture::new(FIXTURE_DIALOG, COVERAGE_DOC)
         .with_state(super::State::new("", "", super::Kind::Invalid))
-        .with_state(super::State::new(
-            STATE_INVALID,
-            "Invalid",
-            super::Kind::Invalid,
-        ))
-        .with_state(super::State::new(
-            STATE_INVALID,
-            "Invalid duplicate",
-            super::Kind::Malformed,
-        ));
+        .with_state(super::State::new(STATE_INVALID, "Invalid", super::Kind::Invalid))
+        .with_state(super::State::new(STATE_INVALID, "Invalid duplicate", super::Kind::Malformed));
     let stale = super::Fixture::new(FIXTURE_UNKNOWN, "").with_state(
-        super::State::new(STATE_UNSUPPORTED, "Unsupported", super::Kind::Unsupported)
-            .with_renderer(super::Renderer {
-                renderer: crate::showcase_fixtures::ShowcaseRenderer::Meteorite,
-                visible: false,
-                reason: Some(String::new()),
-            }),
+        super::State::new(STATE_UNSUPPORTED, "Unsupported", super::Kind::Unsupported).with_renderer(super::Renderer {
+            renderer: crate::showcase_fixtures::ShowcaseRenderer::Meteorite,
+            visible: false,
+            reason: Some(String::new()),
+        }),
     );
 
-    let outcome = super::validate(&[duplicate.clone(), duplicate, stale], &[FIXTURE_DIALOG]);
+    let outcome =
+        super::validate(&[duplicate.clone(), duplicate, stale], &[super::super::FixtureId::new(FIXTURE_DIALOG)]);
 
     assert!(!outcome.is_valid());
     assert!(outcome.issues.len() >= EXPECTED_NEGATIVE_ISSUES);
@@ -60,19 +52,13 @@ fn valid_fixture() -> super::Fixture {
     super::Fixture::new(FIXTURE_DIALOG, COVERAGE_DOC)
         .with_state(
             super::State::new(STATE_DEFAULT, "Default", super::Kind::HappyPath)
-                .with_renderer(super::Renderer::visible(
-                    crate::showcase_fixtures::ShowcaseRenderer::Subwayrat,
-                ))
-                .with_renderer(super::Renderer::visible(
-                    crate::showcase_fixtures::ShowcaseRenderer::Meteorite,
-                )),
+                .with_renderer(super::Renderer::visible(crate::showcase_fixtures::ShowcaseRenderer::Subwayrat))
+                .with_renderer(super::Renderer::visible(crate::showcase_fixtures::ShowcaseRenderer::Meteorite)),
         )
         .with_state(
             super::State::new(STATE_EMPTY, "Empty", super::Kind::Empty)
                 .with_diagnostic(DIAGNOSTIC_INVALID)
-                .with_renderer(super::Renderer::visible(
-                    crate::showcase_fixtures::ShowcaseRenderer::Subwayrat,
-                ))
+                .with_renderer(super::Renderer::visible(crate::showcase_fixtures::ShowcaseRenderer::Subwayrat))
                 .with_renderer(super::Renderer::unsupported(
                     crate::showcase_fixtures::ShowcaseRenderer::Meteorite,
                     UNSUPPORTED_REASON,

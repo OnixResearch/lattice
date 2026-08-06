@@ -1,0 +1,12 @@
+schema=downstream-source-compatibility-blocker-v1
+downstream=tile
+downstream_revision=62df72ca1ebbb33d96ca3c2714efed15054afe99
+package=tile-tui
+command=cargo check --locked -p tile-tui
+result=blocked
+blocker=the pinned clean Tile Cargo.lock requires an update and --locked correctly refused mutation
+source_clean_before=true
+source_clean_after=true
+source_mutated=false
+claim=no source compatibility evidence
+not_evidence=runtime,semantics,authority,accessibility,security,release,product-support,other-revisions

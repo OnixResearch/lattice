@@ -48,26 +48,16 @@ pub(super) fn denied_reason(
     policy_hash: Option<&str>,
     caveat: super::super::AdmissionCaveat,
 ) -> Option<super::super::AdmissionReason> {
-    let request = super::super::AdmissionRequest::new(&super::support::draft(
-        credential,
-        policy_hash,
-        caveat,
-    ))
-    .expect("request should validate");
-    super::super::admit(&request)
-        .expect("decision should evaluate")
-        .reason()
+    let request = super::super::AdmissionRequest::new(&super::support::draft(credential, policy_hash, caveat))
+        .expect("request should validate");
+    super::super::admit(&request).expect("decision should evaluate").reason()
 }
 
 pub(super) fn request_with(
     credential: Option<super::super::CredentialEvidenceDraft<'_>>,
     policy_hash: Option<&str>,
 ) -> Result<super::super::AdmissionRequest, super::super::AdmissionError> {
-    super::super::AdmissionRequest::new(&draft(
-        credential,
-        policy_hash,
-        super::super::AdmissionCaveat::Allow,
-    ))
+    super::super::AdmissionRequest::new(&draft(credential, policy_hash, super::super::AdmissionCaveat::Allow))
 }
 
 pub(super) fn draft<'a>(
@@ -89,9 +79,7 @@ pub(super) fn draft<'a>(
     }
 }
 
-pub(super) fn credential(
-    fixture: CredentialFixture<'_>,
-) -> super::super::CredentialEvidenceDraft<'_> {
+pub(super) fn credential(fixture: CredentialFixture<'_>) -> super::super::CredentialEvidenceDraft<'_> {
     super::super::CredentialEvidenceDraft {
         audience: fixture.audience,
         actor: ACTOR,
@@ -161,18 +149,16 @@ impl RemoteHandshakeFixture<'_> {
 pub(super) fn remote_handshake_with(
     fixture: RemoteHandshakeFixture<'_>,
 ) -> Result<super::super::RemoteServerHandshakeSummary, super::super::RemoteServerAdmissionError> {
-    super::super::RemoteServerHandshakeSummary::new(
-        &super::super::RemoteServerHandshakeSummaryDraft {
-            observed_tls: fixture.tls,
-            fingerprint_status: fixture.fingerprint_status,
-            auth_outcome: fixture.auth_outcome,
-            protocol_version: PROTOCOL_VERSION,
-            protocol_version_status: fixture.protocol_status,
-            accepted_features: &[FEATURE_PROMPT, FEATURE_EVENTS],
-            audience_hash: fixture.audience_hash,
-            safe_failure_class: super::super::RemoteServerFailureClass::None,
-        },
-    )
+    super::super::RemoteServerHandshakeSummary::new(&super::super::RemoteServerHandshakeSummaryDraft {
+        observed_tls: fixture.tls,
+        fingerprint_status: fixture.fingerprint_status,
+        auth_outcome: fixture.auth_outcome,
+        protocol_version: PROTOCOL_VERSION,
+        protocol_version_status: fixture.protocol_status,
+        accepted_features: &[FEATURE_PROMPT, FEATURE_EVENTS],
+        audience_hash: fixture.audience_hash,
+        safe_failure_class: super::super::RemoteServerFailureClass::None,
+    })
 }
 
 pub(super) fn remote_handshake()
@@ -184,8 +170,7 @@ pub(super) fn remote_handshake()
 pub(super) struct RemotePolicyFixture<'a> {
     pub(super) requested_scope: &'a str,
     pub(super) requested_capabilities: &'a [&'a str],
-    pub(super) credential_source_availability:
-        super::super::RemoteServerCredentialSourceAvailability,
+    pub(super) credential_source_availability: super::super::RemoteServerCredentialSourceAvailability,
     pub(super) tofu_approved: bool,
     pub(super) fallback_requested: bool,
 }
@@ -195,8 +180,7 @@ impl RemotePolicyFixture<'_> {
         Self {
             requested_scope: SCOPE,
             requested_capabilities: &[CAPABILITY_PROMPT],
-            credential_source_availability:
-                super::super::RemoteServerCredentialSourceAvailability::Available,
+            credential_source_availability: super::super::RemoteServerCredentialSourceAvailability::Available,
             tofu_approved: false,
             fallback_requested: false,
         }
@@ -206,16 +190,14 @@ impl RemotePolicyFixture<'_> {
 pub(super) fn remote_policy_with(
     fixture: RemotePolicyFixture<'_>,
 ) -> Result<super::super::RemoteServerAdmissionPolicy, super::super::RemoteServerAdmissionError> {
-    super::super::RemoteServerAdmissionPolicy::new(
-        &super::super::RemoteServerAdmissionPolicyDraft {
-            policy_hash: HASH_B,
-            requested_scope: fixture.requested_scope,
-            requested_capabilities: fixture.requested_capabilities,
-            credential_source_availability: fixture.credential_source_availability,
-            tofu_approved: fixture.tofu_approved,
-            fallback_requested: fixture.fallback_requested,
-        },
-    )
+    super::super::RemoteServerAdmissionPolicy::new(&super::super::RemoteServerAdmissionPolicyDraft {
+        policy_hash: HASH_B,
+        requested_scope: fixture.requested_scope,
+        requested_capabilities: fixture.requested_capabilities,
+        credential_source_availability: fixture.credential_source_availability,
+        tofu_approved: fixture.tofu_approved,
+        fallback_requested: fixture.fallback_requested,
+    })
 }
 
 pub(super) fn remote_policy()

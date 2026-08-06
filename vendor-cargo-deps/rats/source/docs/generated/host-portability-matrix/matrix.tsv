@@ -1,0 +1,37 @@
+schema	profile	target	status	required_grades	reason
+rats.host-portability-matrix.v1	evidence-only	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	evidence-only	wasm32-unknown-unknown	irrelevant		irrelevant
+rats.host-portability-matrix.v1	evidence-only	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	evidence-only	x86_64-unknown-linux-gnu	irrelevant		irrelevant
+rats.host-portability-matrix.v1	experimental	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	experimental	wasm32-unknown-unknown	irrelevant		irrelevant
+rats.host-portability-matrix.v1	experimental	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	experimental	x86_64-unknown-linux-gnu	experimental		experimental
+rats.host-portability-matrix.v1	meteorite-components-wasm	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-components-wasm	wasm32-unknown-unknown	supported	compile	all-required-grades-passed
+rats.host-portability-matrix.v1	meteorite-components-wasm	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-components-wasm	x86_64-unknown-linux-gnu	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-showcase-web	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-showcase-web	wasm32-unknown-unknown	supported	browser-runtime,compile	all-required-grades-passed
+rats.host-portability-matrix.v1	meteorite-showcase-web	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-showcase-web	x86_64-unknown-linux-gnu	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-web	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-web	wasm32-unknown-unknown	supported	browser-runtime,compile	all-required-grades-passed
+rats.host-portability-matrix.v1	meteorite-web	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	meteorite-web	x86_64-unknown-linux-gnu	irrelevant		irrelevant
+rats.host-portability-matrix.v1	native-terminal	aarch64-apple-darwin	missing	compile,native-host-test,native-runtime-smoke	compile=missing,native-host-test=missing,native-runtime-smoke=missing
+rats.host-portability-matrix.v1	native-terminal	wasm32-unknown-unknown	irrelevant		irrelevant
+rats.host-portability-matrix.v1	native-terminal	x86_64-pc-windows-msvc	missing	compile,native-host-test,native-runtime-smoke	compile=missing,native-host-test=missing,native-runtime-smoke=missing
+rats.host-portability-matrix.v1	native-terminal	x86_64-unknown-linux-gnu	supported	compile,native-host-test,native-runtime-smoke	all-required-grades-passed
+rats.host-portability-matrix.v1	pure-core	aarch64-apple-darwin	missing	compile,native-host-test	compile=missing,native-host-test=missing
+rats.host-portability-matrix.v1	pure-core	wasm32-unknown-unknown	supported	compile	all-required-grades-passed
+rats.host-portability-matrix.v1	pure-core	x86_64-pc-windows-msvc	missing	compile,native-host-test	compile=missing,native-host-test=missing
+rats.host-portability-matrix.v1	pure-core	x86_64-unknown-linux-gnu	supported	compile,native-host-test	all-required-grades-passed
+rats.host-portability-matrix.v1	ratzilla-web	aarch64-apple-darwin	irrelevant		irrelevant
+rats.host-portability-matrix.v1	ratzilla-web	wasm32-unknown-unknown	supported	browser-runtime,compile	all-required-grades-passed
+rats.host-portability-matrix.v1	ratzilla-web	x86_64-pc-windows-msvc	irrelevant		irrelevant
+rats.host-portability-matrix.v1	ratzilla-web	x86_64-unknown-linux-gnu	irrelevant		irrelevant
+rats.host-portability-matrix.v1	reusable-subwayrat	aarch64-apple-darwin	missing	compile,native-host-test	compile=missing,native-host-test=missing
+rats.host-portability-matrix.v1	reusable-subwayrat	wasm32-unknown-unknown	supported	compile	all-required-grades-passed
+rats.host-portability-matrix.v1	reusable-subwayrat	x86_64-pc-windows-msvc	missing	compile,native-host-test	compile=missing,native-host-test=missing
+rats.host-portability-matrix.v1	reusable-subwayrat	x86_64-unknown-linux-gnu	supported	compile,native-host-test	all-required-grades-passed

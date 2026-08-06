@@ -1,29 +1,15 @@
+#[cfg(test)]
 const KEY_ENTER: &str = "Enter";
-const KEY_ESCAPE: &str = "Escape";
 const ACTION_ACTIVATE: &str = "activate";
 const ACTION_CANCEL: &str = "cancel";
 const ACTION_POINTER_ROUTE: &str = "pointer.route";
 const GRID_ORIGIN: i32 = 0;
 
-/// Ratzilla key event normalized at the shell boundary.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RatzillaKeyInput {
-    /// Key label.
-    pub key: String,
-    /// Modifier labels.
-    pub modifiers: Vec<String>,
-}
-
-impl RatzillaKeyInput {
-    /// Creates a key input.
-    #[must_use]
-    pub fn new(key: impl Into<String>, modifiers: Vec<String>) -> Self {
-        Self {
-            key: key.into(),
-            modifiers,
-        }
-    }
-}
+#[path = "events/normalization.rs"]
+mod normalization;
+pub use normalization::RatzillaKeyInput;
+pub use normalization::adapt_ratzilla_key_input;
+pub use normalization::normalize_ratzilla_key_input;
 
 /// Ratzilla mouse input normalized at the shell boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,10 +53,7 @@ impl RatzillaMouseInput {
 
     /// Sets modifier metadata.
     #[must_use]
-    pub const fn with_modifiers(
-        mut self,
-        modifiers: crate::pointer_input_routing::PointerModifiers,
-    ) -> Self {
+    pub const fn with_modifiers(mut self, modifiers: crate::pointer_input_routing::PointerModifiers) -> Self {
         self.modifiers = modifiers;
         self
     }
@@ -104,6 +87,10 @@ pub enum WebInputDiagnosticCode {
     OutOfBoundsCoordinate,
     /// Modifier combination is not supported by the web shell.
     UnsupportedModifierCombination,
+    /// Uncommitted composition cannot become a shortcut.
+    CompositionExcluded,
+    /// Repeated key input is excluded by policy.
+    RepeatExcluded,
 }
 
 /// Web input diagnostic.
@@ -157,33 +144,9 @@ fn diagnostic_outcome(
     }
 }
 
-/// Adapts a Ratzilla key input into a platform-neutral action.
-#[must_use]
-pub fn adapt_ratzilla_key_input(input: &RatzillaKeyInput) -> WebInputOutcome {
-    if input.modifiers.iter().any(|modifier| modifier == "Hyper") {
-        return diagnostic_outcome(
-            WebInputDiagnosticCode::UnsupportedModifierCombination,
-            "Hyper modifier is not mapped by the web shell",
-            None,
-        );
-    }
-    match input.key.as_str() {
-        KEY_ENTER => action_outcome(ACTION_ACTIVATE),
-        KEY_ESCAPE => action_outcome(ACTION_CANCEL),
-        _ => diagnostic_outcome(
-            WebInputDiagnosticCode::UnsupportedKey,
-            format!("unsupported web key: {}", input.key),
-            None,
-        ),
-    }
-}
-
 /// Adapts a Ratzilla mouse input into a platform-neutral pointer action.
 #[must_use]
-pub fn adapt_ratzilla_mouse_input(
-    input: RatzillaMouseInput,
-    bounds: WebGridBounds,
-) -> WebInputOutcome {
+pub fn adapt_ratzilla_mouse_input(input: RatzillaMouseInput, bounds: WebGridBounds) -> WebInputOutcome {
     debug_assert!(bounds.width >= GRID_ORIGIN);
     debug_assert!(bounds.height >= GRID_ORIGIN);
     if input.x < 0 || input.y < 0 || input.x >= bounds.width || input.y >= bounds.height {
@@ -220,28 +183,19 @@ fn shared_pointer_outcome(
     let hit_map = crate::pointer_input_routing::derive_pointer_hit_map(vec![
         crate::pointer_input_routing::RenderedPointerRegion::new(
             ACTION_POINTER_ROUTE,
-            crate::pointer_input_routing::PointerRect::new(
-                GRID_ORIGIN,
-                GRID_ORIGIN,
-                bounds.width,
-                bounds.height,
-            ),
+            crate::pointer_input_routing::PointerRect::new(GRID_ORIGIN, GRID_ORIGIN, bounds.width, bounds.height),
             GRID_ORIGIN,
         )
         .with_action(ACTION_POINTER_ROUTE),
     ]);
     match crate::pointer_input_routing::route_pointer_event(event, &hit_map) {
         crate::pointer_input_routing::PointerRouteOutcome::Routed(route) => WebInputOutcome {
-            action_id: route.action_id,
+            action_id: route.action_id.map(|action_id| action_id.to_string()),
             diagnostic: None,
             pointer_modifiers: Some(event.modifiers),
         },
         crate::pointer_input_routing::PointerRouteOutcome::Diagnostic(diagnostic) => {
-            diagnostic_outcome(
-                WebInputDiagnosticCode::UnknownMouseButton,
-                diagnostic.message,
-                Some(event.modifiers),
-            )
+            diagnostic_outcome(WebInputDiagnosticCode::UnknownMouseButton, diagnostic.message, Some(event.modifiers))
         }
     }
 }

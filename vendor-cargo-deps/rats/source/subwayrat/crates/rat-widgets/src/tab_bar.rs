@@ -3,11 +3,23 @@
 //! Renders a row of tab labels with active/inactive styling.
 //! Supports optional count badges like "Tracks (42)".
 
+mod behavior;
+mod view;
+pub use behavior::SubwayTabsAdapter;
+pub use behavior::TerminalTabKey;
+pub use behavior::normalize_terminal_tab_key;
+pub use behavior::subway_tabs_adapter_receipt;
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::layout::Alignment;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Paragraph;
+pub use view::ProjectedTabBar;
 
 /// A single tab entry.
 #[derive(Debug, Clone)]
@@ -100,9 +112,7 @@ impl TabBar {
     pub fn new(labels: Vec<&str>) -> Self {
         Self {
             model: TabBarModel::new(labels),
-            active_style: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            active_style: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             inactive_style: Style::default(),
             separator: " | ".to_string(),
             border_color: Color::Cyan,

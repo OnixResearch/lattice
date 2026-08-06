@@ -117,6 +117,8 @@ pub enum PointerRenderer {
     Subwayrat,
     /// Ratzilla browser abstraction.
     Ratzilla,
+    /// Experimental Iced native adapter.
+    Iced,
 }
 
 /// Renderer adapter projection for pointer routes.

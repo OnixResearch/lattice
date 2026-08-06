@@ -1,0 +1,35 @@
+{
+  "browser": "Chromium 149.0.7827.53",
+  "bundle_hash": "b3f6338cc2c9cb9eca58705896dc076623977b69",
+  "command_hash": "6923f9bf56205991e6ce4e25ce18f4dc776304c2",
+  "command_id": "meteorite-showcase-web.v1",
+  "grades": {
+    "bundle": "pass",
+    "cleanup": "pass",
+    "compile": "pass",
+    "console_runtime": "pass",
+    "interaction": "pass",
+    "mounted_render": "pass"
+  },
+  "limitations": [
+    "not all components",
+    "not another browser engine or operating system",
+    "not accessibility-tree, screen-reader, visual, security, release, or downstream evidence"
+  ],
+  "package": "met-showcase",
+  "package_set_hash": "335739dd308965b9777e3df3fb19da8385554108270c59925455486cb2f2dcb2",
+  "profile": "meteorite-showcase-web",
+  "runner": "x86_64-unknown-linux-gnu",
+  "scenarios": {
+    "keyboard": "enter-count-1",
+    "overlay": "open-observed-then-closed",
+    "pointer": "click-count-1",
+    "rejected_disabled": "preserved-count-0",
+    "selection": "details",
+    "theme": "dark-to-light"
+  },
+  "schema": "rats.meteorite-showcase-web-runtime.v1",
+  "source_hash": "dc07d08686d62df9725752b3f00536116f2ec5a9",
+  "source_revision": "ab4a6a6786ed0c480585676cba7dc785f103f4fc",
+  "target": "wasm32-unknown-unknown"
+}

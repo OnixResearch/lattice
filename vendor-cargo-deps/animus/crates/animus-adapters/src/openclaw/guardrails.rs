@@ -5,30 +5,20 @@
 //! config loading, filesystem scanning, package installation, plugin loading,
 //! daemon restarts, Doctor UI, and auto-fix execution.
 
-const SNAPSHOT_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_snapshot_id");
-const SAFE_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_safe_label");
+const SNAPSHOT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_snapshot_id");
+const SAFE_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_safe_label");
 const REMEDIATION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("guardrail_remediation_label");
-const AUTOFIX_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_autofix_label");
-const PLUGIN_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_plugin_id");
-const CHANNEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_channel_id");
-const PROVIDER_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_provider_id");
-const SLOT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_slot_id");
-const SKILL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_skill_id");
-const UI_HINT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_ui_hint");
+const AUTOFIX_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_autofix_label");
+const PLUGIN_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_plugin_id");
+const CHANNEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_channel_id");
+const PROVIDER_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_provider_id");
+const SLOT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_slot_id");
+const SKILL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_skill_id");
+const UI_HINT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_ui_hint");
 const RECEIPT_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("guardrail_receipt_summary");
-const SOURCE_CLASS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("guardrail_source_class");
+const SOURCE_CLASS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("guardrail_source_class");
 const PROVENANCE_CLASS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("guardrail_provenance_class");
 const LEAK_RAW_CONFIG: &str = "RAW_CONFIG:";
@@ -88,7 +78,8 @@ pub enum Error {
     RegistryOnlyClaimMismatch,
     /// Plugin lifecycle scripts are risky for admission.
     LifecycleScriptRisk,
-    /// Text contained raw config, credentials, paths, provider payloads, prompts, plugin code, or unbounded logs.
+    /// Text contained raw config, credentials, paths, provider payloads, prompts, plugin code, or
+    /// unbounded logs.
     UnsafePayload {
         /// Field that contained unsafe text.
         field: &'static str,
@@ -372,7 +363,8 @@ impl AuditSnapshot {
     ///
     /// # Errors
     ///
-    /// Returns [`Error`] when snapshot identity/evidence is invalid or ambient host inspection is requested.
+    /// Returns [`Error`] when snapshot identity/evidence is invalid or ambient host inspection is
+    /// requested.
     pub fn new(draft: &AuditSnapshotDraft<'_>) -> Result<Self, Error> {
         if draft.ambient_host_inspection {
             return Err(Error::AmbientHostInspection);
@@ -406,16 +398,12 @@ impl AuditSnapshot {
 /// # Panics
 ///
 /// Panics if a previously validated snapshot loses its identity or evidence hash.
-pub fn classify_audit(
-    snapshot: &AuditSnapshot,
-) -> Result<alloc::vec::Vec<GuardrailFinding>, Error> {
+pub fn classify_audit(snapshot: &AuditSnapshot) -> Result<alloc::vec::Vec<GuardrailFinding>, Error> {
     assert!(!snapshot.snapshot_id().is_empty());
     assert!(!snapshot.evidence_hash.as_str().is_empty());
     let mut findings = alloc::vec::Vec::new();
-    if matches!(
-        snapshot.bind_posture,
-        BindPosture::RemoteBound | BindPosture::PublicInternet
-    ) && snapshot.admission_posture != AdmissionPosture::Required
+    if matches!(snapshot.bind_posture, BindPosture::RemoteBound | BindPosture::PublicInternet)
+        && snapshot.admission_posture != AdmissionPosture::Required
     {
         findings.push(finding(&FindingDraft {
             id: FindingId::RemoteExposureWithoutAdmission,
@@ -426,10 +414,8 @@ pub fn classify_audit(
             autofix_label: Some("disable_remote_or_require_auth"),
         })?);
     }
-    if matches!(
-        snapshot.channel_posture,
-        ChannelPosture::OpenDirectMessages | ChannelPosture::OpenGroup
-    ) && snapshot.tool_profile.is_broad()
+    if matches!(snapshot.channel_posture, ChannelPosture::OpenDirectMessages | ChannelPosture::OpenGroup)
+        && snapshot.tool_profile.is_broad()
         && !snapshot.sandbox_posture.is_enforced()
     {
         findings.push(finding(&FindingDraft {
@@ -546,14 +532,13 @@ impl PluginManifestValidation {
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when manifest data is missing, unknown, unsafe, or tries to execute plugin code.
+/// Returns [`Error`] when manifest data is missing, unknown, unsafe, or tries to execute plugin
+/// code.
 ///
 /// # Panics
 ///
 /// Panics if plugin execution or config-schema post-conditions are violated after validation.
-pub fn validate_plugin_manifest(
-    draft: &PluginManifestDraft<'_>,
-) -> Result<PluginManifestValidation, Error> {
+pub fn validate_plugin_manifest(draft: &PluginManifestDraft<'_>) -> Result<PluginManifestValidation, Error> {
     if draft.execution_requested {
         return Err(Error::PluginExecutionRequested);
     }
@@ -571,24 +556,9 @@ pub fn validate_plugin_manifest(
     validate_labels(SLOT_FIELD, draft.slots)?;
     validate_labels(SKILL_FIELD, draft.skills)?;
     validate_labels(UI_HINT_FIELD, draft.ui_hints)?;
-    reject_unknown(
-        CHANNEL_FIELD,
-        draft.config_channels,
-        draft.declared_channels,
-        &Error::UnknownChannel,
-    )?;
-    reject_unknown(
-        PROVIDER_FIELD,
-        draft.config_providers,
-        draft.declared_providers,
-        &Error::UnknownProvider,
-    )?;
-    reject_unknown(
-        SLOT_FIELD,
-        draft.config_slots,
-        draft.slots,
-        &Error::UnknownSlot,
-    )?;
+    reject_unknown(CHANNEL_FIELD, draft.config_channels, draft.declared_channels, &Error::UnknownChannel)?;
+    reject_unknown(PROVIDER_FIELD, draft.config_providers, draft.declared_providers, &Error::UnknownProvider)?;
+    reject_unknown(SLOT_FIELD, draft.config_slots, draft.slots, &Error::UnknownSlot)?;
     let mut diagnostics = alloc::vec::Vec::new();
     if !draft.enabled {
         diagnostics.push(PluginDiagnostic::DisabledPlugin);
@@ -705,7 +675,8 @@ impl PluginTrustValidation {
 ///
 /// # Errors
 ///
-/// Returns [`Error`] for denied policy, unsafe path, writability, ownership, registry-only, or lifecycle risk.
+/// Returns [`Error`] for denied policy, unsafe path, writability, ownership, registry-only, or
+/// lifecycle risk.
 ///
 /// # Panics
 ///
@@ -795,10 +766,7 @@ impl GuardrailReceipt {
             affected_label: safe_text(SAFE_LABEL_FIELD, draft.affected_label)?,
             remediation_label: safe_text(REMEDIATION_FIELD, draft.remediation_label)?,
             policy_hash: crate::ArtifactHash::new(draft.policy_hash)?,
-            plugin_id: draft
-                .plugin_id
-                .map(|plugin_id| safe_text(PLUGIN_ID_FIELD, plugin_id))
-                .transpose()?,
+            plugin_id: draft.plugin_id.map(|plugin_id| safe_text(PLUGIN_ID_FIELD, plugin_id)).transpose()?,
             provenance_class: safe_text(PROVENANCE_CLASS_FIELD, draft.provenance_class)?,
             path_safety: draft.path_safety,
             receipt_hash: crate::ArtifactHash::new(draft.receipt_hash)?,
@@ -889,10 +857,7 @@ fn finding(draft: &FindingDraft<'_>) -> Result<GuardrailFinding, Error> {
         affected_labels: alloc::vec![safe_text(SAFE_LABEL_FIELD, draft.affected_label)?],
         remediation_labels: alloc::vec![safe_text(REMEDIATION_FIELD, draft.remediation_label)?],
         evidence_hash: draft.snapshot.evidence_hash.clone(),
-        autofix: draft
-            .autofix_label
-            .map(AutofixDescriptor::new)
-            .transpose()?,
+        autofix: draft.autofix_label.map(AutofixDescriptor::new).transpose()?,
     })
 }
 
@@ -918,10 +883,7 @@ fn reject_unknown(
     Ok(())
 }
 
-fn safe_text(
-    field_name: crate::validation::FieldName,
-    value: &str,
-) -> Result<alloc::string::String, Error> {
+fn safe_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
     let normalized = crate::validation::normalized_adapter_field(field_name, value)?;
     reject_unsafe_text(field_name, normalized.as_str())?;
     Ok(normalized)
@@ -986,23 +948,15 @@ mod tests {
             ..valid_manifest()
         })
         .expect("disabled trusted plugin should validate with warning");
-        let manifest =
-            validate_plugin_manifest(&valid_manifest()).expect("manifest should validate");
+        let manifest = validate_plugin_manifest(&valid_manifest()).expect("manifest should validate");
         let trust = validate_plugin_trust(&valid_trust()).expect("trust should validate");
         let receipt = GuardrailReceipt::new(&valid_receipt()).expect("receipt should validate");
 
         assert!(findings.is_empty());
-        assert!(
-            disabled
-                .diagnostics()
-                .contains(&PluginDiagnostic::DisabledPlugin)
-        );
+        assert!(disabled.diagnostics().contains(&PluginDiagnostic::DisabledPlugin));
         assert_eq!(manifest.plugin_id(), PLUGIN_ID);
         assert_eq!(trust.plugin_id(), PLUGIN_ID);
-        assert_eq!(
-            receipt.finding_id(),
-            FindingId::RemoteExposureWithoutAdmission
-        );
+        assert_eq!(receipt.finding_id(), FindingId::RemoteExposureWithoutAdmission);
     }
 
     #[test]
@@ -1025,24 +979,11 @@ mod tests {
         let findings = classify_audit(&snapshot).expect("findings should classify");
 
         assert!(findings.iter().any(|finding| {
-            finding.id() == FindingId::RemoteExposureWithoutAdmission
-                && finding.severity() == Severity::Critical
+            finding.id() == FindingId::RemoteExposureWithoutAdmission && finding.severity() == Severity::Critical
         }));
-        assert!(
-            findings
-                .iter()
-                .any(|finding| finding.id() == FindingId::OpenMessagingWithBroadTools)
-        );
-        assert!(
-            findings
-                .iter()
-                .any(|finding| finding.id() == FindingId::SandboxDrift)
-        );
-        assert!(
-            findings
-                .iter()
-                .any(|finding| finding.id() == FindingId::ModelToolRiskMismatch)
-        );
+        assert!(findings.iter().any(|finding| finding.id() == FindingId::OpenMessagingWithBroadTools));
+        assert!(findings.iter().any(|finding| finding.id() == FindingId::SandboxDrift));
+        assert!(findings.iter().any(|finding| finding.id() == FindingId::ModelToolRiskMismatch));
     }
 
     #[test]

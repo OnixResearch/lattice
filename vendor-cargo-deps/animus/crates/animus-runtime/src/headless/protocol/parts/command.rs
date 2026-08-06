@@ -17,6 +17,7 @@ const MODEL_RESPONSE_SUMMARY: &str = "model_response";
 const TOOL_REQUEST_SUMMARY: &str = "tool_request";
 const TOOL_RESPONSE_SUMMARY: &str = "tool_response";
 const FINAL_RESPONSE_SUMMARY: &str = "final_response";
+const COMPLETION_CANDIDATE_SUMMARY: &str = "completion_candidate";
 const STOPPED_SUMMARY: &str = "stopped";
 const MALFORMED_RECORD_SUMMARY: &str = "malformed_record";
 const AMBIGUOUS_ACTIVE_PROMPT_SUMMARY: &str = "ambiguous_active_prompt";

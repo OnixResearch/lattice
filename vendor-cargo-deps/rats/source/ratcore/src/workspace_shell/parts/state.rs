@@ -4,20 +4,20 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Focus {
     /// Focused workspace live ID.
-    pub workspace: super::types::LiveId,
+    pub workspace: super::types::WorkspaceId,
     /// Focused tab live ID.
-    pub tab: super::types::LiveId,
+    pub tab: super::types::TabId,
     /// Focused pane live ID.
-    pub pane: super::types::LiveId,
+    pub pane: super::types::PaneId,
 }
 
 impl Focus {
     /// Creates a focus target.
     #[must_use]
     pub fn new(
-        workspace: impl Into<super::types::LiveId>,
-        tab: impl Into<super::types::LiveId>,
-        pane: impl Into<super::types::LiveId>,
+        workspace: impl Into<super::types::WorkspaceId>,
+        tab: impl Into<super::types::TabId>,
+        pane: impl Into<super::types::PaneId>,
     ) -> Self {
         Self {
             workspace: workspace.into(),
@@ -31,9 +31,9 @@ impl Focus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pane {
     /// Compact session-visible pane ID.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::PaneId,
     /// Durable persisted pane ID.
-    pub persisted_id: super::types::PersistedId,
+    pub persisted_id: super::types::PersistedPaneId,
     /// User-facing pane title.
     pub title: String,
     /// Current portable task status.
@@ -48,8 +48,8 @@ impl Pane {
     /// Creates a pane with empty content and no diagnostics.
     #[must_use]
     pub fn new(
-        live_id: impl Into<super::types::LiveId>,
-        persisted_id: impl Into<super::types::PersistedId>,
+        live_id: impl Into<super::types::PaneId>,
+        persisted_id: impl Into<super::types::PersistedPaneId>,
         title: impl Into<String>,
         status: super::types::TaskStatus,
     ) -> Self {
@@ -82,23 +82,23 @@ impl Pane {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tab {
     /// Compact session-visible tab ID.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::TabId,
     /// Durable persisted tab ID.
-    pub persisted_id: super::types::PersistedId,
+    pub persisted_id: super::types::PersistedTabId,
     /// User-facing tab title.
     pub title: String,
     /// Panes inside the tab.
     pub panes: Vec<Pane>,
     /// Active pane live ID when a pane is selected.
-    pub active_pane: Option<super::types::LiveId>,
+    pub active_pane: Option<super::types::PaneId>,
 }
 
 impl Tab {
     /// Creates a tab and selects its first pane when present.
     #[must_use]
     pub fn new(
-        live_id: impl Into<super::types::LiveId>,
-        persisted_id: impl Into<super::types::PersistedId>,
+        live_id: impl Into<super::types::TabId>,
+        persisted_id: impl Into<super::types::PersistedTabId>,
         title: impl Into<String>,
         panes: Vec<Pane>,
     ) -> Self {
@@ -117,23 +117,23 @@ impl Tab {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Space {
     /// Compact session-visible workspace ID.
-    pub live_id: super::types::LiveId,
+    pub live_id: super::types::WorkspaceId,
     /// Durable persisted workspace ID.
-    pub persisted_id: super::types::PersistedId,
+    pub persisted_id: super::types::PersistedWorkspaceId,
     /// User-facing workspace title.
     pub title: String,
     /// Tabs inside the workspace.
     pub tabs: Vec<Tab>,
     /// Active tab live ID when a tab is selected.
-    pub active_tab: Option<super::types::LiveId>,
+    pub active_tab: Option<super::types::TabId>,
 }
 
 impl Space {
     /// Creates a workspace and selects its first tab when present.
     #[must_use]
     pub fn new(
-        live_id: impl Into<super::types::LiveId>,
-        persisted_id: impl Into<super::types::PersistedId>,
+        live_id: impl Into<super::types::WorkspaceId>,
+        persisted_id: impl Into<super::types::PersistedWorkspaceId>,
         title: impl Into<String>,
         tabs: Vec<Tab>,
     ) -> Self {
@@ -156,7 +156,7 @@ pub struct Model {
     /// Focused pane target when a focusable pane exists.
     pub focus: Option<Focus>,
     /// Retired live IDs that must be rejected as stale.
-    pub retired_live_ids: std::collections::BTreeSet<super::types::LiveId>,
+    pub retired_live_ids: std::collections::BTreeSet<super::types::RetiredLiveId>,
     /// Model-level deterministic diagnostics.
     pub diagnostics: Vec<super::types::Diagnostic>,
 }
@@ -183,7 +183,7 @@ impl Model {
 
     /// Records a retired live ID for deterministic stale-ID rejection.
     #[must_use]
-    pub fn with_retired_live_id(mut self, live_id: impl Into<super::types::LiveId>) -> Self {
+    pub fn with_retired_live_id(mut self, live_id: impl Into<super::types::RetiredLiveId>) -> Self {
         self.retired_live_ids.insert(live_id.into());
         self
     }
@@ -199,13 +199,9 @@ impl Model {
 pub(crate) fn first_focus(workspaces: &[Space]) -> Option<Focus> {
     workspaces.iter().find_map(|workspace| {
         workspace.tabs.iter().find_map(|tab| {
-            tab.panes.first().map(|pane| {
-                Focus::new(
-                    workspace.live_id.clone(),
-                    tab.live_id.clone(),
-                    pane.live_id.clone(),
-                )
-            })
+            tab.panes
+                .first()
+                .map(|pane| Focus::new(workspace.live_id.clone(), tab.live_id.clone(), pane.live_id.clone()))
         })
     })
 }
@@ -216,13 +212,8 @@ pub(crate) struct TabPosition {
     pub tab: usize,
 }
 
-pub(crate) fn repair_focus_after_close(
-    model: &mut Model,
-    position: TabPosition,
-    closed_pane: &str,
-) {
-    let closed_pane_owned = closed_pane.to_string();
-    if model.focus.as_ref().map(|focus| &focus.pane) != Some(&closed_pane_owned) {
+pub(crate) fn repair_focus_after_close(model: &mut Model, position: TabPosition, closed_pane: &super::types::PaneId) {
+    if model.focus.as_ref().map(|focus| &focus.pane) != Some(closed_pane) {
         return;
     }
     let workspace_id = model.workspaces[position.workspace].live_id.clone();

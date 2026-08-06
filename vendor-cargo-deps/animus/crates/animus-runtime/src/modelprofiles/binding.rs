@@ -7,10 +7,13 @@
 )]
 
 use super::composition::ModelInvocationPlan;
-use super::types::{
-    ModelProfileEnablementPolicy, ModelRuntimeProfileError, ModelRuntimeProfileIssue,
-};
-use super::validation::{ModelProfileField, error, lowercase_blake3, safe_label};
+use super::types::ModelProfileEnablementPolicy;
+use super::types::ModelRuntimeProfileError;
+use super::types::ModelRuntimeProfileIssue;
+use super::validation::ModelProfileField;
+use super::validation::error;
+use super::validation::lowercase_blake3;
+use super::validation::safe_label;
 
 const FIELD_DISPATCH: &str = "model_dispatch";
 const FIELD_TRANSITION: &str = "invocation_transition";
@@ -93,10 +96,7 @@ pub fn bind_model_dispatch_plan(
         invocation_plan_hash,
     };
     assert!(plan.dispatch.is_admitted());
-    assert_eq!(
-        plan.invocation_plan_hash.is_some(),
-        enablement == ModelProfileEnablementPolicy::Required
-    );
+    assert_eq!(plan.invocation_plan_hash.is_some(), enablement == ModelProfileEnablementPolicy::Required);
     Ok(plan)
 }
 
@@ -199,10 +199,7 @@ pub fn evaluate_model_invocation_transition(
     request: ModelInvocationTransitionRequest<'_>,
 ) -> Result<ModelInvocationTransitionDecision, ModelRuntimeProfileError> {
     validate_snapshot_hashes(&request.current_snapshot)?;
-    lowercase_blake3(
-        ModelProfileField("next_target_hash"),
-        request.next_target_hash,
-    )?;
+    lowercase_blake3(ModelProfileField("next_target_hash"), request.next_target_hash)?;
     if !snapshot_matches_plan(&request.current_snapshot, request.current_plan) {
         return Err(error(
             ModelRuntimeProfileIssue::StaleBinding,
@@ -210,10 +207,7 @@ pub fn evaluate_model_invocation_transition(
             "current profile, prompt, skill, capability, tool, policy, or plan identity changed",
         ));
     }
-    assert!(snapshot_matches_plan(
-        &request.current_snapshot,
-        request.current_plan
-    ));
+    assert!(snapshot_matches_plan(&request.current_snapshot, request.current_plan));
     assert!(!request.next_target_hash.is_empty());
     match request.kind {
         ModelInvocationTransitionKind::RouterFallback => {
@@ -245,9 +239,7 @@ pub fn evaluate_model_invocation_transition(
     }
 }
 
-fn validate_snapshot_hashes(
-    snapshot: &ModelInvocationIdentitySnapshot<'_>,
-) -> Result<(), ModelRuntimeProfileError> {
+fn validate_snapshot_hashes(snapshot: &ModelInvocationIdentitySnapshot<'_>) -> Result<(), ModelRuntimeProfileError> {
     for (field, value) in [
         ("target_hash", snapshot.target_hash),
         ("profile_hash", snapshot.profile_hash),
@@ -265,10 +257,7 @@ fn validate_snapshot_hashes(
     Ok(())
 }
 
-fn snapshot_matches_plan(
-    snapshot: &ModelInvocationIdentitySnapshot<'_>,
-    plan: &ModelInvocationPlan,
-) -> bool {
+fn snapshot_matches_plan(snapshot: &ModelInvocationIdentitySnapshot<'_>, plan: &ModelInvocationPlan) -> bool {
     snapshot.target_hash == plan.target().target_hash()
         && snapshot.profile_hash == plan.profile_hash()
         && snapshot.prompt_plan_hash == plan.prompt_plan_hash()
@@ -376,10 +365,7 @@ pub fn validate_model_tool_call_binding(
             "returned tool call does not match the exact invocation plan",
         ));
     }
-    let is_tool_advertised = plan
-        .tools()
-        .iter()
-        .any(|declaration| declaration.definition().name() == tool_name);
+    let is_tool_advertised = plan.tools().iter().any(|declaration| declaration.definition().name() == tool_name);
     if !is_tool_advertised {
         return Err(error(
             ModelRuntimeProfileIssue::ToolDenied,

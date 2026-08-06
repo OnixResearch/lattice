@@ -47,8 +47,7 @@ impl Profile {
     pub fn from_draft(draft: &ProfileDraft<'_>) -> Result<Self, super::Error> {
         let name = super::text::validate_profile_name(draft.name)?;
         let script_label = super::text::validate_script_label(draft.script_label)?;
-        let script_hash =
-            super::text::validate_hash(draft.script_hash, super::text::FieldName::SCRIPT_HASH)?;
+        let script_hash = super::text::validate_hash(draft.script_hash, super::text::FieldName::SCRIPT_HASH)?;
         let max_turns = super::text::validate_turn_budget(draft.max_turns)?;
         let allowed_host_actions = super::text::parse_allowed_actions(draft.allowed_host_actions)?;
         let fallback_mode = super::FallbackMode::parse(draft.fallback_mode)?;
@@ -144,10 +143,7 @@ impl Profile {
         super::ActivationReceipt::new(self, activation, self.activation_denial(activation))
     }
 
-    pub(crate) fn activation_denial(
-        &self,
-        activation: &super::Activation<'_>,
-    ) -> Option<super::DenyReason> {
+    pub(crate) fn activation_denial(&self, activation: &super::Activation<'_>) -> Option<super::DenyReason> {
         let script = activation.script();
         if !self.enabled {
             return Some(super::DenyReason::DisabledProfile);
@@ -155,8 +151,7 @@ impl Profile {
         if !super::text::is_safe_profile_name(script.selected_profile()) {
             return Some(super::DenyReason::BadProfileName);
         }
-        self.script_denial(script)
-            .or_else(|| self.runtime_denial(activation))
+        self.script_denial(script).or_else(|| self.runtime_denial(activation))
     }
 
     fn script_denial(&self, script: super::Script<'_>) -> Option<super::DenyReason> {
@@ -183,8 +178,7 @@ impl Profile {
     }
 
     fn runtime_denial(&self, activation: &super::Activation<'_>) -> Option<super::DenyReason> {
-        if activation.turn_budget() < MIN_RUNTIME_TURNS || activation.turn_budget() > self.max_turns
-        {
+        if activation.turn_budget() < MIN_RUNTIME_TURNS || activation.turn_budget() > self.max_turns {
             return Some(super::DenyReason::InvalidBudget);
         }
         activation

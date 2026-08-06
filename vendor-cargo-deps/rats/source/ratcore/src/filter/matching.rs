@@ -42,26 +42,16 @@ impl<'a> PredicateEvalState<'a> {
         debug_assert!(self.results.len() <= self.results.capacity());
         match predicate {
             Predicate::Always => self.results.push(true),
-            Predicate::Field {
-                field,
-                operator,
-                value,
-            } => self.results.push(
-                record
-                    .get_value(field)
-                    .is_some_and(|actual| operator_matches(actual, *operator, value)),
-            ),
+            Predicate::Field { field, operator, value } => self
+                .results
+                .push(record.get_value(field).is_some_and(|actual| operator_matches(actual, *operator, value))),
             Predicate::And(children) => {
-                self.frames
-                    .push(PredicateEvalFrame::ApplyAnd(children.len()));
-                self.frames
-                    .extend(children.iter().rev().map(PredicateEvalFrame::Evaluate));
+                self.frames.push(PredicateEvalFrame::ApplyAnd(children.len()));
+                self.frames.extend(children.iter().rev().map(PredicateEvalFrame::Evaluate));
             }
             Predicate::Or(children) => {
-                self.frames
-                    .push(PredicateEvalFrame::ApplyOr(children.len()));
-                self.frames
-                    .extend(children.iter().rev().map(PredicateEvalFrame::Evaluate));
+                self.frames.push(PredicateEvalFrame::ApplyOr(children.len()));
+                self.frames.extend(children.iter().rev().map(PredicateEvalFrame::Evaluate));
             }
             Predicate::Not(child) => {
                 self.frames.push(PredicateEvalFrame::ApplyNot);
@@ -120,15 +110,10 @@ fn operator_matches(actual: &QueryValue, operator: QueryOperator, expected: &Que
 
 pub(super) fn date_ranges_match<R: QueryRecord>(record: &R, clauses: &[DateRangeClause]) -> bool {
     clauses.iter().all(|clause| {
-        record
-            .get_value(&clause.field)
-            .is_some_and(|value| match value {
-                QueryValue::DateOrdinal(date) => clause.range.contains(*date),
-                QueryValue::Text(_)
-                | QueryValue::Number(_)
-                | QueryValue::Bool(_)
-                | QueryValue::Tags(_) => false,
-            })
+        record.get_value(&clause.field).is_some_and(|value| match value {
+            QueryValue::DateOrdinal(date) => clause.range.contains(*date),
+            QueryValue::Text(_) | QueryValue::Number(_) | QueryValue::Bool(_) | QueryValue::Tags(_) => false,
+        })
     })
 }
 
@@ -145,10 +130,7 @@ pub(super) fn search_matches<R: QueryRecord>(record: &R, searches: &[SearchTerm]
         }
         let mut has_term_match = false;
         for field in &search.fields {
-            if record
-                .get_value(field)
-                .is_some_and(|value| value.text_contains(&search.term))
-            {
+            if record.get_value(field).is_some_and(|value| value.text_contains(&search.term)) {
                 has_term_match = true;
                 score = score.saturating_add(FIELD_MATCH_SCORE);
             }
@@ -167,10 +149,7 @@ pub(super) fn matched_fields<R: QueryRecord>(record: &R, searches: &[SearchTerm]
             continue;
         }
         for field in &search.fields {
-            if record
-                .get_value(field)
-                .is_some_and(|value| value.text_contains(&search.term))
-            {
+            if record.get_value(field).is_some_and(|value| value.text_contains(&search.term)) {
                 fields.insert(field.clone());
             }
         }

@@ -70,11 +70,7 @@ impl MenuItem {
     }
 
     /// Create an enabled submenu item with an accelerator hint.
-    pub fn submenu_with_accel(
-        label: impl Into<String>,
-        accel: impl Into<String>,
-        children: Vec<MenuItem>,
-    ) -> Self {
+    pub fn submenu_with_accel(label: impl Into<String>, accel: impl Into<String>, children: Vec<MenuItem>) -> Self {
         Self::Submenu {
             label: label.into(),
             accel: Some(accel.into()),
@@ -143,9 +139,7 @@ impl MenuItem {
     /// True when this item is an enabled submenu with selectable children.
     pub fn can_enter(&self) -> bool {
         match self {
-            Self::Submenu {
-                enabled, children, ..
-            } => *enabled && first_selectable_index(children).is_some(),
+            Self::Submenu { enabled, children, .. } => *enabled && first_selectable_index(children).is_some(),
             Self::Action { .. } | Self::Separator => false,
         }
     }
@@ -225,8 +219,7 @@ impl MenuNav {
 
     /// Return the focused item in the current submenu level.
     pub fn current_item<'a>(&self, root_items: &'a [MenuItem]) -> Option<&'a MenuItem> {
-        self.current_items(root_items)
-            .and_then(|items| self.selected_item(items))
+        self.current_items(root_items).and_then(|items| self.selected_item(items))
     }
 
     /// Enter the focused submenu and focus its first selectable child.
@@ -237,10 +230,7 @@ impl MenuNav {
         let Some(focused_index) = self.focused else {
             return false;
         };
-        let Some(MenuItem::Submenu {
-            enabled, children, ..
-        }) = current_items.get(focused_index)
-        else {
+        let Some(MenuItem::Submenu { enabled, children, .. }) = current_items.get(focused_index) else {
             return false;
         };
 
@@ -278,11 +268,7 @@ fn first_selectable_index(items: &[MenuItem]) -> Option<usize> {
     items.iter().position(MenuItem::is_selectable)
 }
 
-fn next_selectable_index(
-    items: &[MenuItem],
-    current: Option<usize>,
-    direction: Direction,
-) -> Option<usize> {
+fn next_selectable_index(items: &[MenuItem], current: Option<usize>, direction: Direction) -> Option<usize> {
     if items.is_empty() {
         return None;
     }
@@ -351,22 +337,16 @@ mod tests {
         assert_eq!(nav.move_down(&items), Some(SECOND_SELECTABLE));
         assert_eq!(nav.move_down(&items), Some(FIRST_SELECTABLE));
         assert_eq!(nav.move_up(&items), Some(SECOND_SELECTABLE));
-        assert_eq!(
-            nav.selected_item(&items).and_then(MenuItem::label),
-            Some("Save")
-        );
+        assert_eq!(nav.selected_item(&items).and_then(MenuItem::label), Some("Save"));
     }
 
     #[test]
     fn submenu_enter_and_leave_tracks_path() {
-        let items = vec![MenuItem::submenu(
-            "File",
-            vec![
-                MenuItem::action("Open"),
-                MenuItem::separator(),
-                MenuItem::action("Exit"),
-            ],
-        )];
+        let items = vec![MenuItem::submenu("File", vec![
+            MenuItem::action("Open"),
+            MenuItem::separator(),
+            MenuItem::action("Exit"),
+        ])];
         let mut nav = MenuNav::new();
 
         assert_eq!(nav.focus_first(&items), Some(SUBMENU_INDEX));
@@ -376,10 +356,7 @@ mod tests {
 
         let current_items = nav.current_items(&items).unwrap_or_default();
         assert_eq!(nav.move_down(current_items), Some(CHILD_EXIT_INDEX));
-        assert_eq!(
-            nav.current_item(&items).and_then(MenuItem::label),
-            Some("Exit")
-        );
+        assert_eq!(nav.current_item(&items).and_then(MenuItem::label), Some("Exit"));
 
         assert!(nav.leave_submenu());
         assert_eq!(nav.submenu_path(), &[]);
@@ -434,10 +411,7 @@ mod tests {
     #[test]
     fn enter_submenu_rejects_actions_disabled_submenus_and_empty_submenus() {
         let action_items = vec![MenuItem::action("Open")];
-        let disabled_items = vec![MenuItem::disabled_submenu(
-            "More",
-            vec![MenuItem::action("Child")],
-        )];
+        let disabled_items = vec![MenuItem::disabled_submenu("More", vec![MenuItem::action("Child")])];
         let empty_submenu_items = vec![MenuItem::submenu("More", vec![MenuItem::separator()])];
         let mut nav = MenuNav::new();
 

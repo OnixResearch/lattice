@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=codebase_graph_profile"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.codebase-graph-profile",
+      "source": {
+        "path": "config/codebase-graph-profile.ncl",
+        "identity": "b3:2846ce1bb5a6988bfa882b00f40bcf10dc473f8128af1e9d92be022fdc2c33dc",
+        "bytes": 1886
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "codebase_graph_profile",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/codebase-graph-profile.json",
+        "identity": "b3:db22b62aa6ac904ff04e55a8b03cf2b4266e31a5837947d908d7982b96d70cc4",
+        "bytes": 811
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=codebase_graph_profile"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:316ad5a46d986d4b15e24083dd8e269c749e27ceb9dd6874513f8cefdce75ec0"
+}

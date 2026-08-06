@@ -4,13 +4,19 @@
 //! `rat-inline` view trees. Renders the visible window of output
 //! lines without chat-UI chrome (no border prefixes).
 
-use crate::streaming_output::{DisplayLine, StreamingOutput};
 use rat_inline::InlineWidget;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, Widget};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Widget;
+
+use crate::streaming_output::DisplayLine;
+use crate::streaming_output::StreamingOutput;
 
 impl InlineWidget for StreamingOutput {
     fn height(&self, _width: u16) -> u16 {
@@ -21,9 +27,7 @@ impl InlineWidget for StreamingOutput {
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let output_style = Style::default().fg(Color::DarkGray);
-        let omit_style = Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::DIM);
+        let omit_style = Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM);
 
         let display_count = self.display_line_count();
         let visible = area.height as usize;
@@ -40,10 +44,7 @@ impl InlineWidget for StreamingOutput {
                     lines.push(Line::from(Span::styled(text, output_style)));
                 }
                 DisplayLine::Omitted(n) => {
-                    lines.push(Line::from(Span::styled(
-                        format!("┄ {} lines omitted ┄", n),
-                        omit_style,
-                    )));
+                    lines.push(Line::from(Span::styled(format!("┄ {} lines omitted ┄", n), omit_style)));
                 }
             }
         }

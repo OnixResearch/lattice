@@ -1,0 +1,53 @@
+fact	browser_observation	status	reason	next_action
+role.application	AX role application	untested	not present in bounded mounted fixtures	add a maintained application-role fixture before claiming runtime support
+role.dialog	AX role dialog	direct	-	-
+role.menu	AX role menu	direct	-	-
+role.menu-item	AX role menuitem	direct	-	-
+role.tree	AX role tree	direct	-	-
+role.tree-item	AX role treeitem	direct	-	-
+role.heading	AX role heading	direct	-	-
+role.description	AX role group	transformed	Meteorite intentionally maps Description to DOM group and Chromium exposes group	evaluate a dedicated description mapping before changing classification
+role.group	AX role group	untested	the observed group comes from Description rather than a Group source node	add a maintained Group-role fixture
+role.button	AX role button	untested	not present in bounded mounted fixtures	add a maintained button semantic fixture
+role.progress	AX role progressbar	direct	-	-
+role.status	AX role status	direct	-	-
+role.tab-list	AX role tablist	untested	tabs use separate headless receipts but are not mounted in this rail	mount the maintained tabs projection in a later runtime fixture
+role.tab	AX role tab	untested	tabs use separate headless receipts but are not mounted in this rail	mount the maintained tabs projection in a later runtime fixture
+role.tab-panel	AX role tabpanel	untested	tabs use separate headless receipts but are not mounted in this rail	mount the maintained tabs projection in a later runtime fixture
+name.aria-label	AX accessible name	direct	-	-
+name.labelled-by	AX accessible name	transformed	Chromium resolves the referenced heading and does not retain raw idrefs in normalized facts	retain DOM relation tests and compare the resulting AX name
+property.description	computed AX description	transformed	Chromium applies the aria-describedby target ahead of the source aria-description in the bounded dialog	require the computed target text and retain both source facts in semantic and DOM evidence
+state.disabled	AX disabled property	direct	-	-
+state.hidden	AX ignored node	transformed	Chromium represents aria-hidden by ignoring the correlated AX node	require ignored=true while retaining DOM aria-hidden tests
+state.selected.tree-item	AX selected property	direct	-	-
+state.selected.menu-item	no AX selected property	omitted-by-design	aria-selected is not exposed for Chromium menuitem in this pinned target	keep the DOM fact and do not claim browser selected support for menuitem
+state.checked	AX checked property	untested	no checked node is present in bounded fixtures	add checkbox or mixed-state fixture
+state.expanded	AX expanded property	direct	-	-
+state.current	AX current exposure	untested	no current state is present in bounded fixtures	add a maintained current-item fixture
+state.required	AX required property	untested	no source required=true node is present in bounded fixtures	add a required input fixture
+state.invalid	AX invalid property	untested	no source invalid node is present in bounded fixtures	add an invalid input fixture
+value.range	AX value plus valuemin and valuemax	direct	-	-
+value.text	AX valuetext	untested	the bounded fixture uses a numeric range and Chromium emits empty valuetext	add a source text-value fixture
+collection.level.tree-item	AX level property	direct	-	-
+collection.position	protocol-dependent collection ordering	volatile-unreliable	Chromium does not expose stable posinset in the normalized AX property set	retain semantic and DOM evidence and revisit on a pinned protocol change
+collection.set-size	protocol-dependent collection size	volatile-unreliable	Chromium does not expose stable setsize in the normalized AX property set	retain semantic and DOM evidence and revisit on a pinned protocol change
+relation.labelled-by	resolved AX name	transformed	Chromium resolves relation targets into the computed name	require the computed name and retain DOM idref evidence
+relation.described-by	resolved AX description	transformed	Chromium resolves relation targets into the computed description	require the computed description and retain DOM idref evidence
+relation.owns	AX ownership reparenting	volatile-unreliable	raw backend relationships require volatile browser node identity	keep raw protocol IDs out of receipts and retain DOM relation evidence
+relation.controls	AX controls relation	volatile-unreliable	related backend node identity is excluded from deterministic receipts	retain DOM relation evidence and add stable browser correlation if protocol permits
+collection.reading-order	AX capture in semantic fixture order	transformed	receipts order by accepted semantic identity rather than volatile protocol traversal	keep source order only where collection semantics require it
+action.activate	no normalized action invocation surface	omitted-by-design	browser tree presence does not authorize or invoke activation effects	retain semantic generation and contextual action gates
+action.increment	no normalized action invocation surface	omitted-by-design	browser tree presence does not authorize or invoke range effects	retain semantic generation and contextual action gates
+action.decrement	no normalized action invocation surface	omitted-by-design	browser tree presence does not authorize or invoke range effects	retain semantic generation and contextual action gates
+action.expand	AX expanded state only	omitted-by-design	an exposed state does not prove assistive expand action delivery	add a separate assistive-action runtime rail
+action.collapse	AX expanded state only	omitted-by-design	an exposed state does not prove assistive collapse action delivery	add a separate assistive-action runtime rail
+action.dismiss	no normalized action invocation surface	omitted-by-design	browser tree presence does not authorize or invoke dismiss effects	retain semantic generation and contextual action gates
+action.select	AX selected state only	omitted-by-design	an exposed state does not prove assistive selection action delivery	add a separate assistive-action runtime rail
+action.focus	AX focused state observation only	omitted-by-design	browser focus observation does not prove semantic focus-request delivery	add a separate assistive-action runtime rail
+action.set-value	AX range value observation only	omitted-by-design	browser value observation does not prove assistive value action delivery	add a separate assistive-action runtime rail
+focus.join	AX focused property after DOM focus	direct	-	-
+live.polite-structure	AX status role and live polite property	direct	-	-
+live.assertive-structure	AX live assertive property	untested	bounded mounted fixtures contain only a polite status	add an accepted assertive live fixture
+live.atomic	AX atomic property	untested	bounded mounted fixtures do not request atomic announcements	add an accepted atomic live fixture
+live.relevant	AX relevant property	untested	bounded mounted fixtures do not request relevant-event filtering	add an accepted relevant live fixture
+live.delivery	screen-reader announcement	untested	CDP tree structure does not prove speech or braille delivery	require a separate assistive-technology runtime rail

@@ -1,0 +1,71 @@
+animus dev shell: cargo, clippy, rustfmt, rust-analyzer, nickel, pre-commit, and Octet are available
+verification: cargo test --workspace; cargo clippy --workspace --all-targets -- -D warnings; cargo tigerstyle check; check-nickel-configs
+{
+  "cases": [
+    {
+      "field": "protocol.identity",
+      "id": "unknown-protocol",
+      "value": "unknown"
+    },
+    {
+      "field": "toolchain.cohort",
+      "id": "unknown-toolchain",
+      "value": "lean4-unreviewed"
+    },
+    {
+      "field": "bounds.frame_bytes",
+      "id": "non-positive-bound",
+      "value": "0"
+    },
+    {
+      "field": "bounds.text_bytes",
+      "id": "inconsistent-bounds",
+      "value": "greater-than-frame"
+    },
+    {
+      "field": "allowed_decisions",
+      "id": "unknown-decision",
+      "value": "shell"
+    },
+    {
+      "field": "launch.path_discovery",
+      "id": "ambient-executable-discovery",
+      "value": "true"
+    },
+    {
+      "field": "launch.inherited_environment",
+      "id": "unrestricted-environment",
+      "value": "true"
+    },
+    {
+      "field": "launch.fallback_policy",
+      "id": "implicit-fallback",
+      "value": "steel"
+    },
+    {
+      "field": "launch.sandbox_posture",
+      "id": "missing-sandbox-posture",
+      "value": "missing"
+    },
+    {
+      "field": "toolchain.source_module",
+      "id": "stale-source-hash",
+      "value": "stale"
+    },
+    {
+      "field": "toolchain.package",
+      "id": "unsafe-label",
+      "value": "/private/path"
+    },
+    {
+      "field": "redaction.raw_payloads",
+      "id": "weakened-redaction",
+      "value": "true"
+    },
+    {
+      "field": "non_claims",
+      "id": "weakened-non-claims",
+      "value": "empty"
+    }
+  ]
+}

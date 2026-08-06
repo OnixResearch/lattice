@@ -121,30 +121,19 @@ impl Budget {
     /// Returns [`super::failure::Error`] when required text is missing,
     /// condition lists are empty or over limit, or the optional limit is zero.
     pub fn validate(draft: &Draft<'_>) -> Result<Self, super::failure::Error> {
-        let repeat_conditions =
-            super::check::conditions(super::REPEAT_CONDITION_FIELD, draft.repeat_conditions)?;
-        let stop_conditions =
-            super::check::conditions(super::STOP_CONDITION_FIELD, draft.stop_conditions)?;
+        let repeat_conditions = super::check::conditions(super::REPEAT_CONDITION_FIELD, draft.repeat_conditions)?;
+        let stop_conditions = super::check::conditions(super::STOP_CONDITION_FIELD, draft.stop_conditions)?;
         Ok(Self {
             purpose: super::check::required_text(super::PURPOSE_FIELD, draft.purpose)?,
-            first_action: super::check::required_text(
-                super::FIRST_ACTION_FIELD,
-                draft.first_action,
-            )?,
+            first_action: super::check::required_text(super::FIRST_ACTION_FIELD, draft.first_action)?,
             repeat_conditions,
             stop_conditions,
             missing_evidence_behavior: super::check::required_text(
                 super::MISSING_BEHAVIOR_FIELD,
                 draft.missing_evidence_behavior,
             )?,
-            citation_expectation: super::check::required_text(
-                super::CITATION_FIELD,
-                draft.citation_expectation,
-            )?,
-            progress_guidance: super::check::required_text(
-                super::PROGRESS_FIELD,
-                draft.progress_guidance,
-            )?,
+            citation_expectation: super::check::required_text(super::CITATION_FIELD, draft.citation_expectation)?,
+            progress_guidance: super::check::required_text(super::PROGRESS_FIELD, draft.progress_guidance)?,
             provenance: super::check::required_text(super::PROVENANCE_FIELD, draft.provenance)?,
             max_retrievals: super::check::limit(draft.max_retrievals)?,
         })

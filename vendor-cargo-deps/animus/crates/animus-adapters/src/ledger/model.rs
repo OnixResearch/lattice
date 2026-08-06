@@ -33,11 +33,7 @@ pub struct ContextItem {
 }
 
 impl ContextItem {
-    pub(super) fn new(
-        role: ContextRole,
-        content: alloc::string::String,
-        source_id: super::EntryId,
-    ) -> Self {
+    pub(super) fn new(role: ContextRole, content: alloc::string::String, source_id: super::EntryId) -> Self {
         Self {
             role,
             content,

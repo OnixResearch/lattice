@@ -76,12 +76,7 @@ impl PointerButtonSet {
     /// Returns true when no supported or unsupported buttons are active.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        !self.primary
-            && !self.secondary
-            && !self.middle
-            && !self.back
-            && !self.forward
-            && self.unsupported.is_empty()
+        !self.primary && !self.secondary && !self.middle && !self.back && !self.forward && self.unsupported.is_empty()
     }
 
     /// Returns true when a context-menu style button is active.

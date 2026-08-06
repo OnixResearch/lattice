@@ -7,11 +7,23 @@ mod record;
 mod state;
 mod types;
 
-pub use core::{RequestDraft, SpanDraft, validate_plan};
+pub use core::RequestDraft;
+pub use core::SpanDraft;
+pub use core::validate_plan;
+
 pub use fault::Error;
-pub use record::{Receipt, ReceiptDraft, SpanMetadata};
-pub use state::{Snapshot, SnapshotDraft, TaggedLine, TaggedLineDraft};
-pub use types::{NewlinePolicy, Plan, ResourceRedaction, TextNormalization, Validated};
+pub use record::Receipt;
+pub use record::ReceiptDraft;
+pub use record::SpanMetadata;
+pub use state::Snapshot;
+pub use state::SnapshotDraft;
+pub use state::TaggedLine;
+pub use state::TaggedLineDraft;
+pub use types::NewlinePolicy;
+pub use types::Plan;
+pub use types::ResourceRedaction;
+pub use types::TextNormalization;
+pub use types::Validated;
 
 const SNAPSHOT_SCHEMA: &str = "animus.hashed-edit.snapshot.v1";
 const PLAN_SCHEMA: &str = "animus.hashed-edit.plan.v1";
@@ -27,12 +39,9 @@ const RESOURCE_REDACTION_RESOURCE_HASH: &str = "resource_hash";
 const OMITTED_RESOURCE_IDENTITY: &str = "omitted";
 const HASH_LENGTH_REASON: &str = "hash must use the configured BLAKE3 hex length";
 const HASH_ALPHABET_REASON: &str = "hash must contain lowercase hex only";
-const TAGGED_LINES_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_tagged_lines");
-const EDITS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_edits");
-const DIAGNOSTICS_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_diagnostics");
+const TAGGED_LINES_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_tagged_lines");
+const EDITS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_edits");
+const DIAGNOSTICS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_diagnostics");
 const RESOURCE_CLASS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("hashed_edit_resource_class");
 const RESOURCE_IDENTITY_FIELD: crate::validation::FieldName =
@@ -49,12 +58,9 @@ const NEWLINE_POLICY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("hashed_edit_newline_policy");
 const TAG_GENERATION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("hashed_edit_tag_generation");
-const LINE_TAG_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_line_tag");
-const LINE_HASH_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_line_hash");
-const REPLACEMENT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("hashed_edit_replacement");
+const LINE_TAG_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_line_tag");
+const LINE_HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_line_hash");
+const REPLACEMENT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("hashed_edit_replacement");
 const RECEIPT_DIAGNOSTIC_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("hashed_edit_receipt_diagnostic");
 const MAX_LINES: usize = 512;
@@ -98,9 +104,7 @@ fn validate_hash(field: crate::validation::FieldName, value: &str) -> Result<Tex
 }
 
 fn has_lowercase_hex_only(value: &str) -> bool {
-    value
-        .chars()
-        .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
+    value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
 }
 
 fn validate_collection_count(limit: CountLimit) -> Result<(), Error> {
@@ -114,15 +118,9 @@ fn validate_collection_count(limit: CountLimit) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_non_empty_collection(
-    field: crate::validation::FieldName,
-    actual_items: usize,
-) -> Result<(), Error> {
+fn validate_non_empty_collection(field: crate::validation::FieldName, actual_items: usize) -> Result<(), Error> {
     if actual_items == 0 {
-        return Err(crate::AdapterContractError::EmptyCollection {
-            field: field.as_str(),
-        }
-        .into());
+        return Err(crate::AdapterContractError::EmptyCollection { field: field.as_str() }.into());
     }
     Ok(())
 }

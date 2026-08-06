@@ -30,7 +30,8 @@
     clippy::struct_excessive_bools
 )]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 const HASH_DOMAIN: &str = "animus.researchspec-promotion-dag.v1";
 const HASH_SEPARATOR: &str = "|";
@@ -212,20 +213,16 @@ pub fn plan_promotion_dag(dag: &PromotionDag) -> PromotionDagResult<PromotionDag
         return Err(report.issues);
     }
     let mut completed = BTreeSet::new();
-    let mut remaining = dag
-        .groups
-        .iter()
-        .map(|group| group.group_id.clone())
-        .collect::<BTreeSet<_>>();
+    let mut remaining = dag.groups.iter().map(|group| group.group_id.clone()).collect::<BTreeSet<_>>();
     let incoming = incoming_dependencies(dag);
     let mut batches = Vec::new();
     while !remaining.is_empty() {
         let ready = remaining
             .iter()
             .filter(|group_id| {
-                incoming.get(group_id.as_str()).is_none_or(|dependencies| {
-                    dependencies.iter().all(|dep| completed.contains(dep))
-                })
+                incoming
+                    .get(group_id.as_str())
+                    .is_none_or(|dependencies| dependencies.iter().all(|dep| completed.contains(dep)))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -251,10 +248,7 @@ pub fn plan_promotion_dag(dag: &PromotionDag) -> PromotionDagResult<PromotionDag
     })
 }
 
-pub fn project_promotion_dag_receipt(
-    dag: &PromotionDag,
-    report: &PromotionDagValidationReport,
-) -> PromotionDagReceipt {
+pub fn project_promotion_dag_receipt(dag: &PromotionDag, report: &PromotionDagValidationReport) -> PromotionDagReceipt {
     let mut receipt = PromotionDagReceipt {
         schema: RECEIPT_SCHEMA.to_owned(),
         dag_label: dag.dag_label.clone(),
@@ -276,10 +270,7 @@ pub fn project_promotion_dag_receipt(
 pub fn validate_promotion_dag_receipt(receipt: &PromotionDagReceipt) -> PromotionDagResult<()> {
     let mut issues = Vec::new();
     if receipt.schema != RECEIPT_SCHEMA {
-        issues.push(issue(
-            PromotionDagIssueKind::InvalidReceipt,
-            receipt.schema.as_str(),
-        ));
+        issues.push(issue(PromotionDagIssueKind::InvalidReceipt, receipt.schema.as_str()));
     }
     validate_label(receipt.dag_label.as_str(), &mut issues);
     validate_hash(receipt.graph_hash.as_str(), &mut issues);
@@ -288,20 +279,11 @@ pub fn validate_promotion_dag_receipt(receipt: &PromotionDagReceipt) -> Promotio
     validate_hashes(&receipt.touched_file_summary_hashes, &mut issues);
     validate_hashes(&receipt.patch_hashes, &mut issues);
     if !receipt.redacted {
-        issues.push(issue(
-            PromotionDagIssueKind::ReceiptLeak,
-            receipt.dag_label.as_str(),
-        ));
+        issues.push(issue(PromotionDagIssueKind::ReceiptLeak, receipt.dag_label.as_str()));
     }
     if let Some(marker) = &receipt.leak_marker {
-        if UNSAFE_MARKERS
-            .iter()
-            .any(|unsafe_marker| marker.contains(unsafe_marker))
-        {
-            issues.push(issue(
-                PromotionDagIssueKind::ReceiptLeak,
-                receipt.dag_label.as_str(),
-            ));
+        if UNSAFE_MARKERS.iter().any(|unsafe_marker| marker.contains(unsafe_marker)) {
+            issues.push(issue(PromotionDagIssueKind::ReceiptLeak, receipt.dag_label.as_str()));
         }
     }
     result_from_issues(issues, ())
@@ -321,10 +303,7 @@ fn collect_group_ids(dag: &PromotionDag, issues: &mut Vec<PromotionDagIssue>) ->
     let mut ids = BTreeSet::new();
     for group in &dag.groups {
         if !ids.insert(group.group_id.clone()) {
-            issues.push(issue(
-                PromotionDagIssueKind::DuplicateGroup,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::DuplicateGroup, group.group_id.as_str()));
         }
     }
     ids
@@ -336,10 +315,7 @@ fn validate_groups(dag: &PromotionDag, issues: &mut Vec<PromotionDagIssue>) {
         validate_hash(group.metric_evidence_hash.as_str(), issues);
         validate_hash(group.patch_hash.as_str(), issues);
         if group.kept_run_ids.is_empty() {
-            issues.push(issue(
-                PromotionDagIssueKind::EmptyField,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::EmptyField, group.group_id.as_str()));
         }
         for run_id in &group.kept_run_ids {
             validate_label(run_id.as_str(), issues);
@@ -348,61 +324,34 @@ fn validate_groups(dag: &PromotionDag, issues: &mut Vec<PromotionDagIssue>) {
             validate_label(file.as_str(), issues);
         }
         if group.stale_run_evidence {
-            issues.push(issue(
-                PromotionDagIssueKind::StaleRunEvidence,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::StaleRunEvidence, group.group_id.as_str()));
         }
         if group.run_status != PromotionRunStatus::Kept {
-            issues.push(issue(
-                PromotionDagIssueKind::FailedOrUnkeptRun,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::FailedOrUnkeptRun, group.group_id.as_str()));
         }
         if !group.hypothesis_resolved {
-            issues.push(issue(
-                PromotionDagIssueKind::UnresolvedHypothesis,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::UnresolvedHypothesis, group.group_id.as_str()));
         }
         if group.guardrail_status != PromotionGuardrailStatus::Passed {
-            issues.push(issue(
-                PromotionDagIssueKind::GuardedFileConflict,
-                group.group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::GuardedFileConflict, group.group_id.as_str()));
         }
     }
 }
 
-fn validate_edges(
-    dag: &PromotionDag,
-    group_ids: &BTreeSet<String>,
-    issues: &mut Vec<PromotionDagIssue>,
-) {
+fn validate_edges(dag: &PromotionDag, group_ids: &BTreeSet<String>, issues: &mut Vec<PromotionDagIssue>) {
     let mut seen = BTreeSet::new();
     for edge in &dag.edges {
         validate_label(edge.from_group_id.as_str(), issues);
         validate_label(edge.to_group_id.as_str(), issues);
         let edge_id = edge_id(edge);
         if !seen.insert(edge_id.clone()) {
-            issues.push(issue(
-                PromotionDagIssueKind::DuplicateEdge,
-                edge_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::DuplicateEdge, edge_id.as_str()));
         }
         if edge.from_group_id == edge.to_group_id {
-            issues.push(issue(
-                PromotionDagIssueKind::SelfDependency,
-                edge.from_group_id.as_str(),
-            ));
+            issues.push(issue(PromotionDagIssueKind::SelfDependency, edge.from_group_id.as_str()));
         }
-        if !group_ids.contains(edge.from_group_id.as_str())
-            || !group_ids.contains(edge.to_group_id.as_str())
-        {
-            issues.push(issue(
-                PromotionDagIssueKind::UnknownDependency,
-                edge_id.as_str(),
-            ));
+        if !group_ids.contains(edge.from_group_id.as_str()) || !group_ids.contains(edge.to_group_id.as_str()) {
+            issues.push(issue(PromotionDagIssueKind::UnknownDependency, edge_id.as_str()));
         }
     }
 }
@@ -433,18 +382,12 @@ fn collect_cycles(dag: &PromotionDag, issues: &mut Vec<PromotionDagIssue>) {
     }
 }
 
-fn has_cycle(
-    group: &str,
-    incoming: &BTreeMap<String, BTreeSet<String>>,
-    visiting: &mut BTreeSet<String>,
-) -> bool {
+fn has_cycle(group: &str, incoming: &BTreeMap<String, BTreeSet<String>>, visiting: &mut BTreeSet<String>) -> bool {
     if !visiting.insert(group.to_owned()) {
         return true;
     }
     let found = incoming.get(group).is_some_and(|dependencies| {
-        dependencies
-            .iter()
-            .any(|dependency| has_cycle(dependency.as_str(), incoming, visiting))
+        dependencies.iter().any(|dependency| has_cycle(dependency.as_str(), incoming, visiting))
     });
     visiting.remove(group);
     found
@@ -461,10 +404,7 @@ fn incoming_dependencies(dag: &PromotionDag) -> BTreeMap<String, BTreeSet<String
     incoming
 }
 
-fn explain_blocked_groups(
-    dag: &PromotionDag,
-    completed: &BTreeSet<String>,
-) -> Vec<BlockedPromotionGroup> {
+fn explain_blocked_groups(dag: &PromotionDag, completed: &BTreeSet<String>) -> Vec<BlockedPromotionGroup> {
     let incoming = incoming_dependencies(dag);
     sorted_group_ids(dag)
         .into_iter()
@@ -486,21 +426,11 @@ fn explain_blocked_groups(
 }
 
 fn sorted_group_ids(dag: &PromotionDag) -> Vec<String> {
-    dag.groups
-        .iter()
-        .map(|group| group.group_id.clone())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
+    dag.groups.iter().map(|group| group.group_id.clone()).collect::<BTreeSet<_>>().into_iter().collect()
 }
 
 fn sorted_edge_ids(dag: &PromotionDag) -> Vec<String> {
-    dag.edges
-        .iter()
-        .map(edge_id)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
+    dag.edges.iter().map(edge_id).collect::<BTreeSet<_>>().into_iter().collect()
 }
 
 fn sorted_metric_hashes(dag: &PromotionDag) -> Vec<String> {
@@ -599,11 +529,7 @@ fn issue_codes(issues: &[PromotionDagIssue]) -> Vec<String> {
 }
 
 fn result_from_issues<T>(issues: Vec<PromotionDagIssue>, value: T) -> PromotionDagResult<T> {
-    if issues.is_empty() {
-        Ok(value)
-    } else {
-        Err(issues)
-    }
+    if issues.is_empty() { Ok(value) } else { Err(issues) }
 }
 
 #[cfg(test)]
@@ -651,17 +577,14 @@ mod tests {
         // r[verify agent_harness_runtime.hermes_researchspec.promotion_dag.verification]
         let mut bad = PromotionDag {
             dag_label: DAG_LABEL.to_owned(),
-            groups: vec![
-                group(GROUP_A, RUN_A, FILE_A),
-                PromotionDagGroup {
-                    touched_file_summaries: vec![FILE_A.to_owned()],
-                    stale_run_evidence: true,
-                    run_status: PromotionRunStatus::Failed,
-                    hypothesis_resolved: false,
-                    guardrail_status: PromotionGuardrailStatus::Conflict,
-                    ..group(GROUP_B, RUN_B, FILE_A)
-                },
-            ],
+            groups: vec![group(GROUP_A, RUN_A, FILE_A), PromotionDagGroup {
+                touched_file_summaries: vec![FILE_A.to_owned()],
+                stale_run_evidence: true,
+                run_status: PromotionRunStatus::Failed,
+                hypothesis_resolved: false,
+                guardrail_status: PromotionGuardrailStatus::Conflict,
+                ..group(GROUP_B, RUN_B, FILE_A)
+            }],
             edges: vec![
                 PromotionDagEdge {
                     from_group_id: GROUP_A.to_owned(),
@@ -682,48 +605,14 @@ mod tests {
         let report = validate_promotion_dag(&bad);
 
         assert!(!report.valid);
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::Cycle.code().to_owned())
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::DuplicateGroup.code().to_owned())
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::UnknownDependency.code().to_owned())
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::OverlappingFiles.code().to_owned())
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::StaleRunEvidence.code().to_owned())
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::FailedOrUnkeptRun.code().to_owned())
-        );
-        assert!(
-            report.issue_codes.contains(
-                &PromotionDagIssueKind::UnresolvedHypothesis
-                    .code()
-                    .to_owned()
-            )
-        );
-        assert!(
-            report
-                .issue_codes
-                .contains(&PromotionDagIssueKind::GuardedFileConflict.code().to_owned())
-        );
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::Cycle.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::DuplicateGroup.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::UnknownDependency.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::OverlappingFiles.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::StaleRunEvidence.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::FailedOrUnkeptRun.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::UnresolvedHypothesis.code().to_owned()));
+        assert!(report.issue_codes.contains(&PromotionDagIssueKind::GuardedFileConflict.code().to_owned()));
     }
 
     #[test]
@@ -742,11 +631,7 @@ mod tests {
 
         let issues = validate_promotion_dag_receipt(&receipt).expect_err("receipt leak");
 
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.kind == PromotionDagIssueKind::ReceiptLeak)
-        );
+        assert!(issues.iter().any(|issue| issue.kind == PromotionDagIssueKind::ReceiptLeak));
     }
 
     fn group(id: &str, run_id: &str, file: &str) -> PromotionDagGroup {

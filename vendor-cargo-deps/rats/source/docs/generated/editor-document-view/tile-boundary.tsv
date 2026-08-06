@@ -1,0 +1,10 @@
+Tile_fact	pinned_owner	candidate_Rats_term	mapping	allowed_frontend_action	forbidden_Rats_authority
+ResourceId	Tile workspace object model	document-like resource	none implicit;explicit caller adapter only	project supplied metadata	allocate persist repair delete or recover
+BufferId	Tile workspace object model	document/buffer	none implicit;equal u64 is unrelated	carry opaque caller identity	serialize shadow content or lifecycle
+ViewId	Tile workspace object model	view	none implicit;explicit typed adapter	associate projection under fresh revision	create clone close focus or reattach
+ViewState viewport/presentation	Tile workspace object model	per-view facts	read-only fresh snapshot projection	display supplied facts	commit cursor viewport geometry or lens
+ViewLayoutTree/Tab focused	Tile workspace object model	pane attachment/focus	no Rats ownership	emit typed request requiring translation	focus resize split close directly
+WorkspaceRevision	Tile daemon	document/view revision	distinct external generation	attach current revision at downstream edge	mint repair cache as continuity or bypass fence
+lens/presentation policy	Tile application	view capability	no generic Rats policy	render reasoned supplied capability	select policy or authorize effect
+input/capture	Tile runtime	view interaction	no mapping from semantic visibility	emit component intent	capture route or authorize input
+persistence/recovery	Tile daemon/service	durable document/view lifecycle	no Rats persistence	fresh protocol reload	restore shadow snapshot

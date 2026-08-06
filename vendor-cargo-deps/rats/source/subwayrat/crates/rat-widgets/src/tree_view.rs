@@ -3,13 +3,18 @@
 use rat_chrome::overlay_frame;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
-use crate::popup_chrome::{
-    POPUP_MARGIN, centered_overlay_model, clamped_axis, themed_overlay_style, title,
-};
+use crate::popup_chrome::POPUP_MARGIN;
+use crate::popup_chrome::centered_overlay_model;
+use crate::popup_chrome::clamped_axis;
+use crate::popup_chrome::themed_overlay_style;
+use crate::popup_chrome::title;
 use crate::theme::WidgetTheme;
 
 const TREE_VIEW_WIDTH: u16 = 50;
@@ -67,9 +72,7 @@ impl TreeViewModel {
     }
 
     pub fn selected_id(&self) -> Option<&str> {
-        self.flat_cache
-            .get(self.selected)
-            .map(|(_, id, _)| id.as_str())
+        self.flat_cache.get(self.selected).map(|(_, id, _)| id.as_str())
     }
 }
 
@@ -112,13 +115,8 @@ impl TreeView {
             return;
         }
 
-        let selected_style = Style::default()
-            .bg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD);
-        frame.render_widget(
-            Paragraph::new(tree_lines(&self.model, selected_style, Style::default())),
-            layout.inner,
-        );
+        let selected_style = Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD);
+        frame.render_widget(Paragraph::new(tree_lines(&self.model, selected_style, Style::default())), layout.inner);
     }
 
     pub fn render_themed(&self, frame: &mut Frame, area: Rect, theme: &WidgetTheme) {
@@ -135,11 +133,7 @@ impl TreeView {
         }
 
         frame.render_widget(
-            Paragraph::new(tree_lines(
-                &self.model,
-                theme.highlight_style(),
-                Style::default(),
-            )),
+            Paragraph::new(tree_lines(&self.model, theme.highlight_style(), Style::default())),
             layout.inner,
         );
     }
@@ -152,11 +146,7 @@ fn tree_overlay_model(area: Rect, title_text: &str) -> rat_chrome::OverlayModel 
     centered_overlay_model(width, height, title(title_text))
 }
 
-fn tree_lines(
-    model: &TreeViewModel,
-    selected_style: Style,
-    normal_style: Style,
-) -> Vec<Line<'static>> {
+fn tree_lines(model: &TreeViewModel, selected_style: Style, normal_style: Style) -> Vec<Line<'static>> {
     model
         .flat_cache
         .iter()
@@ -175,12 +165,13 @@ fn tree_lines(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::text::Line;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 70;
     const VIEWPORT_HEIGHT: u16 = 18;
@@ -201,11 +192,7 @@ mod tests {
 
         assert_eq!(buffer[(layout.outer.x, layout.outer.y)].fg, Color::Blue);
         assert_eq!(buffer[(layout.inner.x, layout.inner.y)].symbol(), "R");
-        assert!(
-            buffer[(layout.inner.x, layout.inner.y)]
-                .modifier
-                .contains(Modifier::BOLD)
-        );
+        assert!(buffer[(layout.inner.x, layout.inner.y)].modifier.contains(Modifier::BOLD));
     }
 
     #[test]
@@ -230,16 +217,13 @@ mod tests {
     }
 
     fn sample_tree() -> TreeView {
-        TreeView::new(
-            TREE_TITLE,
-            vec![TreeNode {
-                label: ROOT_LABEL.to_string(),
-                id: ROOT_ID.to_string(),
-                children: Vec::new(),
-                expanded: true,
-                depth: 0,
-            }],
-        )
+        TreeView::new(TREE_TITLE, vec![TreeNode {
+            label: ROOT_LABEL.to_string(),
+            id: ROOT_ID.to_string(),
+            children: Vec::new(),
+            expanded: true,
+            depth: 0,
+        }])
     }
 
     fn render_tree(tree: &TreeView, viewport: Rect) -> Buffer {

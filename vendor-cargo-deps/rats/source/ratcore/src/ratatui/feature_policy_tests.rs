@@ -58,15 +58,7 @@ fn malformed_policy_rows_fail_with_deterministic_diagnostics() {
         POLICY_REASON,
         POLICY_FALLBACK,
     );
-    let missing_required = feature_policy_row(
-        "",
-        "missing-owner",
-        STATUS_FORBIDDEN,
-        "",
-        POLICY_SCOPE,
-        "",
-        "",
-    );
+    let missing_required = feature_policy_row("", "missing-owner", STATUS_FORBIDDEN, "", POLICY_SCOPE, "", "");
     let staged_without_next_action = feature_policy_row(
         "workspace-policy",
         "macros",
@@ -97,34 +89,13 @@ fn malformed_policy_rows_fail_with_deterministic_diagnostics() {
     assert!(!outcome.is_valid());
     assert_eq!(outcome.rows.len(), MALFORMED_ROW_COUNT);
     assert!(outcome.issues.len() >= MIN_MALFORMED_ISSUES);
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::DuplicatePolicyKey,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::MissingRequiredField,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::MissingEvidence,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::MissingReason,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::MissingFallback,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::MissingNextAction,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::UnknownStatus,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::DuplicatePolicyKey);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::MissingRequiredField);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::MissingEvidence);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::MissingReason);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::MissingFallback);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::MissingNextAction);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::UnknownStatus);
 }
 
 #[test]
@@ -140,10 +111,7 @@ fn forbidden_backend_feature_leak_is_rejected() {
     let outcome = crate::ratatui_integration::validate_ratatui_feature_uses(&rows, &feature_uses);
 
     assert!(!outcome.is_valid());
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::ForbiddenFeatureUse,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::ForbiddenFeatureUse);
 }
 
 #[test]
@@ -159,14 +127,8 @@ fn web_incompatible_feature_use_is_rejected() {
     let outcome = crate::ratatui_integration::validate_ratatui_feature_uses(&rows, &feature_uses);
 
     assert!(!outcome.is_valid());
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::WebIncompatibleFeatureUse,
-    );
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::ForbiddenFeatureUse,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::WebIncompatibleFeatureUse);
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::ForbiddenFeatureUse);
 }
 
 #[test]
@@ -182,10 +144,7 @@ fn unapproved_unstable_feature_use_is_rejected() {
     let outcome = crate::ratatui_integration::validate_ratatui_feature_uses(&rows, &feature_uses);
 
     assert!(!outcome.is_valid());
-    assert_issue(
-        &outcome.issues,
-        crate::ratatui_integration::FeaturePolicyIssueCode::UnapprovedFeatureUse,
-    );
+    assert_issue(&outcome.issues, crate::ratatui_integration::FeaturePolicyIssueCode::UnapprovedFeatureUse);
 }
 
 #[test]
@@ -240,15 +199,13 @@ fn feature_policy_row(
     reason: &str,
     fallback: &str,
 ) -> crate::ratatui_integration::FeaturePolicyRow {
-    crate::ratatui_integration::FeaturePolicyRow::new(
-        crate::ratatui_integration::FeaturePolicyRowParts {
-            crate_family: crate_family.to_string(),
-            feature_name: feature_name.to_string(),
-            status: status.to_string(),
-            owner: owner.to_string(),
-            compatibility_scope: compatibility_scope.to_string(),
-            reason: reason.to_string(),
-            fallback: fallback.to_string(),
-        },
-    )
+    crate::ratatui_integration::FeaturePolicyRow::new(crate::ratatui_integration::FeaturePolicyRowParts {
+        crate_family: crate_family.to_string(),
+        feature_name: feature_name.to_string(),
+        status: status.to_string(),
+        owner: owner.to_string(),
+        compatibility_scope: compatibility_scope.to_string(),
+        reason: reason.to_string(),
+        fallback: fallback.to_string(),
+    })
 }

@@ -24,15 +24,13 @@ fn most_restrictive_matching_decision_wins_with_all_rule_evidence() {
         evaluation
             .matched_rules()
             .iter()
-            .any(|evidence| evidence.rule_id() == ALLOW_CARGO_ID
-                && evidence.decision() == Decision::Allow)
+            .any(|evidence| evidence.rule_id() == ALLOW_CARGO_ID && evidence.decision() == Decision::Allow)
     );
     assert!(
         evaluation
             .matched_rules()
             .iter()
-            .any(|evidence| evidence.rule_id() == FORBID_CARGO_TEST_ID
-                && evidence.decision() == Decision::Forbid)
+            .any(|evidence| evidence.rule_id() == FORBID_CARGO_TEST_ID && evidence.decision() == Decision::Forbid)
     );
     assert_eq!(evaluation.redaction_marker(), REDACTION_COMMAND_HASH_ONLY);
 }
@@ -48,10 +46,7 @@ fn prompt_rule_requires_approval_without_denying_by_default() {
     assert_eq!(evaluation.matched_rules().len(), 1);
     assert_eq!(evaluation.matched_rules()[0].rule_id(), PROMPT_NIX_ID);
     assert_eq!(evaluation.sandbox().active_sandbox(), SANDBOX);
-    assert_eq!(
-        evaluation.sandbox().requested_capability(),
-        REQUESTED_CAPABILITY
-    );
+    assert_eq!(evaluation.sandbox().requested_capability(), REQUESTED_CAPABILITY);
 }
 
 #[test]
@@ -64,17 +59,7 @@ fn simple_shell_chain_evaluates_each_command_and_blocks_smuggling() {
     assert_eq!(evaluation.shell_analysis(), AnalysisKind::SimpleChain);
     assert_eq!(evaluation.decision(), Decision::Forbid);
     assert_eq!(evaluation.command_fingerprints().len(), rules.len());
-    assert!(
-        evaluation
-            .matched_rules()
-            .iter()
-            .any(|evidence| evidence.rule_id() == ALLOW_CARGO_ID)
-    );
-    assert!(
-        evaluation
-            .matched_rules()
-            .iter()
-            .any(|evidence| evidence.rule_id() == FORBID_RM_ID)
-    );
+    assert!(evaluation.matched_rules().iter().any(|evidence| evidence.rule_id() == ALLOW_CARGO_ID));
+    assert!(evaluation.matched_rules().iter().any(|evidence| evidence.rule_id() == FORBID_RM_ID));
     assert!(!rendered.contains(RAW_REMOVE_SOURCE));
 }

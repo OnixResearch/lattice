@@ -1,0 +1,12 @@
+responsibility	subwayrat_lines	meteorite_lines	equivalent_lines_per_target	candidate_or_leaf	measurement_rule
+constructor-delegation	9	8	7	candidate	function body and signature excluding target docs
+projection-delegation	4	4	3	candidate	function body and signature
+normalized-key-reduction	5	5	4	candidate	function body and signature
+pointer-reduction	4	4	3	candidate	function body and signature
+selection-commit	4	4	3	candidate	function body and signature
+catalog-replacement	4	4	3	candidate	function body and signature
+physical-key-normalization	19	16	14	renderer-leaf	structurally similar match but target physical vocabulary differs
+receipt-wiring	14	14	11	evidence-leaf	canonical script with target normalization
+adapter-type-and-state	6	6	4	candidate	type declaration excluding target documentation
+TOTAL	69	65	52	mixed	sum; 52 equivalent maintained lines per target is the maximum removable baseline
+FILE_TOTAL	123	128	251	context	wc -l before pilot; not all lines are duplication

@@ -1,7 +1,6 @@
 const FAILURE_MESSAGE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("adapter_failure_message");
-const CORRELATION_ID_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("adapter_correlation_id");
+const CORRELATION_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("adapter_correlation_id");
 const RECEIPT_REFERENCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("adapter_receipt_reference");
 const UNSAFE_METADATA_MARKERS: &[&str] = &[
@@ -16,9 +15,7 @@ const UNSAFE_METADATA_MARKERS: &[&str] = &[
     "sk-",
 ];
 
-pub(super) fn required_message(
-    value: &str,
-) -> Result<alloc::string::String, crate::AdapterContractError> {
+pub(super) fn required_message(value: &str) -> Result<alloc::string::String, crate::AdapterContractError> {
     safe_required_text(FAILURE_MESSAGE_FIELD, value)
 }
 
@@ -47,15 +44,10 @@ fn safe_optional_text(
     field: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<alloc::string::String>, crate::AdapterContractError> {
-    value
-        .map(|text| safe_required_text(field, text))
-        .transpose()
+    value.map(|text| safe_required_text(field, text)).transpose()
 }
 
-fn reject_unsafe(
-    field: crate::validation::FieldName,
-    value: &str,
-) -> Result<(), crate::AdapterContractError> {
+fn reject_unsafe(field: crate::validation::FieldName, value: &str) -> Result<(), crate::AdapterContractError> {
     let lower = value.to_ascii_lowercase();
     for marker in UNSAFE_METADATA_MARKERS {
         if lower.contains(marker) {

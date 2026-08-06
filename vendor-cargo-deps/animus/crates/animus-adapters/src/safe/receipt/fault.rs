@@ -55,20 +55,12 @@ impl core::fmt::Display for Error {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} must contain at most {max_items} items; got {actual_items}"
-            ),
-            Self::NulCharacter { field, byte_index } => write!(
-                formatter,
-                "{field} contains a NUL character at byte index {byte_index}"
-            ),
+            } => write!(formatter, "{field} must contain at most {max_items} items; got {actual_items}"),
+            Self::NulCharacter { field, byte_index } => {
+                write!(formatter, "{field} contains a NUL character at byte index {byte_index}")
+            }
             Self::UnsafeMetadata { field, class } => {
-                write!(
-                    formatter,
-                    "{field} contains unsafe {} material",
-                    class.as_str()
-                )
+                write!(formatter, "{field} contains unsafe {} material", class.as_str())
             }
             Self::CountTooLarge { field, max, actual } => {
                 write!(formatter, "{field} must be at most {max}; got {actual}")

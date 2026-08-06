@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "showcase/data.rs"]
+mod data;
 const FIXTURE_DIALOG_BASIC: &str = "dialog.basic";
 const FIXTURE_CHROME_SHELL: &str = "chrome.shell";
 const FIXTURE_KNOWLEDGE_WORKFLOW: &str = "knowledge.workflow";
@@ -26,6 +28,10 @@ const KNOWLEDGE_CONTROL_SEARCH: &str = "search";
 const KNOWLEDGE_CONTROL_SEARCH_LABEL: &str = "Search knowledge graph";
 const KNOWLEDGE_CONTROL_CAPTURE: &str = "capture";
 const KNOWLEDGE_CONTROL_CAPTURE_LABEL: &str = "Capture to Inbox";
+
+pub use data::built_in_fixture_parity_rows;
+pub use data::built_in_fixtures;
+
 const STATUS_SHARED: &str = "shared";
 const STATUS_TUI_ONLY: &str = "tui-only";
 const STATUS_METEORITE_ONLY: &str = "meteorite-only";
@@ -35,17 +41,28 @@ const STATUS_EVIDENCE_COMPLETE: &str = "complete";
 const STATUS_EVIDENCE_MISSING: &str = "missing";
 const STATUS_EVIDENCE_UNSUPPORTED: &str = "unsupported";
 
+/// One ordered display-ready renderer family summary cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixtureParitySummaryCell {
+    /// Nominal renderer family identity.
+    pub family: crate::targeting_core::RendererFamilyId,
+    /// Support, evidence, or gap summary.
+    pub text: String,
+}
+
 /// Display-ready parity summary row shared by showcase renderers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixtureParitySummaryRow {
     /// Fixture ID.
-    pub fixture_id: String,
+    pub fixture_id: FixtureId,
     /// Component family.
     pub family: String,
     /// Subwayrat support and evidence text.
     pub subwayrat: String,
     /// Meteorite support and evidence text.
     pub meteorite: String,
+    /// Ordered source-of-truth renderer family summaries.
+    pub renderer_cells: Vec<FixtureParitySummaryCell>,
     /// Generated documentation target.
     pub documentation_target: String,
     /// Overall parity status.
@@ -73,108 +90,29 @@ impl FixtureParitySummary {
     }
 }
 
-/// Builds the built-in showcase fixtures used by parity showcase surfaces.
+/// Builds a display-ready parity summary for the maintained default family scope.
 #[must_use]
-pub fn built_in_fixtures() -> Vec<ShowcaseFixture> {
-    vec![
-        shared_fixture(SharedFixtureSpec {
-            id: FIXTURE_DIALOG_BASIC,
-            family: FAMILY_DIALOG,
-            title: "Basic dialog",
-        }),
-        shared_fixture(SharedFixtureSpec {
-            id: FIXTURE_CHROME_SHELL,
-            family: FAMILY_CHROME,
-            title: "Chrome shell",
-        }),
-        ShowcaseFixture::new(
-            FIXTURE_KNOWLEDGE_WORKFLOW,
-            FAMILY_KNOWLEDGE,
-            "Knowledge workflow",
-        )
-        .with_state(
-            FixtureState::new(KNOWLEDGE_STATE_CAPTURE, KNOWLEDGE_LABEL_CAPTURE_BACKLINKS)
-                .with_data(FixtureDatum::new(
-                    KNOWLEDGE_DATA_GRAPH,
-                    KNOWLEDGE_GRAPH_FACTS,
-                ))
-                .with_data(FixtureDatum::new(
-                    KNOWLEDGE_DATA_AGENDA,
-                    KNOWLEDGE_AGENDA_FACTS,
-                ))
-                .with_data(FixtureDatum::new(
-                    KNOWLEDGE_DATA_METADATA,
-                    KNOWLEDGE_METADATA_FACTS,
-                ))
-                .with_data(FixtureDatum::new(
-                    KNOWLEDGE_DATA_DIAGNOSTICS,
-                    KNOWLEDGE_DIAGNOSTIC_FACTS,
-                )),
-        )
-        .with_control(FixtureControl::new(
-            KNOWLEDGE_CONTROL_SEARCH,
-            KNOWLEDGE_CONTROL_SEARCH_LABEL,
-        ))
-        .with_control(FixtureControl::new(
-            KNOWLEDGE_CONTROL_CAPTURE,
-            KNOWLEDGE_CONTROL_CAPTURE_LABEL,
-        ))
-        .with_renderer(RendererSupport::supported(ShowcaseRenderer::Subwayrat))
-        .with_renderer(RendererSupport::supported(ShowcaseRenderer::Meteorite)),
-        shared_fixture(SharedFixtureSpec {
-            id: FIXTURE_THEME_TOKENS,
-            family: FAMILY_THEME,
-            title: "Theme tokens",
-        }),
-    ]
+pub fn build_fixture_parity_summary(rows: &[FixtureParityRow], fixtures: &[ShowcaseFixture]) -> FixtureParitySummary {
+    let registry = crate::targeting_core::built_in_renderer_registry();
+    let scope = crate::targeting_core::built_in_renderer_scope(
+        crate::targeting_core::BuiltInRendererScope::FixtureParityFamilies,
+    );
+    build_fixture_parity_summary_with_policy(rows, fixtures, &registry, &scope)
 }
 
-/// Builds the built-in fixture parity rows used by showcase surfaces.
+/// Builds a display-ready parity summary for an explicit renderer family scope.
 #[must_use]
-pub fn built_in_fixture_parity_rows() -> Vec<FixtureParityRow> {
-    vec![
-        shared_parity_row(SharedParitySpec {
-            id: FIXTURE_DIALOG_BASIC,
-            family: FAMILY_DIALOG,
-            documentation_target: DOC_DIALOG_BASIC,
-        }),
-        shared_parity_row(SharedParitySpec {
-            id: FIXTURE_CHROME_SHELL,
-            family: FAMILY_CHROME,
-            documentation_target: DOC_CHROME_SHELL,
-        }),
-        FixtureParityRow::new(
-            FIXTURE_KNOWLEDGE_WORKFLOW,
-            FAMILY_KNOWLEDGE,
-            DOC_KNOWLEDGE_WORKFLOW,
-        )
-        .with_renderer(FixtureParityRenderer::supported(
-            ShowcaseRenderer::Subwayrat,
-            FixtureParityEvidenceStatus::Complete,
-        ))
-        .with_renderer(FixtureParityRenderer::supported(
-            ShowcaseRenderer::Meteorite,
-            FixtureParityEvidenceStatus::Complete,
-        )),
-        shared_parity_row(SharedParitySpec {
-            id: FIXTURE_THEME_TOKENS,
-            family: FAMILY_THEME,
-            documentation_target: DOC_THEME_TOKENS,
-        }),
-    ]
-}
-
-/// Builds a display-ready parity summary from rows and fixture metadata.
-#[must_use]
-pub fn build_fixture_parity_summary(
+pub fn build_fixture_parity_summary_with_policy(
     rows: &[FixtureParityRow],
     fixtures: &[ShowcaseFixture],
+    registry: &crate::targeting_core::RendererRegistry,
+    scope: &crate::targeting_core::RendererRequirementScope,
 ) -> FixtureParitySummary {
-    let parity_status = validate_fixture_parity_baseline(rows, fixtures);
+    let parity_status = validate_fixture_parity_baseline_with_policy(rows, fixtures, registry, scope);
     let mut summary_rows = parity_status
         .rows
         .iter()
-        .map(summary_row)
+        .map(|row| summary_row(row, scope))
         .collect::<Vec<FixtureParitySummaryRow>>();
     summary_rows.sort_by(|left, right| left.fixture_id.cmp(&right.fixture_id));
     FixtureParitySummary {
@@ -188,77 +126,52 @@ pub fn build_fixture_parity_summary(
 /// Builds the built-in parity summary used by showcase renderers.
 #[must_use]
 pub fn built_in_fixture_parity_summary() -> FixtureParitySummary {
-    let mut summary =
-        build_fixture_parity_summary(&built_in_fixture_parity_rows(), &built_in_fixtures());
+    let mut summary = build_fixture_parity_summary(&built_in_fixture_parity_rows(), &built_in_fixtures());
     let edge_display = built_in_edge_display();
     summary.edge_states = edge_display.rows;
     summary.edge_issues = edge_display.issues;
     summary
 }
 
-struct SharedFixtureSpec {
-    id: &'static str,
-    family: &'static str,
-    title: &'static str,
-}
-
-fn shared_fixture(spec: SharedFixtureSpec) -> ShowcaseFixture {
-    ShowcaseFixture::new(spec.id, spec.family, spec.title)
-        .with_state(FixtureState::new("default", "Default"))
-        .with_control(FixtureControl::new("inspect", "Inspect fixture evidence"))
-        .with_renderer(RendererSupport::supported(ShowcaseRenderer::Subwayrat))
-        .with_renderer(RendererSupport::supported(ShowcaseRenderer::Meteorite))
-}
-
-struct SharedParitySpec {
-    id: &'static str,
-    family: &'static str,
-    documentation_target: &'static str,
-}
-
-fn shared_parity_row(spec: SharedParitySpec) -> FixtureParityRow {
-    FixtureParityRow::new(spec.id, spec.family, spec.documentation_target)
-        .with_renderer(FixtureParityRenderer::supported(
-            ShowcaseRenderer::Subwayrat,
-            FixtureParityEvidenceStatus::Complete,
-        ))
-        .with_renderer(FixtureParityRenderer::supported(
-            ShowcaseRenderer::Meteorite,
-            FixtureParityEvidenceStatus::Complete,
-        ))
-}
-
-fn summary_row(row: &FixtureParityRow) -> FixtureParitySummaryRow {
+fn summary_row(
+    row: &FixtureParityRow,
+    scope: &crate::targeting_core::RendererRequirementScope,
+) -> FixtureParitySummaryRow {
     FixtureParitySummaryRow {
         fixture_id: row.fixture_id.clone(),
         family: row.family.clone(),
-        subwayrat: renderer_summary(row, ShowcaseRenderer::Subwayrat),
-        meteorite: renderer_summary(row, ShowcaseRenderer::Meteorite),
+        subwayrat: renderer_summary(row, &ShowcaseRenderer::Subwayrat.family_id()),
+        meteorite: renderer_summary(row, &ShowcaseRenderer::Meteorite.family_id()),
+        renderer_cells: scope.members.iter().filter_map(|member| summary_cell(row, member)).collect(),
         documentation_target: row.documentation_target.clone(),
         status: parity_status(row).to_string(),
     }
 }
 
-fn renderer_summary(row: &FixtureParityRow, renderer: ShowcaseRenderer) -> String {
-    row.renderers
-        .iter()
-        .find(|entry| entry.renderer == renderer)
-        .map_or_else(
-            || "missing".to_string(),
-            |entry| {
-                if entry.supported {
-                    format!("{STATUS_SUPPORTED} ({})", evidence_status(entry.evidence))
-                } else {
-                    format!(
-                        "{STATUS_UNSUPPORTED}: {}",
-                        entry
-                            .unsupported_reason
-                            .as_deref()
-                            .unwrap_or("reason missing")
-                    )
-                }
-            },
-        )
+fn summary_cell(
+    row: &FixtureParityRow,
+    member: &crate::targeting_core::RendererSubject,
+) -> Option<FixtureParitySummaryCell> {
+    let crate::targeting_core::RendererSubject::Family(family) = member else {
+        return None;
+    };
+    Some(FixtureParitySummaryCell {
+        family: family.clone(),
+        text: renderer_summary(row, family),
+    })
+}
+
+fn renderer_summary(row: &FixtureParityRow, family: &crate::targeting_core::RendererFamilyId) -> String {
+    row.renderer_cells.iter().find(|entry| entry.family == *family).map_or_else(
+        || "missing".to_string(),
+        |entry| {
+            if entry.supported {
+                format!("{STATUS_SUPPORTED} ({})", evidence_status(entry.evidence))
+            } else {
+                format!("{STATUS_UNSUPPORTED}: {}", entry.unsupported_reason.as_deref().unwrap_or("reason missing"))
+            }
+        },
+    )
 }
 
 fn parity_status(row: &FixtureParityRow) -> &'static str {
@@ -273,9 +186,8 @@ fn parity_status(row: &FixtureParityRow) -> &'static str {
 }
 
 fn renderer_supported(row: &FixtureParityRow, renderer: ShowcaseRenderer) -> bool {
-    row.renderers
-        .iter()
-        .any(|entry| entry.renderer == renderer && entry.supported)
+    let family = renderer.family_id();
+    row.renderer_cells.iter().any(|entry| entry.family == family && entry.supported)
 }
 
 fn evidence_status(status: FixtureParityEvidenceStatus) -> &'static str {

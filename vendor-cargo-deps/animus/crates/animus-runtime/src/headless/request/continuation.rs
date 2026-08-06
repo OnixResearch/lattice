@@ -46,10 +46,7 @@ impl ThreadResume {
                 });
             }
         }
-        Ok(Self {
-            thread_id,
-            ledger_hash,
-        })
+        Ok(Self { thread_id, ledger_hash })
     }
 
     /// Returns the thread identity.

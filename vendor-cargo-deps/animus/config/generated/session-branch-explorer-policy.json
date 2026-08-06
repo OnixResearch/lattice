@@ -1,0 +1,26 @@
+{
+  "annotations_are_sidecars": true,
+  "destructive_actions_allowed": false,
+  "external_state_required": true,
+  "max_comparison_suffix": 256,
+  "max_depth": 128,
+  "max_label_bytes": 96,
+  "max_labels_per_node": 8,
+  "max_nodes": 2048,
+  "max_ordered_children": 128,
+  "max_safe_references": 64,
+  "non_claims": [
+    "transcript_truth",
+    "effect_rollback",
+    "world_isolation",
+    "semantic_quality",
+    "ui_delivery",
+    "accessibility",
+    "production_readiness",
+    "release_eligibility"
+  ],
+  "one_replay_parent": true,
+  "receipt_metadata_only": true,
+  "redaction_first": true,
+  "schema": "animus.session-branch-explorer.policy.v1"
+}

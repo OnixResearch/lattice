@@ -32,13 +32,7 @@ impl Input {
     pub(crate) fn from_context(context: &super::AuthorizationContext<'_>) -> Self {
         Self {
             contract_permits: context.contract.permits(context.request),
-            matching_grants: count(
-                context
-                    .grants
-                    .iter()
-                    .filter(|grant| grant.authorizes(context.request))
-                    .count(),
-            ),
+            matching_grants: count(context.grants.iter().filter(|grant| grant.authorizes(context.request)).count()),
             local_denies: count(
                 context
                     .caveats

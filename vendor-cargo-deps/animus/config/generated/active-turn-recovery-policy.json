@@ -1,0 +1,30 @@
+{
+  "corruption_posture": "fail_closed",
+  "max_aggregate_bytes": 8388608,
+  "max_entries": 1024,
+  "max_entry_bytes": 65536,
+  "max_steering_entries": 64,
+  "non_claims": [
+    "store_correctness",
+    "power_loss_durability",
+    "provider_acceptance",
+    "exactly_once_effects",
+    "task_completion",
+    "production_readiness"
+  ],
+  "policy_hash": "4c39f74256c4cd5ec5a095095ff64c1d71864a8cfc650bd89a66674867e2205d",
+  "policy_id": "durable-active-turn",
+  "receipt_fields": [
+    "policy_hash",
+    "turn_hash",
+    "checkpoint_hash",
+    "plan_hash",
+    "generation",
+    "action",
+    "terminal"
+  ],
+  "replacement_posture": "compare_and_swap_atomic",
+  "retention_class": "host_managed",
+  "schema": "animus.active-turn-recovery.v1",
+  "transaction_evidence_required": true
+}

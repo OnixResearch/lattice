@@ -1,0 +1,7 @@
+role	source_owner	revision_requirement	shared_candidate	renderer_owned	rejection_boundary
+diagnostic	analysis/application	exact observed document revision	stable ID range semantic severity/style role	paint tooltip geometry arbitrary payload	stale/missing source invalid range unknown role
+search-hit	search owner	exact revision	stable ID range active status	highlight and navigation UI	stale/missing search generation
+link	content/analysis owner	exact revision	stable ID range semantic action identity	underline hit geometry destination execution	unknown action or invalid range
+selection	view owner	exact revision	view-local range and primary status	platform selection paint/clipboard	cross-view conflation or stale range
+fold	outline/document policy owner	exact revision	closed visibility role only if consumer agrees	gutter geometry animation	missing fold source or unsupported nesting
+annotation	application domain	exact revision	stable ID range closed semantic role	arbitrary content widget/popup	property bag callback renderer style or unknown payload

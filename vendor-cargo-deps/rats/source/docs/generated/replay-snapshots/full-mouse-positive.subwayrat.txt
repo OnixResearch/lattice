@@ -1,0 +1,8 @@
+fixture=full-mouse.positive
+renderer=subwayrat-tui
+adapter=normalize_subwayrat_mouse_input
+generator=full-mouse-replay-routes-v1
+scenario=full mouse positive
+state-blake3=d8c4a7a4cd5a61ef94ec11ad45d234f738e53ca94d36003bb1c934c3071a965d
+route-summary-blake3=d8c4a7a4cd5a61ef94ec11ad45d234f738e53ca94d36003bb1c934c3071a965d
+diagnostics=-

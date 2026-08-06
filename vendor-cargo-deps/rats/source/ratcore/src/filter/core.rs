@@ -41,12 +41,27 @@ mod matching;
 mod parts;
 mod runtime;
 
-pub use atoms::{
-    FieldSpec, FieldType, QueryOperator, QuerySchema, QuerySurface, QueryValue, surface_schema,
-};
-pub use checks::{QueryError, QueryErrorCode, validate_query};
-pub use parts::{DateRange, DateRangeClause, Predicate, Query, SearchTerm, SortDirection, SortKey};
-pub use runtime::{QueryEvaluation, QueryRecord, QueryRow, evaluate_records};
+pub use atoms::FieldSpec;
+pub use atoms::FieldType;
+pub use atoms::QueryOperator;
+pub use atoms::QuerySchema;
+pub use atoms::QuerySurface;
+pub use atoms::QueryValue;
+pub use atoms::surface_schema;
+pub use checks::QueryError;
+pub use checks::QueryErrorCode;
+pub use checks::validate_query;
+pub use parts::DateRange;
+pub use parts::DateRangeClause;
+pub use parts::Predicate;
+pub use parts::Query;
+pub use parts::SearchTerm;
+pub use parts::SortDirection;
+pub use parts::SortKey;
+pub use runtime::QueryEvaluation;
+pub use runtime::QueryRecord;
+pub use runtime::QueryRow;
+pub use runtime::evaluate_records;
 
 #[cfg(test)]
 #[path = "tests.rs"]

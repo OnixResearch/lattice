@@ -175,8 +175,13 @@ pub enum ViewportError {
 
 mod bridge;
 mod model;
-pub use bridge::{ViewportAdapterInput, ViewportAdapterProjection, project_viewport};
-pub use model::{ViewportParts, ViewportState};
+mod virtualization;
+pub use bridge::ViewportAdapterInput;
+pub use bridge::ViewportAdapterProjection;
+pub use bridge::project_viewport;
+pub use model::ViewportParts;
+pub use model::ViewportState;
+pub use virtualization::*;
 
 #[cfg(test)]
 #[path = "tests.rs"]

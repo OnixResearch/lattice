@@ -1,10 +1,16 @@
 //! Single-line input dialog
 
-use rat_chrome::{OverlayAnchor, OverlayModel, OverlaySize, OverlayStyle, overlay_frame};
+use rat_chrome::OverlayAnchor;
+use rat_chrome::OverlayModel;
+use rat_chrome::OverlaySize;
+use rat_chrome::OverlayStyle;
+use rat_chrome::overlay_frame;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
 use crate::theme::WidgetTheme;
@@ -91,10 +97,7 @@ impl InputDialog {
             return;
         }
 
-        frame.render_widget(
-            Paragraph::new(input_line(&self.model.value, theme)),
-            layout.inner,
-        );
+        frame.render_widget(Paragraph::new(input_line(&self.model.value, theme)), layout.inner);
     }
 }
 
@@ -128,24 +131,20 @@ fn input_title(title: &str) -> String {
 fn input_line<'a>(value: &'a str, theme: &WidgetTheme) -> Line<'a> {
     Line::from(vec![
         Span::styled(value, Style::default().fg(theme.text)),
-        Span::styled(
-            CURSOR_GLYPH,
-            Style::default()
-                .fg(theme.text)
-                .add_modifier(Modifier::SLOW_BLINK),
-        ),
+        Span::styled(CURSOR_GLYPH, Style::default().fg(theme.text).add_modifier(Modifier::SLOW_BLINK)),
     ])
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rat_chrome::compute_overlay_layout;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::style::Color;
     use ratatui::widgets::Paragraph;
+
+    use super::*;
 
     const VIEWPORT_WIDTH: u16 = 60;
     const VIEWPORT_HEIGHT: u16 = 12;
@@ -208,15 +207,8 @@ mod tests {
         let buffer = render_input(&dialog, &WidgetTheme::default(), viewport());
         let layout = input_layout(viewport(), INPUT_TITLE);
 
-        assert_eq!(
-            buffer[(layout.inner.x, layout.inner.y)].symbol(),
-            CURSOR_GLYPH
-        );
-        assert!(
-            buffer[(layout.inner.x, layout.inner.y)]
-                .modifier
-                .contains(Modifier::SLOW_BLINK)
-        );
+        assert_eq!(buffer[(layout.inner.x, layout.inner.y)].symbol(), CURSOR_GLYPH);
+        assert!(buffer[(layout.inner.x, layout.inner.y)].modifier.contains(Modifier::SLOW_BLINK));
     }
 
     #[test]

@@ -23,10 +23,8 @@ pub(super) const MODEL_FALLBACK_LOCAL: &str = "model:fallback:local";
 pub(super) const MODEL_FALLBACK_REMOTE: &str = "model:fallback:remote";
 pub(super) const BACKEND_LOCAL: &str = "backend:local";
 pub(super) const BACKEND_REMOTE: &str = "backend:remote";
-pub(super) const SAFE_HASH: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
-pub(super) const OTHER_SAFE_HASH: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
+pub(super) const SAFE_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+pub(super) const OTHER_SAFE_HASH: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 pub(super) const ZERO_COUNT: u32 = 0;
 pub(super) const MAX_CANDIDATES_ONE: u32 = 1;
 pub(super) const MAX_CANDIDATES_TWO: u32 = 2;
@@ -172,8 +170,7 @@ pub(super) fn catalog() -> alloc::vec::Vec<crate::CatalogEntry> {
 }
 
 pub(super) fn budget() -> crate::Budget {
-    crate::Budget::new(MAX_CANDIDATES_THREE, &[BACKEND_LOCAL, BACKEND_REMOTE])
-        .expect("valid budget should parse")
+    crate::Budget::new(MAX_CANDIDATES_THREE, &[BACKEND_LOCAL, BACKEND_REMOTE]).expect("valid budget should parse")
 }
 
 pub(super) fn signal_draft() -> crate::SignalDraft<'static> {

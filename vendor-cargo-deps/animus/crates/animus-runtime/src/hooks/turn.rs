@@ -81,10 +81,7 @@ pub struct Effect {
 
 impl Effect {
     const fn new(event_kind: LifecycleHookEventKind, turn_index: Option<usize>) -> Self {
-        Self {
-            event_kind,
-            turn_index,
-        }
+        Self { event_kind, turn_index }
     }
 
     /// Returns the lifecycle hook event kind to route through host-owned adapters.
@@ -177,29 +174,17 @@ impl Error {
 pub fn advance(state: State, event: Event) -> Result<Transition, Error> {
     // r[impl agent_harness_runtime.turn_lifecycle_hooks.fsm]
     match (state, event) {
-        (State::New, Event::Startup) => Ok(Transition::new(
-            State::Started,
-            Some(Effect::new(LifecycleHookEventKind::SessionStart, None)),
-        )),
-        (State::Started, Event::PreTurn { turn_index }) => begin_initial(state, event, turn_index),
-        (
-            State::AfterTurn {
-                turn_index: previous,
-            },
-            Event::PreTurn { turn_index },
-        ) => begin_next(state, event, previous, turn_index),
-        (
-            State::BeforeTurn {
-                turn_index: expected,
-            },
-            Event::PostTurn {
-                turn_index,
-                outcome: _,
-            },
-        ) => finish_current(state, event, expected, turn_index),
-        (State::Started | State::AfterTurn { .. }, Event::Complete) => {
-            Ok(Transition::new(State::Completed, None))
+        (State::New, Event::Startup) => {
+            Ok(Transition::new(State::Started, Some(Effect::new(LifecycleHookEventKind::SessionStart, None))))
         }
+        (State::Started, Event::PreTurn { turn_index }) => begin_initial(state, event, turn_index),
+        (State::AfterTurn { turn_index: previous }, Event::PreTurn { turn_index }) => {
+            begin_next(state, event, previous, turn_index)
+        }
+        (State::BeforeTurn { turn_index: expected }, Event::PostTurn { turn_index, outcome: _ }) => {
+            finish_current(state, event, expected, turn_index)
+        }
+        (State::Started | State::AfterTurn { .. }, Event::Complete) => Ok(Transition::new(State::Completed, None)),
         _ => Err(Error::new(ErrorKind::InvalidTransition, state, event)),
     }
 }
@@ -211,12 +196,7 @@ fn begin_initial(state: State, event: Event, turn_index: usize) -> Result<Transi
     Ok(begin_transition(turn_index))
 }
 
-fn begin_next(
-    state: State,
-    event: Event,
-    previous_turn_index: usize,
-    turn_index: usize,
-) -> Result<Transition, Error> {
+fn begin_next(state: State, event: Event, previous_turn_index: usize, turn_index: usize) -> Result<Transition, Error> {
     let Some(expected_turn_index) = previous_turn_index.checked_add(1) else {
         return Err(Error::new(ErrorKind::TurnIndexOverflow, state, event));
     };
@@ -229,10 +209,7 @@ fn begin_next(
 fn begin_transition(turn_index: usize) -> Transition {
     Transition::new(
         State::BeforeTurn { turn_index },
-        Some(Effect::new(
-            LifecycleHookEventKind::PreTurn,
-            Some(turn_index),
-        )),
+        Some(Effect::new(LifecycleHookEventKind::PreTurn, Some(turn_index))),
     )
 }
 
@@ -247,10 +224,7 @@ fn finish_current(
     }
     Ok(Transition::new(
         State::AfterTurn { turn_index },
-        Some(Effect::new(
-            LifecycleHookEventKind::PostTurn,
-            Some(turn_index),
-        )),
+        Some(Effect::new(LifecycleHookEventKind::PostTurn, Some(turn_index))),
     ))
 }
 
@@ -269,41 +243,20 @@ mod tests {
     fn emits_hooks_in_order() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.fsm.positive]
         let startup = must_advance(State::New, Event::Startup);
-        let pre_turn = must_advance(
-            startup.state(),
-            Event::PreTurn {
-                turn_index: FIRST_TURN_INDEX,
-            },
-        );
-        let post_turn = must_advance(
-            pre_turn.state(),
-            Event::PostTurn {
-                turn_index: FIRST_TURN_INDEX,
-                outcome: Outcome::Model,
-            },
-        );
+        let pre_turn = must_advance(startup.state(), Event::PreTurn {
+            turn_index: FIRST_TURN_INDEX,
+        });
+        let post_turn = must_advance(pre_turn.state(), Event::PostTurn {
+            turn_index: FIRST_TURN_INDEX,
+            outcome: Outcome::Model,
+        });
         let complete = must_advance(post_turn.state(), Event::Complete);
 
-        assert_eq!(
-            startup.effect().map(Effect::event_kind),
-            Some(LifecycleHookEventKind::SessionStart)
-        );
-        assert_eq!(
-            pre_turn.effect().map(Effect::event_kind),
-            Some(LifecycleHookEventKind::PreTurn)
-        );
-        assert_eq!(
-            pre_turn.effect().and_then(Effect::turn_index),
-            Some(FIRST_TURN_INDEX)
-        );
-        assert_eq!(
-            post_turn.effect().map(Effect::event_kind),
-            Some(LifecycleHookEventKind::PostTurn)
-        );
-        assert_eq!(
-            post_turn.effect().and_then(Effect::turn_index),
-            Some(FIRST_TURN_INDEX)
-        );
+        assert_eq!(startup.effect().map(Effect::event_kind), Some(LifecycleHookEventKind::SessionStart));
+        assert_eq!(pre_turn.effect().map(Effect::event_kind), Some(LifecycleHookEventKind::PreTurn));
+        assert_eq!(pre_turn.effect().and_then(Effect::turn_index), Some(FIRST_TURN_INDEX));
+        assert_eq!(post_turn.effect().map(Effect::event_kind), Some(LifecycleHookEventKind::PostTurn));
+        assert_eq!(post_turn.effect().and_then(Effect::turn_index), Some(FIRST_TURN_INDEX));
         assert_eq!(complete.state(), State::Completed);
         assert_eq!(complete.effect(), None);
     }
@@ -312,18 +265,12 @@ mod tests {
     fn requires_post_before_next_pre() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.fsm.negative]
         let startup = must_advance(State::New, Event::Startup);
-        let pre_turn = must_advance(
-            startup.state(),
-            Event::PreTurn {
-                turn_index: FIRST_TURN_INDEX,
-            },
-        );
-        let error = advance(
-            pre_turn.state(),
-            Event::PreTurn {
-                turn_index: SECOND_TURN_INDEX,
-            },
-        )
+        let pre_turn = must_advance(startup.state(), Event::PreTurn {
+            turn_index: FIRST_TURN_INDEX,
+        });
+        let error = advance(pre_turn.state(), Event::PreTurn {
+            turn_index: SECOND_TURN_INDEX,
+        })
         .expect_err("duplicate pre-turn without post-turn should fail");
 
         assert_eq!(error.kind(), ErrorKind::InvalidTransition);
@@ -334,15 +281,11 @@ mod tests {
     fn rejects_duplicate_startup_and_early_post() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.fsm.negative]
         let startup = must_advance(State::New, Event::Startup);
-        let duplicate_startup =
-            advance(startup.state(), Event::Startup).expect_err("duplicate startup should fail");
-        let post_without_pre = advance(
-            startup.state(),
-            Event::PostTurn {
-                turn_index: FIRST_TURN_INDEX,
-                outcome: Outcome::Tool,
-            },
-        )
+        let duplicate_startup = advance(startup.state(), Event::Startup).expect_err("duplicate startup should fail");
+        let post_without_pre = advance(startup.state(), Event::PostTurn {
+            turn_index: FIRST_TURN_INDEX,
+            outcome: Outcome::Tool,
+        })
         .expect_err("post-turn before pre-turn should fail");
 
         assert_eq!(duplicate_startup.kind(), ErrorKind::InvalidTransition);
@@ -353,26 +296,17 @@ mod tests {
     fn rejects_skipped_or_stale_indices() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.fsm.negative]
         let startup = must_advance(State::New, Event::Startup);
-        let skipped_first = advance(
-            startup.state(),
-            Event::PreTurn {
-                turn_index: SECOND_TURN_INDEX,
-            },
-        )
+        let skipped_first = advance(startup.state(), Event::PreTurn {
+            turn_index: SECOND_TURN_INDEX,
+        })
         .expect_err("first pre-turn must use the initial index");
-        let first_pre = must_advance(
-            startup.state(),
-            Event::PreTurn {
-                turn_index: FIRST_TURN_INDEX,
-            },
-        );
-        let mismatched_post = advance(
-            first_pre.state(),
-            Event::PostTurn {
-                turn_index: SECOND_TURN_INDEX,
-                outcome: Outcome::Respond,
-            },
-        )
+        let first_pre = must_advance(startup.state(), Event::PreTurn {
+            turn_index: FIRST_TURN_INDEX,
+        });
+        let mismatched_post = advance(first_pre.state(), Event::PostTurn {
+            turn_index: SECOND_TURN_INDEX,
+            outcome: Outcome::Respond,
+        })
         .expect_err("post-turn index must match the pre-turn index");
 
         assert_eq!(skipped_first.kind(), ErrorKind::TurnIndexMismatch);

@@ -9,22 +9,13 @@ fn hashes_raw_evidence_and_omits_raw_material() {
             PRIVATE_PATH_SENTINEL,
             RAW_TOOL_SENTINEL,
         ],
-        ..draft(
-            SecurityActionClass::ReadOnly,
-            &[SAFE_ARGUMENT],
-            &[CONTEXT_SUMMARY],
-        )
+        ..draft(SecurityActionClass::ReadOnly, &[SAFE_ARGUMENT], &[CONTEXT_SUMMARY])
     })
     .expect("raw evidence should be hashed and discarded");
     let rendered = alloc::format!("{input:?}");
 
     assert_eq!(input.evidence_hashes().len(), 4);
-    assert!(
-        input
-            .evidence_hashes()
-            .iter()
-            .all(|hash| hash.len() == SECURITY_REVIEW_HASH_HEX_CHARS)
-    );
+    assert!(input.evidence_hashes().iter().all(|hash| hash.len() == SECURITY_REVIEW_HASH_HEX_CHARS));
     assert!(!rendered.contains(RAW_PROMPT_SENTINEL));
     assert!(!rendered.contains(CREDENTIAL_SENTINEL));
     assert!(!rendered.contains(PRIVATE_PATH_SENTINEL));
@@ -33,20 +24,14 @@ fn hashes_raw_evidence_and_omits_raw_material() {
 
 #[test]
 fn rejects_unsafe_safe_summary() {
-    let error = SecurityReviewInput::validate(&draft(
-        SecurityActionClass::ReadOnly,
-        &[SAFE_ARGUMENT],
-        &[RAW_PROMPT_SENTINEL],
-    ))
-    .expect_err("safe summaries must reject raw prompt material");
+    let error =
+        SecurityReviewInput::validate(&draft(SecurityActionClass::ReadOnly, &[SAFE_ARGUMENT], &[RAW_PROMPT_SENTINEL]))
+            .expect_err("safe summaries must reject raw prompt material");
 
-    assert!(matches!(
-        error,
-        SecurityReviewError::UnsafeText {
-            leak: SecurityReceiptLeak::RawPrompt,
-            ..
-        }
-    ));
+    assert!(matches!(error, SecurityReviewError::UnsafeText {
+        leak: SecurityReceiptLeak::RawPrompt,
+        ..
+    }));
 }
 
 #[test]
@@ -57,16 +42,8 @@ fn deterministic_scanner_detects_dangerous_fixtures() {
         let input = review_input(case.action_class, case.arguments, case.summaries);
         let scan = scan_review_input(&input);
 
-        assert!(
-            scan.findings()
-                .iter()
-                .any(|finding| finding.category() == case.category)
-        );
-        assert!(
-            scan.findings()
-                .iter()
-                .all(|finding| finding.disposition() == SecurityFindingDisposition::Block)
-        );
+        assert!(scan.findings().iter().any(|finding| finding.category() == case.category));
+        assert!(scan.findings().iter().all(|finding| finding.disposition() == SecurityFindingDisposition::Block));
         assert!(
             scan.findings()
                 .iter()

@@ -1,0 +1,11 @@
+scenario=normal active=open
+scenario=filter count=1 active=settings
+scenario=disabled accepted=false code=DisabledCandidate
+scenario=movement active=settings disabled-skipped=true
+scenario=changing-catalog active=settings label=Settings renamed
+scenario=history restored=draft persisted=false
+scenario=stale accepted=false code=StaleCandidates
+scenario=validation accepted=false code=ValidationPending
+scenario=submit output=candidate close_pending=true
+scenario=cancel output=cancelled close_pending=true
+scenario=sensitive replay=[redacted] history-retained=false

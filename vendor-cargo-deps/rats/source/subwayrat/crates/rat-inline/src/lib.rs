@@ -29,9 +29,9 @@ mod widget;
 mod widgets;
 
 pub use builder::InlineView;
-pub use renderer::InlineRenderer;
-pub use widget::InlineWidget;
-pub use widgets::{InlineMarkdown, InlineText};
-
 // Re-export ratcore inline types for convenience.
 pub use ratcore::inline::{NodeKey, ViewNode, ViewTree};
+pub use renderer::InlineRenderer;
+pub use widget::InlineWidget;
+pub use widgets::InlineMarkdown;
+pub use widgets::InlineText;

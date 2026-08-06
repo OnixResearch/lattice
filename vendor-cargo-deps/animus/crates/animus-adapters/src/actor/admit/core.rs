@@ -1,14 +1,8 @@
 /// Evaluates activation after discovery, project admission, and runtime policy.
 #[must_use]
 pub fn activate(request: super::ActivationRequest<'_>) -> super::Activation {
-    assert!(
-        request.policy.model_roles.len() <= super::super::MAX_ITEMS,
-        "model-role policy stays bounded"
-    );
-    assert!(
-        request.policy.capabilities.len() <= super::super::MAX_ITEMS,
-        "capability policy stays bounded"
-    );
+    assert!(request.policy.model_roles.len() <= super::super::MAX_ITEMS, "model-role policy stays bounded");
+    assert!(request.policy.capabilities.len() <= super::super::MAX_ITEMS, "capability policy stays bounded");
     let admission = project_admission_status(request.manifest, request.admission);
     if admission == super::AdmissionStatus::Denied {
         return denied_activation(admission);
@@ -47,8 +41,7 @@ fn active_activation(
         "activation admission status matches the request"
     );
     let mut denied = super::super::Collection::with_capacity(super::super::MAX_ITEMS);
-    let selected_model_role =
-        select_model_role(request.manifest, request.policy.model_roles, &mut denied);
+    let selected_model_role = select_model_role(request.manifest, request.policy.model_roles, &mut denied);
     let sets = effective_sets(request, &mut denied);
     build_active(ActiveInput {
         manifest: request.manifest,
@@ -148,10 +141,7 @@ fn project_admission_status(
     if manifest.source_scope() != super::super::SourceScope::Project {
         return super::AdmissionStatus::NotRequired;
     }
-    if super::super::contains_label(
-        admission.admitted_manifest_identities,
-        manifest.manifest_identity(),
-    ) {
+    if super::super::contains_label(admission.admitted_manifest_identities, manifest.manifest_identity()) {
         return super::AdmissionStatus::Admitted;
     }
     super::AdmissionStatus::Denied
@@ -165,10 +155,7 @@ fn select_model_role(
     if super::super::contains_label(model_roles, manifest.model_preference()) {
         return Some(super::super::Text::from(manifest.model_preference()));
     }
-    denied_escalations.push(denied_escalation(
-        super::AbilityKind::ModelRole,
-        manifest.model_preference(),
-    ));
+    denied_escalations.push(denied_escalation(super::AbilityKind::ModelRole, manifest.model_preference()));
     None
 }
 
@@ -178,14 +165,8 @@ fn filter_allowed(
     allowed: &[&str],
     denied_escalations: &mut super::super::Collection<super::DeniedEscalation>,
 ) -> super::super::Collection<super::super::Text> {
-    assert!(
-        requested.len() <= super::super::MAX_ITEMS,
-        "requested labels are bounded"
-    );
-    assert!(
-        allowed.len() <= super::super::MAX_ITEMS,
-        "allowed labels are bounded"
-    );
+    assert!(requested.len() <= super::super::MAX_ITEMS, "requested labels are bounded");
+    assert!(allowed.len() <= super::super::MAX_ITEMS, "allowed labels are bounded");
     let mut effective = super::super::Collection::with_capacity(requested.len());
     for value in requested {
         if super::super::contains_label(allowed, value.as_str()) {

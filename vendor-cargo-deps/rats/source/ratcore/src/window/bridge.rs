@@ -63,9 +63,7 @@ pub struct ViewportAdapterProjection {
 ///
 /// Returns a [`ViewportError`] when the adapter input contains invalid geometry,
 /// cursor, scroll, anchor, or selection data.
-pub fn project_viewport(
-    input: ViewportAdapterInput,
-) -> Result<ViewportAdapterProjection, ViewportError> {
+pub fn project_viewport(input: ViewportAdapterInput) -> Result<ViewportAdapterProjection, ViewportError> {
     let renderer = input.renderer;
     let widget = input.widget;
     let state = input.into_state()?;

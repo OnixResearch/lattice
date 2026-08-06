@@ -1,0 +1,8 @@
+fixture=full-mouse.negative
+renderer=subwayrat-tui
+adapter=normalize_subwayrat_mouse_input
+generator=full-mouse-replay-routes-v1
+scenario=full mouse negative
+state-blake3=18e427eb6485e0b2fc5c5c6f4e30d47db539abda6f0175e2a5c6e61f4343b934
+route-summary-blake3=18e427eb6485e0b2fc5c5c6f4e30d47db539abda6f0175e2a5c6e61f4343b934
+diagnostics=DisabledAction;MissingDragStart;StaleCapture;UnsupportedEvent;OutOfBoundsMouse;ImpossibleGeometry

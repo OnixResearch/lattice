@@ -38,10 +38,7 @@ fn dto_accepts_backend_neutral_checkpoint_identities() {
         ("jj", CheckpointBackendKind::Jj),
         ("git", CheckpointBackendKind::Git),
         ("in_memory", CheckpointBackendKind::InMemory),
-        (
-            "workspace_isolation",
-            CheckpointBackendKind::WorkspaceIsolation,
-        ),
+        ("workspace_isolation", CheckpointBackendKind::WorkspaceIsolation),
     ];
     for (label, expected_kind) in cases {
         let checkpoint = CheckpointRecord::new(draft(label)).expect("checkpoint should validate");
@@ -52,10 +49,7 @@ fn dto_accepts_backend_neutral_checkpoint_identities() {
         assert_eq!(checkpoint.before_hash().as_str(), HASH_B);
         assert_eq!(checkpoint.after_hash().as_str(), HASH_C);
         assert_eq!(checkpoint.changed_file_count(), CHANGED_FILE_COUNT);
-        assert_eq!(
-            checkpoint.session_hash().map(CheckpointHash::as_str),
-            Some(HASH_D)
-        );
+        assert_eq!(checkpoint.session_hash().map(CheckpointHash::as_str), Some(HASH_D));
         assert_eq!(checkpoint.tool_label(), Some(TOOL_LABEL));
         assert_eq!(checkpoint.status(), CheckpointStatus::Created);
     }
@@ -63,8 +57,7 @@ fn dto_accepts_backend_neutral_checkpoint_identities() {
 
 #[test]
 fn dto_rejects_unknown_backend_and_invalid_metadata() {
-    let unknown_backend_diagnostic =
-        CheckpointRecord::new(draft("svn")).expect_err("unknown backend should fail");
+    let unknown_backend_diagnostic = CheckpointRecord::new(draft("svn")).expect_err("unknown backend should fail");
     assert!(
         matches!(unknown_backend_diagnostic, CheckpointError::UnsupportedValue { field, .. } if field == CHECKPOINT_BACKEND_FIELD.as_str())
     );
@@ -73,10 +66,7 @@ fn dto_rejects_unknown_backend_and_invalid_metadata() {
         ..draft("git")
     })
     .expect_err("oversized changed-file count should fail");
-    assert!(matches!(
-        too_many_files_diagnostic,
-        CheckpointError::ChangedFileCountTooLarge { .. }
-    ));
+    assert!(matches!(too_many_files_diagnostic, CheckpointError::ChangedFileCountTooLarge { .. }));
     let bad_hash_diagnostic = CheckpointRecord::new(CheckpointDraft {
         workspace_hash: "abc",
         ..draft("git")
@@ -96,10 +86,7 @@ fn strict_protected_mutation_requires_injected_service() {
     });
     assert!(!missing.dispatch_allowed());
     assert!(!missing.checkpoint_required());
-    assert_eq!(
-        missing.failure_class(),
-        CheckpointFailureClass::MissingService
-    );
+    assert_eq!(missing.failure_class(), CheckpointFailureClass::MissingService);
     let available = evaluate_protected_mutation(ProtectedMutationInput {
         policy: CheckpointPolicy::Strict,
         protection: MutationProtection::Protected,
@@ -119,10 +106,7 @@ fn best_effort_records_checkpoint_failure_without_blocking_dispatch() {
     });
     assert!(decision.dispatch_allowed());
     assert!(!decision.checkpoint_required());
-    assert_eq!(
-        decision.failure_class(),
-        CheckpointFailureClass::Unavailable
-    );
+    assert_eq!(decision.failure_class(), CheckpointFailureClass::Unavailable);
 }
 
 #[test]
@@ -137,10 +121,7 @@ fn rollback_requires_confirmation_before_restore() {
     });
     assert!(!validation.restore_allowed());
     assert_eq!(validation.status(), CheckpointStatus::Blocked);
-    assert_eq!(
-        validation.failure_class(),
-        CheckpointFailureClass::UnconfirmedRollback
-    );
+    assert_eq!(validation.failure_class(), CheckpointFailureClass::UnconfirmedRollback);
 }
 
 #[test]
@@ -156,10 +137,7 @@ fn rollback_rejects_stale_workspace_before_restore() {
     });
     assert!(!validation.restore_allowed());
     assert_eq!(validation.status(), CheckpointStatus::Blocked);
-    assert_eq!(
-        validation.failure_class(),
-        CheckpointFailureClass::StaleWorkspace
-    );
+    assert_eq!(validation.failure_class(), CheckpointFailureClass::StaleWorkspace);
 }
 
 #[test]
@@ -201,14 +179,8 @@ fn receipt_records_safe_metadata_and_stable_hash() {
     assert_eq!(receipt.backend_kind(), CheckpointBackendKind::Jj);
     assert_eq!(receipt.checkpoint_id(), CHECKPOINT_ID);
     assert_eq!(receipt.workspace_hash().as_str(), HASH_A);
-    assert_eq!(
-        receipt.before_hash().map(CheckpointHash::as_str),
-        Some(HASH_B)
-    );
-    assert_eq!(
-        receipt.after_hash().map(CheckpointHash::as_str),
-        Some(HASH_C)
-    );
+    assert_eq!(receipt.before_hash().map(CheckpointHash::as_str), Some(HASH_B));
+    assert_eq!(receipt.after_hash().map(CheckpointHash::as_str), Some(HASH_C));
     assert_eq!(receipt.changed_file_count(), CHANGED_FILE_COUNT);
     assert_eq!(receipt.confirmation(), RollbackConfirmationStatus::Approved);
     assert_eq!(receipt.failure_class(), CheckpointFailureClass::None);
@@ -217,25 +189,13 @@ fn receipt_records_safe_metadata_and_stable_hash() {
 
 #[test]
 fn receipt_rejects_leak_markers() {
-    assert_eq!(
-        validate_checkpoint_receipt_text("operation=rollback status=blocked"),
-        Ok(())
-    );
+    assert_eq!(validate_checkpoint_receipt_text("operation=rollback status=blocked"), Ok(()));
     let cases = [
         ("RAW_DIFF:\n-old\n+new", CheckpointReceiptLeak::RawDiff),
-        (
-            "RAW_FILE: complete source",
-            CheckpointReceiptLeak::RawFileBody,
-        ),
+        ("RAW_FILE: complete source", CheckpointReceiptLeak::RawFileBody),
         ("API_KEY=secret", CheckpointReceiptLeak::Credential),
-        (
-            "ENV_DUMP:\nTOKEN=value",
-            CheckpointReceiptLeak::EnvironmentDump,
-        ),
-        (
-            "files: /home/alice/project/src/lib.rs",
-            CheckpointReceiptLeak::FullPathList,
-        ),
+        ("ENV_DUMP:\nTOKEN=value", CheckpointReceiptLeak::EnvironmentDump),
+        ("files: /home/alice/project/src/lib.rs", CheckpointReceiptLeak::FullPathList),
     ];
     for (text, expected) in cases {
         assert_eq!(validate_checkpoint_receipt_text(text), Err(expected));

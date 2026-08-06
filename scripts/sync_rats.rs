@@ -13,7 +13,7 @@ const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
 const SELF_TEST_ARGUMENT_COUNT: usize = 2;
 const SELF_TEST_ARGUMENT: &str = "--self-test";
-const EXPECTED_REVISION: &str = "3418e08e4408d6eb899dd4abc8af3fbad9499bb1";
+const EXPECTED_REVISION: &str = "ef26e13b2e9cbcb4a0c902f9caff641b6d013867";
 const GIT_PROGRAM: &str = "git";
 const FAILURE_EXIT_CODE: u8 = 1;
 const STAGING_PREFIX: &str = ".rats-sync-stage";
@@ -21,7 +21,9 @@ const WORKTREE_PREFIX: &str = "lattice-rats-sync-worktree";
 const SOURCE_METADATA_FILE_NAME: &str = "SOURCE";
 const SOURCE_REPOSITORY: &str = "https://github.com/brittonr/rats";
 const SNAPSHOT_PATHS: &[&str] = &[
-    "docs/generated/snapshots",
+    "docs/generated",
+    "meteorite/crates/met-core/generated",
+    "themes",
     "ratcore/Cargo.toml",
     "ratcore/src",
     "subwayrat/crates/rat-nodegraph/Cargo.toml",
@@ -241,7 +243,9 @@ fn self_test() -> Result<(), String> {
     validate_snapshot_paths(SNAPSHOT_PATHS)?;
     if !source_metadata().contains(&format!("revision: {EXPECTED_REVISION}"))
         || !source_metadata().contains("- ratcore/src")
-        || !source_metadata().contains("- docs/generated/snapshots")
+        || !source_metadata().contains("- docs/generated")
+        || !source_metadata().contains("- meteorite/crates/met-core/generated")
+        || !source_metadata().contains("- themes")
     {
         return Err("source metadata omitted required identity or paths".to_string());
     }

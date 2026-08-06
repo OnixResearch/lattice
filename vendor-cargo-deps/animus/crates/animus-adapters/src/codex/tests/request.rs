@@ -18,14 +18,8 @@ fn requests_accept_supported_selector_shapes() {
         capabilities,
     )
     .expect("working-copy selector should validate");
-    assert_eq!(
-        working_copy.selector().kind(),
-        DiffReviewSelectorKind::WorkingCopy
-    );
-    assert_eq!(
-        working_copy.target_labels(),
-        &[alloc::string::String::from(TARGET_LABEL)]
-    );
+    assert_eq!(working_copy.selector().kind(), DiffReviewSelectorKind::WorkingCopy);
+    assert_eq!(working_copy.target_labels(), &[alloc::string::String::from(TARGET_LABEL)]);
 
     let commit = request(
         DiffReviewSelectorDraft {
@@ -87,12 +81,9 @@ fn unsupported_or_missing_input_fails_before_review_starts() {
         &[DiffReviewSelectorKind::Commit],
     )
     .expect_err("commit without revision should fail");
-    assert_eq!(
-        missing_commit,
-        DiffReviewError::InvalidSelectorShape {
-            kind: DiffReviewSelectorKind::Commit,
-        }
-    );
+    assert_eq!(missing_commit, DiffReviewError::InvalidSelectorShape {
+        kind: DiffReviewSelectorKind::Commit,
+    });
 
     let missing_targets = DiffReviewRequest::validate(&DiffReviewRequestDraft {
         run_id: RUN_ID,
@@ -105,10 +96,7 @@ fn unsupported_or_missing_input_fails_before_review_starts() {
         target_labels: &[],
     })
     .expect_err("request without a bounded target should fail");
-    assert_eq!(
-        missing_targets,
-        DiffReviewError::EmptyCollection {
-            field: "diff_review_target_label",
-        }
-    );
+    assert_eq!(missing_targets, DiffReviewError::EmptyCollection {
+        field: "diff_review_target_label",
+    });
 }

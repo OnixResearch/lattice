@@ -10,9 +10,7 @@ pub(super) struct DropdownRectRequest {
 
 pub(super) fn dropdown_rect(request: DropdownRectRequest) -> ratatui::layout::Rect {
     debug_assert!(request.requested_width <= request.viewport.width || request.viewport.width == 0);
-    debug_assert!(
-        request.requested_height <= request.viewport.height || request.viewport.height == 0
-    );
+    debug_assert!(request.requested_height <= request.viewport.height || request.viewport.height == 0);
     if request.viewport.width == 0 || request.viewport.height == 0 {
         return ratatui::layout::Rect::new(request.viewport.x, request.viewport.y, 0, 0);
     }
@@ -20,10 +18,7 @@ pub(super) fn dropdown_rect(request: DropdownRectRequest) -> ratatui::layout::Re
     let width = request.requested_width.min(request.viewport.width);
     let height = request.requested_height.min(request.viewport.height);
     let max_x = rect_right(request.viewport).saturating_sub(width);
-    let x = request
-        .anchor
-        .x
-        .clamp(request.viewport.x, max_x.max(request.viewport.x));
+    let x = request.anchor.x.clamp(request.viewport.x, max_x.max(request.viewport.x));
     let below_y = request.anchor.y.saturating_add(request.anchor.height);
     let max_y = rect_bottom(request.viewport).saturating_sub(height);
     let y = below_y.clamp(request.viewport.y, max_y.max(request.viewport.y));
@@ -54,8 +49,7 @@ mod tests {
     #[test]
     fn clamps_dropdown_to_right_edge() {
         let viewport = ratatui::layout::Rect::new(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
-        let anchor =
-            ratatui::layout::Rect::new(ANCHOR_X_NEAR_RIGHT_EDGE, 0, ANCHOR_WIDTH, ANCHOR_HEIGHT);
+        let anchor = ratatui::layout::Rect::new(ANCHOR_X_NEAR_RIGHT_EDGE, 0, ANCHOR_WIDTH, ANCHOR_HEIGHT);
 
         let rect = dropdown_rect(DropdownRectRequest {
             viewport,
@@ -71,8 +65,7 @@ mod tests {
     #[test]
     fn rejects_empty_viewport_without_underflow() {
         let viewport = ratatui::layout::Rect::new(5, 7, 0, VIEWPORT_HEIGHT);
-        let anchor =
-            ratatui::layout::Rect::new(ANCHOR_X_NEAR_RIGHT_EDGE, 0, ANCHOR_WIDTH, ANCHOR_HEIGHT);
+        let anchor = ratatui::layout::Rect::new(ANCHOR_X_NEAR_RIGHT_EDGE, 0, ANCHOR_WIDTH, ANCHOR_HEIGHT);
 
         let rect = dropdown_rect(DropdownRectRequest {
             viewport,

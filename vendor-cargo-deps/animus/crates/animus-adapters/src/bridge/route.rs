@@ -1,4 +1,9 @@
-use super::{Collection, InteropError, TOOL_FIELD, Text, contains_text, text_collection};
+use super::Collection;
+use super::InteropError;
+use super::TOOL_FIELD;
+use super::Text;
+use super::contains_text;
+use super::text_collection;
 
 /// Tool pass-through intersection input.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,15 +52,10 @@ impl ToolPassThroughResolution {
 /// # Panics
 ///
 /// Panics if required requested-tool validation is weakened before intersection.
-pub fn resolve_tool_pass_through(
-    input: ToolPassThroughInput<'_>,
-) -> Result<ToolPassThroughResolution, InteropError> {
+pub fn resolve_tool_pass_through(input: ToolPassThroughInput<'_>) -> Result<ToolPassThroughResolution, InteropError> {
     let requested = text_collection(TOOL_FIELD, input.requested_tools, true)?;
     assert!(!requested.is_empty(), "requested tools are required");
-    assert!(
-        requested.len() <= input.requested_tools.len(),
-        "normalized tools are bounded"
-    );
+    assert!(requested.len() <= input.requested_tools.len(), "normalized tools are bounded");
     let animus = text_collection(TOOL_FIELD, input.animus_capability_ceilings, true)?;
     let permission = text_collection(TOOL_FIELD, input.permission_mode_tools, true)?;
     let host = text_collection(TOOL_FIELD, input.host_admission, true)?;

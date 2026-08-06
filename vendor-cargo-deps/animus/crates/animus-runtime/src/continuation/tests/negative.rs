@@ -1,4 +1,35 @@
 #[test]
+// r[verify agent_harness_runtime.authoritative_completion.continuation]
+// r[verify agent_harness_runtime.authoritative_completion.continuation.empty]
+fn empty_queue_waits_when_authoritative_completion_is_required() {
+    let policy = ContinuationPolicy::new_with_authoritative_completion(
+        "receipt-authoritative",
+        ContinuationPriority::default(),
+    )
+    .expect("authoritative policy should validate");
+    let decision = select_next_continuation(&ContinuationState::new(), &policy);
+    let receipt = ContinuationReceipt::from_decision(
+        ContinuationStateClass::Idle,
+        &decision,
+        &policy,
+        None,
+    )
+    .expect("awaiting-evidence receipt should validate");
+
+    assert!(matches!(
+        decision,
+        ContinuationDecision::AwaitingCompletionEvidence {
+            reason: ContinuationReason::CompletionEvidenceRequired
+        }
+    ));
+    assert_eq!(
+        receipt.selected_action(),
+        ContinuationAction::AwaitCompletionEvidence
+    );
+    assert_ne!(policy.policy_hash(), default_policy().policy_hash());
+}
+
+#[test]
 fn complete_decision_uses_stable_no_work_hash() {
     let policy = default_policy();
     let decision = select_next_continuation(&ContinuationState::new(), &policy);
@@ -32,6 +63,7 @@ fn duplicate_priority_candidates_are_rejected() {
 }
 
 #[test]
+// r[verify agent_harness_runtime.authoritative_completion.continuation.work_id]
 fn missing_dispatch_acknowledgement_work_id_preserves_state() {
     let state = state_with_all_candidates();
     let decision = select_next_continuation(&state, &default_policy());

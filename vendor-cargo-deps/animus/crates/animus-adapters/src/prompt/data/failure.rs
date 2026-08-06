@@ -52,19 +52,13 @@ impl core::fmt::Display for ContextReferenceError {
             | Self::MalformedRange { reason }
             | Self::PathEscape { reason }
             | Self::UnsafeTarget { reason } => formatter.write_str(reason),
-            Self::ResolverDenied => {
-                formatter.write_str("context reference resolver denied by policy")
-            }
+            Self::ResolverDenied => formatter.write_str("context reference resolver denied by policy"),
             Self::ResolverMissing => formatter.write_str("context reference resolver is missing"),
-            Self::ResolverUnavailable => {
-                formatter.write_str("context reference resolver is unavailable")
-            }
+            Self::ResolverUnavailable => formatter.write_str("context reference resolver is unavailable"),
             Self::ResolverMalformedOutput => {
                 formatter.write_str("context reference resolver returned malformed output")
             }
-            Self::ResolverOversized => {
-                formatter.write_str("context reference resolver output is oversized")
-            }
+            Self::ResolverOversized => formatter.write_str("context reference resolver output is oversized"),
             Self::InvalidBudget => formatter.write_str("context reference budget must be positive"),
             Self::CountOverflow => formatter.write_str("context reference count overflowed u32"),
             Self::SafeMetadata(error) => write!(formatter, "{error}"),

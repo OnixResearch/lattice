@@ -45,9 +45,7 @@ impl QueryValue {
         let needle_lower = needle.to_lowercase();
         match self {
             Self::Text(value) => value.to_lowercase().contains(&needle_lower),
-            Self::Tags(values) => values
-                .iter()
-                .any(|value| value.to_lowercase().contains(&needle_lower)),
+            Self::Tags(values) => values.iter().any(|value| value.to_lowercase().contains(&needle_lower)),
             Self::Number(_) | Self::Bool(_) | Self::DateOrdinal(_) => false,
         }
     }
@@ -56,9 +54,7 @@ impl QueryValue {
         let prefix_lower = prefix.to_lowercase();
         match self {
             Self::Text(value) => value.to_lowercase().starts_with(&prefix_lower),
-            Self::Tags(values) => values
-                .iter()
-                .any(|value| value.to_lowercase().starts_with(&prefix_lower)),
+            Self::Tags(values) => values.iter().any(|value| value.to_lowercase().starts_with(&prefix_lower)),
             Self::Number(_) | Self::Bool(_) | Self::DateOrdinal(_) => false,
         }
     }
@@ -132,10 +128,7 @@ impl QuerySchema {
     #[must_use]
     pub fn new(fields: Vec<FieldSpec>) -> Self {
         Self {
-            fields: fields
-                .into_iter()
-                .map(|field| (field.name.clone(), field))
-                .collect(),
+            fields: fields.into_iter().map(|field| (field.name.clone(), field)).collect(),
         }
     }
 
@@ -170,9 +163,7 @@ fn default_operators(value_type: FieldType) -> std::collections::BTreeSet<QueryO
         ]
         .into_iter()
         .collect(),
-        FieldType::Bool => [QueryOperator::Equals, QueryOperator::NotEquals]
-            .into_iter()
-            .collect(),
+        FieldType::Bool => [QueryOperator::Equals, QueryOperator::NotEquals].into_iter().collect(),
     }
 }
 

@@ -1,0 +1,16 @@
+schema=terminal-image-boundary-v1
+package=rat-image
+image=0.25.10
+base64=0.22.1
+formats=png,jpeg,gif,webp
+preparation=bounded-staged-before-effect
+writer=explicit-exact-partial-reporting
+legacy=ambient-wrapper-removed
+acquisition=caller-supplied-protocol-facts-and-writer
+claim=finite-library-contract-only
+dependency-audit_sha256=447b35af2633ba2090968e9ee9da3b4cc0d2f1d93f22883291cd056e056f791a
+allocation-inventory_sha256=dfaf8a398cbf08cf32a89c5e59e227f8b5bec063ce575ebeb7af94031c1c2515
+limits_sha256=59b7fdd52ae08580831f3328d9a1a29a9b93cb37243e7accfbae7073c445e8a3
+corpus_sha256=078ac9c5d592cf027daa5ec2d05e86b7c85a91d400998af61010e555d34d8987
+compatibility_sha256=dd277a7b591f4df247a5a30dcc293008332496bdf195697dc686eb9e47f12f84
+source_sha256=cb34249258c4aff5d7ef46073c3cad02c6f2cf6ae55befe11bff21bb018cc9e1

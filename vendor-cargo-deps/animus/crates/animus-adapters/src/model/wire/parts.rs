@@ -10,10 +10,7 @@ impl CallId {
     /// Returns [`super::failure::Error`] when the identifier is empty, too long,
     /// or contains a NUL character.
     pub fn new(raw: &str) -> Result<Self, super::failure::Error> {
-        Ok(Self(crate::validation::normalized_adapter_field(
-            super::MODEL_CALL_ID_FIELD,
-            raw,
-        )?))
+        Ok(Self(crate::validation::normalized_adapter_field(super::MODEL_CALL_ID_FIELD, raw)?))
     }
 
     /// Returns the model-call identifier text.
@@ -35,10 +32,7 @@ impl ToolCallId {
     /// Returns [`super::failure::Error`] when the identifier is empty, too long,
     /// or contains a NUL character.
     pub fn new(raw: &str) -> Result<Self, super::failure::Error> {
-        Ok(Self(crate::validation::normalized_adapter_field(
-            super::TOOL_CALL_ID_FIELD,
-            raw,
-        )?))
+        Ok(Self(crate::validation::normalized_adapter_field(super::TOOL_CALL_ID_FIELD, raw)?))
     }
 
     /// Returns the tool-call identifier text.
@@ -120,11 +114,7 @@ impl Kind {
 
     pub(super) const fn requires_body(self) -> bool {
         match self {
-            Self::ContentDelta
-            | Self::ThoughtDelta
-            | Self::ToolCallDelta
-            | Self::Cancelled
-            | Self::Failure => true,
+            Self::ContentDelta | Self::ThoughtDelta | Self::ToolCallDelta | Self::Cancelled | Self::Failure => true,
             Self::Usage | Self::Finish => false,
         }
     }
@@ -144,12 +134,9 @@ impl Kind {
     pub(super) const fn requires_tool_call_id(self) -> bool {
         match self {
             Self::ToolCallDelta => true,
-            Self::ContentDelta
-            | Self::ThoughtDelta
-            | Self::Usage
-            | Self::Finish
-            | Self::Cancelled
-            | Self::Failure => false,
+            Self::ContentDelta | Self::ThoughtDelta | Self::Usage | Self::Finish | Self::Cancelled | Self::Failure => {
+                false
+            }
         }
     }
 }

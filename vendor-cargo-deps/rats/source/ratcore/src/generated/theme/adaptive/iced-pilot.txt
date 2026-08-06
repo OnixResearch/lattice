@@ -1,0 +1,11 @@
+generator=rats-adaptive-theme-v1
+source-blake3=463e69cf119ca95615d1080aca2096cf4d87dfcd8425bbaf088cb9b00d23dfe8
+renderer=iced-pilot
+scope=experimental-mounted
+mapping.surface-elevation=supported fallback=- reason=-
+mapping.typography=approximated fallback=weight-and-size reason=font discovery and exact metrics remain platform-owned
+mapping.control-metrics=supported fallback=- reason=-
+mapping.focus-indicator=supported fallback=- reason=-
+mapping.interaction-state=supported fallback=- reason=-
+mapping.contrast=approximated fallback=authored-palette-emphasis reason=native forced-color observation is outside the pilot
+mapping.motion=supported fallback=- reason=-

@@ -1,0 +1,2 @@
+source	revision	license	reviewed_area	adopted	rejected	copied_regions	attribution
+GNU Emacs 30.2	29f3f150af5c5b065c3a9f39969429e5bb3285da	GPL-3.0-or-later	minibuffer.el; simple.el completion/history documentation	explicit session; supplied completion table semantics; namespaced history navigation; draft restoration	recursive minibuffers; dynamic Lisp variables/hooks; command loop; keybindings; file handlers; process/network/filesystem completion	none	conceptual provenance in docs; no GPL code or tables distributed

@@ -12,12 +12,10 @@ pub struct IdeCommandSurfaces {
     /// Menu entries.
     pub menu: Vec<crate::action_registry::MenuItemProjection>,
     /// Shortcut help labels by action ID.
-    pub help: std::collections::BTreeMap<String, String>,
+    pub help: std::collections::BTreeMap<crate::action_registry::ActionId, String>,
 }
 
-pub(super) fn registry_issues(
-    registry: &crate::action_registry::ActionRegistryBuild,
-) -> Vec<IdeIssue> {
+pub(super) fn registry_issues(registry: &crate::action_registry::ActionRegistryBuild) -> Vec<IdeIssue> {
     registry
         .issues
         .iter()
@@ -31,9 +29,7 @@ pub(super) fn registry_issues(
         .collect()
 }
 
-pub(super) fn command_surfaces(
-    registry: &crate::action_registry::ActionRegistryBuild,
-) -> IdeCommandSurfaces {
+pub(super) fn command_surfaces(registry: &crate::action_registry::ActionRegistryBuild) -> IdeCommandSurfaces {
     let keymap = registry.snapshot.keymap_bindings();
     let help = keymap
         .iter()

@@ -1,0 +1,17 @@
+surface	before	replacement	behavior
+cell literal	CellAddr { col, row }	checked role conversion plus CellAddr::new(column, row)	zero-based identity preserved
+primitive address helper	direct fields	TryFrom<u64> per role plus CellAddr::new	checked stable-width migration; no public host-sized primitive
+external address	implicit/local conversion	CellAddr::from_zero_based_u64(column, row)	checked; no saturation
+A1 parse	Result<CellAddr, ()>	Result<CellAddr, A1ParseError>	valid A1 preserved; malformed/overflow classified
+range literal	CellRange { start, end }	CellRange::new(first, second)	reversed axes normalize
+ordered range	implicit assumption	CellRange::from_ordered(start, end)	reversed input rejects
+Grid::new	Grid::new(cols, rows)	Grid::new(ColumnCount, RowCount)	storage layout preserved
+SpreadsheetState::new	new(u64, u64)	new(ColumnCount, RowCount)	typed dimensions
+external state counts	clamped u64	from_zero_based_u64(cols, rows)	checked host conversion
+column width	u64 key	ColumnIndex key	accepted width and minimum policy preserved
+validator	u64 key	ColumnIndex key	validator routing preserved
+frozen headers	u64 fields	ColumnCount/RowCount fields	projection behavior preserved
+header request	new(kind, u64, command)	new(HeaderTarget, command)	accepted commands preserved; inconsistent axis pair impossible
+header external request	kind plus u64	from_zero_based_u64(kind, index, command)	checked named ingestion
+formula refs	primitive CellAddr fields	typed CellAddr	A1 dependency identity preserved
+paste	saturating primitive offsets	typed counts with checked addition	nominal paste preserved; overflow rejects before mutation

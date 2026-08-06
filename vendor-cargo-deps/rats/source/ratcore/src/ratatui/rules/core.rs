@@ -8,12 +8,16 @@ mod check;
 mod seeds;
 mod types;
 
-pub use check::{validate_ratatui_feature_policy, validate_ratatui_feature_uses};
+pub use check::validate_ratatui_feature_policy;
+pub use check::validate_ratatui_feature_uses;
 pub use seeds::baseline_ratatui_feature_policy_rows;
-pub use types::{
-    FeaturePolicyIssue, FeaturePolicyIssueCode, FeaturePolicyReport, FeaturePolicyRow,
-    FeaturePolicyRowParts, FeatureUse, FeatureUseTarget,
-};
+pub use types::FeaturePolicyIssue;
+pub use types::FeaturePolicyIssueCode;
+pub use types::FeaturePolicyReport;
+pub use types::FeaturePolicyRow;
+pub use types::FeaturePolicyRowParts;
+pub use types::FeatureUse;
+pub use types::FeatureUseTarget;
 
 #[cfg(test)]
 #[path = "../feature_policy_tests.rs"]

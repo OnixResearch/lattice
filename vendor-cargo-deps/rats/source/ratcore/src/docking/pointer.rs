@@ -11,9 +11,7 @@ pub fn pointer_outcome_to_session_event(
     event: &crate::pointer_input_routing::PointerEvent,
 ) -> Result<crate::docking::DragEvent, crate::docking::DragDiagnostic> {
     match outcome {
-        crate::pointer_input_routing::PointerRouteOutcome::Routed(route) => {
-            pointer_route_to_event(route, event)
-        }
+        crate::pointer_input_routing::PointerRouteOutcome::Routed(route) => pointer_route_to_event(route, event),
         crate::pointer_input_routing::PointerRouteOutcome::Diagnostic(diagnostic) => {
             Err(pointer_diagnostic_to_drag_diagnostic(diagnostic))
         }
@@ -27,13 +25,13 @@ fn pointer_route_to_event(
     let Some(phase) = pointer_interaction_to_drag_phase(route.interaction) else {
         return Err(crate::docking::DragDiagnostic::new(
             crate::docking::DragDiagnosticCode::UnsupportedPhase,
-            Some(route.target_id.clone()),
+            Some(route.target_id.to_string()),
             "pointer route is not a docking drag interaction",
         ));
     };
     Ok(crate::docking::DragEvent::new(
         phase,
-        route.target_id.clone(),
+        route.target_id.to_string(),
         crate::docking::DragPoint::new(event.position.x, event.position.y),
     ))
 }
@@ -42,18 +40,10 @@ fn pointer_interaction_to_drag_phase(
     interaction: crate::pointer_input_routing::PointerInteractionClass,
 ) -> Option<crate::docking::DragPhase> {
     match interaction {
-        crate::pointer_input_routing::PointerInteractionClass::DragStart => {
-            Some(crate::docking::DragPhase::Start)
-        }
-        crate::pointer_input_routing::PointerInteractionClass::DragUpdate => {
-            Some(crate::docking::DragPhase::Update)
-        }
-        crate::pointer_input_routing::PointerInteractionClass::DragCommit => {
-            Some(crate::docking::DragPhase::Commit)
-        }
-        crate::pointer_input_routing::PointerInteractionClass::DragCancel => {
-            Some(crate::docking::DragPhase::Cancel)
-        }
+        crate::pointer_input_routing::PointerInteractionClass::DragStart => Some(crate::docking::DragPhase::Start),
+        crate::pointer_input_routing::PointerInteractionClass::DragUpdate => Some(crate::docking::DragPhase::Update),
+        crate::pointer_input_routing::PointerInteractionClass::DragCommit => Some(crate::docking::DragPhase::Commit),
+        crate::pointer_input_routing::PointerInteractionClass::DragCancel => Some(crate::docking::DragPhase::Cancel),
         crate::pointer_input_routing::PointerInteractionClass::Activation
         | crate::pointer_input_routing::PointerInteractionClass::ContextMenu
         | crate::pointer_input_routing::PointerInteractionClass::WheelScroll
@@ -69,7 +59,7 @@ fn pointer_diagnostic_to_drag_diagnostic(
 ) -> crate::docking::DragDiagnostic {
     crate::docking::DragDiagnostic::new(
         pointer_diagnostic_code_to_drag_code(diagnostic.code),
-        diagnostic.target_id.clone(),
+        diagnostic.target_id.as_ref().map(ToString::to_string),
         diagnostic.message.clone(),
     )
 }
@@ -97,9 +87,7 @@ mod tests {
     const POINT_X: i32 = 3;
     const POINT_Y: i32 = 4;
 
-    fn pointer_event(
-        phase: crate::pointer_input_routing::PointerPhase,
-    ) -> crate::pointer_input_routing::PointerEvent {
+    fn pointer_event(phase: crate::pointer_input_routing::PointerPhase) -> crate::pointer_input_routing::PointerEvent {
         crate::pointer_input_routing::PointerEvent::new(
             crate::pointer_input_routing::PointerPoint::new(POINT_X, POINT_Y),
             crate::pointer_input_routing::PointerButton::Primary,
@@ -111,43 +99,38 @@ mod tests {
     #[test]
     fn pointer_drag_route_becomes_docking_session_event() {
         let event = pointer_event(crate::pointer_input_routing::PointerPhase::DragStart);
-        let outcome = crate::pointer_input_routing::PointerRouteOutcome::Routed(
-            crate::pointer_input_routing::PointerRoute {
-                target_id: "splitter".to_string(),
+        let outcome =
+            crate::pointer_input_routing::PointerRouteOutcome::Routed(crate::pointer_input_routing::PointerRoute {
+                target_id: crate::pointer_input_routing::PointerTargetId::new("splitter"),
                 action_id: None,
                 modal_capture: false,
                 interaction: crate::pointer_input_routing::PointerInteractionClass::DragStart,
                 capture: crate::pointer_input_routing::PointerCaptureTransition::Start,
-            },
-        );
+            });
 
-        let drag_event = super::pointer_outcome_to_session_event(&outcome, &event)
-            .expect("drag route converts to docking event");
+        let drag_event =
+            super::pointer_outcome_to_session_event(&outcome, &event).expect("drag route converts to docking event");
 
         assert_eq!(drag_event.phase, crate::docking::DragPhase::Start);
         assert_eq!(drag_event.target_id, "splitter".to_string());
-        assert_eq!(
-            drag_event.position,
-            crate::docking::DragPoint::new(POINT_X, POINT_Y)
-        );
+        assert_eq!(drag_event.position, crate::docking::DragPoint::new(POINT_X, POINT_Y));
     }
 
     #[test]
     fn non_drag_and_diagnostic_outcomes_fail_closed() {
         let event = pointer_event(crate::pointer_input_routing::PointerPhase::Down);
-        let activation = crate::pointer_input_routing::PointerRouteOutcome::Routed(
-            crate::pointer_input_routing::PointerRoute {
-                target_id: "button".to_string(),
+        let activation =
+            crate::pointer_input_routing::PointerRouteOutcome::Routed(crate::pointer_input_routing::PointerRoute {
+                target_id: crate::pointer_input_routing::PointerTargetId::new("button"),
                 action_id: None,
                 modal_capture: false,
                 interaction: crate::pointer_input_routing::PointerInteractionClass::Activation,
                 capture: crate::pointer_input_routing::PointerCaptureTransition::None,
-            },
-        );
+            });
         let diagnostic = crate::pointer_input_routing::PointerRouteOutcome::Diagnostic(
             crate::pointer_input_routing::PointerDiagnostic::new(
                 crate::pointer_input_routing::PointerDiagnosticCode::DisabledTarget,
-                Some("splitter".to_string()),
+                Some(crate::pointer_input_routing::PointerTargetId::new("splitter")),
                 "disabled",
             ),
         );

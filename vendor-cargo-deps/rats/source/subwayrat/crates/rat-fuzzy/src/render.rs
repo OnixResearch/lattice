@@ -2,9 +2,14 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, StatefulWidget, Widget};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::StatefulWidget;
+use ratatui::widgets::Widget;
 
 use crate::state::FuzzyState;
 use crate::types::FuzzySource;
@@ -25,9 +30,7 @@ impl Default for FuzzyStyle {
         Self {
             prompt: Style::default().fg(Color::Cyan),
             query: Style::default().add_modifier(Modifier::BOLD),
-            match_highlight: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            match_highlight: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             selected: Style::default().bg(Color::Rgb(40, 40, 60)),
             context: Style::default().fg(Color::DarkGray),
             count: Style::default().fg(Color::DarkGray),
@@ -87,12 +90,7 @@ impl<S: FuzzySource> StatefulWidget for FuzzyFinder<'_, S> {
         let filtered = state.results.len();
         let count_str = format!("{}/{}", filtered, total);
         let count_x = inner.x + inner.width - count_str.len() as u16;
-        buf.set_line(
-            count_x,
-            inner.y,
-            &Line::from(Span::styled(count_str, self.style.count)),
-            inner.width,
-        );
+        buf.set_line(count_x, inner.y, &Line::from(Span::styled(count_str, self.style.count)), inner.width);
 
         // Result list
         let list_height = (inner.height - 1) as usize;
@@ -104,8 +102,7 @@ impl<S: FuzzySource> StatefulWidget for FuzzyFinder<'_, S> {
             state.scroll_offset = state.selected.saturating_sub(list_height - 1);
         }
 
-        let visible = &state.results
-            [state.scroll_offset..state.results.len().min(state.scroll_offset + list_height)];
+        let visible = &state.results[state.scroll_offset..state.results.len().min(state.scroll_offset + list_height)];
         for (row, scored) in visible.iter().enumerate() {
             let y = inner.y + 1 + row as u16;
             let is_selected = state.scroll_offset + row == state.selected;
@@ -116,7 +113,7 @@ impl<S: FuzzySource> StatefulWidget for FuzzyFinder<'_, S> {
                 }
             }
 
-            if let Some(candidate) = candidates.get(scored.index) {
+            if let Some(candidate) = candidates.get(scored.index.get()) {
                 // Icon
                 let mut spans: Vec<Span<'static>> = Vec::new();
                 if let Some(icon) = candidate.icon {
@@ -128,7 +125,7 @@ impl<S: FuzzySource> StatefulWidget for FuzzyFinder<'_, S> {
                 let mut chunk = String::new();
                 let mut in_match = false;
                 for (ci, &ch) in text_chars.iter().enumerate() {
-                    let is_match = scored.positions.contains(&ci);
+                    let is_match = scored.positions.iter().any(|p| p.get() == ci);
                     if is_match != in_match {
                         if !chunk.is_empty() {
                             let sty = if in_match {

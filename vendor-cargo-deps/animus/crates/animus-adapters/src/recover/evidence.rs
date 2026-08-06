@@ -58,8 +58,7 @@ impl CheckpointReceipt {
     ///
     /// Returns [`super::CheckpointError`] when safe metadata fields or bounded counts are invalid.
     pub fn new(draft: CheckpointReceiptDraft<'_>) -> Result<Self, super::CheckpointError> {
-        let checkpoint_id =
-            super::core::required_string(super::CHECKPOINT_ID_FIELD, draft.checkpoint_id)?;
+        let checkpoint_id = super::core::required_string(super::CHECKPOINT_ID_FIELD, draft.checkpoint_id)?;
         super::core::validate_changed_file_count(draft.changed_file_count)?;
         let receipt_hash = build_hash(&checkpoint_id, draft);
         Ok(Self {
@@ -166,10 +165,7 @@ const LEAK_MARKERS: &[(CheckpointReceiptLeak, &[&str])] = &[
     (CheckpointReceiptLeak::RawDiff, RAW_DIFF_MARKERS),
     (CheckpointReceiptLeak::RawFileBody, RAW_FILE_MARKERS),
     (CheckpointReceiptLeak::Credential, CREDENTIAL_MARKERS),
-    (
-        CheckpointReceiptLeak::EnvironmentDump,
-        ENVIRONMENT_DUMP_MARKERS,
-    ),
+    (CheckpointReceiptLeak::EnvironmentDump, ENVIRONMENT_DUMP_MARKERS),
     (CheckpointReceiptLeak::FullPathList, FULL_PATH_MARKERS),
 ];
 
@@ -248,15 +244,11 @@ fn canonical_text(checkpoint_id: &str, draft: CheckpointReceiptDraft<'_>) -> all
     });
     canonical.push(CanonicalPair {
         key: "before",
-        value: draft
-            .before_hash
-            .map_or(super::NO_HASH_SENTINEL, super::CheckpointHash::as_str),
+        value: draft.before_hash.map_or(super::NO_HASH_SENTINEL, super::CheckpointHash::as_str),
     });
     canonical.push(CanonicalPair {
         key: "after",
-        value: draft
-            .after_hash
-            .map_or(super::NO_HASH_SENTINEL, super::CheckpointHash::as_str),
+        value: draft.after_hash.map_or(super::NO_HASH_SENTINEL, super::CheckpointHash::as_str),
     });
     canonical.push(CanonicalPair {
         key: "changed_files",
@@ -274,9 +266,7 @@ fn canonical_text(checkpoint_id: &str, draft: CheckpointReceiptDraft<'_>) -> all
 }
 
 fn first_leak(text: &str) -> Option<CheckpointReceiptLeak> {
-    LEAK_MARKERS
-        .iter()
-        .find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
+    LEAK_MARKERS.iter().find_map(|(leak, markers)| contains_marker(text, markers).then_some(*leak))
 }
 fn contains_marker(text: &str, markers: &[&str]) -> bool {
     markers.iter().any(|marker| text.contains(marker))

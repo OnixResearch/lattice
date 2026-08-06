@@ -58,16 +58,9 @@ pub struct RequestDraft<'a> {
 /// # Panics
 ///
 /// Panics if the shared hash validator stops returning BLAKE3-sized hashes.
-pub fn validate_plan(
-    snapshot: &super::Snapshot,
-    request: &RequestDraft<'_>,
-) -> Result<super::Plan, super::Error> {
-    let expected_hash =
-        super::validate_hash(super::SNAPSHOT_HASH_FIELD, request.expected_snapshot_hash)?;
-    let current_hash = super::validate_hash(
-        super::CURRENT_SNAPSHOT_HASH_FIELD,
-        request.current_snapshot_hash,
-    )?;
+pub fn validate_plan(snapshot: &super::Snapshot, request: &RequestDraft<'_>) -> Result<super::Plan, super::Error> {
+    let expected_hash = super::validate_hash(super::SNAPSHOT_HASH_FIELD, request.expected_snapshot_hash)?;
+    let current_hash = super::validate_hash(super::CURRENT_SNAPSHOT_HASH_FIELD, request.current_snapshot_hash)?;
     assert_eq!(expected_hash.len(), crate::BLAKE3_HASH_HEX_CHARS);
     assert_eq!(current_hash.len(), crate::BLAKE3_HASH_HEX_CHARS);
     validate_snapshot_hash_match(HashMatch {
@@ -127,13 +120,10 @@ fn collect_validated_spans(
     let mut previous_end_line = None;
     for draft in drafts {
         let span = validate_span(snapshot, draft)?;
-        validate_unique_span(
-            spans.as_slice(),
-            SpanSelector {
-                start_tag: span.start_tag(),
-                end_tag: span.end_tag(),
-            },
-        )?;
+        validate_unique_span(spans.as_slice(), SpanSelector {
+            start_tag: span.start_tag(),
+            end_tag: span.end_tag(),
+        })?;
         validate_span_order(previous_start_line, span.start_line())?;
         validate_span_overlap(previous_end_line, span.start_line())?;
         previous_start_line = Some(span.start_line());
@@ -143,19 +133,13 @@ fn collect_validated_spans(
     Ok(spans)
 }
 
-fn validate_span(
-    snapshot: &super::Snapshot,
-    draft: &SpanDraft<'_>,
-) -> Result<super::Validated, super::Error> {
+fn validate_span(snapshot: &super::Snapshot, draft: &SpanDraft<'_>) -> Result<super::Validated, super::Error> {
     debug_assert!(line_count_covers_tags(snapshot), "line count covers tags");
     let start_tag = super::required_label(super::LINE_TAG_FIELD, draft.start_tag)?;
     let end_tag = super::required_label(super::LINE_TAG_FIELD, draft.end_tag)?;
     let start_line = snapshot.line_for_tag(start_tag.as_str())?.line_number();
     let end_line = snapshot.line_for_tag(end_tag.as_str())?.line_number();
-    validate_span_lines(SpanLines {
-        start_line,
-        end_line,
-    })?;
+    validate_span_lines(SpanLines { start_line, end_line })?;
     let replacement_chars = validate_replacement(draft.replacement)?;
     let replacement_hash = super::hash::replacement(super::hash::ReplacementIdentity {
         snapshot_hash: snapshot.snapshot_hash(),
@@ -191,10 +175,7 @@ fn validate_span_lines(span: SpanLines) -> Result<(), super::Error> {
     Ok(())
 }
 
-fn validate_unique_span(
-    spans: &[super::Validated],
-    selector: SpanSelector<'_>,
-) -> Result<(), super::Error> {
+fn validate_unique_span(spans: &[super::Validated], selector: SpanSelector<'_>) -> Result<(), super::Error> {
     if spans
         .iter()
         .any(|span| span.start_tag() == selector.start_tag && span.end_tag() == selector.end_tag)
@@ -207,10 +188,7 @@ fn validate_unique_span(
     Ok(())
 }
 
-fn validate_span_order(
-    previous_start_line: Option<u32>,
-    current_start_line: u32,
-) -> Result<(), super::Error> {
+fn validate_span_order(previous_start_line: Option<u32>, current_start_line: u32) -> Result<(), super::Error> {
     if let Some(previous) = previous_start_line {
         if current_start_line < previous {
             return Err(super::Error::OutOfOrderSpan {
@@ -222,10 +200,7 @@ fn validate_span_order(
     Ok(())
 }
 
-fn validate_span_overlap(
-    previous_end_line: Option<u32>,
-    current_start_line: u32,
-) -> Result<(), super::Error> {
+fn validate_span_overlap(previous_end_line: Option<u32>, current_start_line: u32) -> Result<(), super::Error> {
     if let Some(previous) = previous_end_line {
         if current_start_line <= previous {
             return Err(super::Error::OverlappingSpan {

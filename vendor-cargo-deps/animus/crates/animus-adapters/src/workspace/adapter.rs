@@ -1,11 +1,8 @@
 const SUPPORTED_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_supported_capability");
-const ADAPTER_LABEL_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_adapter_label");
-const ADAPTER_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_adapter_kind");
-const ADAPTER_STATE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("workspace_adapter_state");
+const ADAPTER_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_adapter_label");
+const ADAPTER_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_adapter_kind");
+const ADAPTER_STATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_adapter_state");
 
 const ADAPTER_KIND_BRANCHFS_LIKE: &str = "branchfs_like";
 const ADAPTER_KIND_JUJUTSU_WORKSPACE: &str = "jujutsu_workspace";
@@ -115,16 +112,12 @@ impl Capabilities {
     /// Returns [`crate::AdapterContractError`] when fields are empty, malformed,
     /// unknown, or the supported capability set is empty.
     pub fn new(draft: CapabilitiesDraft<'_>) -> Result<Self, crate::AdapterContractError> {
-        crate::validation::validate_required_adapter_field(
-            ADAPTER_LABEL_FIELD,
-            draft.adapter_label,
-        )?;
+        crate::validation::validate_required_adapter_field(ADAPTER_LABEL_FIELD, draft.adapter_label)?;
         let kind = Kind::parse(draft.kind)?;
         let state = State::parse(draft.state)?;
-        let advertised =
-            super::text::collect_capabilities(draft.supported_capabilities, |value| {
-                Capability::parse_for_field(SUPPORTED_CAPABILITY_FIELD, value)
-            })?;
+        let advertised = super::text::collect_capabilities(draft.supported_capabilities, |value| {
+            Capability::parse_for_field(SUPPORTED_CAPABILITY_FIELD, value)
+        })?;
         if advertised.is_empty() {
             return Err(crate::AdapterContractError::EmptyCollection {
                 field: SUPPORTED_CAPABILITY_FIELD.as_str(),

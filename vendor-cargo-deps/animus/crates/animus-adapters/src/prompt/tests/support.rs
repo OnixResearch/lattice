@@ -29,19 +29,8 @@ impl<'a> CountingUrlResolver<'a> {
 }
 
 impl UrlContextResolver for CountingUrlResolver<'_> {
-    fn resolve_url(
-        &self,
-        reference: &ContextReference,
-    ) -> Result<ResolvedContextCandidate, ContextReferenceError> {
-        self.calls.set(
-            self.calls
-                .get()
-                .saturating_add(super::super::base::MIN_LINE_NUMBER),
-        );
-        Ok(ResolvedContextCandidate::new(
-            reference.clone(),
-            ContextResolverKind::Url,
-            self.content,
-        ))
+    fn resolve_url(&self, reference: &ContextReference) -> Result<ResolvedContextCandidate, ContextReferenceError> {
+        self.calls.set(self.calls.get().saturating_add(super::super::base::MIN_LINE_NUMBER));
+        Ok(ResolvedContextCandidate::new(reference.clone(), ContextResolverKind::Url, self.content))
     }
 }

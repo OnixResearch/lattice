@@ -1,0 +1,8 @@
+candidate_consumer	maintained	semantic_need	duplication_with_other_consumer	integration_path	gate	decision
+rat-editor	yes	multiline prompt cursor selection submission history	none cross-renderer	Subwayrat terminal widget	one consumer only	localize future fixes
+rat-outline	yes	heading parsing fold visibility structural edits	embeds rat-editor but adds terminal-specific semantics	Subwayrat terminal widget	not independent same contract	localize
+terminal IDE buffer adapter	contract only	application-owned editor buffer capability	none implemented	application adapter	hypothetical	defer
+Meteorite editor	no	unknown	none	no component	missing maintained consumer	defer
+Iced editor	no experimental	unknown	none	no component	missing consumer and maintained scope	defer
+Tile frontend	external	already owns resource buffer view lifecycle	must not be replaced	one-way frontend adapter	downstream authority not Rats consumer	compatibility only
+candidate Ratcore API	n/a	document identity plus independent views	no measured implementation duplication	would require two adapters	fails two-consumer and named-app gates	do not create

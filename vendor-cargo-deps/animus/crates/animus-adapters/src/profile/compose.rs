@@ -4,11 +4,7 @@ pub(super) fn context(
 ) -> super::CompositionReport {
     let profile_count = profiles.len();
     let mut ordered: super::Collection<&super::Descriptor> = profiles.iter().collect();
-    assert_eq!(
-        ordered.len(),
-        profile_count,
-        "all profiles are staged for ordering"
-    );
+    assert_eq!(ordered.len(), profile_count, "all profiles are staged for ordering");
     ordered.sort_by(|left, right| {
         left.precedence_rank()
             .cmp(&right.precedence_rank())
@@ -17,24 +13,17 @@ pub(super) fn context(
     });
 
     let has_global_destructive_guard = ordered.iter().any(|profile| {
-        profile.scope == super::SourceScope::Global
-            && has_constraint(profile, ConstraintMarker::RequireApproval)
+        profile.scope == super::SourceScope::Global && has_constraint(profile, ConstraintMarker::RequireApproval)
     });
     let mut segments = super::Collection::with_capacity(profile_count);
     let mut diagnostics = super::Collection::with_capacity(profile_count);
     for profile in ordered {
         if project_policy_is_omitted(profile, project_trust_mode) {
-            diagnostics.push(diagnostic(
-                super::DiagnosticKind::ProjectPolicyOmitted,
-                profile.provenance(),
-            ));
+            diagnostics.push(diagnostic(super::DiagnosticKind::ProjectPolicyOmitted, profile.provenance()));
             continue;
         }
         if project_destructive_allow_is_overridden(profile, has_global_destructive_guard) {
-            diagnostics.push(diagnostic(
-                super::DiagnosticKind::GlobalSafetyPrecedence,
-                profile.provenance(),
-            ));
+            diagnostics.push(diagnostic(super::DiagnosticKind::GlobalSafetyPrecedence, profile.provenance()));
             continue;
         }
         segments.push(prompt_segment(profile));
@@ -43,17 +32,12 @@ pub(super) fn context(
         segments.len().saturating_add(diagnostics.len()) <= profile_count,
         "composition output stays within input cardinality"
     );
-    super::CompositionReport {
-        segments,
-        diagnostics,
-    }
+    super::CompositionReport { segments, diagnostics }
 }
 
 /// Returns the runtime guard requirement for a policy-described mutation request.
 #[must_use]
-pub fn mutation_requires_runtime_guard(
-    descriptor: &super::Descriptor,
-) -> super::RuntimeGuardRequirement {
+pub fn mutation_requires_runtime_guard(descriptor: &super::Descriptor) -> super::RuntimeGuardRequirement {
     if descriptor.validates_as_read_only_guidance() {
         return super::RuntimeGuardRequirement::Required;
     }
@@ -134,19 +118,13 @@ impl PromptText {
     }
 }
 
-fn project_policy_is_omitted(
-    descriptor: &super::Descriptor,
-    project_trust_mode: super::ProjectTrustMode,
-) -> bool {
+fn project_policy_is_omitted(descriptor: &super::Descriptor, project_trust_mode: super::ProjectTrustMode) -> bool {
     descriptor.scope == super::SourceScope::Project
         && (descriptor.trust == super::TrustStatus::Untrusted
             || project_trust_mode == super::ProjectTrustMode::DenyProjectPolicy)
 }
 
-fn project_destructive_allow_is_overridden(
-    descriptor: &super::Descriptor,
-    has_global_destructive_guard: bool,
-) -> bool {
+fn project_destructive_allow_is_overridden(descriptor: &super::Descriptor, has_global_destructive_guard: bool) -> bool {
     has_global_destructive_guard
         && descriptor.scope == super::SourceScope::Project
         && has_constraint(descriptor, ConstraintMarker::AllowDestructive)
@@ -174,8 +152,5 @@ fn diagnostic(kind: super::DiagnosticKind, provenance: &str) -> super::Compositi
 }
 
 fn has_constraint(descriptor: &super::Descriptor, target: ConstraintMarker) -> bool {
-    descriptor
-        .constraints
-        .iter()
-        .any(|constraint| constraint == target.as_str())
+    descriptor.constraints.iter().any(|constraint| constraint == target.as_str())
 }

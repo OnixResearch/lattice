@@ -15,30 +15,56 @@ mod shape;
 #[cfg(test)]
 mod tests;
 
-pub use admit::{
-    RecipeInfluence, RecipeInfluenceStatus, RecipeProvenanceDraft, RecipeSourceKind,
-    RecipeTrustReceipt, RecipeTrustStatus,
-};
-pub use assign::{
-    RecipeBinding, RecipeBindingDraft, RecipeParameterInput, RecipeParameterInputDraft,
-    RecipeParameterInputKind, SAFE_TEMPLATE_BUILTINS, bind_recipe_parameters,
-};
-pub use attempt::{
-    RecipeHostEffectKind, RecipeRetryCheck, RecipeRetryCheckDraft, RecipeRetryDenialReason,
-    RecipeRetryPlan, RecipeRetryPlanDraft, RecipeRetryPolicy, RecipeRetryPolicyDraft,
-    RecipeRetryRequest, RecipeRetryRequestStatus, plan_recipe_retry,
-};
-pub use data::{RecipeWorkflow, RecipeWorkflowDraft};
-pub use field::{RecipeParameter, RecipeParameterDraft, RecipeParameterKind};
-pub use graph::{
-    RecipeDagAdmission, RecipeDagBatch, RecipeDagBlockReason, RecipeDagBlockedStep, RecipeDagPlan,
-    RecipeDagReceipt, RecipeDagStep, RecipeDagStepDraft, RecipeDagStepKind, plan_recipe_dag,
-};
-pub use shape::{
-    RecipeAutomationOutcome, RecipeAutomationStatus, RecipeOutputDraft, RecipeOutputFailure,
-    RecipeOutputFieldDraft, RecipeResponseField, RecipeResponseFieldDraft, RecipeResponseFieldKind,
-    RecipeResponseSchema, RecipeResponseSchemaDraft, validate_recipe_output,
-};
+pub use admit::RecipeInfluence;
+pub use admit::RecipeInfluenceStatus;
+pub use admit::RecipeProvenanceDraft;
+pub use admit::RecipeSourceKind;
+pub use admit::RecipeTrustReceipt;
+pub use admit::RecipeTrustStatus;
+pub use assign::RecipeBinding;
+pub use assign::RecipeBindingDraft;
+pub use assign::RecipeParameterInput;
+pub use assign::RecipeParameterInputDraft;
+pub use assign::RecipeParameterInputKind;
+pub use assign::SAFE_TEMPLATE_BUILTINS;
+pub use assign::bind_recipe_parameters;
+pub use attempt::RecipeHostEffectKind;
+pub use attempt::RecipeRetryCheck;
+pub use attempt::RecipeRetryCheckDraft;
+pub use attempt::RecipeRetryDenialReason;
+pub use attempt::RecipeRetryPlan;
+pub use attempt::RecipeRetryPlanDraft;
+pub use attempt::RecipeRetryPolicy;
+pub use attempt::RecipeRetryPolicyDraft;
+pub use attempt::RecipeRetryRequest;
+pub use attempt::RecipeRetryRequestStatus;
+pub use attempt::plan_recipe_retry;
+pub use data::RecipeWorkflow;
+pub use data::RecipeWorkflowDraft;
+pub use field::RecipeParameter;
+pub use field::RecipeParameterDraft;
+pub use field::RecipeParameterKind;
+pub use graph::RecipeDagAdmission;
+pub use graph::RecipeDagBatch;
+pub use graph::RecipeDagBlockReason;
+pub use graph::RecipeDagBlockedStep;
+pub use graph::RecipeDagPlan;
+pub use graph::RecipeDagReceipt;
+pub use graph::RecipeDagStep;
+pub use graph::RecipeDagStepDraft;
+pub use graph::RecipeDagStepKind;
+pub use graph::plan_recipe_dag;
+pub use shape::RecipeAutomationOutcome;
+pub use shape::RecipeAutomationStatus;
+pub use shape::RecipeOutputDraft;
+pub use shape::RecipeOutputFailure;
+pub use shape::RecipeOutputFieldDraft;
+pub use shape::RecipeResponseField;
+pub use shape::RecipeResponseFieldDraft;
+pub use shape::RecipeResponseFieldKind;
+pub use shape::RecipeResponseSchema;
+pub use shape::RecipeResponseSchemaDraft;
+pub use shape::validate_recipe_output;
 
 mod digest;
 /// Error raised by recipe workflow DTO validation.
@@ -231,66 +257,42 @@ impl core::fmt::Display for RecipeWorkflowError {
         match self {
             Self::Contract(error) => core::fmt::Display::fmt(error, formatter),
             Self::UnsupportedWorkflowValue { field, value } => {
-                write!(
-                    formatter,
-                    "{field} contains unsupported workflow value {value}"
-                )
+                write!(formatter, "{field} contains unsupported workflow value {value}")
             }
             Self::EmptyCollection { field } => write!(formatter, "{field} must not be empty"),
             Self::DuplicateName { field, value } => {
                 write!(formatter, "{field} contains duplicate value {value}")
             }
             Self::MissingOptionalDefault { parameter } => {
-                write!(
-                    formatter,
-                    "optional parameter {parameter} must define a default"
-                )
+                write!(formatter, "optional parameter {parameter} must define a default")
             }
             Self::FileParameterDefault { parameter } => {
-                write!(
-                    formatter,
-                    "file parameter {parameter} must not define a default"
-                )
+                write!(formatter, "file parameter {parameter} must not define a default")
             }
             Self::OptionalFileParameter { parameter } => {
                 write!(formatter, "file parameter {parameter} must be required")
             }
             Self::EmptySelectOptions { parameter } => {
-                write!(
-                    formatter,
-                    "select parameter {parameter} must define options"
-                )
+                write!(formatter, "select parameter {parameter} must define options")
             }
             Self::UnexpectedSelectOptions { parameter } => {
-                write!(
-                    formatter,
-                    "non-select parameter {parameter} must not define options"
-                )
+                write!(formatter, "non-select parameter {parameter} must not define options")
             }
             Self::InvalidSelectValue { parameter, value } => {
-                write!(
-                    formatter,
-                    "parameter {parameter} rejects select value {value}"
-                )
+                write!(formatter, "parameter {parameter} rejects select value {value}")
             }
             Self::MalformedTemplate => formatter.write_str("template marker is not closed"),
             Self::UndeclaredTemplateVariable { variable } => {
                 write!(formatter, "template variable {variable} is not declared")
             }
             Self::UnusedParameter { parameter } => {
-                write!(
-                    formatter,
-                    "parameter {parameter} is not referenced by the template"
-                )
+                write!(formatter, "parameter {parameter} is not referenced by the template")
             }
             Self::MissingParameterValue { parameter } => {
                 write!(formatter, "parameter {parameter} requires a value")
             }
             Self::InvalidParameterSource { parameter } => {
-                write!(
-                    formatter,
-                    "parameter {parameter} arrived from an invalid source"
-                )
+                write!(formatter, "parameter {parameter} arrived from an invalid source")
             }
             Self::ZeroRetryAttempts => formatter.write_str("retry attempts must be bounded"),
             Self::UnsafeRetryEffect { effect } => {
@@ -302,36 +304,22 @@ impl core::fmt::Display for RecipeWorkflowError {
     }
 }
 
-fn fmt_recipe_dag_error(
-    error: &RecipeWorkflowError,
-    formatter: &mut core::fmt::Formatter<'_>,
-) -> core::fmt::Result {
+fn fmt_recipe_dag_error(error: &RecipeWorkflowError, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match error {
         RecipeWorkflowError::DagLimitExceeded {
             field,
             max_items,
             actual_items,
-        } => write!(
-            formatter,
-            "{field} allows at most {max_items} DAG items; got {actual_items}"
-        ),
+        } => write!(formatter, "{field} allows at most {max_items} DAG items; got {actual_items}"),
         RecipeWorkflowError::DuplicateDagStep { step_id } => {
             write!(formatter, "recipe DAG step {step_id} is duplicated")
         }
-        RecipeWorkflowError::DuplicateDagEdge {
-            step_id,
-            dependency,
-        } => write!(
-            formatter,
-            "recipe DAG step {step_id} repeats dependency {dependency}"
-        ),
-        RecipeWorkflowError::UnknownDagDependency {
-            step_id,
-            dependency,
-        } => write!(
-            formatter,
-            "recipe DAG step {step_id} depends on unknown step {dependency}"
-        ),
+        RecipeWorkflowError::DuplicateDagEdge { step_id, dependency } => {
+            write!(formatter, "recipe DAG step {step_id} repeats dependency {dependency}")
+        }
+        RecipeWorkflowError::UnknownDagDependency { step_id, dependency } => {
+            write!(formatter, "recipe DAG step {step_id} depends on unknown step {dependency}")
+        }
         RecipeWorkflowError::SelfDagEdge { step_id } => {
             write!(formatter, "recipe DAG step {step_id} depends on itself")
         }
@@ -339,38 +327,26 @@ fn fmt_recipe_dag_error(
             write!(formatter, "recipe DAG cycle includes step {step_id}")
         }
         RecipeWorkflowError::UnsafeDagLabel { field, value } => {
-            write!(
-                formatter,
-                "{field} contains unsafe recipe DAG label {value}"
-            )
+            write!(formatter, "{field} contains unsafe recipe DAG label {value}")
         }
-        RecipeWorkflowError::UndeclaredDagInput { step_id, reference } => write!(
-            formatter,
-            "recipe DAG step {step_id} uses undeclared input {reference}"
-        ),
-        RecipeWorkflowError::UndeclaredDagOutput { step_id, reference } => write!(
-            formatter,
-            "recipe DAG step {step_id} uses undeclared output {reference}"
-        ),
-        RecipeWorkflowError::UntrustedDagSubrecipe { step_id, subrecipe } => write!(
-            formatter,
-            "recipe DAG step {step_id} references untrusted subrecipe {subrecipe}"
-        ),
-        RecipeWorkflowError::CapabilityWidening {
-            step_id,
-            capability,
-        } => write!(
-            formatter,
-            "recipe DAG step {step_id} widens capability {capability}"
-        ),
-        RecipeWorkflowError::MissingDagGate { step_id, gate } => write!(
-            formatter,
-            "recipe DAG step {step_id} references undeclared gate {gate}"
-        ),
-        RecipeWorkflowError::RetryBypass { step_id, retry_ref } => write!(
-            formatter,
-            "recipe DAG step {step_id} references undeclared retry check {retry_ref}"
-        ),
+        RecipeWorkflowError::UndeclaredDagInput { step_id, reference } => {
+            write!(formatter, "recipe DAG step {step_id} uses undeclared input {reference}")
+        }
+        RecipeWorkflowError::UndeclaredDagOutput { step_id, reference } => {
+            write!(formatter, "recipe DAG step {step_id} uses undeclared output {reference}")
+        }
+        RecipeWorkflowError::UntrustedDagSubrecipe { step_id, subrecipe } => {
+            write!(formatter, "recipe DAG step {step_id} references untrusted subrecipe {subrecipe}")
+        }
+        RecipeWorkflowError::CapabilityWidening { step_id, capability } => {
+            write!(formatter, "recipe DAG step {step_id} widens capability {capability}")
+        }
+        RecipeWorkflowError::MissingDagGate { step_id, gate } => {
+            write!(formatter, "recipe DAG step {step_id} references undeclared gate {gate}")
+        }
+        RecipeWorkflowError::RetryBypass { step_id, retry_ref } => {
+            write!(formatter, "recipe DAG step {step_id} references undeclared retry check {retry_ref}")
+        }
         _ => formatter.write_str("recipe workflow validation failed"),
     }
 }
@@ -391,17 +367,14 @@ fn required_text(
     field_name: crate::validation::FieldName,
     value: &str,
 ) -> Result<alloc::string::String, RecipeWorkflowError> {
-    crate::validation::normalized_adapter_field(field_name, value)
-        .map_err(RecipeWorkflowError::from)
+    crate::validation::normalized_adapter_field(field_name, value).map_err(RecipeWorkflowError::from)
 }
 
 fn optional_text(
     field_name: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<alloc::string::String>, RecipeWorkflowError> {
-    value
-        .map(|text| required_text(field_name, text))
-        .transpose()
+    value.map(|text| required_text(field_name, text)).transpose()
 }
 
 fn text_collection(

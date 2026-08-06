@@ -149,9 +149,7 @@ impl RuntimeCapabilityDescriptor {
     ///
     /// Returns [`RuntimeCapabilityError`] when required fields are empty,
     /// unsupported, overlong, or unsafe for safe receipts.
-    pub fn from_draft(
-        draft: RuntimeCapabilityDescriptorDraft<'_>,
-    ) -> Result<Self, RuntimeCapabilityError> {
+    pub fn from_draft(draft: RuntimeCapabilityDescriptorDraft<'_>) -> Result<Self, RuntimeCapabilityError> {
         validate_required_text(LABEL_FIELD, draft.label)?;
         validate_optional_scope(draft.scope)?;
         Ok(Self {
@@ -212,14 +210,9 @@ impl RuntimeCapabilityRegistry {
     /// # Errors
     ///
     /// Returns [`RuntimeCapabilityError`] when any descriptor is invalid or labels duplicate.
-    pub fn from_drafts(
-        drafts: &[RuntimeCapabilityDescriptorDraft<'_>],
-    ) -> Result<Self, RuntimeCapabilityError> {
-        let descriptors = drafts
-            .iter()
-            .copied()
-            .map(RuntimeCapabilityDescriptor::from_draft)
-            .collect::<Result<Vec<_>, _>>()?;
+    pub fn from_drafts(drafts: &[RuntimeCapabilityDescriptorDraft<'_>]) -> Result<Self, RuntimeCapabilityError> {
+        let descriptors =
+            drafts.iter().copied().map(RuntimeCapabilityDescriptor::from_draft).collect::<Result<Vec<_>, _>>()?;
         Self::from_descriptors(descriptors)
     }
 
@@ -228,9 +221,7 @@ impl RuntimeCapabilityRegistry {
     /// # Errors
     ///
     /// Returns [`RuntimeCapabilityError`] when labels duplicate.
-    pub fn from_descriptors(
-        descriptors: Vec<RuntimeCapabilityDescriptor>,
-    ) -> Result<Self, RuntimeCapabilityError> {
+    pub fn from_descriptors(descriptors: Vec<RuntimeCapabilityDescriptor>) -> Result<Self, RuntimeCapabilityError> {
         let mut labels = std::collections::BTreeSet::new();
         for descriptor in &descriptors {
             if !labels.insert(descriptor.label().to_owned()) {
@@ -252,27 +243,18 @@ impl RuntimeCapabilityRegistry {
 
     /// Resolves a required capability by label and service kind.
     #[must_use]
-    pub fn resolve(
-        &self,
-        label: &str,
-        service_kind: RuntimeCapabilityServiceKind,
-    ) -> RuntimeCapabilityResolution<'_> {
+    pub fn resolve(&self, label: &str, service_kind: RuntimeCapabilityServiceKind) -> RuntimeCapabilityResolution<'_> {
         self.descriptors
             .iter()
-            .find(|descriptor| {
-                descriptor.label() == label && descriptor.service_kind() == service_kind
-            })
-            .map_or(RuntimeCapabilityResolution::Absent, |descriptor| {
-                RuntimeCapabilityResolution::Resolved { descriptor }
+            .find(|descriptor| descriptor.label() == label && descriptor.service_kind() == service_kind)
+            .map_or(RuntimeCapabilityResolution::Absent, |descriptor| RuntimeCapabilityResolution::Resolved {
+                descriptor,
             })
     }
 
     /// Resolves a required capability by exact label, service kind, and safe scope.
     #[must_use]
-    pub fn resolve_exact(
-        &self,
-        required: &RuntimeCapabilityDescriptor,
-    ) -> RuntimeCapabilityResolution<'_> {
+    pub fn resolve_exact(&self, required: &RuntimeCapabilityDescriptor) -> RuntimeCapabilityResolution<'_> {
         // r[impl agent_harness_runtime.scoped_capabilities.exact_resolution]
         self.descriptors
             .iter()
@@ -281,17 +263,15 @@ impl RuntimeCapabilityRegistry {
                     && descriptor.service_kind() == required.service_kind()
                     && descriptor.scope() == required.scope()
             })
-            .map_or(RuntimeCapabilityResolution::Absent, |descriptor| {
-                RuntimeCapabilityResolution::Resolved { descriptor }
+            .map_or(RuntimeCapabilityResolution::Absent, |descriptor| RuntimeCapabilityResolution::Resolved {
+                descriptor,
             })
     }
 
     /// Returns true when a service kind is present under any label.
     #[must_use]
     pub fn contains_service(&self, service_kind: RuntimeCapabilityServiceKind) -> bool {
-        self.descriptors
-            .iter()
-            .any(|descriptor| descriptor.service_kind() == service_kind)
+        self.descriptors.iter().any(|descriptor| descriptor.service_kind() == service_kind)
     }
 
     pub(crate) fn model_tool_presence(is_model_present: bool, is_tool_present: bool) -> Self {
@@ -439,10 +419,7 @@ fn validate_required_text(field: FieldName, value: &str) -> Result<(), RuntimeCa
 }
 
 fn validate_optional_scope(scope: Option<&str>) -> Result<(), RuntimeCapabilityError> {
-    assert!(
-        !SCOPE_FIELD.as_str().is_empty(),
-        "scope field must be named"
-    );
+    assert!(!SCOPE_FIELD.as_str().is_empty(), "scope field must be named");
     const {
         assert!(
             animus_adapters::MAX_ADAPTER_FIELD_CHARS >= animus_adapters::MIN_ADAPTER_FIELD_CHARS,
@@ -454,30 +431,19 @@ fn validate_optional_scope(scope: Option<&str>) -> Result<(), RuntimeCapabilityE
     };
     let trimmed = scope.trim();
     if trimmed.is_empty() {
-        return Err(RuntimeCapabilityError::new(
-            RuntimeCapabilityErrorKind::UnsafeScopeText,
-            SCOPE_FIELD,
-            scope,
-        ));
+        return Err(RuntimeCapabilityError::new(RuntimeCapabilityErrorKind::UnsafeScopeText, SCOPE_FIELD, scope));
     }
     validate_text_length_and_nul(SCOPE_FIELD, trimmed)?;
     let lower = trimmed.to_ascii_lowercase();
     for marker in UNSAFE_SCOPE_MARKERS {
         if lower.contains(&marker.to_ascii_lowercase()) {
-            return Err(RuntimeCapabilityError::new(
-                RuntimeCapabilityErrorKind::UnsafeScopeText,
-                SCOPE_FIELD,
-                marker,
-            ));
+            return Err(RuntimeCapabilityError::new(RuntimeCapabilityErrorKind::UnsafeScopeText, SCOPE_FIELD, marker));
         }
     }
     Ok(())
 }
 
-fn validate_text_length_and_nul(
-    field: FieldName,
-    value: &str,
-) -> Result<(), RuntimeCapabilityError> {
+fn validate_text_length_and_nul(field: FieldName, value: &str) -> Result<(), RuntimeCapabilityError> {
     assert!(!field.as_str().is_empty(), "field name must not be empty");
     const {
         assert!(
@@ -487,18 +453,10 @@ fn validate_text_length_and_nul(
     };
     let actual_chars = value.chars().count();
     if actual_chars > animus_adapters::MAX_ADAPTER_FIELD_CHARS {
-        return Err(RuntimeCapabilityError::new(
-            RuntimeCapabilityErrorKind::UnsafeScopeText,
-            field,
-            value,
-        ));
+        return Err(RuntimeCapabilityError::new(RuntimeCapabilityErrorKind::UnsafeScopeText, field, value));
     }
     if value.chars().any(|character| character == NUL_CHARACTER) {
-        return Err(RuntimeCapabilityError::new(
-            RuntimeCapabilityErrorKind::UnsafeScopeText,
-            field,
-            value,
-        ));
+        return Err(RuntimeCapabilityError::new(RuntimeCapabilityErrorKind::UnsafeScopeText, field, value));
     }
     Ok(())
 }
@@ -537,26 +495,19 @@ mod tests {
             scope: Some(EVENT_SCOPE),
         })
         .expect("required capability should validate");
-        let mismatched_scope =
-            RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
-                label: EVENT_SCOPE,
-                service_kind: EVENT_SINK_SERVICE,
-                scope: Some(CUSTOM_MODEL_LABEL),
-            })
-            .expect("mismatched capability should validate");
+        let mismatched_scope = RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
+            label: EVENT_SCOPE,
+            service_kind: EVENT_SINK_SERVICE,
+            scope: Some(CUSTOM_MODEL_LABEL),
+        })
+        .expect("mismatched capability should validate");
 
         assert!(matches!(
             registry.resolve(CUSTOM_MODEL_LABEL, RuntimeCapabilityServiceKind::Model),
             RuntimeCapabilityResolution::Resolved { .. }
         ));
-        assert!(matches!(
-            registry.resolve_exact(&required),
-            RuntimeCapabilityResolution::Resolved { .. }
-        ));
-        assert_eq!(
-            registry.resolve_exact(&mismatched_scope),
-            RuntimeCapabilityResolution::Absent
-        );
+        assert!(matches!(registry.resolve_exact(&required), RuntimeCapabilityResolution::Resolved { .. }));
+        assert_eq!(registry.resolve_exact(&mismatched_scope), RuntimeCapabilityResolution::Absent);
         assert!(registry.contains_service(RuntimeCapabilityServiceKind::EventSink));
     }
 
@@ -574,31 +525,23 @@ mod tests {
             scope: None,
         })
         .expect_err("empty labels should fail");
-        let service_kind_rejection =
-            RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
-                label: CUSTOM_MODEL_LABEL,
-                service_kind: UNKNOWN_SERVICE_KIND,
-                scope: None,
-            })
-            .expect_err("unsupported services should fail");
-        let unsafe_scope =
-            RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
-                label: CUSTOM_MODEL_LABEL,
-                service_kind: MODEL_SERVICE,
-                scope: Some(UNSAFE_SCOPE),
-            })
-            .expect_err("unsafe scope should fail");
+        let service_kind_rejection = RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
+            label: CUSTOM_MODEL_LABEL,
+            service_kind: UNKNOWN_SERVICE_KIND,
+            scope: None,
+        })
+        .expect_err("unsupported services should fail");
+        let unsafe_scope = RuntimeCapabilityDescriptor::from_draft(RuntimeCapabilityDescriptorDraft {
+            label: CUSTOM_MODEL_LABEL,
+            service_kind: MODEL_SERVICE,
+            scope: Some(UNSAFE_SCOPE),
+        })
+        .expect_err("unsafe scope should fail");
 
         assert_eq!(duplicate.kind(), RuntimeCapabilityErrorKind::DuplicateLabel);
         assert_eq!(empty.kind(), RuntimeCapabilityErrorKind::EmptyLabel);
-        assert_eq!(
-            service_kind_rejection.kind(),
-            RuntimeCapabilityErrorKind::UnsupportedServiceKind
-        );
-        assert_eq!(
-            unsafe_scope.kind(),
-            RuntimeCapabilityErrorKind::UnsafeScopeText
-        );
+        assert_eq!(service_kind_rejection.kind(), RuntimeCapabilityErrorKind::UnsupportedServiceKind);
+        assert_eq!(unsafe_scope.kind(), RuntimeCapabilityErrorKind::UnsafeScopeText);
     }
 
     #[test]
@@ -614,10 +557,7 @@ mod tests {
 
         for outcome in blocking {
             assert!(!outcome.allows_dispatch());
-            assert_ne!(
-                outcome.outcome_kind(),
-                animus_adapters::OutcomeKind::Completed
-            );
+            assert_ne!(outcome.outcome_kind(), animus_adapters::OutcomeKind::Completed);
         }
         assert!(RuntimeCapabilityOutcome::Completed.allows_dispatch());
     }

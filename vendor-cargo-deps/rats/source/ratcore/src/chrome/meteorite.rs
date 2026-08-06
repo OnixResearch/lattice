@@ -12,14 +12,18 @@ const UNTITLED_SURFACE: &str = "Untitled";
 const MIN_CONTAINER_WIDTH: u16 = 1;
 const SEPARATOR_WIDTH: u16 = 1;
 
-/// Stable chrome surface identifier.
-pub type ChromeSurfaceId = String;
+semantic_string_id! {
+    /// Stable chrome surface identifier.
+    pub struct ChromeSurfaceId;
+}
 
-/// Stable chrome item identifier.
-pub type ChromeItemId = String;
+semantic_string_id! {
+    /// Stable chrome item identifier.
+    pub struct ChromeItemId;
+}
 
-/// Stable chrome action identifier.
-pub type ChromeActionId = String;
+/// Canonical registry action identifier emitted by chrome controls.
+pub type ChromeActionId = crate::action_registry::ActionId;
 
 /// Meteorite chrome surface kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,7 +171,7 @@ impl MeteoriteChromeModel {
     ) -> Self {
         let surface_id = surface_id.into();
         Self {
-            content_slot_id: surface_id.clone(),
+            content_slot_id: surface_id.to_string(),
             surface_id,
             kind,
             title: title.into(),
@@ -329,11 +333,7 @@ pub fn validate_meteorite_chrome_model(model: &MeteoriteChromeModel) -> Meteorit
             "chrome content overflows available width",
         ));
     }
-    let items = model
-        .items
-        .iter()
-        .map(|item| project_item(model, item, &mut diagnostics))
-        .collect();
+    let items = model.items.iter().map(|item| project_item(model, item, &mut diagnostics)).collect();
     MeteoriteChromeProjection {
         surface_id: model.surface_id.clone(),
         kind: model.kind,
@@ -346,16 +346,10 @@ pub fn validate_meteorite_chrome_model(model: &MeteoriteChromeModel) -> Meteorit
 
 /// Projects a validated chrome model into a component shell.
 #[must_use]
-pub fn project_meteorite_chrome_component(
-    model: &MeteoriteChromeModel,
-) -> MeteoriteChromeComponentProjection {
+pub fn project_meteorite_chrome_component(model: &MeteoriteChromeModel) -> MeteoriteChromeComponentProjection {
     let chrome = validate_meteorite_chrome_model(model);
-    let emitted_intents = chrome
-        .items
-        .iter()
-        .filter(|item| item.enabled)
-        .filter_map(|item| item.action_id.clone())
-        .collect();
+    let emitted_intents =
+        chrome.items.iter().filter(|item| item.enabled).filter_map(|item| item.action_id.clone()).collect();
     MeteoriteChromeComponentProjection {
         root_class: format!("{METEORITE_CHROME_CLASS} {:?}", chrome.kind).to_ascii_lowercase(),
         chrome,
@@ -365,9 +359,7 @@ pub fn project_meteorite_chrome_component(
 
 /// Builds showcase evidence for normal and edge chrome states.
 #[must_use]
-pub fn meteorite_chrome_showcase_evidence(
-    models: &[MeteoriteChromeModel],
-) -> MeteoriteChromeShowcaseEvidence {
+pub fn meteorite_chrome_showcase_evidence(models: &[MeteoriteChromeModel]) -> MeteoriteChromeShowcaseEvidence {
     let mut state_ids = Vec::with_capacity(models.len());
     let mut parity_keys = Vec::new();
     let mut diagnostics = Vec::new();
@@ -406,11 +398,7 @@ fn duplicate_item_ids(items: &[ChromeItem]) -> BTreeSet<ChromeItemId> {
 
 fn preferred_model_width(model: &MeteoriteChromeModel) -> u16 {
     let title_width = string_width(&model.title);
-    let item_width = model
-        .items
-        .iter()
-        .map(preferred_item_width)
-        .fold(0_u16, u16::saturating_add);
+    let item_width = model.items.iter().map(preferred_item_width).fold(0_u16, u16::saturating_add);
     title_width.saturating_add(item_width)
 }
 
@@ -459,11 +447,7 @@ fn project_item(
         label: item.label.clone(),
         kind: item.kind,
         action_id: item.action_id.clone(),
-        enabled: item.enabled
-            && item
-                .action_id
-                .as_ref()
-                .map_or(true, |action_id| !action_id.is_empty()),
+        enabled: item.enabled && item.action_id.as_ref().map_or(true, |action_id| !action_id.is_empty()),
         active,
         truncated: item_width > model.container_width,
         diagnostic: item.diagnostic.clone(),
@@ -491,18 +475,13 @@ mod tests {
     const NARROW_CONTAINER: u16 = 3;
 
     fn title_bar() -> MeteoriteChromeModel {
-        MeteoriteChromeModel::new(
-            "title",
-            ChromeSurfaceKind::TitleBar,
-            "Workspace",
-            WIDE_CONTAINER,
-        )
-        .with_content_slot("workspace-body")
-        .with_items(vec![
-            ChromeItem::control("close", "Close", "window.close"),
-            ChromeItem::separator("sep"),
-            ChromeItem::label("status", "Ready"),
-        ])
+        MeteoriteChromeModel::new("title", ChromeSurfaceKind::TitleBar, "Workspace", WIDE_CONTAINER)
+            .with_content_slot("workspace-body")
+            .with_items(vec![
+                ChromeItem::control("close", "Close", "window.close"),
+                ChromeItem::separator("sep"),
+                ChromeItem::label("status", "Ready"),
+            ])
     }
 
     #[test]
@@ -517,23 +496,19 @@ mod tests {
 
     #[test]
     fn malformed_model_reports_empty_duplicate_disabled_tiny_and_overflow_cases() {
-        let model =
-            MeteoriteChromeModel::new("bad", ChromeSurfaceKind::Toolbar, "", TINY_CONTAINER)
-                .with_items(vec![
-                    ChromeItem::control("dup", "", "missing.label"),
-                    ChromeItem::control("dup", "Disabled", "disabled")
-                        .with_enabled(false)
-                        .with_active(true),
-                    ChromeItem {
-                        id: "missing-action".to_string(),
-                        label: "Broken".to_string(),
-                        kind: ChromeItemKind::Control,
-                        action_id: None,
-                        enabled: true,
-                        active: false,
-                        diagnostic: None,
-                    },
-                ]);
+        let model = MeteoriteChromeModel::new("bad", ChromeSurfaceKind::Toolbar, "", TINY_CONTAINER).with_items(vec![
+            ChromeItem::control("dup", "", "missing.label"),
+            ChromeItem::control("dup", "Disabled", "disabled").with_enabled(false).with_active(true),
+            ChromeItem {
+                id: ChromeItemId::new("missing-action"),
+                label: "Broken".to_string(),
+                kind: ChromeItemKind::Control,
+                action_id: None,
+                enabled: true,
+                active: false,
+                diagnostic: None,
+            },
+        ]);
 
         let projection = validate_meteorite_chrome_model(&model);
 
@@ -579,27 +554,15 @@ mod tests {
 
     #[test]
     fn truncation_and_showcase_evidence_are_deterministic() {
-        let narrow = MeteoriteChromeModel::new(
-            "breadcrumbs",
-            ChromeSurfaceKind::Breadcrumbs,
-            "Workspace",
-            NARROW_CONTAINER,
-        )
-        .with_items(vec![ChromeItem::label("long", "Very long crumb")]);
+        let narrow =
+            MeteoriteChromeModel::new("breadcrumbs", ChromeSurfaceKind::Breadcrumbs, "Workspace", NARROW_CONTAINER)
+                .with_items(vec![ChromeItem::label("long", "Very long crumb")]);
 
         let projection = validate_meteorite_chrome_model(&narrow);
         let evidence = meteorite_chrome_showcase_evidence(&[title_bar(), narrow]);
 
         assert!(projection.items[0].truncated);
-        assert_eq!(
-            evidence.state_ids,
-            vec!["title".to_string(), "breadcrumbs".to_string()]
-        );
-        assert!(
-            evidence
-                .parity_keys
-                .iter()
-                .any(|key| key.contains("window.close"))
-        );
+        assert_eq!(evidence.state_ids, vec!["title".to_string(), "breadcrumbs".to_string()]);
+        assert!(evidence.parity_keys.iter().any(|key| key.contains("window.close")));
     }
 }

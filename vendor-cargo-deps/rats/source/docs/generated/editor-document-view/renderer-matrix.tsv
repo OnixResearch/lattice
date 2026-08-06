@@ -1,0 +1,8 @@
+consumer	model_fixture	editing	input	rendering	positions	decorations	transactions	accessibility	persistence	status_next_action
+Subwayrat rat-editor	terminal-local existing	implemented prompt edits	terminal events	Ratatui cells	byte cursor plus width conversion	cursor only	prompt history	terminal cursor only	none	localize Unicode/range work in rat-editor Cairn
+Subwayrat rat-outline	terminal-local existing	structural edits	terminal events	Ratatui cells/gutter	line and byte cursor	fold state	outline-local	no shared editor semantics	none	keep local until independent consumer
+terminal IDE adapter	capability boolean/summary only	application-owned	application-owned	pane summary only	unspecified	unsupported	unsupported	unsupported	application-owned	not implementation evidence
+Meteorite	private plain fixture only	unsupported	unsupported	unsupported	UTF-16 boundary feasible	unsupported	unsupported	DOM semantics only	browser hook unrelated	name maintained editor consumer
+Iced experimental	private plain fixture only	unsupported	unsupported	unsupported	platform boundary unknown	unsupported	unsupported	native accessibility unsupported	none	does not satisfy maintained gate
+Tile external	pinned own model	Tile-owned	Tile-owned	Tile frontend	Tile-owned	Tile-owned	Tile-owned	Tile-owned	Tile daemon-owned	explicit frontend adapter only
+replay/content-summary	textual fixture only	none	none	summary bytes	none	none	none	semantic fixture only	none	never claim editor parity

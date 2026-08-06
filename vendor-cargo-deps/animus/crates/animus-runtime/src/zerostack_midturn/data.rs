@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,12 +7,7 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -242,11 +238,7 @@ pub struct ZerostackMidturnDiagnostic {
 impl ZerostackMidturnDiagnostic {
     /// Builds a mid-turn diagnostic.
     #[must_use]
-    pub fn new(
-        kind: ZerostackMidturnDiagnosticKind,
-        field: impl Into<String>,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub fn new(kind: ZerostackMidturnDiagnosticKind, field: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
             kind,
             field: field.into(),

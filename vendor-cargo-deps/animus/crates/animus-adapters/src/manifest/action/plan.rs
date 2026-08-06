@@ -1,11 +1,20 @@
-use super::check::{compatibility_diagnostics, validate_host_compatibility};
-use super::context::{diagnostic, is_known_event, target_failure_kind};
-use super::types::{
-    PluginDiagnostic, PluginDiagnosticKind, PluginDiagnosticSeverity, PluginHostCompatibility,
-    PluginRegistryOperationDraft, PluginRegistryOperationKind, PluginRegistryPlan,
-    PluginRegistryPlanStatus, PluginRole, PluginRoleKind,
-};
-use super::{Collection, Text};
+use super::Collection;
+use super::Text;
+use super::check::compatibility_diagnostics;
+use super::check::validate_host_compatibility;
+use super::context::diagnostic;
+use super::context::is_known_event;
+use super::context::target_failure_kind;
+use super::types::PluginDiagnostic;
+use super::types::PluginDiagnosticKind;
+use super::types::PluginDiagnosticSeverity;
+use super::types::PluginHostCompatibility;
+use super::types::PluginRegistryOperationDraft;
+use super::types::PluginRegistryOperationKind;
+use super::types::PluginRegistryPlan;
+use super::types::PluginRegistryPlanStatus;
+use super::types::PluginRole;
+use super::types::PluginRoleKind;
 
 struct DiagnosticsInput<'a> {
     operation: PluginRegistryOperationKind,
@@ -17,16 +26,9 @@ struct DiagnosticsInput<'a> {
 impl super::super::PluginDescriptor {
     /// Plans a host-owned registry operation without mutating state or dispatching executors.
     #[must_use]
-    pub fn plan_registry_operation(
-        &self,
-        draft: &PluginRegistryOperationDraft<'_>,
-    ) -> PluginRegistryPlan {
+    pub fn plan_registry_operation(&self, draft: &PluginRegistryOperationDraft<'_>) -> PluginRegistryPlan {
         let Ok(host) = validate_host_compatibility(&draft.host) else {
-            return self.blocked_plan(
-                draft.operation,
-                draft.entrypoint_id,
-                PluginDiagnosticKind::MalformedContext,
-            );
+            return self.blocked_plan(draft.operation, draft.entrypoint_id, PluginDiagnosticKind::MalformedContext);
         };
 
         match draft.operation {
@@ -38,9 +40,7 @@ impl super::super::PluginDescriptor {
             | PluginRegistryOperationKind::ActionList => self.planned_operation(draft.operation),
             PluginRegistryOperationKind::PlanInvocation
             | PluginRegistryOperationKind::PlanEvent
-            | PluginRegistryOperationKind::PlanPaneEntrypoint => {
-                self.plan_dispatch_like_operation(draft, &host)
-            }
+            | PluginRegistryOperationKind::PlanPaneEntrypoint => self.plan_dispatch_like_operation(draft, &host),
         }
     }
 
@@ -50,18 +50,14 @@ impl super::super::PluginDescriptor {
             if matches!(role.kind(), PluginRoleKind::EventHook) {
                 if let Some(event_name) = role.event_name() {
                     if !is_known_event(event_name) {
-                        diagnostics.push(diagnostic(
-                            PluginDiagnosticKind::UnknownEvent,
-                            PluginDiagnosticSeverity::Warning,
-                        ));
+                        diagnostics
+                            .push(diagnostic(PluginDiagnosticKind::UnknownEvent, PluginDiagnosticSeverity::Warning));
                     }
                 }
             }
             if matches!(role.kind(), PluginRoleKind::LinkHandler) && role.link_scheme().is_none() {
-                diagnostics.push(diagnostic(
-                    PluginDiagnosticKind::MissingOptionalMetadata,
-                    PluginDiagnosticSeverity::Warning,
-                ));
+                diagnostics
+                    .push(diagnostic(PluginDiagnosticKind::MissingOptionalMetadata, PluginDiagnosticSeverity::Warning));
             }
         }
         if diagnostics.is_empty() {
@@ -82,32 +78,16 @@ impl super::super::PluginDescriptor {
         host: &PluginHostCompatibility,
     ) -> PluginRegistryPlan {
         if !draft.plugin_enabled {
-            return self.blocked_plan(
-                draft.operation,
-                draft.entrypoint_id,
-                PluginDiagnosticKind::DisabledPlugin,
-            );
+            return self.blocked_plan(draft.operation, draft.entrypoint_id, PluginDiagnosticKind::DisabledPlugin);
         }
         if !draft.policy_allows {
-            return self.blocked_plan(
-                draft.operation,
-                draft.entrypoint_id,
-                PluginDiagnosticKind::PolicyDenied,
-            );
+            return self.blocked_plan(draft.operation, draft.entrypoint_id, PluginDiagnosticKind::PolicyDenied);
         }
         if draft.context.is_none() {
-            return self.blocked_plan(
-                draft.operation,
-                draft.entrypoint_id,
-                PluginDiagnosticKind::MalformedContext,
-            );
+            return self.blocked_plan(draft.operation, draft.entrypoint_id, PluginDiagnosticKind::MalformedContext);
         }
         let Some(role) = self.target_role(draft) else {
-            return self.blocked_plan(
-                draft.operation,
-                draft.entrypoint_id,
-                target_failure_kind(draft.operation),
-            );
+            return self.blocked_plan(draft.operation, draft.entrypoint_id, target_failure_kind(draft.operation));
         };
         let compatibility_diagnostics = compatibility_diagnostics(role.compatibility(), host);
         if !compatibility_diagnostics.is_empty() {
@@ -126,18 +106,14 @@ impl super::super::PluginDescriptor {
             PluginRegistryOperationKind::PlanInvocation => {
                 let id = draft.entrypoint_id?;
                 self.declared_roles.iter().find(|role| {
-                    role.id() == id
-                        && matches!(
-                            role.kind(),
-                            PluginRoleKind::Action | PluginRoleKind::LinkHandler
-                        )
+                    role.id() == id && matches!(role.kind(), PluginRoleKind::Action | PluginRoleKind::LinkHandler)
                 })
             }
             PluginRegistryOperationKind::PlanPaneEntrypoint => {
                 let id = draft.entrypoint_id?;
-                self.declared_roles.iter().find(|role| {
-                    role.id() == id && matches!(role.kind(), PluginRoleKind::HostPaneEntrypoint)
-                })
+                self.declared_roles
+                    .iter()
+                    .find(|role| role.id() == id && matches!(role.kind(), PluginRoleKind::HostPaneEntrypoint))
             }
             PluginRegistryOperationKind::PlanEvent => {
                 let event_name = draft.event_name?;
@@ -145,8 +121,7 @@ impl super::super::PluginDescriptor {
                     return None;
                 }
                 self.declared_roles.iter().find(|role| {
-                    matches!(role.kind(), PluginRoleKind::EventHook)
-                        && role.event_name() == Some(event_name)
+                    matches!(role.kind(), PluginRoleKind::EventHook) && role.event_name() == Some(event_name)
                 })
             }
             PluginRegistryOperationKind::Link
@@ -167,11 +142,7 @@ impl super::super::PluginDescriptor {
         })
     }
 
-    fn plan_for_role(
-        &self,
-        operation: PluginRegistryOperationKind,
-        role: &PluginRole,
-    ) -> PluginRegistryPlan {
+    fn plan_for_role(&self, operation: PluginRegistryOperationKind, role: &PluginRole) -> PluginRegistryPlan {
         PluginRegistryPlan {
             operation,
             manifest_identity: Text::from(self.identity()),

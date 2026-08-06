@@ -1,8 +1,10 @@
 name: rats
 repository: https://github.com/brittonr/rats
-revision: 3418e08e4408d6eb899dd4abc8af3fbad9499bb1
+revision: ef26e13b2e9cbcb4a0c902f9caff641b6d013867
 paths:
-- docs/generated/snapshots
+- docs/generated
+- meteorite/crates/met-core/generated
+- themes
 - ratcore/Cargo.toml
 - ratcore/src
 - subwayrat/crates/rat-nodegraph/Cargo.toml

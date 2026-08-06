@@ -6,13 +6,15 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
 pub struct ProgressBar {
-    /// Progress as fraction 0.0..=1.0
-    progress: f64,
+    /// Validated progress in `0.0..=1.0`.
+    progress: ratcore::validated_values::UnitInterval,
     /// Character for filled portion
     filled_char: char,
     /// Character for empty portion
@@ -30,20 +32,17 @@ pub struct ProgressBar {
     percentage_style: Style,
 }
 
-fn clamp_progress(p: f64) -> f64 {
-    p.clamp(0.0, 1.0)
-}
-
-fn format_time(secs: u64) -> String {
-    let m = secs / 60;
-    let s = secs % 60;
+fn format_time(duration: std::time::Duration) -> String {
+    let seconds = duration.as_secs();
+    let m = seconds / 60;
+    let s = seconds % 60;
     format!("{m:02}:{s:02}")
 }
 
 impl ProgressBar {
-    pub fn new(progress: f64) -> Self {
+    pub fn new(progress: ratcore::validated_values::UnitInterval) -> Self {
         Self {
-            progress: clamp_progress(progress),
+            progress,
             filled_char: '━',
             empty_char: '─',
             left_label: None,
@@ -56,9 +55,17 @@ impl ProgressBar {
         }
     }
 
-    pub fn with_progress(mut self, progress: f64) -> Self {
-        self.progress = clamp_progress(progress);
+    pub fn try_from_fraction(progress: f64) -> Result<Self, ratcore::validated_values::ValueError> {
+        ratcore::validated_values::UnitInterval::try_new(progress).map(Self::new)
+    }
+
+    pub fn with_progress(mut self, progress: ratcore::validated_values::UnitInterval) -> Self {
+        self.progress = progress;
         self
+    }
+
+    pub fn try_with_progress_fraction(self, progress: f64) -> Result<Self, ratcore::validated_values::ValueError> {
+        ratcore::validated_values::UnitInterval::try_new(progress).map(|value| self.with_progress(value))
     }
 
     pub fn with_chars(mut self, filled: char, empty: char) -> Self {
@@ -77,10 +84,10 @@ impl ProgressBar {
         self
     }
 
-    /// Convenience: formats both labels as "MM:SS".
-    pub fn with_time_labels(mut self, elapsed_secs: u64, total_secs: u64) -> Self {
-        self.left_label = Some(format_time(elapsed_secs));
-        self.right_label = Some(format_time(total_secs));
+    /// Convenience: formats both duration labels as `MM:SS`.
+    pub fn with_time_labels(mut self, elapsed: std::time::Duration, total: std::time::Duration) -> Self {
+        self.left_label = Some(format_time(elapsed));
+        self.right_label = Some(format_time(total));
         self
     }
 
@@ -104,8 +111,14 @@ impl ProgressBar {
         self
     }
 
-    pub fn set_progress(&mut self, progress: f64) {
-        self.progress = clamp_progress(progress);
+    pub fn set_progress(&mut self, progress: ratcore::validated_values::UnitInterval) {
+        self.progress = progress;
+    }
+
+    pub fn try_set_progress_fraction(&mut self, progress: f64) -> Result<(), ratcore::validated_values::ValueError> {
+        let progress = ratcore::validated_values::UnitInterval::try_new(progress)?;
+        self.set_progress(progress);
+        Ok(())
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -132,7 +145,7 @@ impl ProgressBar {
         let filled_count = if bar_width == 0 {
             0
         } else {
-            ((self.progress * bar_width as f64).round() as usize).min(bar_width)
+            ((self.progress.get() * bar_width as f64).round() as usize).min(bar_width)
         };
         let empty_count = bar_width - filled_count;
 
@@ -156,7 +169,7 @@ impl ProgressBar {
         }
 
         if self.show_percentage {
-            let pct = (self.progress * 100.0).round() as u8;
+            let pct = self.progress.rounded_percent().get();
             spans.push(Span::styled(format!(" {pct:>3}%"), self.percentage_style));
         }
 
@@ -167,119 +180,65 @@ impl ProgressBar {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
-    // -- clamping --
+    use super::*;
 
-    #[test]
-    fn clamp_negative() {
-        let bar = ProgressBar::new(-0.5);
-        assert_eq!(bar.progress, 0.0);
+    fn interval(value: f64) -> ratcore::validated_values::UnitInterval {
+        ratcore::validated_values::UnitInterval::try_new(value).unwrap()
     }
 
     #[test]
-    fn clamp_over_one() {
-        let bar = ProgressBar::new(3.0);
-        assert_eq!(bar.progress, 1.0);
+    fn invalid_progress_is_rejected_instead_of_clamped() {
+        assert!(ProgressBar::try_from_fraction(-0.5).is_err());
+        assert!(ProgressBar::try_from_fraction(3.0).is_err());
+        assert!(ProgressBar::try_from_fraction(f64::NAN).is_err());
+        let bar = ProgressBar::new(interval(0.42));
+        assert!((bar.progress.get() - 0.42).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn clamp_normal() {
-        let bar = ProgressBar::new(0.42);
-        assert!((bar.progress - 0.42).abs() < f64::EPSILON);
+    fn rejected_update_preserves_previous_progress() {
+        let mut bar = ProgressBar::new(interval(0.5));
+        assert!(bar.try_set_progress_fraction(-1.0).is_err());
+        assert_eq!(bar.progress, interval(0.5));
+        bar.set_progress(interval(1.0));
+        assert_eq!(bar.progress, interval(1.0));
     }
 
     #[test]
-    fn set_progress_clamps() {
-        let mut bar = ProgressBar::new(0.5);
-        bar.set_progress(-1.0);
-        assert_eq!(bar.progress, 0.0);
-        bar.set_progress(99.0);
-        assert_eq!(bar.progress, 1.0);
-    }
-
-    // -- time labels --
-
-    #[test]
-    fn time_label_formatting() {
-        let bar = ProgressBar::new(0.5).with_time_labels(150, 300);
+    fn duration_labels_preserve_existing_format() {
+        let bar = ProgressBar::new(interval(0.5))
+            .with_time_labels(std::time::Duration::from_secs(150), std::time::Duration::from_secs(300));
         assert_eq!(bar.left_label.as_deref(), Some("02:30"));
         assert_eq!(bar.right_label.as_deref(), Some("05:00"));
-    }
 
-    #[test]
-    fn time_label_zero() {
-        let bar = ProgressBar::new(0.0).with_time_labels(0, 0);
-        assert_eq!(bar.left_label.as_deref(), Some("00:00"));
-        assert_eq!(bar.right_label.as_deref(), Some("00:00"));
+        let large = ProgressBar::new(interval(0.0))
+            .with_time_labels(std::time::Duration::from_secs(5_405), std::time::Duration::from_secs(5_405));
+        assert_eq!(large.left_label.as_deref(), Some("90:05"));
     }
-
-    #[test]
-    fn time_label_large() {
-        // 90 minutes 5 seconds = 5405s
-        let bar = ProgressBar::new(0.0).with_time_labels(5405, 5405);
-        assert_eq!(bar.left_label.as_deref(), Some("90:05"));
-    }
-
-    // -- render: no panic on tiny areas --
 
     fn render_in_area(bar: &ProgressBar, width: u16, height: u16) {
         let backend = TestBackend::new(width.max(1), height.max(1));
         let mut terminal = Terminal::new(backend).unwrap();
-        terminal
-            .draw(|f| {
-                let area = Rect::new(0, 0, width, height);
-                bar.render(f, area);
-            })
-            .unwrap();
+        terminal.draw(|frame| bar.render(frame, Rect::new(0, 0, width, height))).unwrap();
     }
 
     #[test]
-    fn render_zero_width() {
-        let bar = ProgressBar::new(0.5)
-            .with_time_labels(60, 120)
+    fn tiny_and_normal_areas_render_without_panicking() {
+        let bar = ProgressBar::new(interval(0.5))
+            .with_time_labels(std::time::Duration::from_secs(60), std::time::Duration::from_secs(120))
             .with_percentage(true);
-        render_in_area(&bar, 0, 1);
+        for (width, height) in [(0, 1), (40, 0), (1, 1), (10, 1), (40, 1)] {
+            render_in_area(&bar, width, height);
+        }
     }
 
     #[test]
-    fn render_zero_height() {
-        let bar = ProgressBar::new(0.5);
-        render_in_area(&bar, 40, 0);
-    }
-
-    #[test]
-    fn render_width_one() {
-        let bar = ProgressBar::new(1.0);
-        render_in_area(&bar, 1, 1);
-    }
-
-    #[test]
-    fn render_narrow_with_labels() {
-        // Labels alone exceed the width — bar portion collapses to 0.
-        let bar = ProgressBar::new(0.5)
-            .with_left_label("00:00")
-            .with_right_label("99:99")
-            .with_percentage(true);
-        render_in_area(&bar, 10, 1);
-    }
-
-    #[test]
-    fn render_normal() {
-        let bar = ProgressBar::new(0.5)
-            .with_time_labels(30, 60)
-            .with_percentage(true);
-        render_in_area(&bar, 40, 1);
-    }
-
-    // -- builder chaining --
-
-    #[test]
-    fn builder_chain() {
-        let bar = ProgressBar::new(0.0)
-            .with_progress(0.75)
+    fn builder_chain_uses_validated_progress() {
+        let bar = ProgressBar::new(interval(0.0))
+            .with_progress(interval(0.75))
             .with_chars('=', '-')
             .with_left_label("A")
             .with_right_label("B")
@@ -288,7 +247,7 @@ mod tests {
             .with_empty_style(Style::default().fg(Color::Red))
             .with_label_style(Style::default().fg(Color::White));
 
-        assert!((bar.progress - 0.75).abs() < f64::EPSILON);
+        assert_eq!(bar.progress, interval(0.75));
         assert_eq!(bar.filled_char, '=');
         assert_eq!(bar.empty_char, '-');
         assert_eq!(bar.left_label.as_deref(), Some("A"));

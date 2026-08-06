@@ -4,6 +4,11 @@ const NO_PLANNING_STEPS_REMAINING: usize = 0;
 const PLANNING_GUARD_EXHAUSTED: &str = "runtime planning step guard exhausted";
 const OBSERVABILITY_SINK_FAILED: &str = "observability_sink_failed";
 
+struct RuntimeAgentControl<'a> {
+    run_id: animus_adapters::AgentControlRunId,
+    waiter: &'a mut dyn animus_adapters::AgentControlWait,
+}
+
 /// Borrowed injected model/tool service bundle used by runtime runners.
 pub struct RuntimeAdapters<'a, Model, Tool> {
     model: Option<&'a mut Model>,
@@ -11,6 +16,7 @@ pub struct RuntimeAdapters<'a, Model, Tool> {
     middleware: crate::RuntimeMiddlewareStack<'a>,
     capabilities: crate::RuntimeCapabilityRegistry,
     tool_definitions: Vec<animus_adapters::tool::Definition>,
+    agent_control: Option<RuntimeAgentControl<'a>>,
 }
 
 impl<'a, Model, Tool> RuntimeAdapters<'a, Model, Tool> {
@@ -23,6 +29,7 @@ impl<'a, Model, Tool> RuntimeAdapters<'a, Model, Tool> {
             middleware: crate::RuntimeMiddlewareStack::empty(),
             capabilities: crate::RuntimeCapabilityRegistry::model_tool_presence(true, true),
             tool_definitions: Vec::new(),
+            agent_control: None,
         }
     }
 
@@ -35,11 +42,9 @@ impl<'a, Model, Tool> RuntimeAdapters<'a, Model, Tool> {
             model,
             tool,
             middleware: crate::RuntimeMiddlewareStack::empty(),
-            capabilities: crate::RuntimeCapabilityRegistry::model_tool_presence(
-                is_model_present,
-                is_tool_present,
-            ),
+            capabilities: crate::RuntimeCapabilityRegistry::model_tool_presence(is_model_present, is_tool_present),
             tool_definitions: Vec::new(),
+            agent_control: None,
         }
     }
 
@@ -52,22 +57,38 @@ impl<'a, Model, Tool> RuntimeAdapters<'a, Model, Tool> {
 
     /// Replaces the explicit capability registry used for dispatch admission.
     #[must_use]
-    pub fn with_capability_registry(
-        mut self,
-        capabilities: crate::RuntimeCapabilityRegistry,
-    ) -> Self {
+    pub fn with_capability_registry(mut self, capabilities: crate::RuntimeCapabilityRegistry) -> Self {
         self.capabilities = capabilities;
         self
     }
 
     /// Replaces the active trusted tool definitions used for dispatch admission.
     #[must_use]
-    pub fn with_tool_definitions(
-        mut self,
-        tool_definitions: Vec<animus_adapters::tool::Definition>,
-    ) -> Self {
+    pub fn with_tool_definitions(mut self, tool_definitions: Vec<animus_adapters::tool::Definition>) -> Self {
         self.tool_definitions = tool_definitions;
         self
+    }
+
+    /// Adds an explicit host-owned control waiter for one exact run.
+    #[must_use]
+    pub fn with_agent_control(
+        mut self,
+        run_id: animus_adapters::AgentControlRunId,
+        waiter: &'a mut dyn animus_adapters::AgentControlWait,
+    ) -> Self {
+        self.agent_control = Some(RuntimeAgentControl { run_id, waiter });
+        self
+    }
+
+    fn wait_for_agent_control(
+        &mut self,
+        kind: animus_adapters::AgentControlCheckpointKind,
+    ) -> Result<animus_adapters::AgentControlPermit, animus_adapters::AgentControlWaitError> {
+        let Some(control) = self.agent_control.as_mut() else {
+            return Ok(animus_adapters::AgentControlPermit::Continue);
+        };
+        let checkpoint = animus_adapters::AgentControlCheckpoint::new(control.run_id.clone(), kind);
+        control.waiter.wait_until_runnable(&checkpoint)
     }
 
     /// Returns the explicit capability registry used for dispatch admission.
@@ -130,29 +151,19 @@ where
     Tool::Error: core::fmt::Display,
 {
     let mut state = crate::TurnState::new(input);
-    let (mut observed_event_count, mut observation_diagnostics) = collect_new_observations(
-        &mut adapters.middleware,
-        state.events(),
-        NO_PLANNING_STEPS_REMAINING,
-    );
-    let mut planning_steps_remaining = config
-        .max_turns()
-        .count()
-        .saturating_add(crate::MIN_MAX_TURNS.count());
+    let (mut observed_event_count, mut observation_diagnostics) =
+        collect_new_observations(&mut adapters.middleware, state.events(), NO_PLANNING_STEPS_REMAINING);
+    let mut planning_steps_remaining = config.max_turns().count().saturating_add(crate::MIN_MAX_TURNS.count());
     debug_assert_eq!(observed_event_count, state.events().len());
     debug_assert!(planning_steps_remaining > NO_PLANNING_STEPS_REMAINING);
 
     while planning_steps_remaining != NO_PLANNING_STEPS_REMAINING {
-        planning_steps_remaining =
-            planning_steps_remaining.saturating_sub(crate::MIN_MAX_TURNS.count());
+        planning_steps_remaining = planning_steps_remaining.saturating_sub(crate::MIN_MAX_TURNS.count());
         match runner::run_planned_step(config, state, fabric, &mut adapters) {
             runner::Step::Continue { state: next_state } => {
                 state = next_state;
-                let (next_observed_count, mut step_diagnostics) = collect_new_observations(
-                    &mut adapters.middleware,
-                    state.events(),
-                    observed_event_count,
-                );
+                let (next_observed_count, mut step_diagnostics) =
+                    collect_new_observations(&mut adapters.middleware, state.events(), observed_event_count);
                 observed_event_count = next_observed_count;
                 observation_diagnostics.append(&mut step_diagnostics);
             }
@@ -167,14 +178,8 @@ where
         }
     }
 
-    let failure_result =
-        crate::complete_with_fabric_error(state, String::from(PLANNING_GUARD_EXHAUSTED));
-    finalize_observed_report(
-        failure_result,
-        &mut adapters.middleware,
-        observed_event_count,
-        observation_diagnostics,
-    )
+    let failure_result = crate::complete_with_fabric_error(state, String::from(PLANNING_GUARD_EXHAUSTED));
+    finalize_observed_report(failure_result, &mut adapters.middleware, observed_event_count, observation_diagnostics)
 }
 
 fn collect_new_observations(
@@ -232,9 +237,7 @@ where
 {
     match animus_steel::SteelLoopFabric::new(program) {
         Ok(mut fabric) => run_agent_loop(input, config, &mut fabric, adapters),
-        Err(error) => {
-            crate::complete_with_fabric_error(crate::TurnState::new(input), error.to_string())
-        }
+        Err(error) => crate::complete_with_fabric_error(crate::TurnState::new(input), error.to_string()),
     }
 }
 
@@ -265,9 +268,7 @@ where
 
     match animus_steel::SteelLoopFabric::new(policy.script().source()) {
         Ok(mut fabric) => run_agent_loop(input, config, &mut fabric, adapters),
-        Err(error) => {
-            crate::complete_with_fabric_error(crate::TurnState::new(input), error.to_string())
-        }
+        Err(error) => crate::complete_with_fabric_error(crate::TurnState::new(input), error.to_string()),
     }
 }
 

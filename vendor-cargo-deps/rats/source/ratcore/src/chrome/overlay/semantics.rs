@@ -6,8 +6,10 @@
 #[path = "spec.rs"]
 mod spec;
 
-/// Stable Meteorite overlay surface identifier.
-pub type MeteoriteOverlaySurfaceId = String;
+semantic_string_id! {
+    /// Stable Meteorite overlay evidence surface identifier.
+    pub struct MeteoriteOverlaySurfaceId;
+}
 
 /// Shared chrome kind used by overlay evidence rows.
 pub type OverlayChromeKind = crate::meteorite_chrome_core::ChromeSurfaceKind;
@@ -142,11 +144,8 @@ fn sort_report_ids(outcome: &mut MeteoriteOverlaySemanticsReport) {
     outcome.renderer_owned_surface_ids.sort();
 }
 
-fn classify_surface(
-    surface: &MeteoriteOverlaySurfaceEvidence,
-    outcome: &mut MeteoriteOverlaySemanticsReport,
-) {
-    if surface.surface_id.trim().is_empty() {
+fn classify_surface(surface: &MeteoriteOverlaySurfaceEvidence, outcome: &mut MeteoriteOverlaySemanticsReport) {
+    if surface.surface_id.as_str().trim().is_empty() {
         return;
     }
     classification_bucket(surface, outcome).push(surface.surface_id.clone());
@@ -170,18 +169,8 @@ fn validate_required_fields(
 ) {
     validate_surface_id(surface, duplicate_ids, outcome);
     validate_text_field(surface, &surface.owner, spec::empty_owner(), outcome);
-    validate_text_field(
-        surface,
-        &surface.evidence,
-        spec::missing_evidence(),
-        outcome,
-    );
-    validate_text_field(
-        surface,
-        &surface.next_action,
-        spec::missing_next_action(),
-        outcome,
-    );
+    validate_text_field(surface, &surface.evidence, spec::missing_evidence(), outcome);
+    validate_text_field(surface, &surface.next_action, spec::missing_next_action(), outcome);
 }
 
 fn validate_surface_id(
@@ -189,7 +178,7 @@ fn validate_surface_id(
     duplicate_ids: &SurfaceIdSet,
     outcome: &mut MeteoriteOverlaySemanticsReport,
 ) {
-    if surface.surface_id.trim().is_empty() {
+    if surface.surface_id.as_str().trim().is_empty() {
         push_diagnostic(outcome, surface, spec::empty_surface_id());
     } else if duplicate_ids.contains(&surface.surface_id) {
         push_diagnostic(outcome, surface, spec::duplicate_surface_id());
@@ -207,10 +196,7 @@ fn validate_text_field(
     }
 }
 
-fn validate_role_contract(
-    surface: &MeteoriteOverlaySurfaceEvidence,
-    outcome: &mut MeteoriteOverlaySemanticsReport,
-) {
+fn validate_role_contract(surface: &MeteoriteOverlaySurfaceEvidence, outcome: &mut MeteoriteOverlaySemanticsReport) {
     match surface.role {
         MeteoriteOverlayRole::SharedChromeFrame => validate_shared_chrome_kind(surface, outcome),
         MeteoriteOverlayRole::WebNativePrimitive | MeteoriteOverlayRole::RendererOwnedAdapter => {
@@ -233,10 +219,7 @@ fn validate_shared_chrome_kind(
 }
 
 fn is_shared_overlay_kind(kind: OverlayChromeKind) -> bool {
-    matches!(
-        kind,
-        OverlayChromeKind::OverlayFrame | OverlayChromeKind::DialogFrame
-    )
+    matches!(kind, OverlayChromeKind::OverlayFrame | OverlayChromeKind::DialogFrame)
 }
 
 fn validate_non_shared_surface(
@@ -265,7 +248,7 @@ fn record_seen_surface(
     duplicates: &mut SurfaceIdSet,
     surface: &MeteoriteOverlaySurfaceEvidence,
 ) {
-    if surface.surface_id.trim().is_empty() {
+    if surface.surface_id.as_str().trim().is_empty() {
         return;
     }
     if !seen.insert(surface.surface_id.clone()) {

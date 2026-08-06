@@ -15,15 +15,9 @@ fn missing_host_binding_keeps_tool_inactive_without_fallback() {
         output_boundary_status: crate::tool::OutputBoundaryStatus::Bounded,
     });
 
-    assert_eq!(
-        definitions[0].status(),
-        crate::tool::DefinitionStatus::Inactive
-    );
+    assert_eq!(definitions[0].status(), crate::tool::DefinitionStatus::Inactive);
     assert_eq!(decision.status(), crate::tool::DispatchStatus::Failed);
-    assert_eq!(
-        decision.failure_class(),
-        Some(crate::tool::FailureClass::MissingExecutor)
-    );
+    assert_eq!(decision.failure_class(), Some(crate::tool::FailureClass::MissingExecutor));
     assert!(!decision.fallback_attempted());
 }
 
@@ -33,13 +27,9 @@ fn untrusted_descriptor_projects_inactive_definitions() {
     draft.trust_status = Some(TRUST_STATUS_UNTRUSTED);
     let descriptor = PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS)
         .expect("untrusted descriptor should parse as data");
-    let definitions = descriptor
-        .tool_definitions(EXECUTORS)
-        .expect("untrusted descriptor should still project metadata");
+    let definitions =
+        descriptor.tool_definitions(EXECUTORS).expect("untrusted descriptor should still project metadata");
 
     assert_eq!(descriptor.trust_status(), TrustStatus::Untrusted);
-    assert_eq!(
-        definitions[0].status(),
-        crate::tool::DefinitionStatus::Inactive
-    );
+    assert_eq!(definitions[0].status(), crate::tool::DefinitionStatus::Inactive);
 }

@@ -51,10 +51,8 @@ impl DiffReviewSelector {
     /// Returns [`super::DiffReviewError`] when required selector references are
     /// missing, extra references are present, or text fields are malformed.
     pub fn validate(draft: &DiffReviewSelectorDraft<'_>) -> Result<Self, super::DiffReviewError> {
-        let primary_ref =
-            super::check::optional_text(super::SELECTOR_REF_FIELD, draft.primary_ref)?;
-        let secondary_ref =
-            super::check::optional_text(super::SELECTOR_REF_FIELD, draft.secondary_ref)?;
+        let primary_ref = super::check::optional_text(super::SELECTOR_REF_FIELD, draft.primary_ref)?;
+        let secondary_ref = super::check::optional_text(super::SELECTOR_REF_FIELD, draft.secondary_ref)?;
         validate_selector_shape(draft.kind, primary_ref.as_ref(), secondary_ref.as_ref())?;
         Ok(Self {
             kind: draft.kind,
@@ -115,9 +113,7 @@ impl DiffReviewRequest {
         let run_id = super::check::required_text(super::RUN_ID_FIELD, draft.run_id)?;
         let selector = DiffReviewSelector::validate(&draft.selector)?;
         if !draft.adapter_capabilities.contains(&selector.kind()) {
-            return Err(super::DiffReviewError::UnsupportedSelector {
-                kind: selector.kind(),
-            });
+            return Err(super::DiffReviewError::UnsupportedSelector { kind: selector.kind() });
         }
         let target_labels = super::check::text_collection(
             super::TARGET_LABEL_FIELD,
@@ -163,9 +159,7 @@ fn validate_selector_shape(
         DiffReviewSelectorKind::Commit | DiffReviewSelectorKind::ExternalPatch => {
             primary_ref.is_some() && secondary_ref.is_none()
         }
-        DiffReviewSelectorKind::BranchComparison => {
-            primary_ref.is_some() && secondary_ref.is_some()
-        }
+        DiffReviewSelectorKind::BranchComparison => primary_ref.is_some() && secondary_ref.is_some(),
     };
     if is_valid {
         Ok(())

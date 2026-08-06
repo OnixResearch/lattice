@@ -398,11 +398,7 @@ pub struct SessionBranchDiagnostic {
 }
 
 impl SessionBranchDiagnostic {
-    fn new(
-        kind: SessionBranchDiagnosticKind,
-        field: &'static str,
-        detail: impl Into<Text>,
-    ) -> Self {
+    fn new(kind: SessionBranchDiagnosticKind, field: &'static str, detail: impl Into<Text>) -> Self {
         Self {
             kind,
             field,
@@ -539,14 +535,8 @@ impl SessionBranchRequest {
                 FIELD_TARGET_SESSION_HASH,
                 draft.target_session_hash,
             ))?,
-            source_head_hash: validate_hash(SafeFieldValue::new(
-                FIELD_SOURCE_HEAD_HASH,
-                draft.source_head_hash,
-            ))?,
-            cut_point_hash: validate_hash(SafeFieldValue::new(
-                FIELD_CUT_POINT_HASH,
-                draft.cut_point_hash,
-            ))?,
+            source_head_hash: validate_hash(SafeFieldValue::new(FIELD_SOURCE_HEAD_HASH, draft.source_head_hash))?,
+            cut_point_hash: validate_hash(SafeFieldValue::new(FIELD_CUT_POINT_HASH, draft.cut_point_hash))?,
             edited_body_class: validate_safe_text(SafeFieldValue::new(
                 FIELD_EDITED_BODY_CLASS,
                 draft.edited_body_class,
@@ -556,10 +546,7 @@ impl SessionBranchRequest {
                 draft.requested_branch_label,
             ))?,
             continuation_target: draft.continuation_target,
-            provenance_label: validate_safe_text(SafeFieldValue::new(
-                FIELD_PROVENANCE_LABEL,
-                draft.provenance_label,
-            ))?,
+            provenance_label: validate_safe_text(SafeFieldValue::new(FIELD_PROVENANCE_LABEL, draft.provenance_label))?,
             copy_descriptors,
             ambient_storage_requested: draft.ambient_storage_requested,
         })
@@ -732,18 +719,12 @@ impl SessionLedgerEntry {
     /// metadata contains unsafe raw material.
     pub fn new(draft: &SessionLedgerEntryDraft<'_>) -> Result<Self, SessionBranchError> {
         Ok(Self {
-            entry_hash: validate_hash(SafeFieldValue::new(
-                FIELD_LEDGER_ENTRY_HASH,
-                draft.entry_hash,
-            ))?,
+            entry_hash: validate_hash(SafeFieldValue::new(FIELD_LEDGER_ENTRY_HASH, draft.entry_hash))?,
             parent_hash: draft
                 .parent_hash
                 .map(|hash| validate_hash(SafeFieldValue::new(FIELD_PARENT_HASH, hash)))
                 .transpose()?,
-            body_class: validate_safe_text(SafeFieldValue::new(
-                FIELD_EDITED_BODY_CLASS,
-                draft.body_class,
-            ))?,
+            body_class: validate_safe_text(SafeFieldValue::new(FIELD_EDITED_BODY_CLASS, draft.body_class))?,
         })
     }
 
@@ -1095,10 +1076,7 @@ fn apply_edit_in_place_diagnostics(
 
 fn ledger_index(
     ledger: &[SessionLedgerEntry],
-) -> (
-    std::collections::BTreeMap<&str, &SessionLedgerEntry>,
-    Collection<SessionBranchDiagnostic>,
-) {
+) -> (std::collections::BTreeMap<&str, &SessionLedgerEntry>, Collection<SessionBranchDiagnostic>) {
     let mut index = std::collections::BTreeMap::new();
     let mut diagnostics = Collection::with_capacity(ledger.len());
     for entry in ledger {
@@ -1121,14 +1099,9 @@ fn ledger_index(
             }
         }
     }
+    assert!(index.len() <= ledger.len(), "ledger index cannot contain more unique entries than source ledger");
     assert!(
-        index.len() <= ledger.len(),
-        "ledger index cannot contain more unique entries than source ledger"
-    );
-    assert!(
-        diagnostics
-            .iter()
-            .all(|diagnostic| !diagnostic.field().is_empty()),
+        diagnostics.iter().all(|diagnostic| !diagnostic.field().is_empty()),
         "ledger diagnostics must identify a field"
     );
     (index, diagnostics)
@@ -1144,10 +1117,7 @@ fn suffix_span_count(
     let Some(path) = path_from_head(request.source_head_hash(), index, diagnostics) else {
         return 0;
     };
-    let Some(cut_position) = path
-        .iter()
-        .position(|entry| entry.entry_hash() == request.cut_point_hash())
-    else {
+    let Some(cut_position) = path.iter().position(|entry| entry.entry_hash() == request.cut_point_hash()) else {
         diagnostics.push(SessionBranchDiagnostic::new(
             SessionBranchDiagnosticKind::StaleCutPoint,
             FIELD_CUT_POINT_HASH,
@@ -1204,10 +1174,7 @@ fn copy_descriptor_classes(
     request: &SessionBranchRequest,
     policy: &SessionBranchPolicy,
     diagnostics: &mut Collection<SessionBranchDiagnostic>,
-) -> (
-    Collection<SessionCopyDescriptorClass>,
-    Collection<SessionCopyDescriptorClass>,
-) {
+) -> (Collection<SessionCopyDescriptorClass>, Collection<SessionCopyDescriptorClass>) {
     // r[impl agent_harness_runtime.goose_session_branching.copy_boundaries]
     debug_assert!(!request.source_session_hash().is_empty());
     debug_assert!(!policy.policy_hash().is_empty());
@@ -1233,20 +1200,13 @@ fn copy_descriptor_classes(
     (copied.into_iter().collect(), omitted.into_iter().collect())
 }
 
-fn admitted_target_parent(
-    request: &SessionBranchRequest,
-    status: SessionBranchPlanStatus,
-) -> Option<Text> {
+fn admitted_target_parent(request: &SessionBranchRequest, status: SessionBranchPlanStatus) -> Option<Text> {
     if status == SessionBranchPlanStatus::Denied {
         return None;
     }
     let hash = match request.operation() {
-        SessionBranchOperation::ForkFromMessage | SessionBranchOperation::EditInPlace => {
-            request.cut_point_hash()
-        }
-        SessionBranchOperation::DuplicateSession | SessionBranchOperation::LabelUpdate => {
-            request.source_head_hash()
-        }
+        SessionBranchOperation::ForkFromMessage | SessionBranchOperation::EditInPlace => request.cut_point_hash(),
+        SessionBranchOperation::DuplicateSession | SessionBranchOperation::LabelUpdate => request.source_head_hash(),
     };
     Some(hash.to_owned())
 }
@@ -1260,11 +1220,7 @@ fn branch_receipt(input: ReceiptInput<'_>) -> SessionBranchReceipt {
     } else {
         SAFE_BRANCH_LABEL_STATUS.to_owned()
     };
-    let diagnostics = input
-        .diagnostics
-        .iter()
-        .map(SessionBranchDiagnostic::kind)
-        .collect::<Collection<_>>();
+    let diagnostics = input.diagnostics.iter().map(SessionBranchDiagnostic::kind).collect::<Collection<_>>();
     let receipt_hash = branch_receipt_hash(ReceiptHashInput {
         request: input.request,
         policy: input.policy,
@@ -1330,10 +1286,7 @@ fn branch_receipt_hash(input: ReceiptHashInput<'_>) -> Text {
     push_hash_part(&mut normalized, EMPTY_OPTION_PART);
     push_hash_part(&mut normalized, input.policy.policy_hash());
     push_hash_part(&mut normalized, input.checkpoint_status.as_str());
-    push_hash_part(
-        &mut normalized,
-        input.request.continuation_target().as_str(),
-    );
+    push_hash_part(&mut normalized, input.request.continuation_target().as_str());
     for diagnostic in input.diagnostics {
         push_hash_part(&mut normalized, diagnostic.as_str());
     }
@@ -1403,10 +1356,7 @@ fn validate_safe_text(input: SafeFieldValue<'_>) -> Result<Text, SessionBranchEr
 
 fn contains_unsafe_material(value: &str) -> Option<LeakMarker> {
     let lower = value.to_ascii_lowercase();
-    LEAK_MARKERS
-        .iter()
-        .copied()
-        .find(|marker| lower.contains(marker.needle))
+    LEAK_MARKERS.iter().copied().find(|marker| lower.contains(marker.needle))
 }
 
 #[cfg(test)]
@@ -1431,8 +1381,8 @@ mod tests {
     fn fork_branch_plan_preserves_source_branch_and_receipt() {
         // r[verify agent_harness_runtime.goose_session_branching.requests.fork]
         // r[verify agent_harness_runtime.goose_session_branching.pure_planner.deterministic]
-        let request = request(SessionBranchOperation::ForkFromMessage, HASH_B, false)
-            .expect("fork request should validate");
+        let request =
+            request(SessionBranchOperation::ForkFromMessage, HASH_B, false).expect("fork request should validate");
         let policy = admitted_policy(DEFAULT_POLICY_FIXTURE).expect("policy should validate");
         let plan = plan_session_branch(SessionBranchPlannerInput {
             request: &request,
@@ -1444,10 +1394,7 @@ mod tests {
         assert_eq!(plan.status(), SessionBranchPlanStatus::Admitted);
         assert_eq!(plan.target_parent_hash(), Some(HASH_B));
         assert_eq!(plan.suffix_span_count(), EXPECTED_SUFFIX_COUNT);
-        assert_eq!(
-            plan.copied_descriptor_classes(),
-            [SessionCopyDescriptorClass::SessionLabel]
-        );
+        assert_eq!(plan.copied_descriptor_classes(), [SessionCopyDescriptorClass::SessionLabel]);
         assert_eq!(plan.receipt().status(), SessionBranchPlanStatus::Admitted);
         assert_eq!(plan.receipt().receipt_hash().len(), HASH_HEX_LENGTH);
     }
@@ -1466,26 +1413,16 @@ mod tests {
 
         assert_eq!(plan.status(), SessionBranchPlanStatus::Admitted);
         assert_eq!(plan.target_parent_hash(), Some(HASH_D));
-        assert!(
-            plan.copied_descriptor_classes()
-                .contains(&SessionCopyDescriptorClass::PolicyLabel)
-        );
-        assert!(
-            plan.omitted_descriptor_classes()
-                .contains(&SessionCopyDescriptorClass::ProviderSession)
-        );
-        assert!(
-            plan.receipt()
-                .omitted_descriptor_classes()
-                .contains(&SessionCopyDescriptorClass::ProviderSession)
-        );
+        assert!(plan.copied_descriptor_classes().contains(&SessionCopyDescriptorClass::PolicyLabel));
+        assert!(plan.omitted_descriptor_classes().contains(&SessionCopyDescriptorClass::ProviderSession));
+        assert!(plan.receipt().omitted_descriptor_classes().contains(&SessionCopyDescriptorClass::ProviderSession));
     }
 
     #[test]
     fn label_update_records_safe_branch_label() {
         // r[verify agent_harness_runtime.goose_session_branching.verification]
-        let request = request(SessionBranchOperation::LabelUpdate, HASH_D, false)
-            .expect("label request should validate");
+        let request =
+            request(SessionBranchOperation::LabelUpdate, HASH_D, false).expect("label request should validate");
         let policy = admitted_policy(DEFAULT_POLICY_FIXTURE).expect("policy should validate");
         let plan = plan_session_branch(SessionBranchPlannerInput {
             request: &request,
@@ -1496,17 +1433,14 @@ mod tests {
 
         assert_eq!(plan.status(), SessionBranchPlanStatus::Admitted);
         assert_eq!(plan.target_parent_hash(), Some(HASH_D));
-        assert_eq!(
-            plan.receipt().branch_label_status(),
-            SAFE_BRANCH_LABEL_STATUS
-        );
+        assert_eq!(plan.receipt().branch_label_status(), SAFE_BRANCH_LABEL_STATUS);
     }
 
     #[test]
     fn stale_cutpoint_and_suffix_discard_fail_closed() {
         // r[verify agent_harness_runtime.goose_session_branching.edit_in_place.stale]
-        let stale_request = request(SessionBranchOperation::EditInPlace, HASH_E, false)
-            .expect("stale request should validate");
+        let stale_request =
+            request(SessionBranchOperation::EditInPlace, HASH_E, false).expect("stale request should validate");
         let policy = admitted_policy(PolicyFixture {
             require_checkpoint_for_discard: true,
             ..DEFAULT_POLICY_FIXTURE
@@ -1522,8 +1456,8 @@ mod tests {
         assert_eq!(stale_plan.status(), SessionBranchPlanStatus::Denied);
         assert_diagnostic(&stale_plan, SessionBranchDiagnosticKind::StaleCutPoint);
 
-        let discard_request = request(SessionBranchOperation::EditInPlace, HASH_B, false)
-            .expect("discard request should validate");
+        let discard_request =
+            request(SessionBranchOperation::EditInPlace, HASH_B, false).expect("discard request should validate");
         let discard_plan = plan_session_branch(SessionBranchPlannerInput {
             request: &discard_request,
             policy: &policy,
@@ -1532,14 +1466,8 @@ mod tests {
         });
 
         assert_eq!(discard_plan.status(), SessionBranchPlanStatus::Denied);
-        assert_diagnostic(
-            &discard_plan,
-            SessionBranchDiagnosticKind::SuffixDiscardDenied,
-        );
-        assert_diagnostic(
-            &discard_plan,
-            SessionBranchDiagnosticKind::MissingCheckpointEvidence,
-        );
+        assert_diagnostic(&discard_plan, SessionBranchDiagnosticKind::SuffixDiscardDenied);
+        assert_diagnostic(&discard_plan, SessionBranchDiagnosticKind::MissingCheckpointEvidence);
     }
 
     #[test]
@@ -1552,8 +1480,7 @@ mod tests {
         .expect_err("raw prompt body class should fail validation");
         assert_eq!(unsafe_body.kind(), SessionBranchErrorKind::UnsafeText);
 
-        let duplicate_identity =
-            duplicate_request(true).expect("duplicate request should validate");
+        let duplicate_identity = duplicate_request(true).expect("duplicate request should validate");
         let strict_policy = admitted_policy(PolicyFixture {
             deny_unsafe_copy: true,
             ..DEFAULT_POLICY_FIXTURE
@@ -1567,14 +1494,8 @@ mod tests {
         });
 
         assert_eq!(duplicate_plan.status(), SessionBranchPlanStatus::Denied);
-        assert_diagnostic(
-            &duplicate_plan,
-            SessionBranchDiagnosticKind::DuplicateTargetSession,
-        );
-        assert_diagnostic(
-            &duplicate_plan,
-            SessionBranchDiagnosticKind::UnsafeCopyDescriptor,
-        );
+        assert_diagnostic(&duplicate_plan, SessionBranchDiagnosticKind::DuplicateTargetSession);
+        assert_diagnostic(&duplicate_plan, SessionBranchDiagnosticKind::UnsafeCopyDescriptor);
 
         let ambient = request(SessionBranchOperation::ForkFromMessage, HASH_B, true)
             .expect("ambient request should validate before planning");
@@ -1585,32 +1506,21 @@ mod tests {
             ledger: ledger().as_slice(),
             checkpoint_status: SessionBranchCheckpointStatus::NotRequired,
         });
-        assert_diagnostic(
-            &ambient_plan,
-            SessionBranchDiagnosticKind::AmbientAuthorityDenied,
-        );
+        assert_diagnostic(&ambient_plan, SessionBranchDiagnosticKind::AmbientAuthorityDenied);
     }
 
     #[test]
     fn receipt_leak_fixtures_are_rejected() {
         // r[verify agent_harness_runtime.goose_session_branching.receipts.rejects_leaks]
-        for fixture in [
-            RAW_PROMPT,
-            RAW_TRANSCRIPT,
-            "provider payload",
-            "authorization: bearer",
-        ] {
-            let error = validate_session_branch_receipt_text(fixture)
-                .expect_err("receipt leak fixture should fail");
+        for fixture in [RAW_PROMPT, RAW_TRANSCRIPT, "provider payload", "authorization: bearer"] {
+            let error = validate_session_branch_receipt_text(fixture).expect_err("receipt leak fixture should fail");
             assert_eq!(error.kind(), SessionBranchErrorKind::UnsafeText);
         }
     }
 
     fn assert_diagnostic(plan: &SessionBranchPlan, expected: SessionBranchDiagnosticKind) {
         assert!(
-            plan.diagnostics()
-                .iter()
-                .any(|diagnostic| diagnostic.kind() == expected),
+            plan.diagnostics().iter().any(|diagnostic| diagnostic.kind() == expected),
             "expected diagnostic {expected:?} in {:?}",
             plan.diagnostics()
         );
@@ -1649,16 +1559,10 @@ mod tests {
         cut_point_hash: &str,
         ambient_storage_requested: bool,
     ) -> Result<SessionBranchRequest, SessionBranchError> {
-        SessionBranchRequest::new(&request_draft(
-            operation,
-            cut_point_hash,
-            ambient_storage_requested,
-        ))
+        SessionBranchRequest::new(&request_draft(operation, cut_point_hash, ambient_storage_requested))
     }
 
-    fn duplicate_request(
-        duplicate_identity: bool,
-    ) -> Result<SessionBranchRequest, SessionBranchError> {
+    fn duplicate_request(duplicate_identity: bool) -> Result<SessionBranchRequest, SessionBranchError> {
         debug_assert_ne!(HASH_E, HASH_F);
         debug_assert!(!HASH_D.is_empty());
         let target_session_hash = if duplicate_identity { HASH_F } else { HASH_E };

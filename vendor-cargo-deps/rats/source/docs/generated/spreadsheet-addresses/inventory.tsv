@@ -1,0 +1,20 @@
+area	before	after	classification	conversion_or_bound
+cell-address	public usize col/row	private ColumnIndex/RowIndex	logical-address	CellAddr::new; checked from_zero_based_u64 migration helper
+cell-range	public unordered corners	private normalized CellAddr corners	logical-range	CellRange::new normalizes; from_ordered validates
+grid-dimensions	usize constructor/returns	ColumnCount/RowCount	logical-count	Grid::new and count accessors
+spreadsheet-state	u64 dimensions	ColumnCount/RowCount	logical-count	new typed; from_zero_based_u64 checked
+cursor-selection	primitive public address fields	typed CellAddr/CellRange	logical-address-range	private address components
+scroll-state	u64 offsets/visible	ColumnIndex/RowIndex/ColumnCount/RowCount	logical-index-count	viewport writes typed counts
+validators	u64 map keys	ColumnIndex map keys	logical-column	set_column_validator
+column-widths	u64 API keys	ColumnIndex API keys	logical-column	set_col_width/col_width
+frozen-extents	u64 fields	ColumnCount/RowCount	logical-count	public typed extents
+formula-dependencies	CellAddr with primitive fields	CellAddr with nominal components	logical-address	dependency graph keys remain aggregate
+formula-range	private usize span	CellRange	logical-range	bounded iteration
+paste-offsets	usize tuple/counts	ColumnCount/RowCount	logical-relative-count	checked destination addition before mutation
+header-commands	kind plus u64 index	HeaderTarget::Column/Row	logical-sum-target	from_zero_based_u64 is checked compatibility ingestion
+header-affordances	kind plus usize index	HeaderTarget::Column/Row	logical-sum-target	projection derives kind from target
+A1-text	partial two-letter display	checked arbitrary-letter parser/display	compatibility-boundary	typed A1ParseError
+external-integers	u64 clamping or saturation	TryFrom<u64>	compatibility-ingestion	CoordinateError; no host-sized public primitive API
+renderer-coordinate	local usize to u16	u16_from_usize	terminal-geometry	bounded terminal clipping only; not logical identity
+render-loops	usize enumerators	usize enumerators	local-iteration	immediately wrapped before logical APIs
+storage	Vec<Vec<CellValue>> indexes	usize backing inside opaque types	storage-representation	no layout rewrite

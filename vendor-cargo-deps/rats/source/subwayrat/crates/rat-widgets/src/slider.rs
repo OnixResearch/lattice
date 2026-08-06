@@ -12,8 +12,10 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 
 pub struct Slider {
@@ -171,9 +173,10 @@ impl Slider {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     fn render_to_string(slider: &Slider, width: u16) -> String {
         let backend = TestBackend::new(width.max(1), 1);
@@ -223,10 +226,7 @@ mod tests {
         // value=0 → thumb at leftmost position, all empty after
         let rendered = render_to_string(&Slider::new(0.0).with_chars('=', '-', 'O'), 10);
         assert!(rendered.starts_with('O'), "got: {rendered}");
-        assert!(
-            !rendered[1..].contains('='),
-            "no filled chars expected: {rendered}"
-        );
+        assert!(!rendered[1..].contains('='), "no filled chars expected: {rendered}");
     }
 
     #[test]
@@ -234,10 +234,7 @@ mod tests {
         // value=1 → thumb at rightmost position, all filled before
         let rendered = render_to_string(&Slider::new(1.0).with_chars('=', '-', 'O'), 10);
         assert!(rendered.ends_with('O'), "got: {rendered}");
-        assert!(
-            !rendered[..rendered.len() - 1].contains('-'),
-            "no empty chars expected: {rendered}"
-        );
+        assert!(!rendered[..rendered.len() - 1].contains('-'), "no empty chars expected: {rendered}");
     }
 
     #[test]
@@ -287,12 +284,7 @@ mod tests {
 
     #[test]
     fn left_label() {
-        let rendered = render_to_string(
-            &Slider::new(0.0)
-                .with_chars('=', '-', 'O')
-                .with_left_label("L"),
-            12,
-        );
+        let rendered = render_to_string(&Slider::new(0.0).with_chars('=', '-', 'O').with_left_label("L"), 12);
         // "L O---------" (label + space + thumb at 0 + 9 empty)
         assert!(rendered.starts_with("L "), "got: {rendered}");
         assert!(rendered.contains('O'), "got: {rendered}");
@@ -300,12 +292,7 @@ mod tests {
 
     #[test]
     fn right_label() {
-        let rendered = render_to_string(
-            &Slider::new(1.0)
-                .with_chars('=', '-', 'O')
-                .with_right_label("R"),
-            12,
-        );
+        let rendered = render_to_string(&Slider::new(1.0).with_chars('=', '-', 'O').with_right_label("R"), 12);
         // 12 total - 2 right chrome = 10 track. thumb at pos 9.
         assert!(rendered.ends_with("R"), "got: {rendered}");
         assert!(rendered.contains('O'), "got: {rendered}");
@@ -314,10 +301,7 @@ mod tests {
     #[test]
     fn both_labels() {
         let rendered = render_to_string(
-            &Slider::new(0.5)
-                .with_chars('=', '-', 'O')
-                .with_left_label("A")
-                .with_right_label("B"),
+            &Slider::new(0.5).with_chars('=', '-', 'O').with_left_label("A").with_right_label("B"),
             16,
         );
         assert!(rendered.starts_with("A "), "got: {rendered}");
@@ -329,10 +313,7 @@ mod tests {
     fn labels_eat_all_space() {
         // Labels so wide there's no room for the track
         let rendered = render_to_string(
-            &Slider::new(0.5)
-                .with_chars('=', '-', 'O')
-                .with_left_label("ABCDE")
-                .with_right_label("FGHIJ"),
+            &Slider::new(0.5).with_chars('=', '-', 'O').with_left_label("ABCDE").with_right_label("FGHIJ"),
             12,
         );
         // 12 - 6 left - 6 right = 0 track → no thumb/track rendered

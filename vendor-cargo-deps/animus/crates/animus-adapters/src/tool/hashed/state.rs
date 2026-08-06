@@ -84,14 +84,11 @@ impl Snapshot {
     /// duplicate/ambiguous tags, invalid BLAKE3 hashes, or impossible line
     /// positions.
     pub fn new(draft: &SnapshotDraft<'_>) -> Result<Self, super::Error> {
-        let resource_class =
-            super::required_label(super::RESOURCE_CLASS_FIELD, draft.resource_class)?;
-        let resource_identity =
-            super::required_label(super::RESOURCE_IDENTITY_FIELD, draft.resource_identity)?;
+        let resource_class = super::required_label(super::RESOURCE_CLASS_FIELD, draft.resource_class)?;
+        let resource_identity = super::required_label(super::RESOURCE_IDENTITY_FIELD, draft.resource_identity)?;
         let snapshot_hash = super::validate_hash(super::SNAPSHOT_HASH_FIELD, draft.snapshot_hash)?;
         let normalization = super::TextNormalization::parse(draft.normalization)?;
-        let tag_generation =
-            super::required_label(super::TAG_GENERATION_FIELD, draft.tag_generation)?;
+        let tag_generation = super::required_label(super::TAG_GENERATION_FIELD, draft.tag_generation)?;
         let tagged_lines = collect_tagged_lines(draft.line_count, draft.tagged_lines)?;
         let identity_hash = super::hash::snapshot_identity(super::hash::SnapshotIdentity {
             resource_class: resource_class.as_str(),

@@ -1,0 +1,72 @@
+{
+  "backend": "bubblewrap-agent-guardrail",
+  "bounds": {
+    "max_environment": 16,
+    "max_options": 256,
+    "max_roots": 32
+  },
+  "cohort": "bubblewrap-0.11.2-args-v1",
+  "devices": false,
+  "environment_keys": [
+    "TERM"
+  ],
+  "escape_hatches": {
+    "command_environment_source": false,
+    "command_prefix": false,
+    "implicit_shell": false,
+    "passthrough": false,
+    "privileged_sidecar": false,
+    "project_local_policy": false,
+    "raw_arguments": false,
+    "unguarded_fallback": false
+  },
+  "host_sockets": false,
+  "identity": {
+    "algorithm": "blake3",
+    "executable_domain": "animus.agent-guardrail.executable.v1",
+    "plan_domain": "animus.agent-guardrail.plan.v1",
+    "profile_domain": "animus.agent-guardrail.profile.v1",
+    "receipt_domain": "animus.agent-guardrail.receipt.v1"
+  },
+  "label": "interactive-agent-default",
+  "network": "deny",
+  "non_claims": [
+    "not-hostile-code-containment",
+    "not-kernel-correctness",
+    "not-same-uid-secrecy",
+    "not-filtered-network-egress",
+    "not-authorization",
+    "not-build-hermeticity",
+    "not-toctou-safe-path-resolution",
+    "not-production-or-release-readiness"
+  ],
+  "redaction": {
+    "marker": "raw-prompt-credential-environment-host-path-mount-command-output-debug-and-unbounded-events-omitted",
+    "raw_payloads": false
+  },
+  "roots": [
+    {
+      "label": "tool-store",
+      "mode": "read-only",
+      "required": true,
+      "source_kind": "directory",
+      "target": "/nix/store"
+    },
+    {
+      "label": "worktree",
+      "mode": "writable",
+      "required": true,
+      "source_kind": "directory",
+      "target": "/workspace"
+    },
+    {
+      "label": "guardrail-fixture",
+      "mode": "read-only",
+      "required": false,
+      "source_kind": "file",
+      "target": "/guardrail-fixture"
+    }
+  ],
+  "schema": "animus.agent-guardrail.profile.v1",
+  "trust_source": "central-reviewed"
+}

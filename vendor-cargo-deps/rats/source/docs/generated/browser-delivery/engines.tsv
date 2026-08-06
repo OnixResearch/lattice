@@ -1,0 +1,4 @@
+engine	browser_identity	runner	entrypoints	paths	required_scenarios	result	freshness	feature_differences
+chromium	Chromium 149.0.7827.53	x86_64-unknown-linux-gnu	rat-ratzilla,met-showcase	/,/rats/rat-ratzilla/,/rats/met-showcase/	release-load,mounted-render,interaction,effect-rejection,failure,cleanup,mime,csp,no-network	pass	source-and-manifest-bound	outbound host resolution denied; application-effect permission scenarios remain separate
+firefox	Mozilla Firefox 151.0.3; geckodriver 0.36.0	x86_64-unknown-linux-gnu	rat-ratzilla,met-showcase	/,/rats/rat-ratzilla/,/rats/met-showcase/	release-load,mounted-render,interaction,effect-rejection,failure,cleanup,mime,csp	pass	source-and-manifest-bound	WebDriver direct; application-effect permission and Chromium no-network mechanism are not inferred
+webkit	unprovisioned	-	-	-	-	unsupported	missing direct runner	Chromium/Firefox receipts cannot promote this cell

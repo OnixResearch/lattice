@@ -30,13 +30,9 @@ impl DiffReviewSpan {
     ///
     /// Returns [`super::super::DiffReviewError`] when labels are malformed, line
     /// numbers are zero, ranges are reversed, or same-line columns are impossible.
-    pub fn validate(
-        draft: &DiffReviewSpanDraft<'_>,
-    ) -> Result<Self, super::super::DiffReviewError> {
-        let source_label = super::super::check::required_safe_text(
-            super::super::SOURCE_LABEL_FIELD,
-            draft.source_label,
-        )?;
+    pub fn validate(draft: &DiffReviewSpanDraft<'_>) -> Result<Self, super::super::DiffReviewError> {
+        let source_label =
+            super::super::check::required_safe_text(super::super::SOURCE_LABEL_FIELD, draft.source_label)?;
         let lines = super::super::check::LineRange {
             start_line: draft.start_line,
             end_line: draft.end_line,

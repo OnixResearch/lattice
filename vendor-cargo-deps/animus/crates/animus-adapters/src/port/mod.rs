@@ -9,15 +9,9 @@ pub trait ToolAdapter: ComponentAdapter<crate::ToolRequest, crate::ToolResponse>
 impl<T> ToolAdapter for T where T: ComponentAdapter<crate::ToolRequest, crate::ToolResponse> {}
 
 /// Host status-observation adapter contract.
-pub trait HostStatusAdapter:
-    ComponentAdapter<crate::HostStatusRequest, crate::HostStatusObservationBatch>
-{
-}
+pub trait HostStatusAdapter: ComponentAdapter<crate::HostStatusRequest, crate::HostStatusObservationBatch> {}
 
-impl<T> HostStatusAdapter for T where
-    T: ComponentAdapter<crate::HostStatusRequest, crate::HostStatusObservationBatch>
-{
-}
+impl<T> HostStatusAdapter for T where T: ComponentAdapter<crate::HostStatusRequest, crate::HostStatusObservationBatch> {}
 
 /// Generic port between harness orchestration and a swappable component.
 pub trait ComponentAdapter<Request, Response> {

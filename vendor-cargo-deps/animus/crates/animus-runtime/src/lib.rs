@@ -29,17 +29,42 @@
 )]
 #![forbid(unsafe_code)]
 
+/// Pure active-turn durability, transaction, recovery, and receipt contracts.
+pub mod active_turn_recovery;
 mod admission;
+#[allow(excessive_file_length)]
+#[path = "aeneasproofcampaign.rs"]
+pub mod aeneas_proof_campaign;
 #[path = "agentroles/mod.rs"]
 pub mod agent_roles;
+#[allow(excessive_file_length)]
+#[path = "authoritativecompletion/mod.rs"]
+pub mod authoritative_completion;
 mod background;
 #[allow(excessive_file_length)]
 mod batch;
 mod boundary;
+/// Pure bounded session branch projection, control planning, comparison, and evidence.
+pub mod branch_explorer;
 mod branching;
 mod capmap;
 mod caps;
 mod checkpoint;
+/// Pure canonical conversation projection and cache reconciliation.
+#[path = "conversationprojection.rs"]
+pub mod conversation_projection;
+#[path = "codingsession/mod.rs"]
+mod sessionhost;
+/// Pure coding-session lifecycle facade and effect-request state machine.
+pub mod coding_session_host {
+    pub use super::sessionhost::*;
+}
+#[path = "authorityprofile/mod.rs"]
+mod sessionauthority;
+/// Pure metadata-only runtime authority profiles, durable bindings, and receipts.
+pub mod session_authority_profile {
+    pub use super::sessionauthority::*;
+}
 #[path = "composition/conformance.rs"]
 mod composition_conformance;
 mod context_layering;
@@ -58,8 +83,13 @@ mod executionkit;
 mod exports;
 mod fabric;
 mod fresh_context_tasks;
+/// Pure optional Harbor-compatible evaluation planning and evidence projection.
+#[path = "harbor/eval.rs"]
+pub mod harbor_eval;
 mod headless;
 mod hooks;
+#[path = "control.rs"]
+mod runstate;
 #[path = "interrupted_tool_repair/mod.rs"]
 mod session_recovery;
 /// Pure active-branch diagnosis and append-only interrupted tool-call repair.
@@ -94,6 +124,9 @@ mod redactedview;
 mod researchspec;
 #[path = "researchspecpromotiondag.rs"]
 pub mod researchspec_promotion_dag;
+#[cfg(feature = "rlm-kernel")]
+#[path = "rlmkernel.rs"]
+pub mod rlm_kernel;
 mod runtime_dag;
 mod scaffold;
 /// Pure redaction-first session-tree export contracts.
@@ -111,7 +144,8 @@ pub mod durable_session_store {
 mod shell;
 mod status;
 pub mod subagents;
-pub use subagents::{TypedSubagentCapability, subagent_capability_receipt_label};
+pub use subagents::TypedSubagentCapability;
+pub use subagents::subagent_capability_receipt_label;
 mod telemetry;
 #[path = "tooladmission.rs"]
 mod tool_admission;

@@ -34,12 +34,7 @@ impl IdeRect {
     /// Creates a rectangle.
     #[must_use]
     pub const fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-        }
+        Self { x, y, width, height }
     }
 }
 
@@ -226,10 +221,7 @@ pub fn compute_ide_regions(config: &IdeShellConfig) -> IdeShellRegions {
         0
     };
     let main_x = navigation_width;
-    let main_width = config
-        .width
-        .saturating_sub(navigation_width)
-        .saturating_sub(auxiliary_width);
+    let main_width = config.width.saturating_sub(navigation_width).saturating_sub(auxiliary_width);
     let auxiliary_x = main_x.saturating_add(main_width);
     let command_y = usable_height;
     let status_y = config.height.saturating_sub(STATUS_HEIGHT);
@@ -238,21 +230,12 @@ pub fn compute_ide_regions(config: &IdeShellConfig) -> IdeShellRegions {
         navigation: IdeRect::new(0, 0, navigation_width, usable_height),
         main: IdeRect::new(main_x, 0, main_width, usable_height),
         auxiliary: IdeRect::new(auxiliary_x, 0, auxiliary_width, usable_height),
-        command: IdeRect::new(
-            0,
-            command_y,
-            config.width,
-            COMMAND_HEIGHT.min(config.height),
-        ),
+        command: IdeRect::new(0, command_y, config.width, COMMAND_HEIGHT.min(config.height)),
         status: IdeRect::new(0, status_y, config.width, STATUS_HEIGHT.min(config.height)),
     }
 }
 
-fn validate_ide_shell(
-    config: &IdeShellConfig,
-    adapters: &IdeAdapterSet,
-    regions: &IdeShellRegions,
-) -> Vec<IdeIssue> {
+fn validate_ide_shell(config: &IdeShellConfig, adapters: &IdeAdapterSet, regions: &IdeShellRegions) -> Vec<IdeIssue> {
     let mut issues = adapter_issues(adapters);
     if config.persisted_layout_version != Some(IdeLayoutVersion::CURRENT.value()) {
         issues.push(IdeIssue::new(
@@ -282,11 +265,7 @@ fn adapter_issues(adapters: &IdeAdapterSet) -> Vec<IdeIssue> {
     .into_iter()
     .filter(|(_, available)| !available)
     .map(|(name, _)| {
-        IdeIssue::new(
-            IdeIssueCode::MissingAdapter,
-            name,
-            format!("required IDE adapter `{name}` is missing"),
-        )
+        IdeIssue::new(IdeIssueCode::MissingAdapter, name, format!("required IDE adapter `{name}` is missing"))
     })
     .collect()
 }

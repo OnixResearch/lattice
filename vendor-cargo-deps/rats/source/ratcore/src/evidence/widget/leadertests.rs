@@ -1,8 +1,12 @@
-use crate::interaction_replay::{
-    LeaderReplaySummary, LeaderReplayTarget, ReplayIssueCode, ReplayReport,
-    leader_key_negative_replay_script, leader_key_positive_replay_script,
-    leader_key_replay_summary, leader_key_replay_target, run_replay,
-};
+use crate::interaction_replay::LeaderReplaySummary;
+use crate::interaction_replay::LeaderReplayTarget;
+use crate::interaction_replay::ReplayIssueCode;
+use crate::interaction_replay::ReplayReport;
+use crate::interaction_replay::leader_key_negative_replay_script;
+use crate::interaction_replay::leader_key_positive_replay_script;
+use crate::interaction_replay::leader_key_replay_summary;
+use crate::interaction_replay::leader_key_replay_target;
+use crate::interaction_replay::run_replay;
 
 const POSITIVE_FIXTURE_ID: &str = "leader-key.workspace-action.baseline";
 const NEGATIVE_FIXTURE_ID: &str = "leader-key.invalid.baseline";
@@ -18,10 +22,7 @@ fn leader_key_positive_fixture_replays_submenu_and_action() {
     let outcome = run_replay(&script, &mut target);
 
     assert!(outcome.is_success());
-    assert_eq!(
-        outcome.state.get("selected_action"),
-        Some(&ACTION_WORKSPACE_SAVE.to_string())
-    );
+    assert_eq!(outcome.state.get("selected_action"), Some(&ACTION_WORKSPACE_SAVE.to_string()));
     assert_eq!(outcome.state.get("visible"), Some(&false.to_string()));
     assert_eq!(outcome.state_hash, script.snapshots[0].blake3);
 }
@@ -51,17 +52,14 @@ fn leader_key_evidence_includes_positive_and_negative_rows() {
 }
 
 fn has_positive_row(evidence: &LeaderReplaySummary) -> bool {
-    evidence
-        .rows
-        .iter()
-        .any(|row| row.fixture_id == POSITIVE_FIXTURE_ID && row.diagnostics == "-")
+    evidence.rows.iter().any(|row| row.fixture_id == POSITIVE_FIXTURE_ID && row.diagnostics == "-")
 }
 
 fn has_negative_row(evidence: &LeaderReplaySummary) -> bool {
-    evidence.rows.iter().any(|row| {
-        row.fixture_id == NEGATIVE_FIXTURE_ID
-            && row.diagnostics.contains(DISABLED_ACTION_DIAGNOSTIC)
-    })
+    evidence
+        .rows
+        .iter()
+        .any(|row| row.fixture_id == NEGATIVE_FIXTURE_ID && row.diagnostics.contains(DISABLED_ACTION_DIAGNOSTIC))
 }
 
 fn assert_issue(report: &ReplayReport, code: ReplayIssueCode) {

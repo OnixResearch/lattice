@@ -3,11 +3,14 @@
 //! This module contains no ratatui dependency. It's a pure data structure
 //! for directed graphs with typed input/output ports on each node.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -111,10 +114,7 @@ pub enum GraphError {
     /// Tried to connect ports on the same node.
     SelfLoop,
     /// Port types are not compatible.
-    IncompatibleTypes {
-        source_tag: String,
-        target_tag: String,
-    },
+    IncompatibleTypes { source_tag: String, target_tag: String },
     /// Adding the edge would create a cycle (DAG mode).
     WouldCycle,
     /// One or both port IDs not found in the graph.
@@ -135,14 +135,8 @@ impl fmt::Display for GraphError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SelfLoop => write!(f, "self-loops are not allowed"),
-            Self::IncompatibleTypes {
-                source_tag,
-                target_tag,
-            } => {
-                write!(
-                    f,
-                    "incompatible port types: {source_tag:?} → {target_tag:?}"
-                )
+            Self::IncompatibleTypes { source_tag, target_tag } => {
+                write!(f, "incompatible port types: {source_tag:?} → {target_tag:?}")
             }
             Self::WouldCycle => write!(f, "edge would create a cycle (DAG mode)"),
             Self::PortNotFound(id) => write!(f, "port {id} not found"),
@@ -234,18 +228,11 @@ fn plan_port_reconciliation(
     direction: PortDirection,
     next_port_id: u64,
 ) -> Result<PortReconciliationPlan, GraphError> {
-    debug_assert!(
-        existing
-            .iter()
-            .all(|candidate| candidate.direction == direction)
-    );
+    debug_assert!(existing.iter().all(|candidate| candidate.direction == direction));
 
     let mut existing_by_label = BTreeMap::new();
     for candidate in existing {
-        if existing_by_label
-            .insert(candidate.label.clone(), candidate)
-            .is_some()
-        {
+        if existing_by_label.insert(candidate.label.clone(), candidate).is_some() {
             return Err(GraphError::DuplicatePortLabel(candidate.label.clone()));
         }
     }
@@ -272,9 +259,7 @@ fn plan_port_reconciliation(
             continue;
         }
 
-        let following_identity_raw = next_free_identity_raw
-            .checked_add(1)
-            .ok_or(GraphError::PortIdExhausted)?;
+        let following_identity_raw = next_free_identity_raw.checked_add(1).ok_or(GraphError::PortIdExhausted)?;
         replacement.push(Port {
             id: PortId(next_free_identity_raw),
             label: spec.label.clone(),
@@ -291,11 +276,7 @@ fn plan_port_reconciliation(
     }
 
     debug_assert_eq!(replacement.len(), requested.len());
-    debug_assert!(
-        replacement
-            .iter()
-            .all(|candidate| candidate.direction == direction)
-    );
+    debug_assert!(replacement.iter().all(|candidate| candidate.direction == direction));
     Ok(PortReconciliationPlan {
         replacement,
         prior_ids: existing.iter().map(|candidate| candidate.id).collect(),
@@ -334,12 +315,7 @@ impl Graph {
 
     /// Add a node with the given label, input port specs, and output port specs.
     /// Returns the assigned `NodeId`.
-    pub fn add_node(
-        &mut self,
-        label: impl Into<String>,
-        inputs: &[PortSpec],
-        outputs: &[PortSpec],
-    ) -> NodeId {
+    pub fn add_node(&mut self, label: impl Into<String>, inputs: &[PortSpec], outputs: &[PortSpec]) -> NodeId {
         let node_id = NodeId(self.next_node_id);
         self.next_node_id += 1;
 
@@ -394,16 +370,10 @@ impl Graph {
         let node = self.nodes.remove(&id).ok_or(GraphError::NodeNotFound(id))?;
 
         // Collect all port IDs belonging to this node.
-        let port_ids: Vec<PortId> = node
-            .input_ports
-            .iter()
-            .chain(node.output_ports.iter())
-            .map(|p| p.id)
-            .collect();
+        let port_ids: Vec<PortId> = node.input_ports.iter().chain(node.output_ports.iter()).map(|p| p.id).collect();
 
         // Remove edges touching any of those ports.
-        self.edges
-            .retain(|e| !port_ids.contains(&e.source) && !port_ids.contains(&e.target));
+        self.edges.retain(|e| !port_ids.contains(&e.source) && !port_ids.contains(&e.target));
 
         // Remove port ownership entries.
         for pid in &port_ids {
@@ -456,11 +426,7 @@ impl Graph {
         });
         self.next_port_id = plan.next_port_id;
 
-        debug_assert!(
-            plan.replacement
-                .iter()
-                .all(|port| self.port_owner.get(&port.id) == Some(&id))
-        );
+        debug_assert!(plan.replacement.iter().all(|port| self.port_owner.get(&port.id) == Some(&id)));
         Ok(plan.replacement.iter().map(|port| port.id).collect())
     }
 
@@ -470,17 +436,11 @@ impl Graph {
     ///
     /// Validates direction, self-loop, type compatibility, and (if dag_mode) cycles.
     pub fn add_edge(&mut self, source: PortId, target: PortId) -> Result<(), GraphError> {
-        let source_port = self
-            .find_port(source)
-            .ok_or(GraphError::PortNotFound(source))?;
-        let target_port = self
-            .find_port(target)
-            .ok_or(GraphError::PortNotFound(target))?;
+        let source_port = self.find_port(source).ok_or(GraphError::PortNotFound(source))?;
+        let target_port = self.find_port(target).ok_or(GraphError::PortNotFound(target))?;
 
         // Direction check.
-        if source_port.direction != PortDirection::Output
-            || target_port.direction != PortDirection::Input
-        {
+        if source_port.direction != PortDirection::Output || target_port.direction != PortDirection::Input {
             return Err(GraphError::WrongDirection);
         }
 
@@ -581,26 +541,15 @@ impl Graph {
         let Some(node) = self.nodes.get(&id) else {
             return Vec::new();
         };
-        let port_ids: Vec<PortId> = node
-            .input_ports
-            .iter()
-            .chain(node.output_ports.iter())
-            .map(|p| p.id)
-            .collect();
-        self.edges
-            .iter()
-            .filter(|e| port_ids.contains(&e.source) || port_ids.contains(&e.target))
-            .collect()
+        let port_ids: Vec<PortId> = node.input_ports.iter().chain(node.output_ports.iter()).map(|p| p.id).collect();
+        self.edges.iter().filter(|e| port_ids.contains(&e.source) || port_ids.contains(&e.target)).collect()
     }
 
     /// Find a port by ID across all nodes. Returns a clone of the port data.
     pub fn port(&self, id: PortId) -> Option<&Port> {
         let node_id = self.port_owner.get(&id)?;
         let node = self.nodes.get(node_id)?;
-        node.input_ports
-            .iter()
-            .chain(node.output_ports.iter())
-            .find(|p| p.id == id)
+        node.input_ports.iter().chain(node.output_ports.iter()).find(|p| p.id == id)
     }
 
     /// Find which node owns a port.
@@ -691,11 +640,7 @@ mod tests {
     #[test]
     fn create_node_with_ports() {
         let mut g = Graph::new();
-        let id = g.add_node(
-            "HTTP Request",
-            &[string_port("url"), string_port("headers")],
-            &[string_port("response")],
-        );
+        let id = g.add_node("HTTP Request", &[string_port("url"), string_port("headers")], &[string_port("response")]);
 
         let node = g.node(id).unwrap();
         assert_eq!(node.label, "HTTP Request");
@@ -912,11 +857,7 @@ mod tests {
     fn reconcile_ports_preserves_matching_identity_and_cleans_removed_edges() {
         let mut g = Graph::new();
         let source = g.add_node("Source", &[], &[string_port("keep"), string_port("remove")]);
-        let target = g.add_node(
-            "Target",
-            &[string_port("keep-in"), string_port("remove-in")],
-            &[],
-        );
+        let target = g.add_node("Target", &[string_port("keep-in"), string_port("remove-in")], &[]);
         let keep_id = g.node(source).unwrap().output_ports[0].id;
         let remove_id = g.node(source).unwrap().output_ports[1].id;
         let keep_target = g.node(target).unwrap().input_ports[0].id;
@@ -925,37 +866,20 @@ mod tests {
         g.add_edge(remove_id, remove_target).unwrap();
 
         let reconciled = g
-            .reconcile_node_ports(
-                source,
-                PortDirection::Output,
-                &[string_port("added"), string_port("keep")],
-            )
+            .reconcile_node_ports(source, PortDirection::Output, &[string_port("added"), string_port("keep")])
             .unwrap();
 
         let output_snapshot = g.node(source).unwrap().output_ports.clone();
-        assert_eq!(
-            output_snapshot
-                .iter()
-                .map(|port_value| port_value.label.as_str())
-                .collect::<Vec<_>>(),
-            vec!["added", "keep"]
-        );
+        assert_eq!(output_snapshot.iter().map(|port_value| port_value.label.as_str()).collect::<Vec<_>>(), vec![
+            "added", "keep"
+        ]);
         assert_eq!(output_snapshot[1].id, keep_id);
-        assert_eq!(
-            reconciled,
-            output_snapshot
-                .iter()
-                .map(|port_value| port_value.id)
-                .collect::<Vec<_>>()
-        );
+        assert_eq!(reconciled, output_snapshot.iter().map(|port_value| port_value.id).collect::<Vec<_>>());
         assert_eq!(g.edge_count(), 1);
-        assert_eq!(
-            g.edges()[0],
-            Edge {
-                source: keep_id,
-                target: keep_target
-            }
-        );
+        assert_eq!(g.edges()[0], Edge {
+            source: keep_id,
+            target: keep_target
+        });
         assert!(g.add_edge(output_snapshot[0].id, remove_target).is_ok());
     }
 
@@ -969,8 +893,7 @@ mod tests {
         let target_id = g.node(target).unwrap().input_ports[0].id;
         g.add_edge(source_id, target_id).unwrap();
 
-        g.reconcile_node_ports(source, PortDirection::Output, &[number_port("value")])
-            .unwrap();
+        g.reconcile_node_ports(source, PortDirection::Output, &[number_port("value")]).unwrap();
 
         assert_eq!(g.node(source).unwrap().output_ports[0].id, source_id);
         assert_eq!(g.node(source).unwrap().output_ports[0].type_tag, "number");
@@ -984,16 +907,10 @@ mod tests {
         let source = g.add_node("Source", &[], &[string_port("value")]);
         let prior_output_snapshot = g.node(source).unwrap().output_ports.clone();
 
-        let result = g.reconcile_node_ports(
-            source,
-            PortDirection::Output,
-            &[string_port("duplicate"), number_port("duplicate")],
-        );
+        let result = g
+            .reconcile_node_ports(source, PortDirection::Output, &[string_port("duplicate"), number_port("duplicate")]);
 
-        assert_eq!(
-            result,
-            Err(GraphError::DuplicatePortLabel("duplicate".to_string()))
-        );
+        assert_eq!(result, Err(GraphError::DuplicatePortLabel("duplicate".to_string())));
         assert_eq!(g.node(source).unwrap().output_ports, prior_output_snapshot);
         assert_eq!(g.edge_count(), 0);
     }
@@ -1002,8 +919,7 @@ mod tests {
     #[test]
     fn reconcile_missing_node_fails_without_allocating_port_id() {
         let mut g = Graph::new();
-        let result =
-            g.reconcile_node_ports(NodeId(99), PortDirection::Output, &[string_port("value")]);
+        let result = g.reconcile_node_ports(NodeId(99), PortDirection::Output, &[string_port("value")]);
         assert_eq!(result, Err(GraphError::NodeNotFound(NodeId(99))));
 
         let node = g.add_node("After", &[], &[string_port("value")]);
@@ -1029,18 +945,12 @@ mod tests {
             },
         ];
         assert_eq!(
-            plan_port_reconciliation(
-                &duplicate_existing,
-                &[string_port("duplicate")],
-                PortDirection::Output,
-                2,
-            )
-            .unwrap_err(),
+            plan_port_reconciliation(&duplicate_existing, &[string_port("duplicate")], PortDirection::Output, 2,)
+                .unwrap_err(),
             GraphError::DuplicatePortLabel("duplicate".to_string())
         );
         assert_eq!(
-            plan_port_reconciliation(&[], &[string_port("new")], PortDirection::Output, u64::MAX)
-                .unwrap_err(),
+            plan_port_reconciliation(&[], &[string_port("new")], PortDirection::Output, u64::MAX).unwrap_err(),
             GraphError::PortIdExhausted
         );
     }

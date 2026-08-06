@@ -1,0 +1,9 @@
+history_domain	authority	precondition	grouping	inverse_or_checkpoint	dirty_or_effect	decision
+prompt-submission-history	rat-editor	widget input state	submission event	stored prior submissions	not document dirty	keep local
+text-edit-undo	application text engine	content revision	application transaction/coalescing policy	engine inverse or checkpoint	may request dirty/save	follow-up only with consumer
+outline-structural-edit	rat-outline/application	outline parse/content revision	structural action	application-specific	content dirty	keep local pending text engine
+docking-layout-undo	docking/workspace owner	layout generation	layout operation	layout snapshot/inverse	layout persistence effect	separate domain
+workspace-command-history	application runtime	command revision/authorization	command dispatch	application receipt	external/local effects	separate domain
+persistence-migration	persistence owner	durable schema version	migration transaction	backup/recovery policy	storage flush	separate from edit undo
+external-daemon-command	downstream service	external revision/capability/authorization	protocol command	service recovery	service effect	never Rats undo stack
+universal-history	none	none	untyped global order	closures/arbitrary payload	mixed authorities	reject

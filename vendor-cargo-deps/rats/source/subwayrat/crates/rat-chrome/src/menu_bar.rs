@@ -7,17 +7,24 @@
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
+use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 #[path = "menu_bar/layout.rs"]
 mod layout;
 #[path = "menu_bar/reducer.rs"]
 mod reducer;
 
-use crate::{MenuItem, MenuNav};
+use crate::MenuItem;
+use crate::MenuNav;
 
 const MENU_LABEL_HORIZONTAL_PADDING: u16 = 1;
 const MENU_BAR_HEIGHT: u16 = 1;
@@ -117,10 +124,7 @@ impl MenuBarModel {
 
     /// Return the active dropdown item list.
     pub fn active_items(&self) -> &[MenuItem] {
-        self.dropdowns
-            .get(self.active)
-            .map(Vec::as_slice)
-            .unwrap_or_default()
+        self.dropdowns.get(self.active).map(Vec::as_slice).unwrap_or_default()
     }
 
     /// Return the current submenu level for the active dropdown.
@@ -188,11 +192,7 @@ impl MenuBarModel {
         }
 
         let active = self.active;
-        let items = self
-            .dropdowns
-            .get(active)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
+        let items = self.dropdowns.get(active).map(Vec::as_slice).unwrap_or_default();
         let current_items = self.nav.current_items(items).unwrap_or_default();
         self.nav.move_down(current_items)
     }
@@ -205,11 +205,7 @@ impl MenuBarModel {
         }
 
         let active = self.active;
-        let items = self
-            .dropdowns
-            .get(active)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
+        let items = self.dropdowns.get(active).map(Vec::as_slice).unwrap_or_default();
         let current_items = self.nav.current_items(items).unwrap_or_default();
         self.nav.move_up(current_items)
     }
@@ -220,11 +216,7 @@ impl MenuBarModel {
             return false;
         }
         let active = self.active;
-        let items = self
-            .dropdowns
-            .get(active)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
+        let items = self.dropdowns.get(active).map(Vec::as_slice).unwrap_or_default();
         self.nav.enter_submenu(items)
     }
 
@@ -239,11 +231,7 @@ impl MenuBarModel {
             return None;
         }
 
-        let label = self
-            .nav
-            .current_item(self.active_items())
-            .and_then(MenuItem::label)
-            .map(str::to_string);
+        let label = self.nav.current_item(self.active_items()).and_then(MenuItem::label).map(str::to_string);
 
         if label.is_some() {
             self.close();
@@ -255,11 +243,7 @@ impl MenuBarModel {
     fn focus_active_dropdown(&mut self) {
         self.nav.clear();
         let active = self.active;
-        let items = self
-            .dropdowns
-            .get(active)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
+        let items = self.dropdowns.get(active).map(Vec::as_slice).unwrap_or_default();
         self.nav.focus_first(items);
     }
 }
@@ -282,12 +266,8 @@ impl Default for MenuBarStyle {
         Self {
             background: Style::default().bg(Color::Black),
             label: Style::default().fg(Color::Gray),
-            active_label: Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-            open_label: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            active_label: Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            open_label: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
         }
     }
 }
@@ -346,10 +326,7 @@ impl Default for DropdownStyle {
             border: Style::default().fg(Color::Gray),
             item: Style::default().fg(Color::White),
             disabled_item: Style::default().fg(Color::DarkGray),
-            selected_item: Style::default()
-                .fg(Color::Black)
-                .bg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            selected_item: Style::default().fg(Color::Black).bg(Color::Yellow).add_modifier(Modifier::BOLD),
             accel: Style::default().fg(Color::Gray),
             submenu_marker: Style::default().fg(Color::White),
             separator: Style::default().fg(Color::DarkGray),
@@ -469,12 +446,7 @@ pub fn compute_menu_bar_layout(area: Rect, model: &MenuBarModel) -> MenuBarLayou
 }
 
 /// Render the top menu bar and return its computed label layout.
-pub fn render_menu_bar(
-    frame: &mut Frame,
-    area: Rect,
-    model: &MenuBarModel,
-    style: &MenuBarStyle,
-) -> MenuBarLayout {
+pub fn render_menu_bar(frame: &mut Frame, area: Rect, model: &MenuBarModel, style: &MenuBarStyle) -> MenuBarLayout {
     let layout = compute_menu_bar_layout(area, model);
 
     if area.width == 0 || area.height == 0 {
@@ -496,25 +468,14 @@ pub fn render_menu_bar(
 
 /// Return the dropdown width including border, clamped to `minimum_width`.
 pub fn compute_dropdown_width(items: &[MenuItem], minimum_width: u16) -> u16 {
-    let item_width = items
-        .iter()
-        .map(dropdown_item_content_width)
-        .max()
-        .unwrap_or_default();
-    let padded_width = item_width.saturating_add(usize::from(
-        DROPDOWN_ITEM_HORIZONTAL_PADDING.saturating_mul(2),
-    ));
+    let item_width = items.iter().map(dropdown_item_content_width).max().unwrap_or_default();
+    let padded_width = item_width.saturating_add(usize::from(DROPDOWN_ITEM_HORIZONTAL_PADDING.saturating_mul(2)));
     let bordered_width = padded_width.saturating_add(usize::from(DROPDOWN_BORDER_WIDTH));
     usize_to_u16(bordered_width).max(minimum_width)
 }
 
 /// Compute a dropdown area below a top-level menu label.
-pub fn dropdown_area_below(
-    viewport: Rect,
-    anchor: Rect,
-    items: &[MenuItem],
-    minimum_width: u16,
-) -> Rect {
+pub fn dropdown_area_below(viewport: Rect, anchor: Rect, items: &[MenuItem], minimum_width: u16) -> Rect {
     if viewport.width == 0 || viewport.height == 0 {
         return Rect::new(viewport.x, viewport.y, 0, 0);
     }
@@ -540,12 +501,7 @@ pub fn compute_dropdown_layout(area: Rect, items: &[MenuItem]) -> DropdownLayout
     let rows = (0..row_count)
         .map(|index| DropdownRowLayout {
             index,
-            rect: Rect::new(
-                inner.x,
-                inner.y + usize_to_u16(index),
-                inner.width,
-                MENU_BAR_HEIGHT,
-            ),
+            rect: Rect::new(inner.x, inner.y + usize_to_u16(index), inner.width, MENU_BAR_HEIGHT),
         })
         .collect();
 
@@ -573,21 +529,13 @@ pub fn render_dropdown(
     frame.render_widget(Clear, area);
     fill_area(frame.buffer_mut(), area, style.background);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(style.border);
+    let block = Block::default().borders(Borders::ALL).border_style(style.border);
     frame.render_widget(block, area);
 
     let selected = nav.focused();
     for row in &layout.rows {
         let item = &items[row.index];
-        render_dropdown_row(
-            frame.buffer_mut(),
-            row.rect,
-            item,
-            selected == Some(row.index),
-            style,
-        );
+        render_dropdown_row(frame.buffer_mut(), row.rect, item, selected == Some(row.index), style);
     }
 
     layout
@@ -625,26 +573,16 @@ fn dropdown_item_content_width(item: &MenuItem) -> usize {
 
 fn item_text_width(label: &str, accel: Option<&str>, submenu: bool) -> usize {
     let label_width = UnicodeWidthStr::width(label);
-    let accel_width = accel
-        .map(|value| DROPDOWN_ACCEL_GAP + UnicodeWidthStr::width(value))
-        .unwrap_or_default();
+    let accel_width = accel.map(|value| DROPDOWN_ACCEL_GAP + UnicodeWidthStr::width(value)).unwrap_or_default();
     let submenu_width = if submenu {
         DROPDOWN_SUBMENU_MARKER_GAP + UnicodeWidthStr::width(DROPDOWN_SUBMENU_MARKER)
     } else {
         0
     };
-    label_width
-        .saturating_add(accel_width)
-        .saturating_add(submenu_width)
+    label_width.saturating_add(accel_width).saturating_add(submenu_width)
 }
 
-fn render_dropdown_row(
-    buffer: &mut Buffer,
-    rect: Rect,
-    item: &MenuItem,
-    selected: bool,
-    style: &DropdownStyle,
-) {
+fn render_dropdown_row(buffer: &mut Buffer, rect: Rect, item: &MenuItem, selected: bool, style: &DropdownStyle) {
     if rect.width == 0 || rect.height == 0 {
         return;
     }
@@ -654,30 +592,12 @@ fn render_dropdown_row(
 
     match item {
         MenuItem::Action { label, accel, .. } => {
-            render_dropdown_item_text(
-                buffer,
-                rect,
-                label,
-                accel.as_deref(),
-                false,
-                row_style,
-                style,
-            );
+            render_dropdown_item_text(buffer, rect, label, accel.as_deref(), false, row_style, style);
         }
         MenuItem::Submenu { label, accel, .. } => {
-            render_dropdown_item_text(
-                buffer,
-                rect,
-                label,
-                accel.as_deref(),
-                true,
-                row_style,
-                style,
-            );
+            render_dropdown_item_text(buffer, rect, label, accel.as_deref(), true, row_style, style);
         }
-        MenuItem::Separator => {
-            render_separator(buffer, rect, style.separator.patch(style.background))
-        }
+        MenuItem::Separator => render_separator(buffer, rect, style.separator.patch(style.background)),
     }
 }
 
@@ -700,9 +620,7 @@ fn render_dropdown_item_text(
     row_style: Style,
     style: &DropdownStyle,
 ) {
-    let available_width = rect
-        .width
-        .saturating_sub(DROPDOWN_ITEM_HORIZONTAL_PADDING.saturating_mul(2));
+    let available_width = rect.width.saturating_sub(DROPDOWN_ITEM_HORIZONTAL_PADDING.saturating_mul(2));
     if available_width == 0 {
         return;
     }
@@ -722,20 +640,13 @@ fn render_dropdown_item_text(
 
     if submenu && marker_width <= available_width {
         let marker_x = content_right.saturating_sub(marker_width);
-        buffer.set_string(
-            marker_x,
-            rect.y,
-            DROPDOWN_SUBMENU_MARKER,
-            style.submenu_marker.patch(row_style),
-        );
+        buffer.set_string(marker_x, rect.y, DROPDOWN_SUBMENU_MARKER, style.submenu_marker.patch(row_style));
     }
 
     let accel_width = accel.map(text_width_u16).unwrap_or_default();
     let reserved_right = marker_width.saturating_add(marker_gap);
     let accel_x = if accel_width > 0 {
-        content_right
-            .saturating_sub(reserved_right)
-            .saturating_sub(accel_width)
+        content_right.saturating_sub(reserved_right).saturating_sub(accel_width)
     } else {
         content_right.saturating_sub(reserved_right)
     };
@@ -744,9 +655,7 @@ fn render_dropdown_item_text(
         && accel_width > 0
         && accel_x >= content_x
     {
-        let available = content_right
-            .saturating_sub(reserved_right)
-            .saturating_sub(accel_x);
+        let available = content_right.saturating_sub(reserved_right).saturating_sub(accel_x);
         let text = truncate_to_width(accel, available);
         buffer.set_string(accel_x, rect.y, text, style.accel.patch(row_style));
     }
@@ -769,12 +678,7 @@ fn render_separator(buffer: &mut Buffer, rect: Rect, style: Style) {
     }
 
     let line = DROPDOWN_SEPARATOR.repeat(usize::from(rect.width));
-    buffer.set_line(
-        rect.x,
-        rect.y,
-        &Line::from(Span::styled(line, style)),
-        rect.width,
-    );
+    buffer.set_line(rect.x, rect.y, &Line::from(Span::styled(line, style)), rect.width);
 }
 
 fn truncate_to_width(text: &str, max_width: u16) -> String {
@@ -835,9 +739,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const DEFAULT_DROPDOWN_MIN_WIDTH: u16 = 8;
     const MENU_BAR_WIDTH: u16 = 32;
@@ -951,14 +856,8 @@ mod tests {
             MenuItem::submenu("Recent", vec![MenuItem::action("one")]),
         ];
 
-        assert_eq!(
-            compute_dropdown_width(&items, DEFAULT_DROPDOWN_MIN_WIDTH),
-            EXPECTED_WIDE_DROPDOWN_WIDTH
-        );
-        assert_eq!(
-            compute_dropdown_width(&[], DEFAULT_DROPDOWN_MIN_WIDTH),
-            DEFAULT_DROPDOWN_MIN_WIDTH
-        );
+        assert_eq!(compute_dropdown_width(&items, DEFAULT_DROPDOWN_MIN_WIDTH), EXPECTED_WIDE_DROPDOWN_WIDTH);
+        assert_eq!(compute_dropdown_width(&[], DEFAULT_DROPDOWN_MIN_WIDTH), DEFAULT_DROPDOWN_MIN_WIDTH);
     }
 
     #[test]
@@ -983,12 +882,8 @@ mod tests {
         assert_eq!(buffer[(1, 0)].symbol(), "F");
         assert_eq!(buffer[(1, 0)].fg, Color::Red);
 
-        let layout =
-            compute_menu_bar_layout(Rect::new(0, 0, MENU_BAR_WIDTH, MENU_BAR_HEIGHT), &model);
-        assert_eq!(
-            layout.labels[MENU_FILE_INDEX].rect.width,
-            EXPECTED_FILE_LABEL_WIDTH
-        );
+        let layout = compute_menu_bar_layout(Rect::new(0, 0, MENU_BAR_WIDTH, MENU_BAR_HEIGHT), &model);
+        assert_eq!(layout.labels[MENU_FILE_INDEX].rect.width, EXPECTED_FILE_LABEL_WIDTH);
     }
 
     #[test]
@@ -1008,30 +903,12 @@ mod tests {
 
         let buffer = render_dropdown_to_buffer(&items, &nav, &style);
 
-        assert_eq!(
-            buffer[(DROPDOWN_ROW_X, DROPDOWN_SECOND_ROW_Y)].symbol(),
-            DROPDOWN_SEPARATOR
-        );
-        assert_eq!(
-            buffer[(DROPDOWN_ROW_X, DROPDOWN_SECOND_ROW_Y)].fg,
-            Color::Blue
-        );
-        assert_eq!(
-            buffer[(DROPDOWN_CONTENT_X, DROPDOWN_THIRD_ROW_Y)].symbol(),
-            "D"
-        );
-        assert_eq!(
-            buffer[(DROPDOWN_CONTENT_X, DROPDOWN_THIRD_ROW_Y)].fg,
-            Color::DarkGray
-        );
-        assert_eq!(
-            buffer[(DROPDOWN_MARKER_X, DROPDOWN_FOURTH_ROW_Y)].symbol(),
-            DROPDOWN_SUBMENU_MARKER
-        );
-        assert_eq!(
-            buffer[(DROPDOWN_ROW_X, DROPDOWN_FOURTH_ROW_Y)].fg,
-            Color::Red
-        );
+        assert_eq!(buffer[(DROPDOWN_ROW_X, DROPDOWN_SECOND_ROW_Y)].symbol(), DROPDOWN_SEPARATOR);
+        assert_eq!(buffer[(DROPDOWN_ROW_X, DROPDOWN_SECOND_ROW_Y)].fg, Color::Blue);
+        assert_eq!(buffer[(DROPDOWN_CONTENT_X, DROPDOWN_THIRD_ROW_Y)].symbol(), "D");
+        assert_eq!(buffer[(DROPDOWN_CONTENT_X, DROPDOWN_THIRD_ROW_Y)].fg, Color::DarkGray);
+        assert_eq!(buffer[(DROPDOWN_MARKER_X, DROPDOWN_FOURTH_ROW_Y)].symbol(), DROPDOWN_SUBMENU_MARKER);
+        assert_eq!(buffer[(DROPDOWN_ROW_X, DROPDOWN_FOURTH_ROW_Y)].fg, Color::Red);
     }
 
     #[test]
@@ -1048,16 +925,13 @@ mod tests {
 
     fn sample_model() -> MenuBarModel {
         MenuBarModel::from_menus([
-            (
-                "File",
-                vec![
-                    MenuItem::action("Open"),
-                    MenuItem::separator(),
-                    MenuItem::disabled_action("Disabled"),
-                    MenuItem::action("Save"),
-                    MenuItem::submenu("Recent", vec![MenuItem::action("one")]),
-                ],
-            ),
+            ("File", vec![
+                MenuItem::action("Open"),
+                MenuItem::separator(),
+                MenuItem::disabled_action("Disabled"),
+                MenuItem::action("Save"),
+                MenuItem::submenu("Recent", vec![MenuItem::action("one")]),
+            ]),
             ("Edit", vec![MenuItem::action("Undo")]),
             ("View", vec![MenuItem::action("Zoom")]),
         ])
@@ -1075,11 +949,7 @@ mod tests {
         terminal.backend().buffer().clone()
     }
 
-    fn render_dropdown_to_buffer(
-        items: &[MenuItem],
-        nav: &MenuNav,
-        style: &DropdownStyle,
-    ) -> Buffer {
+    fn render_dropdown_to_buffer(items: &[MenuItem], nav: &MenuNav, style: &DropdownStyle) -> Buffer {
         let backend = TestBackend::new(DROPDOWN_WIDTH, DROPDOWN_HEIGHT);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal

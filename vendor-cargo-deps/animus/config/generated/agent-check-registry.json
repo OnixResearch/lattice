@@ -1,0 +1,357 @@
+{
+  "cairn_policy_hash": "b8f81a80716eb7427dacdcd4dac9c01c1599d2bee79cdeb0a6e444525377da59",
+  "checks": [
+    {
+      "affected_crates": [],
+      "affected_paths": [
+        "config",
+        "policy",
+        "Cargo.toml",
+        "flake.nix"
+      ],
+      "affected_surfaces": [
+        "configuration",
+        "generated-policy"
+      ],
+      "argv": [
+        "nix",
+        "run",
+        ".#check-nickel-configs"
+      ],
+      "capability": "nix",
+      "check_id": "nickel-config",
+      "documentation_refs": [
+        "README.md"
+      ],
+      "expected_artifacts": [
+        "config/generated"
+      ],
+      "negative_contract": "config/agent-check-registry/fixtures/negative-unsafe-argv.ncl",
+      "output_budget_class": "small",
+      "positive_contract": "config/agent-check-registry/fixtures/valid-baseline.ncl",
+      "prerequisites": [],
+      "profile": "nickel-config",
+      "reproduction": {
+        "argv": [
+          "nix",
+          "run",
+          ".#check-nickel-configs"
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "low",
+      "tier": "quick",
+      "timeout_class": "short"
+    },
+    {
+      "affected_crates": [
+        "animus-steel",
+        "animus-runtime"
+      ],
+      "affected_paths": [
+        "policy/steel-runtime",
+        "crates/animus-steel",
+        "crates/animus-runtime"
+      ],
+      "affected_surfaces": [
+        "steel-runtime",
+        "completion-candidate"
+      ],
+      "argv": [
+        "scripts/cairn/check-steel-runtime-policy",
+        "--root",
+        "."
+      ],
+      "capability": "local-process",
+      "check_id": "steel-runtime-policy",
+      "documentation_refs": [
+        "README.md"
+      ],
+      "expected_artifacts": [
+        "target/cairn/focused-rails/steel-runtime-policy.md"
+      ],
+      "negative_contract": "crates/animus-steel/src/action.rs",
+      "output_budget_class": "medium",
+      "positive_contract": "crates/animus-steel/src/policy/tests.rs",
+      "prerequisites": [
+        "nickel-config"
+      ],
+      "profile": "steel-runtime-policy",
+      "reproduction": {
+        "argv": [
+          "scripts/cairn/check-steel-runtime-policy",
+          "--root",
+          "."
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "medium",
+      "tier": "quick",
+      "timeout_class": "medium"
+    },
+    {
+      "affected_crates": [
+        "animus-runtime"
+      ],
+      "affected_paths": [
+        "crates",
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
+      "affected_surfaces": [
+        "rust",
+        "runtime"
+      ],
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "capability": "local-process",
+      "check_id": "rust-workspace-tests",
+      "documentation_refs": [
+        "README.md"
+      ],
+      "expected_artifacts": [
+        "target"
+      ],
+      "negative_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "output_budget_class": "large",
+      "positive_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "prerequisites": [],
+      "profile": "rust-workspace-tests",
+      "reproduction": {
+        "argv": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked"
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "medium",
+      "tier": "standard",
+      "timeout_class": "long"
+    },
+    {
+      "affected_crates": [
+        "animus-runtime"
+      ],
+      "affected_paths": [
+        "crates",
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
+      "affected_surfaces": [
+        "rust",
+        "lint"
+      ],
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "capability": "local-process",
+      "check_id": "rust-workspace-clippy",
+      "documentation_refs": [
+        "README.md"
+      ],
+      "expected_artifacts": [
+        "target"
+      ],
+      "negative_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "output_budget_class": "large",
+      "positive_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "prerequisites": [
+        "rust-workspace-tests"
+      ],
+      "profile": "rust-workspace-clippy",
+      "reproduction": {
+        "argv": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "medium",
+      "tier": "standard",
+      "timeout_class": "long"
+    },
+    {
+      "affected_crates": [
+        "animus-runtime"
+      ],
+      "affected_paths": [
+        "crates",
+        "scripts"
+      ],
+      "affected_surfaces": [
+        "rust",
+        "scripts",
+        "tigerstyle"
+      ],
+      "argv": [
+        "cargo",
+        "tigerstyle",
+        "check"
+      ],
+      "capability": "local-process",
+      "check_id": "tigerstyle",
+      "documentation_refs": [
+        "AGENTS.md"
+      ],
+      "expected_artifacts": [
+        "artifacts"
+      ],
+      "negative_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "output_budget_class": "large",
+      "positive_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "prerequisites": [
+        "rust-workspace-clippy"
+      ],
+      "profile": "tigerstyle",
+      "reproduction": {
+        "argv": [
+          "cargo",
+          "tigerstyle",
+          "check"
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "high",
+      "tier": "standard",
+      "timeout_class": "long"
+    },
+    {
+      "affected_crates": [],
+      "affected_paths": [
+        "cairn",
+        "docs",
+        "config",
+        "scripts",
+        "flake.nix"
+      ],
+      "affected_surfaces": [
+        "lifecycle",
+        "documentation",
+        "configuration"
+      ],
+      "argv": [
+        "nix",
+        "run",
+        ".#cairn",
+        "--",
+        "validate",
+        "--root",
+        "."
+      ],
+      "capability": "cairn",
+      "check_id": "cairn-validate",
+      "documentation_refs": [
+        "docs/request-lifecycle.md"
+      ],
+      "expected_artifacts": [
+        "cairn"
+      ],
+      "negative_contract": "cairn/specs/agent-harness-runtime/spec.md",
+      "output_budget_class": "medium",
+      "positive_contract": "cairn/specs/agent-harness-runtime/spec.md",
+      "prerequisites": [
+        "nickel-config"
+      ],
+      "profile": "cairn-validate",
+      "reproduction": {
+        "argv": [
+          "nix",
+          "run",
+          ".#cairn",
+          "--",
+          "validate",
+          "--root",
+          "."
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "high",
+      "tier": "quick",
+      "timeout_class": "medium"
+    },
+    {
+      "affected_crates": [
+        "animus-adapters",
+        "animus-runtime",
+        "animus-std",
+        "animus-steel"
+      ],
+      "affected_paths": [
+        "config/agent-check-registry.ncl",
+        "config/generated/agent-check-registry.json",
+        "crates/animus-adapters",
+        "crates/animus-runtime",
+        "crates/animus-std",
+        "crates/animus-steel",
+        "policy/steel-runtime",
+        "scripts/cairn/check-authoritative-agent-completion"
+      ],
+      "affected_surfaces": [
+        "authoritative-completion",
+        "completion-candidate",
+        "validation"
+      ],
+      "argv": [
+        "scripts/cairn/check-authoritative-agent-completion",
+        "--root",
+        "."
+      ],
+      "capability": "cairn",
+      "check_id": "authoritative-completion-rail",
+      "documentation_refs": [
+        "docs/authoritative-agent-completion.md"
+      ],
+      "expected_artifacts": [
+        "target/cairn/focused-rails/authoritative-completion.md"
+      ],
+      "negative_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "output_budget_class": "large",
+      "positive_contract": "crates/animus-runtime/src/authoritativecompletion/tests.rs",
+      "prerequisites": [
+        "nickel-config",
+        "steel-runtime-policy",
+        "rust-workspace-tests"
+      ],
+      "profile": "authoritative-completion-rail",
+      "reproduction": {
+        "argv": [
+          "scripts/cairn/check-authoritative-agent-completion",
+          "--root",
+          "."
+        ],
+        "working_root": "<repository-root>"
+      },
+      "risk": "high",
+      "tier": "quick",
+      "timeout_class": "long"
+    }
+  ],
+  "fallback_check_ids": [
+    "nickel-config",
+    "rust-workspace-tests",
+    "cairn-validate"
+  ],
+  "registry_id": "animus-agent-checks",
+  "repository_id": "onixresearch/animus",
+  "schema": "animus.agent-check-registry.v1",
+  "supported_cairn_schema": "cairn.agent-completion.v2"
+}

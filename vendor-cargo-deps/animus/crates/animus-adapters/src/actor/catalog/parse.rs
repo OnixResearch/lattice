@@ -1,17 +1,15 @@
 pub(super) fn validate(draft: &super::Draft<'_>) -> Result<super::Manifest, super::super::Error> {
     let fields = RequiredFields::from_draft(draft)?;
-    let source_scope = source_scope_from_label(fields.source_text.as_str()).ok_or_else(|| {
-        super::super::Error::UnsupportedValue {
+    let source_scope =
+        source_scope_from_label(fields.source_text.as_str()).ok_or_else(|| super::super::Error::UnsupportedValue {
             field: super::super::SOURCE_FIELD.as_str(),
             value: fields.source_text.clone(),
-        }
-    })?;
-    let trust_status = trust_status_from_label(fields.trust_text.as_str()).ok_or_else(|| {
-        super::super::Error::UnsupportedValue {
+        })?;
+    let trust_status =
+        trust_status_from_label(fields.trust_text.as_str()).ok_or_else(|| super::super::Error::UnsupportedValue {
             field: super::super::TRUST_FIELD.as_str(),
             value: fields.trust_text.clone(),
-        }
-    })?;
+        })?;
     validate_prompt_budget(&fields.prompt_fragments)?;
     Ok(fields.into_manifest(source_scope, trust_status))
 }
@@ -35,14 +33,8 @@ impl RequiredFields {
     fn from_draft(draft: &super::Draft<'_>) -> Result<Self, super::super::Error> {
         Ok(Self {
             name: super::super::required_text(super::super::NAME_FIELD, draft.name)?,
-            description: super::super::required_text(
-                super::super::DESCRIPTION_FIELD,
-                draft.description,
-            )?,
-            model_preference: super::super::required_text(
-                super::super::MODEL_FIELD,
-                draft.model_preference,
-            )?,
+            description: super::super::required_text(super::super::DESCRIPTION_FIELD, draft.description)?,
+            model_preference: super::super::required_text(super::super::MODEL_FIELD, draft.model_preference)?,
             prompt_fragments: super::super::required_collection(
                 super::super::PROMPT_FRAGMENT_FIELD,
                 draft.prompt_fragments,
@@ -51,14 +43,8 @@ impl RequiredFields {
                 super::super::CAPABILITY_FIELD,
                 draft.capability_ceilings,
             )?,
-            toolset_limits: super::super::required_label_set(
-                super::super::TOOLSET_FIELD,
-                draft.toolset_limits,
-            )?,
-            memory_scopes: super::super::optional_label_set(
-                super::super::MEMORY_FIELD,
-                draft.memory_scopes,
-            )?,
+            toolset_limits: super::super::required_label_set(super::super::TOOLSET_FIELD, draft.toolset_limits)?,
+            memory_scopes: super::super::optional_label_set(super::super::MEMORY_FIELD, draft.memory_scopes)?,
             context_reference_scopes: super::super::optional_label_set(
                 super::super::CONTEXT_FIELD,
                 draft.context_reference_scopes,
@@ -67,10 +53,7 @@ impl RequiredFields {
                 super::super::WORKFLOW_FIELD,
                 draft.workflow_abilities,
             )?,
-            source_text: super::super::required_text(
-                super::super::SOURCE_FIELD,
-                draft.source_scope,
-            )?,
+            source_text: super::super::required_text(super::super::SOURCE_FIELD, draft.source_scope)?,
             trust_text: super::super::required_text(super::super::TRUST_FIELD, draft.trust_status)?,
             manifest_identity: super::super::required_text(
                 super::super::MANIFEST_IDENTITY_FIELD,
@@ -79,11 +62,7 @@ impl RequiredFields {
         })
     }
 
-    fn into_manifest(
-        self,
-        source_scope: super::SourceScope,
-        trust_status: super::TrustStatus,
-    ) -> super::Manifest {
+    fn into_manifest(self, source_scope: super::SourceScope, trust_status: super::TrustStatus) -> super::Manifest {
         super::Manifest {
             name: self.name,
             description: self.description,
@@ -101,9 +80,7 @@ impl RequiredFields {
     }
 }
 
-fn validate_prompt_budget(
-    prompt_fragments: &[super::super::Text],
-) -> Result<(), super::super::Error> {
+fn validate_prompt_budget(prompt_fragments: &[super::super::Text]) -> Result<(), super::super::Error> {
     let mut prompt_chars = 0usize;
     for fragment in prompt_fragments {
         prompt_chars = prompt_chars.saturating_add(fragment.chars().count());

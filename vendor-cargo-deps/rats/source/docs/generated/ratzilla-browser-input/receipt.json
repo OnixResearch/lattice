@@ -1,0 +1,52 @@
+{
+  "schema": "rats.ratzilla-browser-input-receipt.v1",
+  "profile": "subwayrat-web",
+  "target": "wasm32-unknown-unknown",
+  "backend": "ratzilla-dom-0.3.1",
+  "browser": "Chromium 149.0.7827.53",
+  "verdict": "PASS",
+  "source_sha256": "52cdda70cbbca542f70aed6884d59e60a8366f89f2eba5bbf97e143c601d85b4",
+  "command_sha256": "cb7cbc3477035b9c5f32af3877e337b64657e3b33f6d8887ca5f906564d5f6a2",
+  "capabilities_sha256": "3b4e3b20c3ee5f9775732b5c1749bf665fa54f85cbd4fd24c057279d68c1b4e1",
+  "direct_scenarios": [
+    "render",
+    "enter",
+    "escape",
+    "pointer",
+    "fixture-dialog",
+    "fixture-chrome",
+    "fixture-theme",
+    "geometry-resize",
+    "wheel",
+    "drag",
+    "drag-cancel",
+    "focus",
+    "meta",
+    "touch-unavailable",
+    "composition",
+    "repeat",
+    "lifecycle"
+  ],
+  "expected_failure_scenarios": [
+    "missing-redraw"
+  ],
+  "non_claims": [
+    "other-browsers",
+    "other-targets",
+    "universal-keyboard-layouts",
+    "physical-key-location",
+    "complete-ime-correctness",
+    "trusted-pointer-capture",
+    "physical-touch-or-pen",
+    "pixel-geometry-parity",
+    "accessibility-input-delivery",
+    "downstream-support"
+  ],
+  "privacy": {
+    "content_free": true,
+    "absolute_paths": false,
+    "random_ports": false,
+    "raw_dom": false,
+    "input_text": false
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [
+    "config/agent-check-registry.ncl"
+  ],
+  "destination": ".pre-commit-config.yaml",
+  "family_id": "animus.repo.pre-commit",
+  "format": "yaml",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "pre_commit_config",
+  "source": "config/repo.ncl"
+}

@@ -4,10 +4,7 @@ pub(super) fn validate_report_header(
 ) -> Result<(), super::super::DelegationFailure> {
     super::validate_label(super::super::WORKER_REPORT_FIELD, report.worker_id.as_str())?;
     super::contract::validate_output_schema(schema)?;
-    let schema_label = super::validate_label(
-        super::super::OUTPUT_SCHEMA_FIELD,
-        report.schema_name.as_str(),
-    )?;
+    let schema_label = super::validate_label(super::super::OUTPUT_SCHEMA_FIELD, report.schema_name.as_str())?;
     if schema_label != schema.name {
         return Err(super::super::DelegationFailure::new(
             super::super::FailureKind::OutputSchemaMismatch,
@@ -41,11 +38,7 @@ fn validate_required_fields(
     debug_assert!(!schema.required_fields.is_empty());
     debug_assert!(report.fields.len() <= super::super::MAX_REPORT_FIELDS);
     for required in &schema.required_fields {
-        if report
-            .fields
-            .get(required)
-            .is_none_or(|value| value.trim().is_empty())
-        {
+        if report.fields.get(required).is_none_or(|value| value.trim().is_empty()) {
             return Err(super::super::DelegationFailure::new(
                 super::super::FailureKind::MalformedReport,
                 super::super::WORKER_REPORT_FIELD_MAP,
@@ -65,28 +58,17 @@ pub(super) fn validate_report_evidence(
 ) -> Result<(), super::super::DelegationFailure> {
     super::validate_non_empty_slice(super::super::WORKER_EVIDENCE_FIELD, evidence)?;
     for reference in evidence {
-        super::validate_label(
-            super::super::WORKER_EVIDENCE_FIELD,
-            reference.evidence_id.as_str(),
-        )?;
-        super::validate_text(
-            super::super::WORKER_EVIDENCE_FIELD,
-            reference.summary.as_str(),
-        )?;
+        super::validate_label(super::super::WORKER_EVIDENCE_FIELD, reference.evidence_id.as_str())?;
+        super::validate_text(super::super::WORKER_EVIDENCE_FIELD, reference.summary.as_str())?;
     }
     Ok(())
 }
 
-pub(super) fn validate_report_claims(
-    claims: &[super::super::Claim],
-) -> Result<(), super::super::DelegationFailure> {
+pub(super) fn validate_report_claims(claims: &[super::super::Claim]) -> Result<(), super::super::DelegationFailure> {
     for claim in claims {
         super::validate_label(super::super::WORKER_CLAIM_FIELD, claim.subject.as_str())?;
         super::validate_text(super::super::WORKER_CLAIM_FIELD, claim.value.as_str())?;
-        super::validate_non_empty_slice(
-            super::super::WORKER_CLAIM_FIELD,
-            claim.evidence_ids.as_slice(),
-        )?;
+        super::validate_non_empty_slice(super::super::WORKER_CLAIM_FIELD, claim.evidence_ids.as_slice())?;
         for evidence_id in &claim.evidence_ids {
             super::validate_label(super::super::WORKER_CLAIM_FIELD, evidence_id.as_str())?;
         }
@@ -99,14 +81,8 @@ pub(super) fn validate_report_mutations(
 ) -> Result<(), super::super::DelegationFailure> {
     for intent in intents {
         super::validate_label(super::super::WORKER_MUTATION_FIELD, intent.target.as_str())?;
-        super::validate_label(
-            super::super::WORKER_MUTATION_FIELD,
-            intent.mutation_kind.as_str(),
-        )?;
-        super::validate_label(
-            super::super::WORKER_MUTATION_FIELD,
-            intent.evidence_id.as_str(),
-        )?;
+        super::validate_label(super::super::WORKER_MUTATION_FIELD, intent.mutation_kind.as_str())?;
+        super::validate_label(super::super::WORKER_MUTATION_FIELD, intent.evidence_id.as_str())?;
     }
     Ok(())
 }

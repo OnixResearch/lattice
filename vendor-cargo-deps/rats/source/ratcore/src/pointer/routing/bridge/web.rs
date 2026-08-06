@@ -40,11 +40,7 @@ pub struct RatzillaPointerInput {
 impl RatzillaPointerInput {
     /// Creates Ratzilla mouse input.
     #[must_use]
-    pub const fn new(
-        position: super::super::shape::PointerPoint,
-        kind: RatzillaMouseKind,
-        button: i32,
-    ) -> Self {
+    pub const fn new(position: super::super::shape::PointerPoint, kind: RatzillaMouseKind, button: i32) -> Self {
         Self {
             position,
             kind,
@@ -60,10 +56,7 @@ impl RatzillaPointerInput {
 
     /// Adds modifiers.
     #[must_use]
-    pub const fn with_modifiers(
-        mut self,
-        modifiers: super::super::input::PointerModifiers,
-    ) -> Self {
+    pub const fn with_modifiers(mut self, modifiers: super::super::input::PointerModifiers) -> Self {
         self.modifiers = modifiers;
         self
     }
@@ -101,17 +94,13 @@ fn ratzilla_button(button: i32) -> super::super::input::PointerButton {
 
 fn ratzilla_phase(kind: &RatzillaMouseKind) -> super::super::input::PointerPhase {
     match kind {
-        RatzillaMouseKind::ButtonDown | RatzillaMouseKind::SingleClick => {
-            super::super::input::PointerPhase::Down
-        }
+        RatzillaMouseKind::ButtonDown | RatzillaMouseKind::SingleClick => super::super::input::PointerPhase::Down,
         RatzillaMouseKind::ButtonUp => super::super::input::PointerPhase::Up,
         RatzillaMouseKind::DoubleClick => super::super::input::PointerPhase::Down,
         RatzillaMouseKind::Moved => super::super::input::PointerPhase::Move,
         RatzillaMouseKind::Entered => super::super::input::PointerPhase::Enter,
         RatzillaMouseKind::Exited => super::super::input::PointerPhase::Leave,
-        RatzillaMouseKind::Unidentified(kind) => {
-            super::super::input::PointerPhase::Unsupported(kind.clone())
-        }
+        RatzillaMouseKind::Unidentified(kind) => super::super::input::PointerPhase::Unsupported(kind.clone()),
     }
 }
 

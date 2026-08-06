@@ -28,8 +28,10 @@ pub struct BrowserShowcaseEntry {
     pub id: String,
     /// Human-readable showcase title.
     pub title: String,
-    /// Renderer label shown to users.
+    /// Compatibility renderer label shown to users.
     pub renderer_label: String,
+    /// Nominal concrete browser target identity.
+    pub renderer_target: crate::targeting_core::RendererTargetId,
     /// Cargo package or app package name.
     pub package_name: String,
     /// Repository-relative crate path.
@@ -41,7 +43,7 @@ pub struct BrowserShowcaseEntry {
     /// Root validation profile or evidence label.
     pub validation_profile: String,
     /// Shared fixture IDs supported by this browser showcase.
-    pub supported_fixture_ids: Vec<String>,
+    pub supported_fixture_ids: Vec<super::super::FixtureId>,
     /// Repository evidence links backing the status.
     pub evidence_links: Vec<String>,
     /// Browser evidence status.
@@ -60,10 +62,13 @@ impl BrowserShowcaseEntry {
         package_name: impl Into<String>,
         crate_path: impl Into<String>,
     ) -> Self {
+        let renderer_label = renderer_label.into();
+        let renderer_target = super::legacy_browser_target(&renderer_label);
         Self {
             id: id.into(),
             title: title.into(),
-            renderer_label: renderer_label.into(),
+            renderer_label,
+            renderer_target,
             package_name: package_name.into(),
             crate_path: crate_path.into(),
             launch_command: String::new(),
@@ -78,11 +83,7 @@ impl BrowserShowcaseEntry {
 
     /// Adds launch and bundle commands.
     #[must_use]
-    pub fn with_commands(
-        mut self,
-        launch_command: impl Into<String>,
-        bundle_command: impl Into<String>,
-    ) -> Self {
+    pub fn with_commands(mut self, launch_command: impl Into<String>, bundle_command: impl Into<String>) -> Self {
         self.launch_command = launch_command.into();
         self.bundle_command = bundle_command.into();
         self
@@ -98,10 +99,8 @@ impl BrowserShowcaseEntry {
     /// Adds supported shared fixture IDs.
     #[must_use]
     pub fn with_supported_fixture_ids(mut self, fixture_ids: &[&str]) -> Self {
-        self.supported_fixture_ids = fixture_ids
-            .iter()
-            .map(|fixture_id| (*fixture_id).to_string())
-            .collect();
+        self.supported_fixture_ids =
+            fixture_ids.iter().map(|fixture_id| super::super::FixtureId::new(*fixture_id)).collect();
         self
     }
 
@@ -142,6 +141,12 @@ pub enum BrowserShowcaseIssueCode {
     CompleteEvidenceWithoutLinks,
     /// Unsupported evidence status lacks a visible reason.
     UnsupportedWithoutReason,
+    /// Browser renderer registry or scope is invalid.
+    InvalidRendererScope,
+    /// Browser target is unknown or outside the browser scope.
+    InvalidRendererTarget,
+    /// Compatibility label does not map to the nominal target.
+    MismatchedRendererLabel,
 }
 
 /// Deterministic browser showcase validation issue.
@@ -194,7 +199,7 @@ impl BrowserShowcaseIndex {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserFixtureNavigationRow {
     /// Shared fixture ID.
-    pub fixture_id: String,
+    pub fixture_id: super::super::FixtureId,
     /// Shared fixture label.
     pub label: String,
     /// Browser renderer label.

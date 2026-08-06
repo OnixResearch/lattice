@@ -1,54 +1,49 @@
-//! Actions for the fuzzy finder.
+//! Physical-action normalization for the shared fuzzy prompt adapter.
 
 use crate::state::FuzzyState;
 use crate::types::FuzzySource;
 
+/// Logical terminal actions. Physical key events remain application-owned.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
+    /// Open and reset the prompt.
     Open,
+    /// Close the prompt.
     Close,
+    /// Commit one input character.
     TypeChar(char),
+    /// Remove the final committed character.
     Backspace,
+    /// Move to the next eligible candidate.
     SelectNext,
+    /// Move to the previous eligible candidate.
     SelectPrev,
+    /// Submit the active candidate.
     Confirm,
+    /// Clear a non-empty query or cancel an empty prompt.
     Cancel,
 }
 
+/// Applies one logical action through the production shared prompt reducer.
 pub fn handle_action(state: &mut FuzzyState, action: Action, source: &dyn FuzzySource) {
     match action {
-        Action::Open => {
-            state.open = true;
-            state.query.clear();
-            state.update_results(source);
-        }
-        Action::Close | Action::Cancel => {
-            if !state.query.is_empty() {
-                state.query.clear();
-                state.update_results(source);
-            } else {
-                state.open = false;
-            }
-        }
-        Action::TypeChar(c) => {
-            state.query.push(c);
-            state.update_results(source);
+        Action::Open => state.open_with(source),
+        Action::Close => state.cancel(),
+        Action::Cancel if state.query.is_empty() => state.cancel(),
+        Action::Cancel => state.replace_query(String::new(), source),
+        Action::TypeChar(character) => {
+            let mut query = state.query.clone();
+            query.push(character);
+            state.replace_query(query, source);
         }
         Action::Backspace => {
-            state.query.pop();
-            state.update_results(source);
+            let mut query = state.query.clone();
+            query.pop();
+            state.replace_query(query, source);
         }
-        Action::SelectNext => {
-            if !state.results.is_empty() {
-                state.selected = (state.selected + 1).min(state.results.len() - 1);
-            }
-        }
-        Action::SelectPrev => {
-            state.selected = state.selected.saturating_sub(1);
-        }
-        Action::Confirm => {
-            state.confirm(source);
-        }
+        Action::SelectNext => state.move_active(ratcore::prompt_completion::PromptDirection::Next, source),
+        Action::SelectPrev => state.move_active(ratcore::prompt_completion::PromptDirection::Previous, source),
+        Action::Confirm => state.confirm(source),
     }
 }

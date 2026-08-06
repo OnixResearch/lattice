@@ -24,9 +24,7 @@ pub(crate) struct PathErrorInput<'a> {
     pub(crate) profile_name: &'a str,
 }
 
-pub(crate) fn validate_safe_label(
-    input: LabelInput<'_>,
-) -> Result<(), super::super::ProcessJobProfileError> {
+pub(crate) fn validate_safe_label(input: LabelInput<'_>) -> Result<(), super::super::ProcessJobProfileError> {
     if input.value.trim().is_empty() {
         return Err(super::super::ProcessJobProfileError::new(
             super::super::ProcessJobProfileErrorKind::EmptyField,
@@ -58,14 +56,9 @@ pub(crate) fn validate_identity_field(
     Ok(())
 }
 
-pub(crate) fn validate_hash_field(
-    input: super::HashInput<'_>,
-) -> Result<(), super::super::ProcessJobProfileError> {
+pub(crate) fn validate_hash_field(input: super::HashInput<'_>) -> Result<(), super::super::ProcessJobProfileError> {
     let is_hash = input.value.len() == super::super::HASH_HEX_LENGTH
-        && input
-            .value
-            .chars()
-            .all(|character| character.is_ascii_hexdigit());
+        && input.value.chars().all(|character| character.is_ascii_hexdigit());
     if is_hash {
         return Ok(());
     }
@@ -77,9 +70,7 @@ pub(crate) fn validate_hash_field(
     ))
 }
 
-pub(crate) fn command_shape_error(
-    input: CommandShapeErrorInput<'_>,
-) -> super::super::ProcessJobProfileError {
+pub(crate) fn command_shape_error(input: CommandShapeErrorInput<'_>) -> super::super::ProcessJobProfileError {
     super::super::ProcessJobProfileError::new(
         super::super::ProcessJobProfileErrorKind::InvalidCommandShape,
         input.profile_name,
@@ -112,18 +103,14 @@ pub(crate) fn path_error(input: PathErrorInput<'_>) -> super::super::ProcessJobP
 }
 
 pub(crate) fn is_allowed_env_key(key: &str, prefixes: &[String]) -> bool {
-    key_is_upper_snake(key)
-        && !is_secret_like_key(key)
-        && prefixes.iter().any(|prefix| key.starts_with(prefix))
+    key_is_upper_snake(key) && !is_secret_like_key(key) && prefixes.iter().any(|prefix| key.starts_with(prefix))
 }
 
 pub(crate) fn path_within_any_prefix(path: &str, prefixes: &[String]) -> bool {
     prefixes.iter().any(|prefix| {
         let trimmed = prefix.trim_end_matches(super::super::PATH_SEPARATOR);
         path == trimmed
-            || path
-                .strip_prefix(trimmed)
-                .is_some_and(|suffix| suffix.starts_with(super::super::PATH_SEPARATOR))
+            || path.strip_prefix(trimmed).is_some_and(|suffix| suffix.starts_with(super::super::PATH_SEPARATOR))
     })
 }
 
@@ -145,16 +132,14 @@ pub(crate) fn identity_error(
 
 fn key_is_upper_snake(key: &str) -> bool {
     !key.is_empty()
-        && key.chars().all(|character| {
-            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-        })
+        && key
+            .chars()
+            .all(|character| character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_')
 }
 
 fn is_secret_like_key(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
-    super::super::SECRET_KEY_MARKERS
-        .iter()
-        .any(|marker| upper.contains(marker))
+    super::super::SECRET_KEY_MARKERS.iter().any(|marker| upper.contains(marker))
 }
 
 fn is_safe_label(value: &str) -> bool {
@@ -164,17 +149,12 @@ fn is_safe_label(value: &str) -> bool {
 }
 
 fn identity_text_issue(value: &str) -> Option<&'static str> {
-    if value.contains(super::super::PATH_SEPARATOR)
-        || value.contains(super::super::WINDOWS_PATH_SEPARATOR)
-    {
+    if value.contains(super::super::PATH_SEPARATOR) || value.contains(super::super::WINDOWS_PATH_SEPARATOR) {
         return Some("contains unsafe path content");
     }
     if value.contains(super::super::REMOTE_SCHEME_MARKER) {
         return Some("contains remote locator content");
     }
     let lower = value.to_ascii_lowercase();
-    super::super::IDENTITY_LEAK_MARKERS
-        .iter()
-        .copied()
-        .find(|marker| lower.contains(marker))
+    super::super::IDENTITY_LEAK_MARKERS.iter().copied().find(|marker| lower.contains(marker))
 }

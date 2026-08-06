@@ -3,6 +3,9 @@
 //! This crate provides coordinate math for infinite canvas widgets - mapping between
 //! screen coordinates (visible terminal area) and canvas coordinates (infinite space).
 //! It has no dependency on ratatui; rendering is the caller's responsibility.
+//! Its integer positions, terminal dimensions, zoom rounding, and viewport state
+//! remain canvas-domain/terminal projection behavior rather than a general scene
+//! transform contract; see `docs/scene-intent-evaluation.md`.
 //!
 //! ## Types
 //!
@@ -52,10 +55,7 @@ pub const ZOOM_STEP: f32 = 0.25;
 
 // Compile-time assertions for zoom constants
 const _: () = assert!(MIN_ZOOM > 0.0, "MIN_ZOOM must be positive");
-const _: () = assert!(
-    MAX_ZOOM > MIN_ZOOM,
-    "MAX_ZOOM must be greater than MIN_ZOOM"
-);
+const _: () = assert!(MAX_ZOOM > MIN_ZOOM, "MAX_ZOOM must be greater than MIN_ZOOM");
 const _: () = assert!(ZOOM_STEP > 0.0, "ZOOM_STEP must be positive");
 
 /// Viewport - what part of the canvas is visible.
@@ -100,17 +100,10 @@ impl Viewport {
         debug_assert!(self.width > 0, "width must be positive");
         debug_assert!(self.height > 0, "height must be positive");
 
-        let canvas_x = (f32::from(screen_x) / self.zoom)
-            .round()
-            .clamp(i32::MIN as f32, i32::MAX as f32) as i32;
-        let canvas_y = (f32::from(screen_y) / self.zoom)
-            .round()
-            .clamp(i32::MIN as f32, i32::MAX as f32) as i32;
+        let canvas_x = (f32::from(screen_x) / self.zoom).round().clamp(i32::MIN as f32, i32::MAX as f32) as i32;
+        let canvas_y = (f32::from(screen_y) / self.zoom).round().clamp(i32::MIN as f32, i32::MAX as f32) as i32;
 
-        Position::new(
-            canvas_x.saturating_add(self.offset_x),
-            canvas_y.saturating_add(self.offset_y),
-        )
+        Position::new(canvas_x.saturating_add(self.offset_x), canvas_y.saturating_add(self.offset_y))
     }
 
     /// Convert canvas coordinates to screen coordinates (if visible).
@@ -125,12 +118,8 @@ impl Viewport {
         let canvas_x_delta_cells = pos.x.saturating_sub(self.offset_x);
         let canvas_y_delta_cells = pos.y.saturating_sub(self.offset_y);
 
-        let screen_x = (canvas_x_delta_cells as f32 * self.zoom)
-            .round()
-            .clamp(i32::MIN as f32, i32::MAX as f32) as i32;
-        let screen_y = (canvas_y_delta_cells as f32 * self.zoom)
-            .round()
-            .clamp(i32::MIN as f32, i32::MAX as f32) as i32;
+        let screen_x = (canvas_x_delta_cells as f32 * self.zoom).round().clamp(i32::MIN as f32, i32::MAX as f32) as i32;
+        let screen_y = (canvas_y_delta_cells as f32 * self.zoom).round().clamp(i32::MIN as f32, i32::MAX as f32) as i32;
 
         if screen_x < 0 {
             return None;
@@ -189,12 +178,8 @@ impl Viewport {
         debug_assert!(self.width > 0, "width must be positive");
         debug_assert!(self.height > 0, "height must be positive");
 
-        let visible_width = (f32::from(self.width) / self.zoom)
-            .round()
-            .clamp(0.0, u16::MAX as f32) as u16;
-        let visible_height = (f32::from(self.height) / self.zoom)
-            .round()
-            .clamp(0.0, u16::MAX as f32) as u16;
+        let visible_width = (f32::from(self.width) / self.zoom).round().clamp(0.0, u16::MAX as f32) as u16;
+        let visible_height = (f32::from(self.height) / self.zoom).round().clamp(0.0, u16::MAX as f32) as u16;
 
         (visible_width, visible_height)
     }

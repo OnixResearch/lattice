@@ -21,8 +21,7 @@ pub(super) const MAX_REASON_COUNT: usize = 64;
 pub(super) const MAX_SAFE_LABEL_CHARS: usize = 64;
 pub(super) const MIN_ATTEMPT_COUNT: u32 = 1;
 pub(super) const HASH_SEPARATOR: &str = "\u{1f}";
-pub(super) const REDACTION_MARKER: &str =
-    "raw-provider-request-stream-credential-and-reasoning-material-omitted";
+pub(super) const REDACTION_MARKER: &str = "raw-provider-request-stream-credential-and-reasoning-material-omitted";
 pub(super) const NON_CLAIM: &str = "retry evidence does not prove provider reliability, exactly-once billing, remote cancellation, fallback, or partial-stream resumability";
 
 /// Canonical provider failure class admitted by retry policy.

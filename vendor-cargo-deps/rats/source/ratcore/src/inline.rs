@@ -102,8 +102,7 @@ pub struct ReconcileResult {
 #[must_use]
 pub fn reconcile(mut old: Vec<ViewNode>, new: Vec<ViewNode>) -> ReconcileResult {
     // Build index of keyed old nodes: key -> position in old vec.
-    let mut old_by_key: std::collections::HashMap<NodeKey, usize> =
-        std::collections::HashMap::with_capacity(old.len());
+    let mut old_by_key: std::collections::HashMap<NodeKey, usize> = std::collections::HashMap::with_capacity(old.len());
     for (i, node) in old.iter().enumerate() {
         if let Some(ref key) = node.key {
             old_by_key.insert(key.clone(), i);
@@ -172,9 +171,7 @@ pub fn reconcile(mut old: Vec<ViewNode>, new: Vec<ViewNode>) -> ReconcileResult 
     debug_assert_eq!(result_nodes.len(), matched_old.len());
     debug_assert!(result_nodes.len() <= new_node_count);
 
-    ReconcileResult {
-        nodes: result_nodes,
-    }
+    ReconcileResult { nodes: result_nodes }
 }
 
 // ── Commit tracking ──────────────────────────────────────────────────────────

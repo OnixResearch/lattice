@@ -64,11 +64,7 @@ const LABEL_FIELD: MetadataField = MetadataField::new("receipt_label");
 const COUNT_LABEL_FIELD: MetadataField = MetadataField::new("receipt_count_label");
 
 const PROMPT_MARKERS: &[&str] = &[RAW_PROMPT_MARKER, SYSTEM_PROMPT_MARKER, USER_PROMPT_MARKER];
-const PROVIDER_MARKERS: &[&str] = &[
-    PROVIDER_CHOICES_MARKER,
-    PROVIDER_MESSAGES_MARKER,
-    PROVIDER_MODEL_MARKER,
-];
+const PROVIDER_MARKERS: &[&str] = &[PROVIDER_CHOICES_MARKER, PROVIDER_MESSAGES_MARKER, PROVIDER_MODEL_MARKER];
 const CREDENTIAL_MARKERS: &[&str] = &[
     TOKEN_PREFIX,
     GITHUB_TOKEN_PREFIX,
@@ -77,19 +73,10 @@ const CREDENTIAL_MARKERS: &[&str] = &[
     API_KEY_DASH_MARKER,
     BEARER_MARKER,
 ];
-const PATH_MARKERS: &[&str] = &[
-    HOME_PATH_MARKER,
-    TMP_PATH_MARKER,
-    ETC_PATH_MARKER,
-    USER_PATH_MARKER,
-];
+const PATH_MARKERS: &[&str] = &[HOME_PATH_MARKER, TMP_PATH_MARKER, ETC_PATH_MARKER, USER_PATH_MARKER];
 const TOOL_INPUT_MARKERS: &[&str] = &[TOOL_INPUT_MARKER, TOOL_INPUT_TEXT_MARKER];
 const TOOL_OUTPUT_MARKERS: &[&str] = &[TOOL_OUTPUT_MARKER, TOOL_OUTPUT_TEXT_MARKER];
-const MODEL_OUTPUT_MARKERS: &[&str] = &[
-    MODEL_OUTPUT_MARKER,
-    MODEL_OUTPUT_TEXT_MARKER,
-    ASSISTANT_OUTPUT_MARKER,
-];
+const MODEL_OUTPUT_MARKERS: &[&str] = &[MODEL_OUTPUT_MARKER, MODEL_OUTPUT_TEXT_MARKER, ASSISTANT_OUTPUT_MARKER];
 
 /// Schema identifier attached to safe receipt DTOs.
 pub const SCHEMA: &str = "animus.safe-receipt.v1";
@@ -136,11 +123,7 @@ impl ArtifactHash {
             value.push(char::from(LOWER_HEX[high]));
             value.push(char::from(LOWER_HEX[low]));
         }
-        assert_eq!(
-            value.len(),
-            BLAKE3_HASH_HEX_CHARS,
-            "BLAKE3 hex encoding must produce the configured length"
-        );
+        assert_eq!(value.len(), BLAKE3_HASH_HEX_CHARS, "BLAKE3 hex encoding must produce the configured length");
         Self { value }
     }
 
@@ -416,20 +399,12 @@ impl core::fmt::Display for Error {
                 field,
                 max_items,
                 actual_items,
-            } => write!(
-                formatter,
-                "{field} must contain at most {max_items} items; got {actual_items}"
-            ),
-            Self::NulCharacter { field, byte_index } => write!(
-                formatter,
-                "{field} contains a NUL character at byte index {byte_index}"
-            ),
+            } => write!(formatter, "{field} must contain at most {max_items} items; got {actual_items}"),
+            Self::NulCharacter { field, byte_index } => {
+                write!(formatter, "{field} contains a NUL character at byte index {byte_index}")
+            }
             Self::UnsafeMetadata { field, class } => {
-                write!(
-                    formatter,
-                    "{field} contains unsafe {} material",
-                    class.as_str()
-                )
+                write!(formatter, "{field} contains unsafe {} material", class.as_str())
             }
             Self::CountTooLarge { field, max, actual } => {
                 write!(formatter, "{field} must be at most {max}; got {actual}")
@@ -684,10 +659,7 @@ fn labels(values: &[&str]) -> Result<alloc::vec::Vec<alloc::string::String>, Err
 
 fn counts(values: &[BoundedCountDraft<'_>]) -> Result<alloc::vec::Vec<BoundedCount>, Error> {
     ensure_optional_collection(COUNTS_FIELD, values.len())?;
-    let mut counts = values
-        .iter()
-        .map(count)
-        .collect::<Result<alloc::vec::Vec<_>, _>>()?;
+    let mut counts = values.iter().map(count).collect::<Result<alloc::vec::Vec<_>, _>>()?;
     counts.sort();
     counts.dedup();
     Ok(counts)
@@ -755,22 +727,13 @@ fn ensure_optional_collection(field: &'static str, actual_items: usize) -> Resul
     Ok(())
 }
 
-fn optional_label(
-    field: MetadataField,
-    value: Option<&str>,
-) -> Result<Option<alloc::string::String>, Error> {
+fn optional_label(field: MetadataField, value: Option<&str>) -> Result<Option<alloc::string::String>, Error> {
     value.map(|label| required_label(field, label)).transpose()
 }
 
 fn required_label(field: MetadataField, value: &str) -> Result<alloc::string::String, Error> {
-    assert!(
-        !field.name().is_empty(),
-        "metadata field name must not be empty"
-    );
-    assert!(
-        value.len() >= value.chars().count(),
-        "label byte length must cover character count"
-    );
+    assert!(!field.name().is_empty(), "metadata field name must not be empty");
+    assert!(value.len() >= value.chars().count(), "label byte length must cover character count");
     reject_oversized(field, value)?;
     reject_nul(field, value)?;
     let normalized = value.trim();
@@ -791,9 +754,8 @@ fn reject_oversized(field: MetadataField, value: &str) -> Result<(), Error> {
 }
 
 fn reject_nul(field: MetadataField, value: &str) -> Result<(), Error> {
-    if let Some((byte_index, _character)) = value
-        .char_indices()
-        .find(|(_byte_index, character)| *character == NUL_CHARACTER)
+    if let Some((byte_index, _character)) =
+        value.char_indices().find(|(_byte_index, character)| *character == NUL_CHARACTER)
     {
         return Err(Error::NulCharacter {
             field: field.name(),
@@ -805,9 +767,7 @@ fn reject_nul(field: MetadataField, value: &str) -> Result<(), Error> {
 
 fn reject_empty(field: MetadataField, value: &str) -> Result<(), Error> {
     if value.is_empty() {
-        return Err(Error::EmptyField {
-            field: field.name(),
-        });
+        return Err(Error::EmptyField { field: field.name() });
     }
     Ok(())
 }
@@ -824,10 +784,7 @@ fn reject_unsafe(field: MetadataField, value: &str) -> Result<(), Error> {
 
 fn leak_class(value: &str) -> Option<LeakClass> {
     assert!(!value.is_empty(), "safe metadata value must not be empty");
-    assert!(
-        value.len() >= value.chars().count(),
-        "byte length covers chars"
-    );
+    assert!(value.len() >= value.chars().count(), "byte length covers chars");
     let lower = value.to_ascii_lowercase();
     let trimmed = lower.trim();
     if contains_any(trimmed, PROMPT_MARKERS) {
@@ -878,23 +835,15 @@ fn is_path_like(value: &str) -> bool {
 
 fn contains_any(value: &str, markers: &[&str]) -> bool {
     assert!(!markers.is_empty(), "marker list must not be empty");
-    assert!(
-        value.len() >= value.chars().count(),
-        "byte length covers chars"
-    );
+    assert!(value.len() >= value.chars().count(), "byte length covers chars");
     markers.iter().any(|marker| value.contains(marker))
 }
 
 fn validate_hash(value: &str) -> Result<(), Error> {
     let actual_chars = value.chars().count();
-    assert!(
-        actual_chars <= value.len(),
-        "hash char count must fit byte length"
-    );
+    assert!(actual_chars <= value.len(), "hash char count must fit byte length");
     if actual_chars != BLAKE3_HASH_HEX_CHARS
-        || !value
-            .chars()
-            .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
+        || !value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
     {
         return Err(Error::InvalidHash {
             field: FIELD_ARTIFACT_HASH,
@@ -928,16 +877,12 @@ mod tests {
         let hash = ArtifactHash::new(HASH_TEXT)?;
         let counts = [BoundedCountDraft::new(COUNT_LABEL, COUNT_VALUE)];
         let receipt = Record::new(
-            Draft::new(
-                Status::Completed,
-                IssueCode::None,
-                Operation::ProvenanceObservation,
-            )
-            .with_labels(&[SAFE_LABEL])
-            .with_counts(&counts)
-            .with_artifact_hashes(&[hash])
-            .with_backend_label(SAFE_BACKEND)
-            .with_redactions(&[Redaction::PayloadHashOnly]),
+            Draft::new(Status::Completed, IssueCode::None, Operation::ProvenanceObservation)
+                .with_labels(&[SAFE_LABEL])
+                .with_counts(&counts)
+                .with_artifact_hashes(&[hash])
+                .with_backend_label(SAFE_BACKEND)
+                .with_redactions(&[Redaction::PayloadHashOnly]),
         )?;
         assert_eq!(receipt.schema(), SCHEMA);
         assert_eq!(receipt.counts()[0].value(), COUNT_VALUE);
@@ -949,13 +894,9 @@ mod tests {
     fn negative_safe_receipt_rejects_leaks_and_bad_hashes() {
         assert!(matches!(
             Record::new(
-                Draft::new(
-                    Status::Blocked,
-                    IssueCode::LeakRejected,
-                    Operation::RuntimeBlock
-                )
-                .with_labels(&[UNSAFE_CREDENTIAL])
-                .with_redactions(&[Redaction::CredentialOmitted]),
+                Draft::new(Status::Blocked, IssueCode::LeakRejected, Operation::RuntimeBlock)
+                    .with_labels(&[UNSAFE_CREDENTIAL])
+                    .with_redactions(&[Redaction::CredentialOmitted]),
             ),
             Err(Error::UnsafeMetadata {
                 class: LeakClass::Credential,
@@ -964,22 +905,15 @@ mod tests {
         ));
         assert!(matches!(
             Record::new(
-                Draft::new(
-                    Status::Blocked,
-                    IssueCode::LeakRejected,
-                    Operation::RuntimeBlock
-                )
-                .with_labels(&[PRIVATE_PATH])
-                .with_redactions(&[Redaction::AbsolutePathOmitted]),
+                Draft::new(Status::Blocked, IssueCode::LeakRejected, Operation::RuntimeBlock)
+                    .with_labels(&[PRIVATE_PATH])
+                    .with_redactions(&[Redaction::AbsolutePathOmitted]),
             ),
             Err(Error::UnsafeMetadata {
                 class: LeakClass::AbsolutePath,
                 ..
             })
         ));
-        assert!(matches!(
-            ArtifactHash::new("not-a-blake3-hex"),
-            Err(Error::InvalidHash { .. })
-        ));
+        assert!(matches!(ArtifactHash::new("not-a-blake3-hex"), Err(Error::InvalidHash { .. })));
     }
 }

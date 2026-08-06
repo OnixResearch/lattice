@@ -4,7 +4,7 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionRegistrySnapshot {
     pub(super) actions: Vec<ActionDescriptor>,
-    pub(super) blocked_reasons: std::collections::BTreeMap<String, String>,
+    pub(super) blocked_reasons: std::collections::BTreeMap<ActionId, String>,
 }
 
 impl ActionRegistrySnapshot {
@@ -14,10 +14,16 @@ impl ActionRegistrySnapshot {
         &self.actions
     }
 
-    /// Finds an action by ID.
+    /// Finds an action by its canonical ID.
     #[must_use]
-    pub fn action(&self, id: &str) -> Option<&ActionDescriptor> {
-        self.actions.iter().find(|action| action.id == id)
+    pub fn action(&self, id: &ActionId) -> Option<&ActionDescriptor> {
+        self.actions.iter().find(|action| &action.id == id)
+    }
+
+    /// Finds an action by raw text at an ingestion or compatibility boundary.
+    #[must_use]
+    pub fn action_by_raw_id(&self, id: &str) -> Option<&ActionDescriptor> {
+        self.actions.iter().find(|action| action.id.as_str() == id)
     }
 
     /// Returns true when an action is enabled and not blocked by registry diagnostics.
@@ -125,16 +131,13 @@ impl ActionRegistrySnapshot {
             let Some(shortcut) = &action.shortcut else {
                 continue;
             };
-            grouped
-                .entry(action.category.clone())
-                .or_default()
-                .push(ShortcutHelpEntryProjection {
-                    action_id: action.id.clone(),
-                    label: action.label.clone(),
-                    shortcut_label: shortcut.display(),
-                    enabled: self.is_active(action),
-                    disabled_reason: self.inactive_reason(action),
-                });
+            grouped.entry(action.category.clone()).or_default().push(ShortcutHelpEntryProjection {
+                action_id: action.id.clone(),
+                label: action.label.clone(),
+                shortcut_label: shortcut.display(),
+                enabled: self.is_active(action),
+                disabled_reason: self.inactive_reason(action),
+            });
         }
         grouped
             .into_iter()
@@ -147,7 +150,7 @@ impl ActionRegistrySnapshot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeymapBindingProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// Shortcut scope.
@@ -162,7 +165,7 @@ pub struct KeymapBindingProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LeaderEntryProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// User-facing shortcut label.
@@ -175,7 +178,7 @@ pub struct LeaderEntryProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandPaletteItemProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// Optional action description.
@@ -194,7 +197,7 @@ pub struct CommandPaletteItemProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MenuItemProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// Action category.
@@ -211,7 +214,7 @@ pub struct MenuItemProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolbarItemProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// Optional icon name or glyph identifier.
@@ -235,7 +238,7 @@ pub struct ShortcutHelpSectionProjection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShortcutHelpEntryProjection {
     /// Stable action ID.
-    pub action_id: String,
+    pub action_id: ActionId,
     /// Action label.
     pub label: String,
     /// User-facing shortcut label.

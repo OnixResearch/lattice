@@ -28,14 +28,8 @@ pub(super) struct RoleCandidateRequest<'a> {
 pub(super) fn collect_role_candidates(
     request: RoleCandidateRequest<'_>,
 ) -> Result<alloc::vec::Vec<alloc::string::String>, crate::ExecutionPlanError> {
-    assert!(
-        request.selected.bounds().max_candidates() > 0,
-        "candidate cap must be positive"
-    );
-    assert!(
-        request.budget.max_candidates() > 0,
-        "budget cap must be positive"
-    );
+    assert!(request.selected.bounds().max_candidates() > 0, "candidate cap must be positive");
+    assert!(request.budget.max_candidates() > 0, "budget cap must be positive");
     let mut eligible_labels = alloc::vec::Vec::with_capacity(request.catalog.len());
     for entry in request.catalog {
         if entry.role() != request.role {
@@ -77,10 +71,7 @@ pub(super) fn build_fallback_chain(
     budget: &crate::Budget,
     route_labels: &[alloc::string::String],
 ) -> Result<crate::FallbackChain, crate::ExecutionPlanError> {
-    assert!(
-        selected.bounds().max_candidates() > 0,
-        "candidate cap must be positive"
-    );
+    assert!(selected.bounds().max_candidates() > 0, "candidate cap must be positive");
     assert!(budget.max_candidates() > 0, "budget cap must be positive");
     if selected.family() == crate::RouteFamily::Single
         || selected.bounds().fallback_policy() == crate::FallbackPolicy::Deny
@@ -109,9 +100,7 @@ pub(super) fn build_fallback_chain(
             continue;
         }
 
-        if slice_contains_str(route_labels, entry.label())
-            || slice_contains_str(&fallback_labels, entry.label())
-        {
+        if slice_contains_str(route_labels, entry.label()) || slice_contains_str(&fallback_labels, entry.label()) {
             return Err(crate::ExecutionPlanError::CyclicFallback);
         }
 
@@ -139,11 +128,6 @@ fn slice_contains_str(labels: &[alloc::string::String], target: &str) -> bool {
     labels.iter().any(|label| label.as_str() == target)
 }
 
-fn entry_allowed(
-    entry: &crate::CatalogEntry,
-    budget: &crate::Budget,
-    privacy: crate::PrivacyBand,
-) -> bool {
-    budget.allows_backend(entry.backend())
-        && (privacy == crate::PrivacyBand::RemoteAllowed || entry.is_local())
+fn entry_allowed(entry: &crate::CatalogEntry, budget: &crate::Budget, privacy: crate::PrivacyBand) -> bool {
+    budget.allows_backend(entry.backend()) && (privacy == crate::PrivacyBand::RemoteAllowed || entry.is_local())
 }

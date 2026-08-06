@@ -1,0 +1,26 @@
+{
+  "cache_posture": "disposable",
+  "cursor_posture": "revision_fenced",
+  "max_entries": 1024,
+  "max_parts_per_item": 64,
+  "non_claims": [
+    "transcript_truth",
+    "ui_delivery",
+    "cache_durability",
+    "renderer_correctness",
+    "task_completion",
+    "production_readiness"
+  ],
+  "policy_hash": "ad8f2abe166c397804648b2358f32139131f19921054443e2356e6793ac58795",
+  "policy_id": "canonical-conversation",
+  "reasoning_posture": "hidden",
+  "receipt_fields": [
+    "source",
+    "stream",
+    "cursor",
+    "counts",
+    "non_claims"
+  ],
+  "schema": "animus.conversation-projection.v1",
+  "tool_posture": "hash_only"
+}

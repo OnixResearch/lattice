@@ -2,10 +2,8 @@
 
 const SCHEMA_NAME_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_response_schema_name");
-const FIELD_NAME_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("recipe_response_field_name");
-const FIELD_KIND_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("recipe_response_field_kind");
+const FIELD_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_response_field_name");
+const FIELD_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_response_field_kind");
 
 const KIND_STRING: &str = "string";
 const KIND_NUMBER: &str = "number";
@@ -96,9 +94,7 @@ impl RecipeResponseSchema {
     ///
     /// Returns [`super::RecipeWorkflowError`] when the schema is unnamed,
     /// declares no required fields, repeats a field, or names an unsupported kind.
-    pub fn validate(
-        draft: &RecipeResponseSchemaDraft<'_>,
-    ) -> Result<Self, super::RecipeWorkflowError> {
+    pub fn validate(draft: &RecipeResponseSchemaDraft<'_>) -> Result<Self, super::RecipeWorkflowError> {
         let name = super::required_text(SCHEMA_NAME_FIELD, draft.name)?;
         if draft.required_fields.is_empty() {
             return Err(super::RecipeWorkflowError::EmptyCollection {
@@ -107,10 +103,7 @@ impl RecipeResponseSchema {
         }
         let required_fields = collect_fields(draft.required_fields)?;
 
-        Ok(Self {
-            name,
-            required_fields,
-        })
+        Ok(Self { name, required_fields })
     }
 
     /// Returns the stable schema name.
@@ -155,20 +148,19 @@ impl RecipeResponseField {
 
 mod check;
 
-pub use check::{
-    RecipeAutomationOutcome, RecipeAutomationStatus, RecipeOutputDraft, RecipeOutputFailure,
-    RecipeOutputFieldDraft, validate_recipe_output,
-};
+pub use check::RecipeAutomationOutcome;
+pub use check::RecipeAutomationStatus;
+pub use check::RecipeOutputDraft;
+pub use check::RecipeOutputFailure;
+pub use check::RecipeOutputFieldDraft;
+pub use check::validate_recipe_output;
 fn collect_fields(
     drafts: &[RecipeResponseFieldDraft<'_>],
 ) -> Result<Collection<RecipeResponseField>, super::RecipeWorkflowError> {
     let mut fields: Collection<RecipeResponseField> = Collection::with_capacity(drafts.len());
     for draft in drafts {
         let field = RecipeResponseField::validate(draft)?;
-        if fields
-            .iter()
-            .any(|existing| existing.name() == field.name())
-        {
+        if fields.iter().any(|existing| existing.name() == field.name()) {
             return Err(super::RecipeWorkflowError::DuplicateName {
                 field: FIELD_NAME_FIELD.as_str(),
                 value: Text::from(field.name()),

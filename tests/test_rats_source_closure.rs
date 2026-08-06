@@ -5,7 +5,7 @@ use std::path::Path;
 
 use pretty_assertions::assert_eq;
 
-const EXPECTED_RATS_REVISION: &str = "3418e08e4408d6eb899dd4abc8af3fbad9499bb1";
+const EXPECTED_RATS_REVISION: &str = "ef26e13b2e9cbcb4a0c902f9caff641b6d013867";
 const RATS_ROOT: &str = "vendor-cargo-deps/rats/source";
 const SOURCE_METADATA: &str = "vendor-cargo-deps/rats/source/SOURCE";
 const ASSERTIONS_MODULE: &str = "vendor-cargo-deps/rats/source/ratcore/src/manual/doc/assertions.rs";
@@ -14,6 +14,10 @@ const SYNC_SCRIPT: &str = "scripts/sync_rats.rs";
 const CHECK_SCRIPT: &str = "scripts/check.rs";
 const FLAKE_PATH: &str = "flake.nix";
 const EXPECTED_SNAPSHOT_COUNT: usize = 8;
+const RATCORE_GENERATED_ROOT: &str = "ratcore/src/generated";
+const GENERATED_DOCS_ROOT: &str = "docs/generated";
+const METEORITE_GENERATED_ROOT: &str = "meteorite/crates/met-core/generated";
+const THEME_ROOT: &str = "themes";
 const SNAPSHOT_PATHS: &[&str] = &[
     "docs/generated/snapshots/dialog-basic.subwayrat.typ",
     "docs/generated/snapshots/dialog-basic.meteorite.html",
@@ -46,8 +50,12 @@ fn validate_source_closure(closure: &SourceClosure<'_>) -> Result<(), String> {
     {
         return Err("Rats revision identity or source-HEAD admission drifted".to_string());
     }
-    if !closure.metadata.contains("- ratcore/src") || !closure.metadata.contains("- docs/generated/snapshots") {
-        return Err("Rats source metadata omitted required roots".to_string());
+    if !closure.metadata.contains("- ratcore/src")
+        || !closure.metadata.contains(&format!("- {GENERATED_DOCS_ROOT}"))
+        || !closure.metadata.contains(&format!("- {METEORITE_GENERATED_ROOT}"))
+        || !closure.metadata.contains(&format!("- {THEME_ROOT}"))
+    {
+        return Err("Rats source metadata omitted required roots or compile-time assets".to_string());
     }
     if !closure.manual_tests.contains("pub(super) mod assertions;") {
         return Err("Rats manual tests no longer reference the assertions module".to_string());
@@ -58,10 +66,17 @@ fn validate_source_closure(closure: &SourceClosure<'_>) -> Result<(), String> {
         return Err("focused Lattice consumer compile rail is missing".to_string());
     }
     let exact_source_asset = "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE";
-    let exact_snapshot_root = "${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/";
+    let exact_ratcore_generated_root =
+        format!("${{sourceRoot}}/vendor-cargo-deps/rats/source/{RATCORE_GENERATED_ROOT}/");
+    let exact_generated_docs_root = format!("${{sourceRoot}}/vendor-cargo-deps/rats/source/{GENERATED_DOCS_ROOT}/");
+    let exact_meteorite_root = format!("${{sourceRoot}}/vendor-cargo-deps/rats/source/{METEORITE_GENERATED_ROOT}/");
+    let exact_theme_root = format!("${{sourceRoot}}/vendor-cargo-deps/rats/source/{THEME_ROOT}/");
     let broad_source_root = "hasPrefix \"${sourceRoot}/vendor-cargo-deps/rats/source/\" (toString path)";
     if !closure.flake.contains(exact_source_asset)
-        || !closure.flake.contains(exact_snapshot_root)
+        || !closure.flake.contains(&exact_ratcore_generated_root)
+        || !closure.flake.contains(&exact_generated_docs_root)
+        || !closure.flake.contains(&exact_meteorite_root)
+        || !closure.flake.contains(&exact_theme_root)
         || !closure.flake.contains("isRatsCompileTimeAssetPath path")
         || closure.flake.contains(broad_source_root)
     {
@@ -137,14 +152,17 @@ fn pinned_rats_snapshot_is_source_complete_and_has_a_focused_consumer_compile_ra
 
 #[test]
 fn rats_source_closure_rejects_revision_missing_module_snapshot_and_compile_drift() {
-    let complete_metadata =
-        format!("name: rats\nrevision: {EXPECTED_RATS_REVISION}\npaths:\n- ratcore/src\n- docs/generated/snapshots\n");
+    let complete_metadata = format!(
+        "name: rats\nrevision: {EXPECTED_RATS_REVISION}\npaths:\n- ratcore/src\n- {GENERATED_DOCS_ROOT}\n- {METEORITE_GENERATED_ROOT}\n- {THEME_ROOT}\n"
+    );
     let complete_sync = format!(
         "const EXPECTED_REVISION: &str = \"{EXPECTED_RATS_REVISION}\"; verify_source_head(&source_root)?; [\"rev-parse\", \"HEAD\"]"
     );
     let complete_check =
         "const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &[\"check\", \"--package\", \"lattice\", \"--all-targets\"];";
-    let complete_flake = "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE ${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/ isRatsCompileTimeAssetPath path";
+    let complete_flake = format!(
+        "${{sourceRoot}}/vendor-cargo-deps/rats/source/SOURCE ${{sourceRoot}}/vendor-cargo-deps/rats/source/{RATCORE_GENERATED_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{GENERATED_DOCS_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{METEORITE_GENERATED_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{THEME_ROOT}/ isRatsCompileTimeAssetPath path"
+    );
     let complete_manual_tests = "pub(super) mod assertions;";
     let complete_assertions = SNAPSHOT_PATHS.join("\n");
     let snapshot_storage = SNAPSHOT_PATHS.iter().map(|_| vec![1_u8]).collect::<Vec<_>>();
@@ -157,7 +175,7 @@ fn rats_source_closure_rejects_revision_missing_module_snapshot_and_compile_drif
         metadata: &complete_metadata,
         sync_script: &complete_sync,
         check_script: complete_check,
-        flake: complete_flake,
+        flake: &complete_flake,
         manual_tests: complete_manual_tests,
         assertions: &complete_assertions,
         snapshots: snapshots.clone(),
@@ -169,6 +187,20 @@ fn rats_source_closure_rejects_revision_missing_module_snapshot_and_compile_drif
         ..complete.clone()
     };
     assert!(validate_source_closure(&wrong_revision).is_err());
+    let missing_asset_metadata =
+        format!("revision: {EXPECTED_RATS_REVISION}\n- ratcore/src\n- {GENERATED_DOCS_ROOT}\n- {THEME_ROOT}");
+    let missing_asset = SourceClosure {
+        metadata: &missing_asset_metadata,
+        ..complete.clone()
+    };
+    assert!(validate_source_closure(&missing_asset).is_err());
+    let missing_nix_asset_source = complete_flake
+        .replace(&format!("${{sourceRoot}}/vendor-cargo-deps/rats/source/{RATCORE_GENERATED_ROOT}/ "), "");
+    let missing_nix_asset = SourceClosure {
+        flake: &missing_nix_asset_source,
+        ..complete.clone()
+    };
+    assert!(validate_source_closure(&missing_nix_asset).is_err());
     let missing_module = SourceClosure {
         manual_tests: "mod other;",
         ..complete.clone()
@@ -184,8 +216,10 @@ fn rats_source_closure_rejects_revision_missing_module_snapshot_and_compile_drif
         ..complete.clone()
     };
     assert!(validate_source_closure(&missing_compile).is_err());
+    let broad_flake_source =
+        format!("{complete_flake} hasPrefix \"${{sourceRoot}}/vendor-cargo-deps/rats/source/\" (toString path)");
     let broad_flake = SourceClosure {
-        flake: "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE ${sourceRoot}/vendor-cargo-deps/rats/source/docs/generated/snapshots/ isRatsCompileTimeAssetPath path hasPrefix \"${sourceRoot}/vendor-cargo-deps/rats/source/\" (toString path)",
+        flake: &broad_flake_source,
         ..complete
     };
     assert!(validate_source_closure(&broad_flake).is_err());

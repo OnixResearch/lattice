@@ -1,10 +1,26 @@
-use super::{
-    Collection, ExternalSubagentDescriptor, ExternalSubagentDescriptorDraft, ID_FIELD,
-    MIN_TURN_COUNT, MODEL_FIELD, PARAMETER_FIELD, PROFILE_FIELD, RECIPE_FIELD, ROLE_FIELD,
-    SOURCE_USER, SUMMARY_SCHEMA_FIELD, SubagentDelegationSource, SubagentError, SubagentReturnMode,
-    TASK_FIELD, TIMEOUT_FIELD, TOOL_FIELD, Text, WORKSPACE_FIELD, optional_text, required_text,
-    text_collection,
-};
+use super::Collection;
+use super::ExternalSubagentDescriptor;
+use super::ExternalSubagentDescriptorDraft;
+use super::ID_FIELD;
+use super::MIN_TURN_COUNT;
+use super::MODEL_FIELD;
+use super::PARAMETER_FIELD;
+use super::PROFILE_FIELD;
+use super::RECIPE_FIELD;
+use super::ROLE_FIELD;
+use super::SOURCE_USER;
+use super::SUMMARY_SCHEMA_FIELD;
+use super::SubagentDelegationSource;
+use super::SubagentError;
+use super::SubagentReturnMode;
+use super::TASK_FIELD;
+use super::TIMEOUT_FIELD;
+use super::TOOL_FIELD;
+use super::Text;
+use super::WORKSPACE_FIELD;
+use super::optional_text;
+use super::required_text;
+use super::text_collection;
 
 /// Untrusted recipe-backed subagent delegation request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -92,11 +108,7 @@ impl SubagentDelegation {
         }
         let return_mode = SubagentReturnMode::parse(draft.return_mode)?;
         let summary_schema = required_text(SUMMARY_SCHEMA_FIELD, draft.summary_schema)?;
-        let external = draft
-            .external
-            .as_ref()
-            .map(ExternalSubagentDescriptor::validate)
-            .transpose()?;
+        let external = draft.external.as_ref().map(ExternalSubagentDescriptor::validate).transpose()?;
         Ok(Self {
             id,
             role,
@@ -210,10 +222,7 @@ fn validate_delegation_admission(
     draft: &SubagentDelegationDraft<'_>,
     source: SubagentDelegationSource,
 ) -> Result<(), SubagentError> {
-    assert!(
-        !draft.delegation_source.is_empty(),
-        "delegation source was parsed"
-    );
+    assert!(!draft.delegation_source.is_empty(), "delegation source was parsed");
     assert!(!SOURCE_USER.is_empty(), "source labels are stable");
     if source == SubagentDelegationSource::Automatic {
         return Err(SubagentError::ImplicitDelegationDenied);

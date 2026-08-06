@@ -1,0 +1,21 @@
+fact	owner	evidence	classification
+source-revision	Tile repository	git revision 62df72ca1ebbb33d96ca3c2714efed15054afe99	pinned-clean-source-only
+direct-rats-dependency.rat-chrome	tile-tui frontend	crates/tile-tui/Cargo.toml path ../../../rats/subwayrat/crates/rat-chrome	frontend-component-dependency
+direct-rats-dependency.rat-keymap	tile-tui frontend	crates/tile-tui/Cargo.toml path ../../../rats/subwayrat/crates/rat-keymap	frontend-component-dependency
+direct-rats-dependency.rat-leaderkey	tile-tui frontend	crates/tile-tui/Cargo.toml path ../../../rats/subwayrat/crates/rat-leaderkey	frontend-component-dependency
+direct-rats-dependency.rat-scrolltile	tile-tui frontend	crates/tile-tui/Cargo.toml path ../../../rats/subwayrat/crates/rat-scrolltile	frontend-component-dependency
+direct-rats-dependency.rat-widgets	tile-tui frontend	crates/tile-tui/Cargo.toml path ../../../rats/subwayrat/crates/rat-widgets	frontend-component-dependency
+canonical-workspace-identity	Tile core	crates/tile-core/src/workspace.rs SessionId TabId PaneId	canonical-downstream
+canonical-view-identity	Tile core	crates/tile-core/src/buffer_view.rs ViewId	canonical-downstream
+generations-and-revisions	Tile core and protocol	WorkspaceRevision plus protocol frontend frame and control revisions	canonical-downstream
+domain-state	Tile core and daemon	workspace session pane buffer and unified-view models	canonical-downstream
+wire-protocol	Tile protocol	crates/tile-protocol command event and revision schema	canonical-downstream
+persistence-and-recovery	Tile daemon	crates/tile-daemon/src/bootstrap.rs persistence and fresh recovery	canonical-downstream
+process-and-job-lifecycle	Tile daemon	PTY task managed-agent and runtime services	canonical-downstream
+remote-transport	Tile transport	crates/tile-transport route snapshot capability and delivery contracts	canonical-downstream
+focus-input-and-capture	Tile core protocol and daemon	workspace revisions input commands capture targets and policy	canonical-downstream
+tui-layout-and-physical-input	tile-tui frontend	crates/tile-tui renderer key normalization and component adapters	renderer-edge
+accessibility-reading-context	Tile application and platform policy	docs/arcan-homepage-review.md planned semantic presentations and capability-safe actions	reserved-downstream-unimplemented
+diagnostics-and-redaction	Tile domain owners	daemon protocol transport and caller-supplied bounded frontend records	canonical-downstream
+policy-authorization-and-effects	Tile daemon and platform adapters	current revisions capabilities admission and effect shells	canonical-downstream
+compile-receipt	Rats optional tooling	selected tile-tui cargo check only	compatibility-not-behavior-or-support

@@ -1,6 +1,8 @@
 # Nickel is the source of truth for repo-owned tool configuration.
 # Export the native files with scripts/config/export-nickel-configs.
 
+let agent_check_registry_value = (import "agent-check-registry.ncl").agent_check_registry in
+
 let CargoAliasConfig = {
   verify | String,
 } in
@@ -134,6 +136,8 @@ let local_repo = "local" in
       },
     },
   },
+
+  agent_check_registry = agent_check_registry_value,
 
   pre_commit_config | PreCommitConfig = {
     repos = [

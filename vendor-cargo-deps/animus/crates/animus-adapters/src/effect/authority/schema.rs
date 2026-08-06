@@ -1,11 +1,8 @@
-const CONTRACT_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("capability_contract");
-const RESOURCE_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("capability_resource");
+const CONTRACT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("capability_contract");
+const RESOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("capability_resource");
 const RESOURCE_PREFIX_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("capability_resource_prefix");
-const ABILITY_FIELD: crate::validation::FieldName =
-    crate::validation::FieldName::new("capability_ability");
+const ABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("capability_ability");
 pub(super) const HASH_SEPARATOR: &str = "|";
 pub(super) const HASH_SCHEMA: &str = "animus.clash-ucan-authority.v1";
 
@@ -88,8 +85,7 @@ impl CapabilityPolicyContract {
         ability: &str,
     ) -> Result<Self, crate::AdapterContractError> {
         let contract = crate::validation::normalized_adapter_field(CONTRACT_FIELD, contract)?;
-        let resource_prefix =
-            crate::validation::normalized_adapter_field(RESOURCE_PREFIX_FIELD, resource_prefix)?;
+        let resource_prefix = crate::validation::normalized_adapter_field(RESOURCE_PREFIX_FIELD, resource_prefix)?;
         let ability = crate::validation::normalized_adapter_field(ABILITY_FIELD, ability)?;
         let policy_hash = hash_parts(&[
             HASH_SCHEMA,
@@ -151,17 +147,10 @@ impl UcanGrant {
     ///
     /// Returns [`crate::AdapterContractError`] when contract, resource prefix, or
     /// ability is empty, too long, or contains a NUL character.
-    pub fn new(
-        contract: &str,
-        resource_prefix: &str,
-        ability: &str,
-    ) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(contract: &str, resource_prefix: &str, ability: &str) -> Result<Self, crate::AdapterContractError> {
         Ok(Self {
             contract: crate::validation::normalized_adapter_field(CONTRACT_FIELD, contract)?,
-            resource_prefix: crate::validation::normalized_adapter_field(
-                RESOURCE_PREFIX_FIELD,
-                resource_prefix,
-            )?,
+            resource_prefix: crate::validation::normalized_adapter_field(RESOURCE_PREFIX_FIELD, resource_prefix)?,
             ability: crate::validation::normalized_adapter_field(ABILITY_FIELD, ability)?,
         })
     }

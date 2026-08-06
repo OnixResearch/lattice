@@ -90,9 +90,7 @@ pub(super) fn command_profile() -> super::super::ProcessJobProfile {
     }
 }
 
-pub(super) fn manifest(
-    profile: super::super::ProcessJobProfile,
-) -> super::super::ProcessJobProfileManifest {
+pub(super) fn manifest(profile: super::super::ProcessJobProfile) -> super::super::ProcessJobProfileManifest {
     super::super::ProcessJobProfileManifest::current(vec![super::super::NamedProcessJobProfile {
         name: String::from(PROFILE_NAME),
         profile,
@@ -104,6 +102,5 @@ pub(super) fn source(
     safe_label: &str,
     profile: super::super::ProcessJobProfile,
 ) -> super::super::ProcessJobProfileSource {
-    super::super::ProcessJobProfileSource::new(precedence, safe_label, manifest(profile))
-        .expect("safe source")
+    super::super::ProcessJobProfileSource::new(precedence, safe_label, manifest(profile)).expect("safe source")
 }

@@ -3,13 +3,11 @@
 /// Generated policy schema identity.
 pub const SESSION_TREE_EXPORT_POLICY_SCHEMA: &str = "animus.session-tree-export-policy.v1";
 /// BLAKE3 domain for generated policy content.
-pub const SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN: &str =
-    "animus.session-tree-export-policy-content.v1";
+pub const SESSION_TREE_EXPORT_POLICY_HASH_DOMAIN: &str = "animus.session-tree-export-policy-content.v1";
 /// BLAKE3 domain for validated source identity.
 pub const SESSION_TREE_EXPORT_SOURCE_HASH_DOMAIN: &str = "animus.session-tree-export-source.v1";
 /// BLAKE3 domain for redacted tree projection identity.
-pub const SESSION_TREE_EXPORT_PROJECTION_HASH_DOMAIN: &str =
-    "animus.session-tree-export-projection.v1";
+pub const SESSION_TREE_EXPORT_PROJECTION_HASH_DOMAIN: &str = "animus.session-tree-export-projection.v1";
 /// BLAKE3 domain for rendered artifact identity.
 pub const SESSION_TREE_EXPORT_ARTIFACT_HASH_DOMAIN: &str = "animus.session-tree-export-artifact.v1";
 /// BLAKE3 domain for export receipts.

@@ -7,9 +7,13 @@
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use ratatui::style::Color;
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::text::Span;
+use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 const TOOLBAR_ITEM_PADDING: u16 = 1;
 const TOOLBAR_ITEM_PADDING_TOTAL: u16 = TOOLBAR_ITEM_PADDING * 2;
@@ -208,11 +212,7 @@ impl ToolbarModel {
 
     /// Focus an item if it is selectable.
     pub fn set_focus(&mut self, index: usize) -> bool {
-        if self
-            .items
-            .get(index)
-            .is_some_and(ToolbarItem::is_selectable)
-        {
+        if self.items.get(index).is_some_and(ToolbarItem::is_selectable) {
             self.focused = Some(index);
             true
         } else {
@@ -253,10 +253,7 @@ impl ToolbarModel {
                 toggled: Some(*state),
             })
         } else {
-            Some(ToolbarActivation {
-                index,
-                toggled: None,
-            })
+            Some(ToolbarActivation { index, toggled: None })
         }
     }
 
@@ -306,13 +303,9 @@ impl Default for ToolbarStyle {
         Self {
             background: Style::default().bg(Color::Black),
             item: Style::default().fg(Color::White),
-            focused_item: Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+            focused_item: Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             disabled_item: Style::default().fg(Color::DarkGray),
-            toggled_item: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            toggled_item: Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             separator: Style::default().fg(Color::DarkGray),
             overflow: Style::default().fg(Color::Gray),
         }
@@ -384,12 +377,7 @@ pub struct ToolbarLayout {
 }
 
 /// Render a toolbar and return its visible item layout.
-pub fn render_toolbar(
-    frame: &mut Frame,
-    area: Rect,
-    model: &mut ToolbarModel,
-    style: &ToolbarStyle,
-) -> ToolbarLayout {
+pub fn render_toolbar(frame: &mut Frame, area: Rect, model: &mut ToolbarModel, style: &ToolbarStyle) -> ToolbarLayout {
     let primary_len = primary_len(area, model.orientation);
     ensure_focus_visible(model, primary_len);
     let layout = compute_toolbar_layout(area, model);
@@ -403,14 +391,7 @@ pub fn render_toolbar(
 
     for item_layout in &layout.items {
         let item = &model.items[item_layout.index];
-        render_toolbar_item(
-            buffer,
-            item_layout.rect,
-            model,
-            item_layout.index,
-            item,
-            style,
-        );
+        render_toolbar_item(buffer, item_layout.rect, model, item_layout.index, item, style);
     }
 
     render_overflow_indicators(buffer, area, model.orientation, &layout, style);
@@ -425,8 +406,7 @@ fn compute_toolbar_layout(area: Rect, model: &ToolbarModel) -> ToolbarLayout {
 
     let mut layouts = Vec::new();
     let mut cursor = primary_start(area, model.orientation);
-    let primary_end =
-        primary_start(area, model.orientation).saturating_add(primary_len(area, model.orientation));
+    let primary_end = primary_start(area, model.orientation).saturating_add(primary_len(area, model.orientation));
     let mut next_index = model.scroll_offset.min(model.items.len());
 
     while next_index < model.items.len() {
@@ -487,18 +467,12 @@ fn ensure_focus_visible(model: &mut ToolbarModel, available_primary_len: u16) {
         return;
     }
 
-    while !focused_fits_from_offset(model, focused, available_primary_len)
-        && model.scroll_offset < focused
-    {
+    while !focused_fits_from_offset(model, focused, available_primary_len) && model.scroll_offset < focused {
         model.scroll_offset += 1;
     }
 }
 
-fn focused_fits_from_offset(
-    model: &ToolbarModel,
-    focused: usize,
-    available_primary_len: u16,
-) -> bool {
+fn focused_fits_from_offset(model: &ToolbarModel, focused: usize, available_primary_len: u16) -> bool {
     if available_primary_len == 0 {
         return false;
     }
@@ -535,12 +509,7 @@ fn render_toolbar_item(
     }
 }
 
-fn render_separator(
-    buffer: &mut Buffer,
-    rect: Rect,
-    orientation: ToolbarOrientation,
-    style: &ToolbarStyle,
-) {
+fn render_separator(buffer: &mut Buffer, rect: Rect, orientation: ToolbarOrientation, style: &ToolbarStyle) {
     let separator_style = style.separator.patch(style.background);
     match orientation {
         ToolbarOrientation::Horizontal => {
@@ -551,12 +520,7 @@ fn render_separator(
         ToolbarOrientation::Vertical => {
             if rect.width > 0 && rect.height > 0 {
                 let line = VERTICAL_SEPARATOR.repeat(usize::from(rect.width));
-                buffer.set_line(
-                    rect.x,
-                    rect.y,
-                    &Line::from(Span::styled(line, separator_style)),
-                    rect.width,
-                );
+                buffer.set_line(rect.x, rect.y, &Line::from(Span::styled(line, separator_style)), rect.width);
             }
         }
     }
@@ -600,12 +564,7 @@ fn render_overflow_indicators(
     }
 }
 
-fn toolbar_item_style(
-    model: &ToolbarModel,
-    index: usize,
-    item: &ToolbarItem,
-    style: &ToolbarStyle,
-) -> Style {
+fn toolbar_item_style(model: &ToolbarModel, index: usize, item: &ToolbarItem, style: &ToolbarStyle) -> Style {
     if !item.is_enabled() {
         style.disabled_item
     } else if model.focused == Some(index) {
@@ -617,13 +576,7 @@ fn toolbar_item_style(
     }
 }
 
-fn render_text(
-    buffer: &mut Buffer,
-    rect: Rect,
-    orientation: ToolbarOrientation,
-    text: &str,
-    style: Style,
-) {
+fn render_text(buffer: &mut Buffer, rect: Rect, orientation: ToolbarOrientation, text: &str, style: Style) {
     match orientation {
         ToolbarOrientation::Horizontal => {
             if rect.width == 0 || rect.height == 0 {
@@ -644,12 +597,9 @@ fn render_text(
 
 fn item_rect(area: Rect, orientation: ToolbarOrientation, cursor: u16, primary_len: u16) -> Rect {
     match orientation {
-        ToolbarOrientation::Horizontal => Rect::new(
-            cursor,
-            area.y,
-            primary_len,
-            TOOLBAR_ITEM_CROSS_LEN.min(area.height),
-        ),
+        ToolbarOrientation::Horizontal => {
+            Rect::new(cursor, area.y, primary_len, TOOLBAR_ITEM_CROSS_LEN.min(area.height))
+        }
         ToolbarOrientation::Vertical => Rect::new(area.x, cursor, area.width, primary_len),
     }
 }
@@ -689,9 +639,7 @@ fn next_selectable_index(items: &[ToolbarItem], current: Option<usize>) -> Optio
         return None;
     }
 
-    let start = current
-        .unwrap_or_default()
-        .min(items.len().saturating_sub(1));
+    let start = current.unwrap_or_default().min(items.len().saturating_sub(1));
     for index in start.saturating_add(1)..items.len() {
         if items[index].is_selectable() {
             return Some(index);
@@ -712,9 +660,7 @@ fn previous_selectable_index(items: &[ToolbarItem], current: Option<usize>) -> O
         return None;
     }
 
-    let start = current
-        .unwrap_or_else(|| items.len().saturating_sub(1))
-        .min(items.len().saturating_sub(1));
+    let start = current.unwrap_or_else(|| items.len().saturating_sub(1)).min(items.len().saturating_sub(1));
     for index in (0..start).rev() {
         if items[index].is_selectable() {
             return Some(index);
@@ -799,9 +745,10 @@ fn rect_bottom(rect: Rect) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+
+    use super::*;
 
     const SAVE_INDEX: usize = 2;
     const BOLD_INDEX: usize = 4;
@@ -875,10 +822,7 @@ mod tests {
     #[test]
     fn empty_or_all_disabled_toolbar_has_no_focus_or_activation() {
         let mut empty = ToolbarModel::new(Vec::new());
-        let mut disabled = ToolbarModel::new(vec![
-            ToolbarItem::separator(),
-            ToolbarItem::disabled_button("Disabled"),
-        ]);
+        let mut disabled = ToolbarModel::new(vec![ToolbarItem::separator(), ToolbarItem::disabled_button("Disabled")]);
 
         assert_eq!(empty.focused, None);
         assert_eq!(empty.move_next(), None);
@@ -899,10 +843,7 @@ mod tests {
         let (buffer, layout) = render_horizontal(&mut model, HORIZONTAL_WIDTH);
 
         assert!(layout.trailing_overflow);
-        assert_eq!(
-            buffer[(OVERFLOW_INDICATOR_X, FIRST_ROW)].symbol(),
-            HORIZONTAL_TRAILING_OVERFLOW
-        );
+        assert_eq!(buffer[(OVERFLOW_INDICATOR_X, FIRST_ROW)].symbol(), HORIZONTAL_TRAILING_OVERFLOW);
     }
 
     #[test]
@@ -918,12 +859,7 @@ mod tests {
         let (_buffer, layout) = render_horizontal(&mut model, HORIZONTAL_WIDTH);
 
         assert!(model.scroll_offset > 0);
-        assert!(
-            layout
-                .items
-                .iter()
-                .any(|item| item.index == LAST_SELECTABLE_INDEX - 1)
-        );
+        assert!(layout.items.iter().any(|item| item.index == LAST_SELECTABLE_INDEX - 1));
     }
 
     #[test]
@@ -965,10 +901,7 @@ mod tests {
         ]
     }
 
-    fn render_horizontal(
-        model: &mut ToolbarModel,
-        width: u16,
-    ) -> (ratatui::buffer::Buffer, ToolbarLayout) {
+    fn render_horizontal(model: &mut ToolbarModel, width: u16) -> (ratatui::buffer::Buffer, ToolbarLayout) {
         let backend = TestBackend::new(width, HORIZONTAL_HEIGHT);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut layout = ToolbarLayout::default();

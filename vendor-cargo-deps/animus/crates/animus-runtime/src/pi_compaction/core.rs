@@ -1,4 +1,5 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
+// validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -6,33 +7,47 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(
-    compound_condition,
-    excessive_file_length,
-    function_length,
-    non_trait_imports
-)]
+#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
-use super::{
-    BLAKE3_ALGORITHM, EMPTY_COUNT, FIELD_BRANCH, FIELD_CONTEXT_ESTIMATE, FIELD_CUT_POINT,
-    FIELD_POLICY, FIELD_RESOURCE_ID, FIELD_SUMMARIZER, FIELD_SUMMARY_TEXT, FIELD_TOOL_BINDING,
-    HASH_PART_SEPARATOR, PI_COMPACTION_HASH_DOMAIN, REQUIRED_COUNT, REQUIRED_USIZE,
-    data::{
-        PiBranchHandoffPlan, PiBranchHandoffRequest, PiBranchSummaryMode, PiCompactionDecision,
-        PiCompactionDiagnostic, PiCompactionDiagnosticKind, PiCompactionFingerprint,
-        PiCompactionPlan, PiCompactionPolicy, PiCompactionRedactionBehavior,
-        PiCompactionReplayEntry, PiCompactionReplayEntryKind, PiCompactionSummarizerRequest,
-        PiCompactionSummarizerState, PiCompactionSummaryEntry, PiCompactionTrigger,
-        PiCompactionValidationResult,
-    },
-};
+use super::BLAKE3_ALGORITHM;
+use super::EMPTY_COUNT;
+use super::FIELD_BRANCH;
+use super::FIELD_CONTEXT_ESTIMATE;
+use super::FIELD_CUT_POINT;
+use super::FIELD_POLICY;
+use super::FIELD_RESOURCE_ID;
+use super::FIELD_SUMMARIZER;
+use super::FIELD_SUMMARY_TEXT;
+use super::FIELD_TOOL_BINDING;
+use super::HASH_PART_SEPARATOR;
+use super::PI_COMPACTION_HASH_DOMAIN;
+use super::REQUIRED_COUNT;
+use super::REQUIRED_USIZE;
+use super::data::PiBranchHandoffPlan;
+use super::data::PiBranchHandoffRequest;
+use super::data::PiBranchSummaryMode;
+use super::data::PiCompactionDecision;
+use super::data::PiCompactionDiagnostic;
+use super::data::PiCompactionDiagnosticKind;
+use super::data::PiCompactionFingerprint;
+use super::data::PiCompactionPlan;
+use super::data::PiCompactionPolicy;
+use super::data::PiCompactionRedactionBehavior;
+use super::data::PiCompactionReplayEntry;
+use super::data::PiCompactionReplayEntryKind;
+use super::data::PiCompactionSummarizerRequest;
+use super::data::PiCompactionSummarizerState;
+use super::data::PiCompactionSummaryEntry;
+use super::data::PiCompactionTrigger;
+use super::data::PiCompactionValidationResult;
 
 const HASH_RESOURCE_PREFIX: &str = "hash:";
 const MAX_SUMMARY_TEXT_CHARS: usize = 4096;
@@ -200,10 +215,7 @@ pub fn prepare_pi_branch_handoff_summary(request: &PiBranchHandoffRequest) -> Pi
     let old_path = ancestry_path(&graph, &request.old_leaf_id);
     let target_path = ancestry_path(&graph, &request.target_leaf_id);
     let target_set: BTreeSet<String> = target_path.iter().cloned().collect();
-    let common_ancestor_id = old_path
-        .iter()
-        .find(|entry_id| target_set.contains(*entry_id))
-        .cloned();
+    let common_ancestor_id = old_path.iter().find(|entry_id| target_set.contains(*entry_id)).cloned();
     let Some(common_ancestor_id) = common_ancestor_id else {
         diagnostics.push(PiCompactionDiagnostic::new(
             PiCompactionDiagnosticKind::InvalidBranch,
@@ -271,10 +283,7 @@ fn ancestry_path(graph: &BTreeMap<String, Vec<String>>, leaf_id: &str) -> Vec<St
     let mut current = Some(leaf_id.to_string());
     while let Some(entry_id) = current {
         path.push(entry_id.clone());
-        current = graph
-            .get(&entry_id)
-            .and_then(|parents| parents.first())
-            .cloned();
+        current = graph.get(&entry_id).and_then(|parents| parents.first()).cloned();
     }
     path
 }
@@ -316,15 +325,10 @@ fn entry_ids(entries: &[PiCompactionReplayEntry]) -> Vec<String> {
 }
 
 fn invalid_budget(policy: &PiCompactionPolicy) -> bool {
-    policy.context_budget_units <= policy.response_reserve_units
-        || policy.kept_recent_units < REQUIRED_COUNT
+    policy.context_budget_units <= policy.response_reserve_units || policy.kept_recent_units < REQUIRED_COUNT
 }
 
-fn require_hash(
-    fingerprint: &PiCompactionFingerprint,
-    field: &str,
-    diagnostics: &mut Vec<PiCompactionDiagnostic>,
-) {
+fn require_hash(fingerprint: &PiCompactionFingerprint, field: &str, diagnostics: &mut Vec<PiCompactionDiagnostic>) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM || blank(&fingerprint.value_hex) {
         diagnostics.push(PiCompactionDiagnostic::new(
             PiCompactionDiagnosticKind::InvalidHash,
@@ -405,19 +409,14 @@ fn summarizer_state_detail(state: PiCompactionSummarizerState) -> &'static str {
         PiCompactionSummarizerState::Missing => "required summarizer service is missing",
         PiCompactionSummarizerState::Denied => "required summarizer service denied the request",
         PiCompactionSummarizerState::Cancelled => "required summarizer service was cancelled",
-        PiCompactionSummarizerState::MalformedOutput => {
-            "required summarizer service returned malformed output"
-        }
+        PiCompactionSummarizerState::MalformedOutput => "required summarizer service returned malformed output",
     }
 }
 
 fn tool_call_index(entries: &[PiCompactionReplayEntry], call_id: &str) -> Option<usize> {
     entries.iter().position(|entry| {
         entry.kind == PiCompactionReplayEntryKind::ToolCall
-            && entry
-                .tool_binding
-                .as_ref()
-                .is_some_and(|binding| binding.call_id == call_id)
+            && entry.tool_binding.as_ref().is_some_and(|binding| binding.call_id == call_id)
     })
 }
 
@@ -507,8 +506,8 @@ fn validate_resource_id(
     redaction_behavior: PiCompactionRedactionBehavior,
     diagnostics: &mut Vec<PiCompactionDiagnostic>,
 ) {
-    let hash_only_mismatch = redaction_behavior == PiCompactionRedactionBehavior::HashOnly
-        && !id.starts_with(HASH_RESOURCE_PREFIX);
+    let hash_only_mismatch =
+        redaction_behavior == PiCompactionRedactionBehavior::HashOnly && !id.starts_with(HASH_RESOURCE_PREFIX);
     if blank(id) || contains_unsafe_marker(id) || hash_only_mismatch {
         diagnostics.push(PiCompactionDiagnostic::new(
             PiCompactionDiagnosticKind::UnsafeMetadata,
@@ -518,10 +517,7 @@ fn validate_resource_id(
     }
 }
 
-fn validate_resource_ids(
-    entry: &PiCompactionSummaryEntry,
-    diagnostics: &mut Vec<PiCompactionDiagnostic>,
-) {
+fn validate_resource_ids(entry: &PiCompactionSummaryEntry, diagnostics: &mut Vec<PiCompactionDiagnostic>) {
     for id in entry
         .redacted_resource_ids
         .iter()

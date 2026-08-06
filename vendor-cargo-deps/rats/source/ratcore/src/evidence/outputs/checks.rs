@@ -78,8 +78,7 @@ pub fn validate_workspace_shell_renderer_snapshots(
                 "duplicate workspace shell renderer artifact",
             ));
         }
-        let (has_known_renderer, artifact_issues) =
-            validate_artifact_metadata(artifact, &fixture_ids);
+        let (has_known_renderer, artifact_issues) = validate_artifact_metadata(artifact, &fixture_ids);
         if has_known_renderer {
             coverage.insert((artifact.fixture_id.as_str(), artifact.renderer.as_str()));
         }
@@ -165,17 +164,12 @@ fn missing_renderer_issues(
     issues
 }
 
-fn fixture_id_set(
-    rows: &[super::super::widgets::WorkspaceShellReplayEvidenceRow],
-) -> std::collections::BTreeSet<&str> {
+fn fixture_id_set(rows: &[super::super::widgets::WorkspaceShellReplayEvidenceRow]) -> std::collections::BTreeSet<&str> {
     rows.iter().map(|row| row.fixture_id.as_str()).collect()
 }
 
 fn artifact_identity(artifact: &super::WorkspaceShellRendererSnapshot) -> String {
-    format!(
-        "{}:{}:{}",
-        artifact.fixture_id, artifact.renderer, artifact.artifact_path
-    )
+    format!("{}:{}:{}", artifact.fixture_id, artifact.renderer, artifact.artifact_path)
 }
 
 fn issue(

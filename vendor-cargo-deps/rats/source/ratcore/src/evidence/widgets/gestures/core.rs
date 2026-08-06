@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+
 use super::super::super::*;
-use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) const TARGET_FULL_MOUSE: &str = "full-mouse-surface";
 pub(super) const SNAPSHOT_ROUTE_SUMMARY: &str = "route-summary";
@@ -71,10 +73,7 @@ pub struct PointerMouseReplayTarget {
 }
 
 impl PointerMouseReplayTarget {
-    pub(super) fn new(
-        actions: BTreeMap<String, PointerMouseAction>,
-        disabled_actions: BTreeSet<String>,
-    ) -> Self {
+    pub(super) fn new(actions: BTreeMap<String, PointerMouseAction>, disabled_actions: BTreeSet<String>) -> Self {
         debug_assert!(!actions.is_empty());
         debug_assert!(DEFAULT_REPLAY_WIDTH > 0);
         Self {
@@ -93,8 +92,7 @@ impl PointerMouseReplayTarget {
             return Vec::new();
         };
         match &action.behavior {
-            PointerMouseBehavior::DragUpdate { capture }
-            | PointerMouseBehavior::DragRelease { capture } => {
+            PointerMouseBehavior::DragUpdate { capture } | PointerMouseBehavior::DragRelease { capture } => {
                 self.validate_capture(action_id, capture)
             }
             PointerMouseBehavior::Unsupported { diagnostic } => vec![ReplayIssue::new(
@@ -107,9 +105,9 @@ impl PointerMouseReplayTarget {
                 FIELD_CAPTURE,
                 format!("stale pointer capture `{actual}` did not match `{expected}`"),
             )],
-            PointerMouseBehavior::Route
-            | PointerMouseBehavior::DragStart { .. }
-            | PointerMouseBehavior::DragCancel => Vec::new(),
+            PointerMouseBehavior::Route | PointerMouseBehavior::DragStart { .. } | PointerMouseBehavior::DragCancel => {
+                Vec::new()
+            }
         }
     }
 
@@ -149,8 +147,7 @@ impl PointerMouseReplayTarget {
     }
 
     fn apply_mouse(&mut self, x: u16, y: u16) {
-        self.route_log
-            .push(format!("{MOUSE_HOVER_CLASS}:{WORKSPACE_SURFACE}@{x},{y}"));
+        self.route_log.push(format!("{MOUSE_HOVER_CLASS}:{WORKSPACE_SURFACE}@{x},{y}"));
     }
 }
 
@@ -206,28 +203,17 @@ impl ReplayTarget for PointerMouseReplayTarget {
 
     fn snapshot_state(&self) -> BTreeMap<String, String> {
         BTreeMap::from([
-            (
-                STATE_ACCEPTED_ROUTES.to_string(),
-                self.route_log.len().to_string(),
-            ),
+            (STATE_ACCEPTED_ROUTES.to_string(), self.route_log.len().to_string()),
             (
                 STATE_CAPTURED_TARGET.to_string(),
-                self.captured_target
-                    .clone()
-                    .unwrap_or_else(|| EMPTY_MARKER.to_string()),
+                self.captured_target.clone().unwrap_or_else(|| EMPTY_MARKER.to_string()),
             ),
-            (
-                STATE_DIAGNOSTICS.to_string(),
-                join_sorted(self.diagnostics.iter()),
-            ),
+            (STATE_DIAGNOSTICS.to_string(), join_sorted(self.diagnostics.iter())),
             (
                 STATE_LAST_SURFACE.to_string(),
                 last_surface(&self.route_log).unwrap_or_else(|| EMPTY_MARKER.to_string()),
             ),
-            (
-                STATE_ROUTE_SUMMARY.to_string(),
-                join_sorted(self.route_log.iter()),
-            ),
+            (STATE_ROUTE_SUMMARY.to_string(), join_sorted(self.route_log.iter())),
         ])
     }
 
@@ -241,32 +227,19 @@ impl ReplayTarget for PointerMouseReplayTarget {
 }
 
 pub(super) fn state_bytes(state: &BTreeMap<String, String>) -> Vec<u8> {
-    state
-        .iter()
-        .map(|(key, value)| format!("{key}={value}\n"))
-        .collect::<String>()
-        .into_bytes()
+    state.iter().map(|(key, value)| format!("{key}={value}\n")).collect::<String>().into_bytes()
 }
 
 fn route_entry(action: &PointerMouseAction) -> String {
-    format!(
-        "{}:{}:{}",
-        action.event_class, action.surface, action.route_id
-    )
+    format!("{}:{}:{}", action.event_class, action.surface, action.route_id)
 }
 
 fn last_surface(route_log: &[String]) -> Option<String> {
-    route_log
-        .last()
-        .and_then(|entry| entry.split(':').nth(1))
-        .map(str::to_string)
+    route_log.last().and_then(|entry| entry.split(':').nth(1)).map(str::to_string)
 }
 
 fn join_sorted(values: impl IntoIterator<Item = impl AsRef<str>>) -> String {
-    let items = values
-        .into_iter()
-        .map(|value| value.as_ref().to_string())
-        .collect::<Vec<_>>();
+    let items = values.into_iter().map(|value| value.as_ref().to_string()).collect::<Vec<_>>();
     if items.is_empty() {
         EMPTY_MARKER.to_string()
     } else {

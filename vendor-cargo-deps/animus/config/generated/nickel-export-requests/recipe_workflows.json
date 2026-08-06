@@ -1,0 +1,15 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [],
+  "destination": "policy/recipe-workflows/generated/recipe-workflows.json",
+  "family_id": "animus.recipe-workflows",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "recipe_workflow_catalog",
+  "source": "config/recipe-workflows.ncl"
+}

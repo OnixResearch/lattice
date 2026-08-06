@@ -1,0 +1,5 @@
+target	scope	source_manifest	compile	semantic_adapter	renderer_runtime	visual	physical_focus	platform_accessibility	reason_next_action
+Subwayrat	maintained	not-created-by-reject-gate	existing rat-widgets package profile	existing byte-identical tabs receipt	existing headless/view tests only	unsupported	unsupported	terminal semantic projection only	revisit generation only with a second family and larger measured duplication
+Meteorite	maintained	not-created-by-reject-gate	existing met-widgets focused profile	existing byte-identical tabs receipt	existing component projection tests only	unsupported	unsupported	DOM semantic projection only	retain Dioxus lifecycle RSX CSS focus and content locally
+Iced	experimental	not-created-by-reject-gate	existing iced-showcase pilot only	no tabs adapter receipt	no tabs runtime evidence	unsupported	unsupported	unsupported	do not manufacture a binding without a named maintained consumer
+Tile	downstream external	not-a-generator-target	optional compatibility remains separate	not Rats semantic evidence	not tested	not tested	not tested	not tested	frontend may consume existing public tabs APIs; Tile retains all application authority

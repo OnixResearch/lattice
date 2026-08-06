@@ -10,18 +10,42 @@ mod core;
 mod data;
 mod error;
 
-pub use core::{
-    collect_report, enqueue_task, merge_reports, request_cancel, request_status,
-    validate_context_packet, validate_report, validate_task,
-};
-pub use data::{
-    Claim, Conflict, ConflictReport, ContextAdmissionPolicy, EvidenceReference, MutationIntent,
-    ParentTrace, Report, ReportMergeOutcome, WorkerAuthority, WorkerBudgets, WorkerCancelOutcome,
-    WorkerCapability, WorkerContextItem, WorkerContextItemKind, WorkerContextPacket,
-    WorkerContextRedaction, WorkerHandle, WorkerMergedReport, WorkerOutputSchema, WorkerScope,
-    WorkerService, WorkerStatus, WorkerTask, WorkerTaskDraft,
-};
-pub use error::{DelegationFailure, FailureKind};
+pub use core::collect_report;
+pub use core::enqueue_task;
+pub use core::merge_reports;
+pub use core::request_cancel;
+pub use core::request_status;
+pub use core::validate_context_packet;
+pub use core::validate_report;
+pub use core::validate_task;
+
+pub use data::Claim;
+pub use data::Conflict;
+pub use data::ConflictReport;
+pub use data::ContextAdmissionPolicy;
+pub use data::EvidenceReference;
+pub use data::MutationIntent;
+pub use data::ParentTrace;
+pub use data::Report;
+pub use data::ReportMergeOutcome;
+pub use data::WorkerAuthority;
+pub use data::WorkerBudgets;
+pub use data::WorkerCancelOutcome;
+pub use data::WorkerCapability;
+pub use data::WorkerContextItem;
+pub use data::WorkerContextItemKind;
+pub use data::WorkerContextPacket;
+pub use data::WorkerContextRedaction;
+pub use data::WorkerHandle;
+pub use data::WorkerMergedReport;
+pub use data::WorkerOutputSchema;
+pub use data::WorkerScope;
+pub use data::WorkerService;
+pub use data::WorkerStatus;
+pub use data::WorkerTask;
+pub use data::WorkerTaskDraft;
+pub use error::DelegationFailure;
+pub use error::FailureKind;
 
 pub(crate) const TASK_ID_FIELD: &str = "task_id";
 pub(crate) const OBJECTIVE_FIELD: &str = "objective";
@@ -59,8 +83,7 @@ pub(crate) const EMPTY_FIELD_REASON: &str = "field must be non-empty";
 pub(crate) const TOO_LONG_REASON: &str = "field exceeds safe length limit";
 pub(crate) const UNSAFE_TEXT_REASON: &str = "field contains unsafe raw or leaking marker";
 pub(crate) const OVERBROAD_REASON: &str = "authority must remain bounded by parent policy";
-pub(crate) const MISSING_SERVICE_REASON: &str =
-    "worker delegation requires an injected host service";
+pub(crate) const MISSING_SERVICE_REASON: &str = "worker delegation requires an injected host service";
 pub(crate) const MALFORMED_REPORT_REASON: &str = "worker report does not satisfy output schema";
 
 pub(crate) const UNSAFE_TEXT_MARKERS: &[&str] = &[

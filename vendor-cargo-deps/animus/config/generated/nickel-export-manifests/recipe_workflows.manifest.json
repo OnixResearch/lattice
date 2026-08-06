@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=recipe_workflow_catalog"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.recipe-workflows",
+      "source": {
+        "path": "config/recipe-workflows.ncl",
+        "identity": "b3:a4c7ecb3d503b55f2e16986b62bb4d80f487d114a79e038bbadaaaff58347f7b",
+        "bytes": 8158
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "recipe_workflow_catalog",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "policy/recipe-workflows/generated/recipe-workflows.json",
+        "identity": "b3:dc65849b9f8bd2266c38b07c14c4133189baa6840d3baa39937eb921034deb6a",
+        "bytes": 4125
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=recipe_workflow_catalog"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:d8cae8c86fb9251f6e8fe0c0d5b2ed21f4279180dd74e539d7e0c4a88e43263d"
+}
