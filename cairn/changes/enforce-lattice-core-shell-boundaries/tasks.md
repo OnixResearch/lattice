@@ -3,7 +3,7 @@
 ## Phase 1: Baseline and ownership
 
 - [x] [serial] Record focused workflow, scheduler-occurrence, replay, orchestration, serialization, and compatibility test results before source moves. r[lattice.repository_validation.fcis_compatibility]
-- [ ] [serial] Inventory candidate core types, active-change ownership, public callers, persisted forms, BLAKE3 identities, and every host dependency used by the candidate cohort. r[lattice.repository_validation.fcis_crate_boundary]
+- [x] [serial] Inventory candidate core types, active-change ownership, public callers, persisted forms, BLAKE3 identities, and every host dependency used by the candidate cohort. r[lattice.repository_validation.fcis_crate_boundary]
 - [ ] [parallel] Define the reviewed core, shell, adapter, and forbidden-dependency topology with an explicit API and dependency budget. r[lattice.repository_validation.fcis_architecture_guard]
 
 ## Phase 2: Core crate and explicit facts
