@@ -5,7 +5,7 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [workspace]
-members = ["."]
+members = [".", "crates/lattice-core"]
 default-members = ["."]
 exclude = ["vendor-cargo-deps/animus"]
 resolver = "3"
@@ -20,12 +20,13 @@ blake3 = "1.8.3"
 ratatui = { version = "0.30", default-features = false }
 ratcore = { path = "vendor-cargo-deps/rats/source/ratcore" }
 unicode-width = "0.2"
+lattice-core = { path = "crates/lattice-core" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
 [workspace.metadata.octet]
-default_scope = ["-p", "lattice"]
+default_scope = ["-p", "lattice", "-p", "lattice-core"]
 cargo_check_args = ["--lib"]
 
 [[bin]]
@@ -33,6 +34,7 @@ name = "lattice"
 path = "src/main.rs"
 
 [dependencies]
+lattice-core = { workspace = true }
 tokio = { version = "1.50", features = ["full"] }
 futures = "0.3.32"
 async-trait = "0.1.89"

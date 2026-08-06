@@ -2346,6 +2346,7 @@ dependencies = [
  "futures",
  "hex",
  "home",
+ "lattice-core",
  "lattice-repository-validation-fixture",
  "madsim",
  "nickel-lang-core",
@@ -2378,6 +2379,14 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "which",
+]
+
+[[package]]
+name = "lattice-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
 ]
 
 [[package]]

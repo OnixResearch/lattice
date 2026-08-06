@@ -5,6 +5,8 @@
 
 use std::collections::HashMap;
 
+pub use lattice_core::workflow::TemporalError;
+pub use lattice_core::workflow::WorkflowMeta;
 use rat_nodegraph::model::Graph;
 use rat_nodegraph::model::NodeId;
 use rat_nodegraph::model::PortSpec;
@@ -22,33 +24,6 @@ use crate::engine::value::TypeTag;
 use crate::file_node::FileOperationKind;
 use crate::image_node::DEFAULT_MAX_IMAGE_BYTES;
 use crate::triggers::TriggerDefinition;
-
-/// Metadata about a workflow (stored alongside the graph).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkflowMeta {
-    pub name: String,
-    pub description: String,
-    pub created: chrono::DateTime<chrono::Utc>,
-    pub modified: chrono::DateTime<chrono::Utc>,
-}
-
-impl WorkflowMeta {
-    /// Shell convenience constructor that reads the wall clock.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self::new_at(name, chrono::Utc::now())
-    }
-
-    /// Deterministic constructor that derives created and modified from a supplied
-    /// temporal fact instead of reading an ambient clock.
-    pub fn new_at(name: impl Into<String>, now: chrono::DateTime<chrono::Utc>) -> Self {
-        Self {
-            name: name.into(),
-            description: String::new(),
-            created: now,
-            modified: now,
-        }
-    }
-}
 
 /// Per-node execution configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,15 +176,6 @@ pub struct Workflow {
 }
 
 /// Error for stale or contradictory temporal observations supplied to core constructors.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TemporalError {
-    /// The supplied timestamp precedes the workflow creation time and is contradictory.
-    StaleModified {
-        created: chrono::DateTime<chrono::Utc>,
-        supplied: chrono::DateTime<chrono::Utc>,
-    },
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MutationError {
     NodeNotFound(NodeId),
