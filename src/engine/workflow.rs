@@ -520,9 +520,7 @@ mod tests {
     }
 
     fn utc(rfc3339: &str) -> chrono::DateTime<chrono::Utc> {
-        chrono::DateTime::parse_from_rfc3339(rfc3339)
-            .expect("valid rfc3339")
-            .with_timezone(&chrono::Utc)
+        chrono::DateTime::parse_from_rfc3339(rfc3339).expect("valid rfc3339").with_timezone(&chrono::Utc)
     }
 
     #[test]
