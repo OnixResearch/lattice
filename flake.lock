@@ -191,23 +191,6 @@
         "type": "github"
       }
     },
-    "execution-graph": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1784428875,
-        "narHash": "sha256-SzdJGsS631Hk3CbPLThz+2YPgvdoB1cXb3BPusJTX8I=",
-        "ref": "refs/heads/main",
-        "rev": "03736f1ec46c377ff86b451260ad68aa70ff3b0b",
-        "revCount": 1,
-        "type": "git",
-        "url": "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git"
-      },
-      "original": {
-        "rev": "03736f1ec46c377ff86b451260ad68aa70ff3b0b",
-        "type": "git",
-        "url": "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git"
-      }
-    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -391,7 +374,6 @@
         "bounded-exec": "bounded-exec",
         "choregraph": "choregraph",
         "crane": "crane",
-        "execution-graph": "execution-graph",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "octet": "octet",
