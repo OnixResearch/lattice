@@ -10,11 +10,6 @@ use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
-use nickel_lang_core::error::NullReporter;
-use nickel_lang_core::eval::cache::CacheImpl;
-use nickel_lang_core::program::Program;
-use nickel_lang_core::serialize::ExportFormat;
-use nickel_lang_core::serialize::{self};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -448,19 +443,7 @@ pub fn load_node_templates_with_diagnostics(dir: &Path) -> NodeTemplateLoadResul
 
 /// Evaluate a Nickel file and return the result as serde_json::Value.
 pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, String> {
-    let mut program = Program::<CacheImpl>::new_from_file(path, std::io::sink(), NullReporter {})
-        .map_err(|e| format!("failed to load {}: {e:?}", path.display()))?;
-
-    let rt = program.eval_full_for_export().map_err(|e| format!("eval error in {}: {e:?}", path.display()))?;
-
-    // Validate and serialize to JSON string.
-    serialize::validate(ExportFormat::Json, &rt)
-        .map_err(|e| format!("validation error in {}: {e:?}", path.display()))?;
-
-    let mut json_buf = Vec::new();
-    serde_json::to_writer(&mut json_buf, &rt).map_err(|e| format!("json serialize error: {e}"))?;
-
-    serde_json::from_slice(&json_buf).map_err(|e| format!("json parse error: {e}"))
+    crate::nickel_eval_adapter::evaluate_file(path).map_err(|error| error.to_string())
 }
 
 /// Generate a default config.ncl file.

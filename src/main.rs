@@ -481,20 +481,10 @@ fn run_doctor_command(config_path: &Path, args: &DoctorCommandArgs) -> ExitCode 
 
 fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppConfig, String> {
     if !config_path.exists() {
-        return Err(format!("config file not found: {}", config_path.display()));
+        return Err("config file not found".to_string());
     }
-    let mut program = nickel_lang_core::program::Program::<nickel_lang_core::eval::cache::CacheImpl>::new_from_file(
-        config_path,
-        std::io::sink(),
-        nickel_lang_core::error::NullReporter {},
-    )
-    .map_err(|_| "Nickel config could not be loaded".to_string())?;
-    let runtime = program.eval_full_for_export().map_err(|_| "Nickel config evaluation failed".to_string())?;
-    nickel_lang_core::serialize::validate(nickel_lang_core::serialize::ExportFormat::Json, &runtime)
-        .map_err(|_| "Nickel config export validation failed".to_string())?;
-    let mut json = Vec::new();
-    serde_json::to_writer(&mut json, &runtime).map_err(|_| "Nickel config serialization failed".to_string())?;
-    let value = serde_json::from_slice(&json).map_err(|_| "Nickel config JSON parse failed".to_string())?;
+    let value = lattice::nickel_eval_adapter::evaluate_file(config_path)
+        .map_err(|error| format!("Nickel config failed: {error}"))?;
     serde_json::from_value(value).map_err(|_| "Nickel config schema decode failed".to_string())
 }
 

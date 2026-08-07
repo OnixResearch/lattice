@@ -263,6 +263,23 @@
         "type": "github"
       }
     },
+    "nickel-eval": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786130204,
+        "narHash": "sha256-nceubLaAvs4/lel8SJrivpRbfwvJE2eRi+qBzoU2k6o=",
+        "ref": "refs/heads/main",
+        "rev": "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1",
+        "revCount": 1,
+        "type": "git",
+        "url": "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git"
+      },
+      "original": {
+        "rev": "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1",
+        "type": "git",
+        "url": "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git"
+      }
+    },
     "nickel-export": {
       "flake": false,
       "locked": {
@@ -375,6 +392,7 @@
         "choregraph": "choregraph",
         "crane": "crane",
         "flake-utils": "flake-utils",
+        "nickel-eval": "nickel-eval",
         "nixpkgs": "nixpkgs",
         "octet": "octet",
         "rust-overlay": "rust-overlay_4"

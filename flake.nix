@@ -18,6 +18,10 @@
       url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
       flake = false;
     };
+    nickel-eval = {
+      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+      flake = false;
+    };
   };
 
   outputs =
@@ -30,6 +34,7 @@
       octet,
       bounded-exec,
       choregraph,
+      nickel-eval,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -91,6 +96,7 @@
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
+        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
         cargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -102,6 +108,10 @@
             else if builtins.all (package: package.source == choregraphCargoSource) packages then
               checkout.overrideAttrs (_old: {
                 src = choregraph;
+              })
+            else if builtins.all (package: package.source == nickelEvalCargoSource) packages then
+              checkout.overrideAttrs (_old: {
+                src = nickel-eval;
               })
             else
               checkout;

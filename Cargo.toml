@@ -64,7 +64,7 @@ bolero = { version = "0.13.4", optional = true }
 bolero-generator = { version = "0.13.5", optional = true }
 proptest = { version = "1.11", optional = true }
 redb = "3.1.1"
-nickel-lang-core = "0.17.0"
+nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git", rev = "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1" }
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
@@ -91,6 +91,7 @@ animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", defa
 animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
 
 [dev-dependencies]
+nickel-lang-core = "=0.17.0"
 pretty_assertions = "1.4"
 tempfile = "3.27"
 criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }

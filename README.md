@@ -308,6 +308,7 @@ verus verus/example_spec.rs
 ## References
 
 - [bounded-exec](https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git) — bounded child-process mechanics at revision `29dac88ecded94457572db3fdfaaaab95fa91525`.
+- [nickel-eval](https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git) — product-neutral Nickel evaluation at revision `bf16cf223ed3dfe75a28f02ac21ed7891a60bac1`.
 - [Pi coding agent](https://pi.dev) — generic agent SDK and RPC reference.
 - [Clankers](https://github.com/brittonr/clankers) — generic coding-agent integration reference.
 - [Trellis](../trellis/) — verified graph, lifecycle, replay, effect, and identity primitives.
