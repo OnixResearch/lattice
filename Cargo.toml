@@ -64,6 +64,7 @@ bolero = { version = "0.13.4", optional = true }
 bolero-generator = { version = "0.13.5", optional = true }
 proptest = { version = "1.11", optional = true }
 redb = "3.1.1"
+content-identity-core = { git = "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git", rev = "7f55597b5dc879b7601856e8d7fd0dbacaa2a498" }
 nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git", rev = "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1" }
 blake3 = "1.8.3"
 crossterm = "0.29.0"

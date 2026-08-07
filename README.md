@@ -309,6 +309,7 @@ verus verus/example_spec.rs
 
 - [bounded-exec](https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git) — bounded child-process mechanics at revision `29dac88ecded94457572db3fdfaaaab95fa91525`.
 - [nickel-eval](https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git) — product-neutral Nickel evaluation at revision `bf16cf223ed3dfe75a28f02ac21ed7891a60bac1`.
+- [content-identity-core](https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git) — product-neutral identity framing at revision `7f55597b5dc879b7601856e8d7fd0dbacaa2a498`; see [source and role policy](docs/content-identity-source.md).
 - [Pi coding agent](https://pi.dev) — generic agent SDK and RPC reference.
 - [Clankers](https://github.com/brittonr/clankers) — generic coding-agent integration reference.
 - [Trellis](../trellis/) — verified graph, lifecycle, replay, effect, and identity primitives.

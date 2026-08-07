@@ -2,6 +2,7 @@ pub mod agent_node;
 pub mod animus_agent;
 mod capability;
 pub mod config;
+pub mod content_identity;
 pub mod control_flow;
 pub mod credentials;
 pub mod engine;

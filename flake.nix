@@ -22,6 +22,10 @@
       url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
       flake = false;
     };
+    content-identity-core = {
+      url = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
+      flake = false;
+    };
   };
 
   outputs =
@@ -35,6 +39,7 @@
       bounded-exec,
       choregraph,
       nickel-eval,
+      content-identity-core,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -97,6 +102,7 @@
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+        contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         cargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -112,6 +118,10 @@
             else if builtins.all (package: package.source == nickelEvalCargoSource) packages then
               checkout.overrideAttrs (_old: {
                 src = nickel-eval;
+              })
+            else if builtins.all (package: package.source == contentIdentityCoreCargoSource) packages then
+              checkout.overrideAttrs (_old: {
+                src = content-identity-core;
               })
             else
               checkout;
@@ -427,6 +437,42 @@
               touch "$out"
             '';
 
+        contentIdentityCoreSourceCheck =
+          pkgs.runCommand "lattice-content-identity-core-source"
+            {
+              nativeBuildInputs = [ pkgs.jq ];
+            }
+            ''
+              revision=7f55597b5dc879b7601856e8d7fd0dbacaa2a498
+              source_url=https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git
+              test -f ${content-identity-core}/Cargo.toml
+              test -f ${content-identity-core}/LICENSE
+              grep --fixed-strings 'name = "content-identity-core"' ${content-identity-core}/Cargo.toml > /dev/null
+              grep --fixed-strings 'license = "MIT"' ${content-identity-core}/Cargo.toml > /dev/null
+              grep --fixed-strings "content-identity-core = { git = \"$source_url\", rev = \"$revision\" }" ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings "git+$source_url?rev=$revision#$revision" ${self}/Cargo.lock > /dev/null
+              jq --exit-status \
+                --arg revision "$revision" \
+                --arg source_url "$source_url" \
+                '.nodes["content-identity-core"].locked.rev == $revision
+                  and .nodes["content-identity-core"].locked.url == $source_url
+                  and .nodes["content-identity-core"].original.rev == $revision' \
+                ${self}/flake.lock > /dev/null
+              if grep -R --fixed-strings 'github.com/OnixResearch/content-identity-core' \
+                ${self}/Cargo.toml ${self}/Cargo.lock ${self}/flake.lock; then
+                echo 'forbidden content-identity-core GitHub fallback' >&2
+                exit 1
+              fi
+              if grep -E 'content_identity_core|crate::content_identity' \
+                ${self}/src/credentials.rs ${self}/src/triggers.rs; then
+                echo 'security owner imported shared content identity' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'content_identity::schedule_occurrence' \
+                ${self}/src/scheduler/admission.rs > /dev/null
+              touch "$out"
+            '';
+
         traceabilityInventoryPolicyCheck =
           pkgs.runCommand "lattice-traceability-inventory-policy"
             {
@@ -505,6 +551,9 @@
 
           # Exact Choregraph source and single adapter path
           choregraph-source = choregraphSourceIdentityCheck;
+
+          # Exact content identity source and security-role boundary
+          content-identity-core-source = contentIdentityCoreSourceCheck;
 
           # Typed traceability inventory policy and negative fixture
           traceability-inventory-policy = traceabilityInventoryPolicyCheck;

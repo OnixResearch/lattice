@@ -1,8 +1,5 @@
 //! Pure durable scheduler-occurrence admission and recovery contract.
 
-const IDENTITY_DOMAIN: &[u8] = b"lattice-schedule-occurrence-v1";
-const ID_TAG: &[u8] = b"schedule-id";
-const DUE_TAG: &[u8] = b"due-epoch-ms";
 mod model;
 
 pub use model::*;
@@ -26,7 +23,7 @@ pub fn plan_schedule_occurrence(
     }
     debug_assert!(!plan.schedule_id.trim().is_empty());
     debug_assert!(plan.next_run_epoch_ms > plan.due_epoch_ms);
-    let identity = identity(&plan.schedule_id, plan.due_epoch_ms);
+    let identity = identity(&plan.schedule_id, plan.due_epoch_ms)?;
     Ok(ScheduleOccurrenceClaimRequest {
         identity,
         schedule_id: plan.schedule_id.clone(),
@@ -75,7 +72,7 @@ pub fn validate_schedule_occurrence(occurrence: &ScheduleOccurrence) -> Result<(
     if occurrence.next_run_epoch_ms <= occurrence.due_epoch_ms {
         return Err(OccurrenceError::InvalidNextRun);
     }
-    if occurrence.identity != identity(&occurrence.schedule_id, occurrence.due_epoch_ms) {
+    if occurrence.identity != identity(&occurrence.schedule_id, occurrence.due_epoch_ms)? {
         return Err(OccurrenceError::IdentityMismatch);
     }
     if occurrence.attempt_run_ids.is_empty() {
@@ -210,17 +207,10 @@ pub fn render_schedule_occurrence(occurrence: &ScheduleOccurrence) -> String {
     )
 }
 
-fn identity(schedule_id: &str, due_epoch_ms: i64) -> String {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(IDENTITY_DOMAIN);
-    update_identity_part(&mut hasher, ID_TAG, schedule_id.as_bytes());
-    update_identity_part(&mut hasher, DUE_TAG, &due_epoch_ms.to_be_bytes());
-    format!("b3:{}", hasher.finalize().to_hex())
-}
-
-fn update_identity_part(hasher: &mut blake3::Hasher, tag: &[u8], value: &[u8]) {
-    let mut part = blake3::Hasher::new();
-    part.update(tag);
-    part.update(value);
-    hasher.update(part.finalize().as_bytes());
+fn identity(schedule_id: &str, due_epoch_ms: i64) -> Result<String, OccurrenceError> {
+    crate::content_identity::schedule_occurrence(crate::content_identity::ScheduleOccurrenceInput {
+        schedule_id,
+        due_epoch_ms,
+    })
+    .map_err(|_error| OccurrenceError::IdentityConfiguration)
 }

@@ -80,6 +80,23 @@
         "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       }
     },
+    "content-identity-core": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786137078,
+        "narHash": "sha256-dwcdRV9LBJEczU9fLN6AYT7cpLcke3auJa7ffPHmoyc=",
+        "ref": "refs/heads/main",
+        "rev": "7f55597b5dc879b7601856e8d7fd0dbacaa2a498",
+        "revCount": 7,
+        "type": "git",
+        "url": "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git"
+      },
+      "original": {
+        "rev": "7f55597b5dc879b7601856e8d7fd0dbacaa2a498",
+        "type": "git",
+        "url": "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1774313767,
@@ -390,6 +407,7 @@
       "inputs": {
         "bounded-exec": "bounded-exec",
         "choregraph": "choregraph",
+        "content-identity-core": "content-identity-core",
         "crane": "crane",
         "flake-utils": "flake-utils",
         "nickel-eval": "nickel-eval",

@@ -946,6 +946,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "content-identity-core"
+version = "0.1.0"
+source = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498"
+dependencies = [
+ "blake3",
+ "serde",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2381,6 +2390,7 @@ dependencies = [
  "choregraph-seaglass",
  "chrono",
  "clap",
+ "content-identity-core",
  "criterion",
  "crossterm 0.29.0",
  "dirs-next",
