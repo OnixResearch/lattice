@@ -1,0 +1,10 @@
+{
+  "depends_on": [
+    "introduce-typed-operation-contracts"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}
