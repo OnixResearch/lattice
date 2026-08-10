@@ -1,0 +1,8 @@
+[package]
+name = "invalid-lattice-core-host"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+serde = "1"
+tokio = "1"

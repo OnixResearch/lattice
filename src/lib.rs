@@ -1,9 +1,12 @@
+// r[impl lattice.architecture.core_crate.compatibility]
 pub mod agent_node;
 pub mod animus_agent;
 mod capability;
 pub mod config;
 pub mod content_identity;
-pub mod control_flow;
+pub mod control_flow {
+    pub use lattice_core::control_flow::*;
+}
 pub mod credentials;
 pub mod engine;
 pub mod error;

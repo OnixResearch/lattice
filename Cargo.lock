@@ -2397,6 +2397,7 @@ dependencies = [
  "futures",
  "hex",
  "home",
+ "lattice-core",
  "lattice-repository-validation-fixture",
  "madsim",
  "nickel-eval",
@@ -2426,10 +2427,22 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-test",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "url",
  "which",
+]
+
+[[package]]
+name = "lattice-core"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "content-identity-core",
+ "rat-nodegraph",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

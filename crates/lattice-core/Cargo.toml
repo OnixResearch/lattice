@@ -1,0 +1,17 @@
+[package]
+name = "lattice-core"
+version.workspace = true
+edition.workspace = true
+license = "AGPL-3.0-or-later"
+description = "Pure value, expression, control-flow, and identity decisions for Lattice"
+publish = false
+
+[dependencies]
+blake3.workspace = true
+content-identity-core = { git = "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git", rev = "7f55597b5dc879b7601856e8d7fd0dbacaa2a498" }
+rat-nodegraph = { path = "../../vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+[lints]
+workspace = true

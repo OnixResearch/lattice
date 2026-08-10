@@ -1,0 +1,20 @@
+{
+  "schema": "lattice-octet-baseline-migration/v1",
+  "old_root_baseline_blake3": "b3:df8498f2e46e82d91d9d3af7d62150f5fa6ce59fe76fd237c1723c7726ae37bf",
+  "new_root_baseline_blake3": "b3:856e9598161759a5fb48e84f0c43ca829aa0cfa72691e157b9e01865a167eac4",
+  "new_core_baseline_blake3": "b3:5c9e91a7052bdbcd47f577afac063e0eb88a1afd1d6057455bbe85f83c283f32",
+  "old_root_results_blake3": "b3:6918eb4e4d699e98dce1c27f9ce6f4d3580a8f612e5805bacf09addd3853a1e4",
+  "new_root_results_blake3": "b3:82942cb303ac62941ac4255a7585cb40a72765d8d0f1a2926eee2d1800b7848e",
+  "new_core_results_blake3": "b3:639ff78b03568cc94d354c5fcf784e89df1008cfc8f8de147d20e0497c5fa289",
+  "old_root_records": 1141,
+  "old_root_identities": 890,
+  "new_root_identities": 872,
+  "new_core_identities": 24,
+  "exact_root_rekeys": 872,
+  "removed_root_identities": 18,
+  "retained_root_occurrences": 1108,
+  "old_moved_occurrences": 33,
+  "moved_occurrences": 32,
+  "reviewed_warning_reductions": 1,
+  "verdict": "pass"
+}

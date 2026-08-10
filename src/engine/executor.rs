@@ -397,7 +397,7 @@ fn expression_context_from_workflow_outputs(
     workflow: &Workflow,
     port_values: &HashMap<PortId, Value>,
 ) -> ExpressionContext {
-    let mut context = ExpressionContext::default();
+    let mut context = ExpressionContext::new(HashMap::new());
     for node in workflow.graph.nodes() {
         for port in &node.output_ports {
             if let Some(value) = port_values.get(&port.id) {
@@ -1150,8 +1150,14 @@ impl Executor {
         node_id: NodeId,
         inputs: &HashMap<PortId, Value>,
     ) -> StepResult {
-        self.execute_node_with_expression_context(workflow, node_id, inputs, &ExpressionContext::default(), None)
-            .await
+        self.execute_node_with_expression_context(
+            workflow,
+            node_id,
+            inputs,
+            &ExpressionContext::new(HashMap::new()),
+            None,
+        )
+        .await
     }
 
     async fn execute_node_with_expression_context(

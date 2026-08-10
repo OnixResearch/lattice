@@ -6,6 +6,7 @@ let LatticeTraceabilityProfile = {
   ],
   evidence_sources = [
     { root = "src", source_kind = "rust_source", extensions = ["rs"] },
+    { root = "crates", source_kind = "rust_source", extensions = ["rs"] },
     { root = "tests", source_kind = "rust_source", extensions = ["rs"] },
     { root = "examples", source_kind = "rust_source", extensions = ["rs"] },
     { root = "examples", source_kind = "nickel_source", extensions = ["ncl"] },

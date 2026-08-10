@@ -167,81 +167,95 @@
           text = ''
             success_status=0
             lint_failure_status=1
-            octet_status="$success_status"
-            artifact_dir="''${OCTET_ARTIFACT_DIR:-target/octet-precommit}"
-            cargo_target_dir="''${OCTET_CARGO_TARGET_DIR:-target/octet-cargo-target}"
-            baseline_file="''${OCTET_BASELINE:-octet-baseline.json}"
-            status_file="$artifact_dir/status.json"
-            summary_file="$artifact_dir/summary.txt"
 
-            rm -rf "$artifact_dir"
-            mkdir -p "$artifact_dir"
+            run_check() {
+              local artifact_dir="$1"
+              local cargo_target_dir="$2"
+              local baseline_file="$3"
+              local status_file="$artifact_dir/status.json"
+              local summary_file="$artifact_dir/summary.txt"
+              local octet_status="$success_status"
+              shift 3
 
-            baseline_args=()
-            if [ -f "$baseline_file" ]; then
-              baseline_args=(--baseline "$baseline_file")
-            fi
+              rm -rf "$artifact_dir"
+              mkdir -p "$artifact_dir"
 
-            set +e
-            CARGO_TARGET_DIR="$cargo_target_dir" cargo-octet check --output-format json --artifact-dir "$artifact_dir" "''${baseline_args[@]}" > "$artifact_dir/stdout.json"
-            octet_status="$?"
-            set -e
+              local -a baseline_args=()
+              if [ -f "$baseline_file" ]; then
+                baseline_args=(--baseline "$baseline_file")
+              fi
 
-            if [ ! -f "$status_file" ]; then
-              exit "$octet_status"
-            fi
+              set +e
+              CARGO_TARGET_DIR="$cargo_target_dir" cargo-octet check "$@" --output-format json --artifact-dir "$artifact_dir" "''${baseline_args[@]}" > "$artifact_dir/stdout.json"
+              octet_status="$?"
+              set -e
 
-            # r[impl lattice.repository_validation.baselined_octet_gate]
-            # r[impl lattice.repository_validation.baselined_octet_gate.scenario.accepted]
-            if jq --exit-status '
-              (.cargo_process_exit.classification == "success")
-              and (.cargo_process_exit.code == 0)
-              and (
-                (
-                  .status == "clean"
-                  and (
-                    .baseline == null
-                    or (.baseline.new_total | tonumber) == 0
+              if [ ! -f "$status_file" ]; then
+                return "$octet_status"
+              fi
+
+              # r[impl lattice.repository_validation.baselined_octet_gate]
+              # r[impl lattice.repository_validation.baselined_octet_gate.scenario.accepted]
+              if jq --exit-status '
+                (.cargo_process_exit.classification == "success")
+                and (.cargo_process_exit.code == 0)
+                and (
+                  (
+                    .status == "clean"
+                    and (
+                      .baseline == null
+                      or (.baseline.new_total | tonumber) == 0
+                    )
+                  )
+                  or (
+                    .status == "warning-only"
+                    and .baseline != null
+                    and (.baseline.new_total | tonumber) == 0
+                    and (.baseline.stale_total | tonumber) == 0
+                    and (.baseline.current_total | tonumber) > 0
+                    and (.baseline.accepted_total | tonumber) == (.baseline.current_total | tonumber)
+                    and (.baseline.accepted_current | tonumber) == (.baseline.current_total | tonumber)
                   )
                 )
-                or (
-                  .status == "warning-only"
-                  and .baseline != null
-                  and (.baseline.new_total | tonumber) == 0
-                  and (.baseline.stale_total | tonumber) == 0
-                  and (.baseline.current_total | tonumber) > 0
-                  and (.baseline.accepted_total | tonumber) == (.baseline.current_total | tonumber)
-                  and (.baseline.accepted_current | tonumber) == (.baseline.current_total | tonumber)
-                )
-              )
-            ' "$status_file" > /dev/null; then
-              exit "$success_status"
-            fi
+              ' "$status_file" > /dev/null; then
+                return "$success_status"
+              fi
 
-            if [ -f "$summary_file" ]; then
-              cat "$summary_file" >&2
-            else
-              cat "$status_file" >&2
-            fi
+              if [ -f "$summary_file" ]; then
+                cat "$summary_file" >&2
+              else
+                cat "$status_file" >&2
+              fi
 
-            if jq --exit-status '.baseline != null' "$status_file" > /dev/null; then
-              jq --raw-output '
-                "Status: "
-                + (.status | tostring)
-                + ", cargo="
-                + (.cargo_process_exit.classification | tostring)
-                + ", baseline: "
-                + (.baseline.accepted_total | tostring)
-                + " accepted, "
-                + (.baseline.accepted_current | tostring)
-                + " current accepted, "
-                + (.baseline.new_total | tostring)
-                + " new, "
-                + (.baseline.stale_total | tostring)
-                + " stale"
-              ' "$status_file" >&2
-            fi
-            exit "$lint_failure_status"
+              if jq --exit-status '.baseline != null' "$status_file" > /dev/null; then
+                jq --raw-output '
+                  "Status: "
+                  + (.status | tostring)
+                  + ", cargo="
+                  + (.cargo_process_exit.classification | tostring)
+                  + ", baseline: "
+                  + (.baseline.accepted_total | tostring)
+                  + " accepted, "
+                  + (.baseline.accepted_current | tostring)
+                  + " current accepted, "
+                  + (.baseline.new_total | tostring)
+                  + " new, "
+                  + (.baseline.stale_total | tostring)
+                  + " stale"
+                ' "$status_file" >&2
+              fi
+              return "$lint_failure_status"
+            }
+
+            run_check \
+              "''${OCTET_ARTIFACT_DIR:-target/octet-precommit}" \
+              "''${OCTET_CARGO_TARGET_DIR:-target/octet-cargo-target}" \
+              "''${OCTET_BASELINE:-octet-baseline.json}"
+            run_check \
+              "''${OCTET_CORE_ARTIFACT_DIR:-target/octet-core-precommit}" \
+              "''${OCTET_CORE_CARGO_TARGET_DIR:-target/octet-core-cargo-target}" \
+              "''${OCTET_CORE_BASELINE:-crates/lattice-core/octet-baseline.json}" \
+              -p lattice-core
           '';
         };
 

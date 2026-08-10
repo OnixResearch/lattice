@@ -5521,6 +5521,13 @@
             "extensions": [
               "rs"
             ],
+            "root": "crates",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "rs"
+            ],
             "root": "tests",
             "source_kind": "rust_source"
           },

@@ -4,6 +4,14 @@ Lattice is a graph-native workflow and agent runtime. It owns product orchestrat
 
 Choregraph supplies deterministic graph and machine decisions. Other adapters provide bounded process, agent, file, and provider functions.
 
+## Internal crates
+
+- `lattice-core` owns pure values, expression mapping, control-flow decisions, and schedule identity framing.
+- `budget-ledger-core` owns pure orchestration budget reservation and settlement.
+- The root `lattice` package owns host effects and preserves the existing public paths through compatibility re-exports.
+
+`lattice-core` has no filesystem, process, network, persistence, clock, provider, or terminal authority.
+
 ## Development
 
 ```bash

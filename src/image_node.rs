@@ -168,8 +168,9 @@ pub fn image_value_from_loaded_bytes(path: &str, bytes: Vec<u8>, max_bytes: usiz
     validate_image_size(path, bytes.len(), max_bytes)?;
     let media_type = sniff_image_media_type(&bytes).ok_or_else(|| ImageError::UnsupportedFormat(path.to_string()))?;
     Ok(ImageValue::new(bytes, media_type.to_string(), ImageMetadata {
+        width: None,
+        height: None,
         source_label: Some(path.to_string()),
-        ..ImageMetadata::default()
     }))
 }
 

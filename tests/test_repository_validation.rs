@@ -393,6 +393,7 @@ fn cargo_and_nix_resolve_the_same_immutable_bounded_exec_source() {
     assert!(!bounded_exec_source_admission_matches(altered_evidence.bounded_exec_source_admission));
 }
 
+// r[verify lattice.architecture.core_crate.validation]
 #[test]
 fn repository_check_contract_mutations_fail_closed() {
     let mut inputs = current_inputs();

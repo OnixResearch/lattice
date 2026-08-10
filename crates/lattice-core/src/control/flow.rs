@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::engine::Value;
-use crate::engine::ValueData;
+use crate::value::Value;
+use crate::value::ValueData;
 
 const PREDICATE_ALWAYS: &str = "always";
 const PREDICATE_EXISTS: &str = "exists";

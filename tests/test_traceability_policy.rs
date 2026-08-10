@@ -6,11 +6,12 @@ const GENERATED_POLICY: &str = include_str!("../cairn-policy/generated/cairn-pol
 const INVALID_SOURCE_ROOT_FIXTURE: &str = include_str!("../cairn-policy/fixtures/invalid-traceability-source-root.ncl");
 const DEFAULT_PROFILE_ID: &str = "cairn-default";
 const UNSAFE_SOURCE_ROOT: &str = "../src";
-const LEGACY_CRATE_ROOT: &str = "crates";
+const INTERNAL_CRATE_ROOT: &str = "crates";
 const LEGACY_TOOL_ROOT: &str = "tools";
 const REQUIRED_MARKER_VERBS: [&str; 4] = ["depends", "impl", "related", "verify"];
-const REQUIRED_SOURCES: [(&str, &str); 7] = [
+const REQUIRED_SOURCES: [(&str, &str); 8] = [
     ("cairn-policy", "nickel_source"),
+    (INTERNAL_CRATE_ROOT, "rust_source"),
     ("examples", "nickel_source"),
     ("examples", "rust_source"),
     ("scripts", "tool_source"),
@@ -48,6 +49,7 @@ fn source_pairs(profile: &Value) -> BTreeSet<(&str, &str)> {
 }
 
 // r[verify lattice.repository_validation.traceability_sources.scenario.discovery]
+// r[verify lattice.architecture.core_crate.traceability]
 #[test]
 fn default_traceability_profile_scans_lattice_owned_sources() {
     let policy = policy();
@@ -72,7 +74,7 @@ fn traceability_profile_rejects_fallback_and_unsafe_roots_without_relaxing_verbs
         .collect::<BTreeSet<_>>();
     let required_verbs = BTreeSet::from(REQUIRED_MARKER_VERBS);
 
-    assert!(!sources.iter().any(|(root, _)| *root == LEGACY_CRATE_ROOT));
+    assert!(sources.contains(&(INTERNAL_CRATE_ROOT, "rust_source")));
     assert!(!sources.iter().any(|(root, _)| *root == LEGACY_TOOL_ROOT));
     assert_eq!(actual_verbs, required_verbs);
     assert!(INVALID_SOURCE_ROOT_FIXTURE.contains(UNSAFE_SOURCE_ROOT));
