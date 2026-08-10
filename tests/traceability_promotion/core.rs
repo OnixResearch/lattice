@@ -140,6 +140,10 @@ pub fn validate_policy_excludes_promoted_ids(policy: &str, promoted_ids: &[&str]
     issues
 }
 
+fn is_supported_test_attribute(line: &str) -> bool {
+    line == "#[test]" || line == "#[tokio::test]" || (line.starts_with("#[tokio::test(") && line.ends_with(")]"))
+}
+
 pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id: &str) -> bool {
     let signature = format!("fn {test_name}(");
     let async_signature = format!("async {signature}");
@@ -157,7 +161,7 @@ pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id:
         if line == expected {
             return true;
         }
-        if line == "#[test]" || line == "#[tokio::test]" || line.starts_with("// r[verify ") {
+        if is_supported_test_attribute(line) || line.starts_with("// r[verify ") {
             continue;
         }
         break;

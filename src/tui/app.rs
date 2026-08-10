@@ -3405,7 +3405,7 @@ mod tests {
         let image_path = temp_dir.path().join(TUI_LOCAL_IMAGE_FILE_NAME);
         std::fs::write(&image_path, TUI_LOCAL_PNG_FIXTURE).expect("TUI image fixture written");
         let mut app = App::new(test_config(&temp_dir));
-        app.add_image_input_node("Local image", &image_path.display().to_string());
+        app.add_image_input_node("Local image", image_path.display().to_string());
         let node_id = app.graph_state.focused.expect("image node focused");
 
         assert!(app.start_workflow_run());

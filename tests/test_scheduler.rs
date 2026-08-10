@@ -67,7 +67,7 @@ const POST_EFFECT_ATTEMPTS_FILE_NAME: &str = "scheduler-post-effect-attempts";
 #[cfg(unix)]
 const POST_EFFECT_IDENTITY: &str = "scheduler-attempt";
 #[cfg(unix)]
-const POST_EFFECT_WAIT_ATTEMPTS: usize = 500;
+const POST_EFFECT_WAIT_ATTEMPTS: usize = 1_500;
 #[cfg(unix)]
 const POST_EFFECT_WAIT_DELAY_MS: u64 = 10;
 #[cfg(unix)]

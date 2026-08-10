@@ -7,5 +7,5 @@
 - [x] [serial] Reject semantic occurrence growth and test accepted reduction. r[lattice.repository_validation.octet_baseline_migration.scenario.multiplicity]
 - [x] [serial] Review all unmatched semantic groups and fix or admit each candidate-only finding. r[lattice.repository_validation.octet_baseline_migration]
 - [x] [serial] Migrate the baseline and require zero new and zero stale identities. r[lattice.repository_validation.octet_baseline_migration]
-- [ ] [serial] Run repository, Cairn, Octet, and Nix validation. r[lattice.repository_validation.octet_baseline_migration]
-- [ ] [serial] Sync the accepted requirement, record evidence, and archive the change. r[lattice.repository_validation.octet_baseline_migration]
+- [x] [serial] Run repository, Cairn, Octet, and Nix validation. r[lattice.repository_validation.octet_baseline_migration]
+- [x] [serial] Sync the accepted requirement, record evidence, and archive the change. r[lattice.repository_validation.octet_baseline_migration]

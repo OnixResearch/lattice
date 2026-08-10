@@ -131,6 +131,18 @@ fn exact_twelve_id_promotion_preserves_every_unrelated_gap() {
 
 // r[verify lattice.repository_validation.core_credential_promotion.scenario.local_binding]
 #[test]
+fn parameterized_tokio_test_attributes_preserve_local_marker_binding() {
+    let requirement_id = "example.parameterized.marker";
+    let marker = format!("// r[{} {}]", "verify", requirement_id);
+    let accepted = format!("{marker}\n#[tokio::test(flavor = \"current_thread\")]\nasync fn parameterized_test() {{}}");
+    let rejected =
+        format!("{marker}\n#[ignore]\n#[tokio::test(flavor = \"current_thread\")]\nasync fn parameterized_test() {{}}");
+
+    assert!(marker_is_attached_to_test(&accepted, "parameterized_test", requirement_id));
+    assert!(!marker_is_attached_to_test(&rejected, "parameterized_test", requirement_id));
+}
+
+#[test]
 fn promoted_markers_are_attached_to_exact_tests_and_leave_the_debt_policy() {
     for attachment in REQUIRED_ATTACHMENTS {
         assert!(

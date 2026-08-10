@@ -2,24 +2,22 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-const ADMISSION_SOURCE: &str = include_str!("fixtures/radicle/execution-graph-source-admission-v1.json");
+const ADMISSION_SOURCE: &str = include_str!("fixtures/radicle/choregraph-source-admission-v1.ncl");
 const CARGO_SOURCE: &str = include_str!("../Cargo.toml");
 const CARGO_LOCK_SOURCE: &str = include_str!("../Cargo.lock");
 const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
-const SCHEMA_VERSION: u64 = 1;
-const SEED_COUNT: u64 = 2;
-const NOT_FOUND_STATUS: u64 = 404;
-const RID: &str = "rad:z2oYsb9jGTyp68BKYhzpivY1eK58a";
-const REVISION: &str = "03736f1ec46c377ff86b451260ad68aa70ff3b0b";
-const ARCHIVE_BLAKE3: &str = "4b5aa3756369236fc82fbbf501d35993cfa208f142694cdd30ca370d6241192c";
+const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
+const REVISION: &str = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
+const ARCHIVE_BLAKE3: &str = "41adfbdae4bc5b688ef92ab11cd39ed9c8f572bf6214f522d9b4a1290e5f84d5";
 const LICENSE: &str = "AGPL-3.0-or-later";
-const HTTPS_URL: &str = "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git";
-const NAR_HASH: &str = "sha256-SzdJGsS631Hk3CbPLThz+2YPgvdoB1cXb3BPusJTX8I=";
-const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"execution-graph-core\", git = \"https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git\", rev = \"03736f1ec46c377ff86b451260ad68aa70ff3b0b\" }";
-const LOCK_SOURCE: &str = "git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b#03736f1ec46c377ff86b451260ad68aa70ff3b0b";
-const FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git?rev=03736f1ec46c377ff86b451260ad68aa70ff3b0b\";";
+const HTTPS_URL: &str = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
+const NAR_HASH: &str = "sha256-Wp7ZBrTXgQYvG62JSbi1nM2CeZx0mBFrK0tygwDpTSc=";
+const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"81b260da2256147ec82cb5dd44c0a0c1dcb7500d\" }";
+const LOCK_SOURCE: &str = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
+const FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d\";";
+const CARGO_LOCK_PACKAGE_COUNT: usize = 3;
 
 const ISSUE_RECEIPT: &str = "source.receipt";
 const ISSUE_CARGO: &str = "source.cargo";
@@ -49,32 +47,30 @@ fn current_inputs() -> Inputs<'static> {
     }
 }
 
-fn receipt_matches(source: &str) -> bool {
-    let Ok(receipt) = serde_json::from_str::<Value>(source) else {
-        return false;
-    };
-    receipt.pointer("/schema_version").and_then(Value::as_u64) == Some(SCHEMA_VERSION)
-        && receipt.pointer("/receipt_type").and_then(Value::as_str)
-            == Some("lattice.radicle-execution-graph-source-admission.v1")
-        && receipt.pointer("/status").and_then(Value::as_str) == Some("accepted")
-        && receipt.pointer("/repository/rid").and_then(Value::as_str) == Some(RID)
-        && receipt.pointer("/repository/reviewed_commit").and_then(Value::as_str) == Some(REVISION)
-        && receipt.pointer("/repository/source_archive_blake3").and_then(Value::as_str) == Some(ARCHIVE_BLAKE3)
-        && receipt.pointer("/repository/license").and_then(Value::as_str) == Some(LICENSE)
-        && receipt.pointer("/sources/cargo_git").and_then(Value::as_str) == Some(HTTPS_URL)
-        && receipt.pointer("/sources/cargo_locked_source").and_then(Value::as_str) == Some(LOCK_SOURCE)
-        && receipt.pointer("/sources/nix_nar_hash").and_then(Value::as_str) == Some(NAR_HASH)
-        && receipt.pointer("/availability/seed_count").and_then(Value::as_u64) == Some(SEED_COUNT)
-        && receipt.pointer("/availability/receive_pack_status").and_then(Value::as_u64) == Some(NOT_FOUND_STATUS)
-        && receipt.pointer("/availability/unknown_rid_status").and_then(Value::as_u64) == Some(NOT_FOUND_STATUS)
-        && receipt.pointer("/availability/github_fallback_configured").and_then(Value::as_bool) == Some(false)
+fn admission_matches(source: &str) -> bool {
+    let required_lines = [
+        "schema = \"lattice.choregraph-source-admission.v1\"".to_owned(),
+        "status = 'accepted".to_owned(),
+        format!("rid = \"{RID}\""),
+        format!("revision = \"{REVISION}\""),
+        format!("source_url = \"{HTTPS_URL}\""),
+        format!("source_archive_blake3 = \"{ARCHIVE_BLAKE3}\""),
+        format!("license = \"{LICENSE}\""),
+        format!("cargo_revision = \"{REVISION}\""),
+        format!("nix_revision = \"{REVISION}\""),
+        "execution_graph_baseline = true".to_owned(),
+        "forbidden_fallbacks = [\"floating\", \"github\", \"sibling\", \"vendor\", \"runtime\"]".to_owned(),
+    ];
+    required_lines
+        .iter()
+        .all(|required| source.lines().any(|line| line.trim().trim_end_matches(',') == required))
 }
 
 fn flake_lock_matches(source: &str) -> bool {
     let Ok(lock) = serde_json::from_str::<Value>(source) else {
         return false;
     };
-    let Some(node) = lock.pointer("/nodes/execution-graph") else {
+    let Some(node) = lock.pointer("/nodes/choregraph") else {
         return false;
     };
     node.pointer("/locked/rev").and_then(Value::as_str) == Some(REVISION)
@@ -86,7 +82,7 @@ fn flake_lock_matches(source: &str) -> bool {
 
 fn validate(inputs: Inputs<'_>) -> BTreeSet<&'static str> {
     let mut issues = BTreeSet::new();
-    if !receipt_matches(inputs.receipt) {
+    if !admission_matches(inputs.receipt) {
         issues.insert(ISSUE_RECEIPT);
     }
     if !inputs.cargo.lines().any(|line| line.trim() == CARGO_PIN)
@@ -94,10 +90,10 @@ fn validate(inputs: Inputs<'_>) -> BTreeSet<&'static str> {
     {
         issues.insert(ISSUE_CARGO);
     }
-    if !inputs.cargo_lock.contains(LOCK_SOURCE) {
+    if inputs.cargo_lock.matches(LOCK_SOURCE).count() != CARGO_LOCK_PACKAGE_COUNT {
         issues.insert(ISSUE_CARGO_LOCK);
     }
-    if !inputs.flake.contains(FLAKE_PIN) || !inputs.flake.contains("src = execution-graph;") {
+    if !inputs.flake.contains(FLAKE_PIN) || !inputs.flake.contains("src = choregraph;") {
         issues.insert(ISSUE_NIX);
     }
     if !flake_lock_matches(inputs.flake_lock) {
@@ -117,20 +113,33 @@ fn replace_once(source: &str, old: &str, new: &str) -> String {
 // r[verify lattice.execution_graph_external_adoption.source.scenario.accepted]
 #[test]
 fn exact_source_is_accepted() {
-    assert!(validate(current_inputs()).is_empty());
+    let issues = validate(current_inputs());
+    assert!(issues.is_empty(), "unexpected source issues: {issues:?}");
 }
 
 // r[verify lattice.execution_graph_external_adoption.source.scenario.rejected]
 #[test]
 fn malformed_and_incomplete_receipts_are_rejected() {
     let base = current_inputs();
-    let wrong_rid = replace_once(base.receipt, RID, "rad:zUnknownExecutionGraph");
-    let wrong_revision = replace_once(base.receipt, REVISION, "0000000000000000000000000000000000000000");
-    let wrong_hash = replace_once(base.receipt, ARCHIVE_BLAKE3, "invalid-archive-hash");
-    let wrong_license = replace_once(base.receipt, LICENSE, "LicenseRef-Unknown");
-    let wrong_endpoint = replace_once(base.receipt, HTTPS_URL, "https://github.com/OnixResearch/execution-graph");
-    let fallback =
-        replace_once(base.receipt, "\"github_fallback_configured\": false", "\"github_fallback_configured\": true");
+    let wrong_rid = replace_once(base.receipt, &format!("rid = \"{RID}\""), "rid = \"rad:zUnknownChoregraph\"");
+    let wrong_revision = replace_once(
+        base.receipt,
+        &format!("revision = \"{REVISION}\""),
+        "revision = \"0000000000000000000000000000000000000000\"",
+    );
+    let wrong_hash = replace_once(
+        base.receipt,
+        &format!("source_archive_blake3 = \"{ARCHIVE_BLAKE3}\""),
+        "source_archive_blake3 = \"invalid-archive-hash\"",
+    );
+    let wrong_license =
+        replace_once(base.receipt, &format!("license = \"{LICENSE}\""), "license = \"LicenseRef-Unknown\"");
+    let wrong_endpoint = replace_once(
+        base.receipt,
+        &format!("source_url = \"{HTTPS_URL}\""),
+        "source_url = \"https://github.com/onixresearch/choregraph\"",
+    );
+    let floating = replace_once(base.receipt, &format!("revision = \"{REVISION}\""), "revision = \"main\"");
     let fixtures = [
         "{",
         &wrong_rid,
@@ -138,7 +147,7 @@ fn malformed_and_incomplete_receipts_are_rejected() {
         &wrong_hash,
         &wrong_license,
         &wrong_endpoint,
-        &fallback,
+        &floating,
     ];
 
     for fixture in fixtures {
@@ -157,9 +166,9 @@ fn malformed_and_incomplete_receipts_are_rejected() {
 #[test]
 fn source_drift_and_duplicate_packages_are_rejected() {
     let base = current_inputs();
-    let path_manifest =
-        replace_once(base.cargo, CARGO_PIN, "seaglass-execution-graph = { path = \"../execution-graph\" }");
-    let floating_manifest = replace_once(base.cargo, REVISION, "main");
+    let path_manifest = replace_once(base.cargo, CARGO_PIN, "seaglass-execution-graph = { path = \"../choregraph\" }");
+    let floating_pin = CARGO_PIN.replace(REVISION, "main");
+    let floating_manifest = replace_once(base.cargo, CARGO_PIN, &floating_pin);
     let wrong_cargo_lock = replace_once(base.cargo_lock, REVISION, "0000000000000000000000000000000000000000");
     let wrong_flake = replace_once(base.flake, REVISION, "0000000000000000000000000000000000000000");
     let wrong_flake_lock = replace_once(base.flake_lock, NAR_HASH, "sha256-invalid");

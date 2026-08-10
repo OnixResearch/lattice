@@ -46,8 +46,9 @@ fn exact_source_and_prerequisites_are_aligned() {
     assert!(SOURCE_ADMISSION.contains(CHOREGRAPH_REVISION));
     assert!(SOURCE_ADMISSION.contains("execution_graph_baseline = true"));
     assert!(SOURCE_ADMISSION.contains("nickel_evaluator_baseline = true"));
-    assert!(FLOATING_SOURCE.contains("admission.revision = \"main\""));
-    assert!(FLOATING_SOURCE.contains("https://github.com/onixresearch/choregraph"));
+    assert!(FLOATING_SOURCE.contains("admission.revision | force = \"main\""));
+    assert!(FLOATING_SOURCE.contains("admission.source_url | force = \"https://github.com/onixresearch/choregraph\""));
+    assert!(FLOATING_SOURCE.contains("admission.evidence.single_step_proof | force = false"));
 }
 
 // r[verify lattice.choregraph_adoption.inventory]

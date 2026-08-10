@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:ab23feea0bcdf4bdf4dfea6f40ad558c68fae835ab58a13028baf609757ea1bf",
+  "baseline_hash": "b3:437767e8ce3cd6ab1687a52dd8310143763970c67ade6b6ff30cd1142fc5e2fd",
   "findings": [
     {
       "stable_id": "b3:1f3a0caead125d14",
@@ -6695,8 +6695,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:8ba305c10e98e4c5",
-      "semantic_id": "b3:8ba305c10e98e4c5",
+      "stable_id": "b3:039fc4fff766a4e2",
+      "semantic_id": "b3:039fc4fff766a4e2",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",
@@ -7163,8 +7163,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:48ea8b3f885313df",
-      "semantic_id": "b3:48ea8b3f885313df",
+      "stable_id": "b3:4a6006755e15e681",
+      "semantic_id": "b3:4a6006755e15e681",
       "identity_status": "computed",
       "lint": "too_many_parameters",
       "group": "tigerstyle::structure",
@@ -9022,8 +9022,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:09570f95018755d0",
-      "semantic_id": "b3:09570f95018755d0",
+      "stable_id": "b3:b13f7a698607344d",
+      "semantic_id": "b3:b13f7a698607344d",
       "identity_status": "computed",
       "lint": "excessive_file_length",
       "group": "tigerstyle::structure",

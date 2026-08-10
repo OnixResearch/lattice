@@ -41,7 +41,6 @@ use lattice::workflow_validation::format_diagnostic;
 use lattice::workflow_validation::validate_workflow;
 use lattice::workflow_validation::validate_workflow_with_credential_registry;
 use pretty_assertions::assert_eq;
-use tracing::instrument::WithSubscriber;
 
 const PROVIDER_NAME: &str = "env";
 const SECRET_KEY: &str = "api_token";
@@ -192,7 +191,7 @@ fn nickel_import_round_trip_preserves_opaque_provider_reference_without_resoluti
 // r[verify n8nclone.credentials.provider_interface.resolve]
 // r[verify n8nclone.credentials.redaction]
 // r[verify n8nclone.credentials.redaction.output]
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn credential_provider_redacts_output_logs_history_json_and_persistence() {
     let (workflow, node_id) = workflow_with_secret_ref();
     let provider = MapCredentialProvider::new([(secret_ref().identity(), SECRET_VALUE.to_string())].into());
@@ -207,7 +206,8 @@ async fn credential_provider_redacts_output_logs_history_json_and_persistence() 
             bytes: Arc::clone(&writer_bytes),
         })
         .finish();
-    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).with_subscriber(subscriber).await;
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+    let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
 
     let NodeStatus::Completed { outputs, .. } = &result.status else {
         panic!("expected completed node, got {:?}", result.status);

@@ -202,7 +202,7 @@ pub async fn start_from_trigger(
     let trigger_id = trigger_id.as_ref();
     let definition = store
         .load_orchestration_definition(&definition_id)?
-        .ok_or_else(|| OrchestrationShellError::WorkflowNotFound(definition_id))?;
+        .ok_or(OrchestrationShellError::WorkflowNotFound(definition_id))?;
     let report = validate_definition_in_store(store, &definition)?;
     if !report.valid() {
         return Err(OrchestrationShellError::DefinitionInvalid(Box::new(report)));
