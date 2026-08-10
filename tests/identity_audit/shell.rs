@@ -17,8 +17,8 @@ const PUBLIC_ROOTS: &[&str] = &[
     "scripts",
 ];
 const TEXT_EXTENSIONS: &[&str] = &["md", "ncl", "nix", "rs", "toml"];
-const ACCEPTED_SPECS_ROOT: &str = "cairn/specs";
-const RENAME_ARCHIVE_ROOT: &str = concat!("cairn/archive/2026-07-20-rename-n8n", "clone-to-lattice");
+const ACCEPTED_SPECS_ROOT: &str = ".cairn/specs";
+const RENAME_ARCHIVE_ROOT: &str = concat!(".cairn/archive/2026-07-20-rename-n8n", "clone-to-lattice");
 
 pub fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

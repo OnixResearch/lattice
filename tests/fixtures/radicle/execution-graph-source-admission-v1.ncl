@@ -46,7 +46,7 @@ let admission | SourceAdmission = {
   },
   onixos = {
     acceptance_revision = "04d20e0cd880030ae1745c12d2b7f0c3988fe58c",
-    acceptance_evidence = "onixos:cairn/archive/2026-07-25-admit-execution-graph-radicle-source/evidence/source-acceptance-2026-07-26.md",
+    acceptance_evidence = "onixos:.cairn/archive/2026-07-25-admit-execution-graph-radicle-source/evidence/source-acceptance-2026-07-26.md",
   },
   sources = {
     cargo_git = "https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git",

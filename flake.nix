@@ -60,7 +60,7 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/examples/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
-          || pkgs.lib.hasPrefix "${sourceRoot}/cairn/specs/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/.cairn/specs/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/cairn-policy/" (toString path);
         isAnimusCompileTimeAssetPath =
           path:
@@ -84,7 +84,7 @@
           || toString path == "${sourceRoot}/flake.nix"
           || toString path == "${sourceRoot}/flake.lock"
           || pkgs.lib.hasPrefix "${sourceRoot}/scripts/" (toString path)
-          || pkgs.lib.hasPrefix "${sourceRoot}/cairn/archive/2026-07-20-rename-n8nclone-to-lattice/" (
+          || pkgs.lib.hasPrefix "${sourceRoot}/.cairn/archive/2026-07-20-rename-n8nclone-to-lattice/" (
             toString path
           );
         src = pkgs.lib.cleanSourceWith {

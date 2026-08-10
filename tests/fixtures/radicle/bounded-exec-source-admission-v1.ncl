@@ -30,7 +30,7 @@ let admission | SourceAdmission = {
   onixos = {
     catalog_blake3 = "f132c01a9d0edb4141201146c1dd5dc1eacfe77a2b080e6f99b2c4181d856655",
     publication_acceptance_revision = "b5ba554",
-    acceptance_evidence = "onixos:cairn/changes/add-radicle-forge-pilot/evidence/bounded-exec-publication-acceptance-2026-07-25.md",
+    acceptance_evidence = "onixos:.cairn/changes/add-radicle-forge-pilot/evidence/bounded-exec-publication-acceptance-2026-07-25.md",
   },
   sources = {
     cargo_git = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git",

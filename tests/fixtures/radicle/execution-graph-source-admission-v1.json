@@ -36,7 +36,7 @@
     "receipt_type": "onix.radicle-execution-graph-source-admission.v1"
   },
   "onixos": {
-    "acceptance_evidence": "onixos:cairn/archive/2026-07-25-admit-execution-graph-radicle-source/evidence/source-acceptance-2026-07-26.md",
+    "acceptance_evidence": "onixos:.cairn/archive/2026-07-25-admit-execution-graph-radicle-source/evidence/source-acceptance-2026-07-26.md",
     "acceptance_revision": "04d20e0cd880030ae1745c12d2b7f0c3988fe58c"
   },
   "publication": {

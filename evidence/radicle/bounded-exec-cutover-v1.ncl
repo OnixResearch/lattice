@@ -91,7 +91,7 @@ let receipt | CutoverReceipt = {
     "whole-stack-github-independence",
   ],
   evidence = [
-    "cairn/changes/consume-bounded-exec-from-radicle/evidence/source-cutover-2026-07-25.md",
+    ".cairn/changes/consume-bounded-exec-from-radicle/evidence/source-cutover-2026-07-25.md",
     "tests/fixtures/radicle/bounded-exec-source-admission-v1.json",
   ],
 }

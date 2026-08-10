@@ -168,7 +168,7 @@ fn allowed_tokens_for_path(path: &str) -> &'static [&'static str] {
         concat!("n8n", "clone-local-vault-stream-v1"),
         concat!("n8n", "clone-local-vault-integrity-v1"),
     ];
-    const FLAKE_TOKENS: &[&str] = &[concat!("cairn/archive/2026-07-20-rename-n8n", "clone-to-lattice/")];
+    const FLAKE_TOKENS: &[&str] = &[concat!(".cairn/archive/2026-07-20-rename-n8n", "clone-to-lattice/")];
 
     match path {
         "src/config/identity.rs" => CONFIG_TOKENS,

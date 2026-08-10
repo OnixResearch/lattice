@@ -15,9 +15,9 @@ use core::stale_branding_findings;
 
 const CANONICAL_PACKAGE_NAME: &str = "lattice";
 const LEGACY_PRODUCT_NAME: &str = concat!("n8n", "clone");
-const EXPECTED_ACCEPTED_ID_MANIFEST_BLAKE3: &str = "18df6fa6c52ecf7e21b154020a71c9194f17936fa6958cf830acafdcd8772c5e";
+const EXPECTED_ACCEPTED_ID_MANIFEST_BLAKE3: &str = "9a7274e65812d089ca587151e94c765fec703c4cd06d6a280fa67c5bc848c95e";
 const EXPECTED_RENAME_ARCHIVE_MANIFEST_BLAKE3: &str =
-    "79d1fa98e6f3e134950f542e54e899fa54c3202926251677ff2555279f5050f3";
+    "cb0b15ff320803f9e98ae49f01691c4b478c0bf21d2c223b90d5d9e1f72f481d";
 const CANONICAL_SURFACES: &[RequiredText<'_>] = &[
     RequiredText {
         path: "Cargo.toml",
@@ -91,19 +91,19 @@ fn maintained_identity_audit_pins_cairn_ids_and_rename_archive() {
 fn identity_manifests_reject_requirement_and_archive_mutation() {
     let legacy = ["n8n", "clone"].concat();
     let original_specs = vec![TextSnapshot::new(
-        "cairn/specs/example/spec.md",
+        ".cairn/specs/example/spec.md",
         format!("r[{legacy}.example]"),
     )];
     let changed_specs = vec![TextSnapshot::new(
-        "cairn/specs/example/spec.md",
+        ".cairn/specs/example/spec.md",
         format!("r[{legacy}.changed]"),
     )];
     let original_archive = vec![BinarySnapshot::new(
-        "cairn/archive/rename/evidence.md",
+        ".cairn/archive/rename/evidence.md",
         b"stable".to_vec(),
     )];
     let changed_archive = vec![BinarySnapshot::new(
-        "cairn/archive/rename/evidence.md",
+        ".cairn/archive/rename/evidence.md",
         b"changed".to_vec(),
     )];
 

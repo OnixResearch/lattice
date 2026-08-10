@@ -16,7 +16,7 @@ const REQUIRED_SOURCES: [(&str, &str); 7] = [
     ("scripts", "tool_source"),
     ("src", "rust_source"),
     ("tests", "rust_source"),
-    ("cairn/specs", "accepted_specs"),
+    (".cairn/specs", "accepted_specs"),
 ];
 
 fn policy() -> Value {

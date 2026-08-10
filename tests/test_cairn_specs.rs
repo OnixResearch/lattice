@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use pretty_assertions::assert_eq;
 
-const CAIRN_SPECS_DIR: &str = "cairn/specs";
+const CAIRN_SPECS_DIR: &str = ".cairn/specs";
 const SPEC_FILE_NAME: &str = "spec.md";
 const LINE_NUMBER_BASE: usize = 1;
 const NORMATIVE_WORDS: &[&str] = &["MUST", "SHOULD", "SHALL", "MAY"];

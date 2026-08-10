@@ -1,5 +1,5 @@
-const NODE_TEMPLATE_SPEC: &str = include_str!("../cairn/specs/node-templates/spec.md");
-const REPOSITORY_VALIDATION_SPEC: &str = include_str!("../cairn/specs/repository-validation/spec.md");
+const NODE_TEMPLATE_SPEC: &str = include_str!("../.cairn/specs/node-templates/spec.md");
+const REPOSITORY_VALIDATION_SPEC: &str = include_str!("../.cairn/specs/repository-validation/spec.md");
 const HEADLESS_SOURCE: &str = include_str!("../src/headless.rs");
 const TEMPLATE_PARAMETER_TESTS: &str = include_str!("test_template_parameters.rs");
 const TRIGGER_TESTS: &str = include_str!("test_triggers.rs");

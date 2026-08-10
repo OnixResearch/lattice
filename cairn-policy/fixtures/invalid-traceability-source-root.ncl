@@ -1,6 +1,7 @@
 # r[verify lattice.repository_validation.traceability_sources.scenario.unsafe-root]
+let Contracts = import "../contracts.ncl" in
 let Base = import "../generated/cairn-policy.json" in
-Base & {
+(Base & {
   traceability_policy | force = {
     default_profile = "cairn-default",
     profiles = [{
@@ -18,4 +19,4 @@ Base & {
       marker_verbs = ["impl", "verify", "depends", "related"],
     }],
   },
-}
+}) | Contracts.Policy

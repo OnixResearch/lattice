@@ -244,7 +244,7 @@
         "extensions": [
           "md"
         ],
-        "root": "cairn/specs",
+        "root": ".cairn/specs",
         "source_kind": "accepted_specs"
       }
     ]
