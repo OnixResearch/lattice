@@ -443,7 +443,7 @@ pub fn load_node_templates_with_diagnostics(dir: &Path) -> NodeTemplateLoadResul
 
 /// Evaluate a Nickel file and return the result as serde_json::Value.
 pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, String> {
-    crate::nickel_eval_adapter::evaluate_file(path).map_err(|error| error.to_string())
+    crate::nickel::evaluate_file(path).map_err(|error| error.to_string())
 }
 
 /// Generate a default config.ncl file.

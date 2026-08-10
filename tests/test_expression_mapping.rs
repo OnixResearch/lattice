@@ -87,7 +87,7 @@ fn parses_output_reference_expression() {
     match &template.segments[1] {
         ExpressionSegment::Reference(reference) => {
             assert_eq!(reference.node_id, 1);
-            assert_eq!(reference.port_id, 2);
+            assert_eq!(reference.port_id, PortId(2));
             assert_eq!(reference.transforms, vec![ExpressionTransform::Trim, ExpressionTransform::Upper]);
         }
         other => panic!("expected reference segment, got {other:?}"),
@@ -114,7 +114,7 @@ fn invalid_expression_syntax_is_validation_diagnostic() {
 #[test]
 fn evaluates_bounded_transforms_without_side_effects() {
     let mut context = ExpressionContext::default();
-    context.insert(1, 2, Value::from_string("  hello  ".to_string()));
+    context.insert(1, PortId(2), Value::from_string("  hello  ".to_string()));
     let template = parse_expression_template("{{node:1:port:2|trim|upper}}").expect("parse expression");
 
     let value = evaluate_expression_template(&template, &context).expect("evaluate expression");
@@ -204,7 +204,7 @@ async fn missing_expression_reference_fails_before_adapter_execution() {
 #[test]
 fn json_transform_on_string_reports_type_mismatch() {
     let mut context = ExpressionContext::default();
-    context.insert(1, 2, Value::from_string("not-json".to_string()));
+    context.insert(1, PortId(2), Value::from_string("not-json".to_string()));
     let template = parse_expression_template("{{node:1:port:2|json:name}}").expect("parse expression");
 
     let error = evaluate_expression_template(&template, &context).expect_err("type mismatch");

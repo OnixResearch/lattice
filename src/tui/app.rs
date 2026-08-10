@@ -1997,8 +1997,8 @@ impl App {
     }
 
     /// Add a new shell node to the workflow.
-    pub fn add_shell_node(&mut self, label: &str, command: &str) {
-        let id = self.workflow.add_shell_node(label, command);
+    pub fn add_shell_node(&mut self, label: impl AsRef<str>, command: impl Into<String>) {
+        let id = self.workflow.add_shell_node(label.as_ref(), command.into());
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -2013,17 +2013,23 @@ impl App {
         self.mark_workflow_dirty();
     }
 
-    pub fn add_file_node(&mut self, label: &str, operation: crate::file_node::FileOperationKind, path: &str) {
-        let id = self.workflow.add_file_node(label, operation, path);
+    pub fn add_file_node(
+        &mut self,
+        label: impl AsRef<str>,
+        operation: crate::file_node::FileOperationKind,
+        path: impl Into<String>,
+    ) {
+        let id = self.workflow.add_file_node(label.as_ref(), operation, path.into());
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
         self.mark_workflow_dirty();
     }
 
-    pub fn add_image_input_node(&mut self, label: &str, path: &str) {
-        let id = self.workflow.add_image_input_node(label, path);
-        let allowed_root = std::path::Path::new(path)
+    pub fn add_image_input_node(&mut self, label: impl AsRef<str>, path: impl Into<String>) {
+        let path = path.into();
+        let id = self.workflow.add_image_input_node(label.as_ref(), &path);
+        let allowed_root = std::path::Path::new(&path)
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
             .unwrap_or_else(|| std::path::Path::new("."))
@@ -2040,8 +2046,14 @@ impl App {
         self.mark_workflow_dirty();
     }
 
-    pub fn add_agent_node(&mut self, label: &str, target: AgentTarget, prompt: &str, output_mode: AgentOutputMode) {
-        let id = self.workflow.add_agent_node(label, target, prompt, output_mode);
+    pub fn add_agent_node(
+        &mut self,
+        label: impl AsRef<str>,
+        target: AgentTarget,
+        prompt: impl Into<String>,
+        output_mode: AgentOutputMode,
+    ) {
+        let id = self.workflow.add_agent_node(label.as_ref(), target, prompt.into(), output_mode);
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);

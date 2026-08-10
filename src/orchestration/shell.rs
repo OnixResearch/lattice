@@ -192,15 +192,17 @@ pub async fn start(
 // r[impl lattice.agent_orchestration.triggers]
 pub async fn start_from_trigger(
     store: &Store,
-    definition_id: &str,
-    trigger_id: &str,
+    definition_id: impl Into<String>,
+    trigger_id: impl AsRef<str>,
     trigger_kind: OrchestrationTriggerKind,
     idempotency_key: &str,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let definition_id = definition_id.into();
+    let trigger_id = trigger_id.as_ref();
     let definition = store
-        .load_orchestration_definition(definition_id)?
-        .ok_or_else(|| OrchestrationShellError::WorkflowNotFound(definition_id.to_string()))?;
+        .load_orchestration_definition(&definition_id)?
+        .ok_or_else(|| OrchestrationShellError::WorkflowNotFound(definition_id))?;
     let report = validate_definition_in_store(store, &definition)?;
     if !report.valid() {
         return Err(OrchestrationShellError::DefinitionInvalid(Box::new(report)));

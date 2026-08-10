@@ -483,8 +483,8 @@ fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppC
     if !config_path.exists() {
         return Err("config file not found".to_string());
     }
-    let value = lattice::nickel_eval_adapter::evaluate_file(config_path)
-        .map_err(|error| format!("Nickel config failed: {error}"))?;
+    let value =
+        lattice::nickel::evaluate_file(config_path).map_err(|error| format!("Nickel config failed: {error}"))?;
     serde_json::from_value(value).map_err(|_| "Nickel config schema decode failed".to_string())
 }
 

@@ -13,7 +13,7 @@ pub mod headless;
 pub mod http;
 pub mod image_node;
 pub mod n8n_json;
-pub mod nickel_eval_adapter;
+pub mod nickel;
 pub mod node_kind_provider;
 pub mod openai;
 pub mod orchestration;

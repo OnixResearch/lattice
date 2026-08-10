@@ -401,7 +401,7 @@ fn expression_context_from_workflow_outputs(
     for node in workflow.graph.nodes() {
         for port in &node.output_ports {
             if let Some(value) = port_values.get(&port.id) {
-                context.insert(node.id.0, port.id.0, value.clone());
+                context.insert(node.id.0, port.id, value.clone());
             }
         }
     }

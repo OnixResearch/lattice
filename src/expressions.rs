@@ -30,7 +30,7 @@ pub enum ExpressionSegment {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExpressionReference {
     pub node_id: u64,
-    pub port_id: u64,
+    pub port_id: rat_nodegraph::model::PortId,
     pub transforms: Vec<ExpressionTransform>,
 }
 
@@ -45,8 +45,14 @@ pub enum ExpressionTransform {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpressionError {
     InvalidSyntax(String),
-    MissingReference { node_id: u64, port_id: u64 },
-    TypeMismatch { transform: String, actual: String },
+    MissingReference {
+        node_id: u64,
+        port_id: rat_nodegraph::model::PortId,
+    },
+    TypeMismatch {
+        transform: String,
+        actual: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -57,15 +63,15 @@ pub struct ExpressionValue {
 
 #[derive(Debug, Clone, Default)]
 pub struct ExpressionContext {
-    values: HashMap<(u64, u64), Value>,
+    values: HashMap<(u64, rat_nodegraph::model::PortId), Value>,
 }
 
 impl ExpressionContext {
-    pub fn new(values: HashMap<(u64, u64), Value>) -> Self {
+    pub fn new(values: HashMap<(u64, rat_nodegraph::model::PortId), Value>) -> Self {
         Self { values }
     }
 
-    pub fn insert(&mut self, node_id: u64, port_id: u64, value: Value) {
+    pub fn insert(&mut self, node_id: u64, port_id: rat_nodegraph::model::PortId, value: Value) {
         self.values.insert((node_id, port_id), value);
     }
 
@@ -79,7 +85,7 @@ impl fmt::Display for ExpressionError {
         match self {
             ExpressionError::InvalidSyntax(message) => write!(f, "invalid expression syntax: {message}"),
             ExpressionError::MissingReference { node_id, port_id } => {
-                write!(f, "expression reference node:{node_id}:port:{port_id} is unavailable")
+                write!(f, "expression reference node:{node_id}:port:{} is unavailable", port_id.0)
             }
             ExpressionError::TypeMismatch { transform, actual } => {
                 write!(f, "expression transform '{transform}' cannot be applied to {actual}")
@@ -136,7 +142,7 @@ fn parse_reference(body: &str) -> Result<ExpressionReference, ExpressionError> {
     let transforms = parts.map(parse_transform).collect::<Result<Vec<_>, _>>()?;
     Ok(ExpressionReference {
         node_id,
-        port_id,
+        port_id: rat_nodegraph::model::PortId(port_id),
         transforms,
     })
 }

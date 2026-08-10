@@ -581,8 +581,9 @@ fn command_args_for_request(runtime: &AgentCommandRuntimeConfig, request: &Agent
     runtime.args.iter().filter_map(|arg| render_command_arg_template(arg, request, prompt)).collect()
 }
 
-fn render_command_arg_template(template: &str, request: &AgentRequest, prompt: &str) -> Option<String> {
+fn render_command_arg_template(template: impl AsRef<str>, request: &AgentRequest, prompt: &str) -> Option<String> {
     let rendered = template
+        .as_ref()
         .replace(PROMPT_PLACEHOLDER, prompt)
         .replace(MODEL_PLACEHOLDER, request.model_hint.as_deref().unwrap_or_default())
         .replace(SESSION_PLACEHOLDER, request.session.as_deref().unwrap_or_default())
