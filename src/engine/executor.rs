@@ -55,6 +55,34 @@ const SHELL_COMMAND_FLAG: &str = "-c";
 const UNKNOWN_EXIT_CODE: i32 = -1;
 const PROCESS_TASK_FAILURE_DIAGNOSTIC: &str = "bounded local process task failed";
 const SHELL_ARGUMENT_COUNT: usize = 2;
+const CHOREGRAPH_NODE_PREFIX: &str = "lattice-node/";
+const EFFECT_TRANSITION: &str = "ready->start";
+const EFFECT_RESOURCE_FILE_PREFIX: &str = "lattice://file/";
+const EFFECT_RESOURCE_PROCESS_PREFIX: &str = "lattice://process/";
+const EFFECT_RESOURCE_NETWORK_PREFIX: &str = "lattice://network/";
+const EFFECT_OPERATION_SHELL: &str = "lattice/shell";
+const EFFECT_OPERATION_HTTP: &str = "lattice/http";
+const EFFECT_OPERATION_FILE: &str = "lattice/file";
+const EFFECT_ABILITY_PROCESS: &str = "process/execute";
+const EFFECT_ABILITY_NETWORK: &str = "network/request";
+const EFFECT_ABILITY_FILE_READ: &str = "file/read";
+const EFFECT_ABILITY_FILE_WRITE: &str = "file/write";
+const EFFECT_ABILITY_FILE_APPEND: &str = "file/append";
+const AUTHORIZED_FILE_ROOT_COUNT: usize = 1;
+const BYTES_PER_KIBIBYTE: usize = 1_024;
+const KIBIBYTES_PER_MEBIBYTE: usize = 1_024;
+const AUTHORIZED_FILE_READ_LIMIT_MEBIBYTES: usize = 64;
+const AUTHORIZED_FILE_READ_MAX_BYTES: usize = AUTHORIZED_FILE_READ_LIMIT_MEBIBYTES
+    .saturating_mul(KIBIBYTES_PER_MEBIBYTE)
+    .saturating_mul(BYTES_PER_KIBIBYTE);
+const AUTHORIZED_EFFECT_BINDING_MISMATCH: &str = "authorized effect binding does not match the selected executor node";
+const AUTHORIZED_EFFECT_REQUEST_MISMATCH: &str = "authorized effect request does not match the resolved adapter plan";
+const AUTHORIZED_FILE_ROOT_MISMATCH: &str = "authorized file effects require one configured root identifier";
+const AUTHORIZED_FILE_READ_UTF8_ERROR: &str = "authorized file read output is not valid UTF-8";
+const AUTHORIZED_EFFECTFUL_NODE_REQUIRED: &str = "authorized execution requires an effectful shell, HTTP, or file node";
+const AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED: &str =
+    "product effect execution requires a current Choregraph authority context";
+const CHOREGRAPH_EXECUTION_FAILURE: &str = "Choregraph product execution failed";
 
 type LocalProcessConfig = crate::process::core::RuntimeConfig;
 const HTTP_BODY_INPUT_LABEL: &str = "body";
@@ -534,6 +562,112 @@ fn file_operation_plan(
     }
 }
 
+fn authorized_file_request(
+    plan: &FileOperationPlan,
+) -> Result<crate::engine::effect::runtime::FileAdapterRequest, String> {
+    let [root_id] = plan.allowed_roots.as_slice() else {
+        return Err(AUTHORIZED_FILE_ROOT_MISMATCH.to_owned());
+    };
+    debug_assert_eq!(plan.allowed_roots.len(), AUTHORIZED_FILE_ROOT_COUNT);
+    Ok(crate::engine::effect::runtime::FileAdapterRequest {
+        root_id: root_id.clone(),
+        relative_path: plan.path.clone(),
+        content: plan.content.as_ref().map(|content| content.as_bytes().to_vec()),
+        overwrite: plan.overwrite,
+        read_max_bytes: AUTHORIZED_FILE_READ_MAX_BYTES,
+    })
+}
+
+fn authorized_file_output(
+    output: crate::engine::effect::runtime::FileAdapterOutput,
+) -> Result<FileOperationResult, String> {
+    match output {
+        crate::engine::effect::runtime::FileAdapterOutput::Read(bytes) => {
+            let byte_count = bytes.len();
+            let content = String::from_utf8(bytes).map_err(|_| AUTHORIZED_FILE_READ_UTF8_ERROR.to_owned())?;
+            Ok(FileOperationResult::Read {
+                content,
+                bytes: byte_count,
+            })
+        }
+        crate::engine::effect::runtime::FileAdapterOutput::Written { bytes } => {
+            Ok(FileOperationResult::Written { bytes })
+        }
+    }
+}
+
+fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
+    match config {
+        NodeConfig::Shell { .. } => Some(EFFECT_OPERATION_SHELL),
+        NodeConfig::Http { .. } => Some(EFFECT_OPERATION_HTTP),
+        NodeConfig::File { .. } => Some(EFFECT_OPERATION_FILE),
+        NodeConfig::ImageInput { .. }
+        | NodeConfig::Agent(_)
+        | NodeConfig::Condition(_)
+        | NodeConfig::Merge(_)
+        | NodeConfig::Subworkflow(_) => None,
+    }
+}
+
+fn effect_ability(config: &NodeConfig) -> Option<&'static str> {
+    match config {
+        NodeConfig::Shell { .. } => Some(EFFECT_ABILITY_PROCESS),
+        NodeConfig::Http { .. } => Some(EFFECT_ABILITY_NETWORK),
+        NodeConfig::File { operation, .. } => Some(match operation {
+            FileOperationKind::Read => EFFECT_ABILITY_FILE_READ,
+            FileOperationKind::Write => EFFECT_ABILITY_FILE_WRITE,
+            FileOperationKind::Append => EFFECT_ABILITY_FILE_APPEND,
+        }),
+        NodeConfig::ImageInput { .. }
+        | NodeConfig::Agent(_)
+        | NodeConfig::Condition(_)
+        | NodeConfig::Merge(_)
+        | NodeConfig::Subworkflow(_) => None,
+    }
+}
+
+fn effect_resource(config: &NodeConfig, node_id: crate::engine::workflow::NodeId) -> Option<String> {
+    let prefix = match config {
+        NodeConfig::Shell { .. } => EFFECT_RESOURCE_PROCESS_PREFIX,
+        NodeConfig::Http { .. } => EFFECT_RESOURCE_NETWORK_PREFIX,
+        NodeConfig::File { .. } => EFFECT_RESOURCE_FILE_PREFIX,
+        NodeConfig::ImageInput { .. }
+        | NodeConfig::Agent(_)
+        | NodeConfig::Condition(_)
+        | NodeConfig::Merge(_)
+        | NodeConfig::Subworkflow(_) => return None,
+    };
+    Some(format!("{prefix}{}", node_id.0))
+}
+
+fn authorized_binding_matches_node(
+    binding: &crate::engine::effect::authority::IntentBinding,
+    node_id: crate::engine::workflow::NodeId,
+    config: &NodeConfig,
+) -> bool {
+    binding.node.as_str() == format!("{CHOREGRAPH_NODE_PREFIX}{}", node_id.0)
+        && binding.transition.as_str() == EFFECT_TRANSITION
+        && effect_operation(config).is_some_and(|operation| binding.operation.as_str() == operation)
+        && effect_ability(config).is_some_and(|ability| binding.ability.as_str() == ability)
+        && effect_resource(config, node_id).is_some_and(|resource| binding.resource.as_str() == resource)
+}
+
+fn authorized_request_matches_payload(
+    binding: &crate::engine::effect::authority::IntentBinding,
+    payload_identity: &str,
+) -> bool {
+    binding.payload.as_str() == payload_identity
+        && binding.request.as_str() == crate::engine::effect::runtime::dispatch_request_identity(payload_identity)
+}
+
+fn dispatch_error(error: crate::engine::effect::dispatch::Error) -> String {
+    format!("effect dispatch failed: {error:?}")
+}
+
+fn choregraph_execution_error(error: crate::engine::effect::execution::Error) -> String {
+    format!("{CHOREGRAPH_EXECUTION_FAILURE}: {error}")
+}
+
 fn ordered_input_values(inputs: &HashMap<PortId, Value>) -> Vec<Value> {
     let mut input_pairs = inputs.iter().collect::<Vec<_>>();
     input_pairs.sort_by_key(|(port_id, _)| port_id.0);
@@ -964,6 +1098,24 @@ struct RuntimeParts {
     local_process: LocalProcessConfig,
 }
 
+enum EffectExecution<'a> {
+    Compatibility,
+    Exact {
+        binding: &'a crate::engine::effect::authority::IntentBinding,
+        dispatch: &'a crate::engine::effect::dispatch::Shell,
+    },
+    Product(&'a mut crate::engine::effect::execution::Session),
+}
+
+struct NodeExecution<'a> {
+    workflow: &'a Workflow,
+    node_id: crate::engine::workflow::NodeId,
+    inputs: &'a HashMap<PortId, Value>,
+    expression_context: &'a ExpressionContext,
+    parent_run_id: Option<RunId>,
+    effect: EffectExecution<'a>,
+}
+
 /// The executor.
 pub struct Executor {
     next_run_id: u64,
@@ -1146,31 +1298,66 @@ impl Executor {
         })
     }
 
-    /// Execute a single node given its input values.
+    /// Execute a single node through the compatibility adapter surface.
+    ///
+    /// Product effect execution must use [`Self::execute_authorized_node`].
     pub async fn execute_node(
         &self,
         workflow: &Workflow,
         node_id: crate::engine::workflow::NodeId,
         inputs: &HashMap<PortId, Value>,
     ) -> StepResult {
-        self.execute_node_with_expression_context(
+        self.execute_node_with_expression_context(NodeExecution {
             workflow,
             node_id,
             inputs,
-            &ExpressionContext::new(HashMap::new()),
-            None,
-        )
+            expression_context: &ExpressionContext::new(HashMap::new()),
+            parent_run_id: None,
+            effect: EffectExecution::Compatibility,
+        })
         .await
     }
 
-    async fn execute_node_with_expression_context(
+    // r[impl lattice.choregraph_effect_authority.binding]
+    // r[impl lattice.choregraph_effect_authority.adapters]
+    /// Execute one effectful node through its exact Choregraph V2 binding.
+    pub async fn execute_authorized_node(
         &self,
         workflow: &Workflow,
         node_id: crate::engine::workflow::NodeId,
         inputs: &HashMap<PortId, Value>,
-        expression_context: &ExpressionContext,
-        parent_run_id: Option<RunId>,
+        binding: &crate::engine::effect::authority::IntentBinding,
+        dispatch: &crate::engine::effect::dispatch::Shell,
     ) -> StepResult {
+        if workflow.node_config(node_id).and_then(effect_operation).is_none() {
+            return StepResult {
+                node_id,
+                status: NodeStatus::Failed {
+                    error: AUTHORIZED_EFFECTFUL_NODE_REQUIRED.to_owned(),
+                },
+                input_hash: input_values_hash(inputs),
+            };
+        }
+        self.execute_node_with_expression_context(NodeExecution {
+            workflow,
+            node_id,
+            inputs,
+            expression_context: &ExpressionContext::new(HashMap::new()),
+            parent_run_id: None,
+            effect: EffectExecution::Exact { binding, dispatch },
+        })
+        .await
+    }
+
+    async fn execute_node_with_expression_context(&self, execution: NodeExecution<'_>) -> StepResult {
+        let NodeExecution {
+            workflow,
+            node_id,
+            inputs,
+            expression_context,
+            parent_run_id,
+            effect,
+        } = execution;
         let node = match workflow.graph.node(node_id) {
             Some(n) => n,
             None => {
@@ -1200,6 +1387,17 @@ impl Executor {
         };
         let node_credentials = workflow.node_credentials(node_id);
         let input_hash = node_execution_cache_key_with_credentials(node_id, config, node_credentials, inputs);
+        if let EffectExecution::Exact { binding, .. } = &effect
+            && !authorized_binding_matches_node(binding, node_id, config)
+        {
+            return StepResult {
+                node_id,
+                status: NodeStatus::Failed {
+                    error: AUTHORIZED_EFFECT_BINDING_MISMATCH.to_owned(),
+                },
+                input_hash,
+            };
+        }
 
         info!(node = %node.label, "executing node");
 
@@ -1276,19 +1474,59 @@ impl Executor {
                 });
                 let merged_env = merged_shell_env(&resolved_env, &secret_env.env);
                 let stdin_value = shell_stdin_value(node, inputs);
-                let result = execute_shell(
-                    ShellExecutionInput {
-                        command: &resolved_command.value,
-                        cwd: &resolved_cwd_value,
-                        environment: &merged_env,
-                        timeout_secs: *timeout_secs,
-                        should_pipe_stdin: *pipe_stdin,
-                        stdin_value,
-                    },
-                    &self.local_process,
-                    std::sync::Arc::clone(&self.cancellation),
-                )
-                .await;
+                let shell_input = ShellExecutionInput {
+                    command: &resolved_command.value,
+                    cwd: &resolved_cwd_value,
+                    environment: &merged_env,
+                    timeout_secs: *timeout_secs,
+                    should_pipe_stdin: *pipe_stdin,
+                    stdin_value,
+                };
+                let result = match effect {
+                    EffectExecution::Exact { binding, dispatch } => {
+                        let request = shell_process_request(&shell_input, &self.local_process);
+                        let payload = crate::engine::effect::runtime::process_plan_identity(&request);
+                        if !authorized_request_matches_payload(binding, &payload) {
+                            Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned())
+                        } else {
+                            let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                dispatch,
+                                self.http_client.as_ref(),
+                                &self.local_process,
+                                self.cancellation.as_ref(),
+                            );
+                            dispatch
+                                .dispatch(&runtime, binding.clone(), &request)
+                                .map(shell_output_values)
+                                .map_err(dispatch_error)
+                        }
+                    }
+                    EffectExecution::Product(session) => {
+                        let request = shell_process_request(&shell_input, &self.local_process);
+                        let payload = crate::engine::effect::runtime::process_plan_identity(&request);
+                        match session.bind_effect(node_id, &payload) {
+                            Ok(binding) => {
+                                let dispatch = session.dispatch();
+                                let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                    dispatch,
+                                    self.http_client.as_ref(),
+                                    &self.local_process,
+                                    self.cancellation.as_ref(),
+                                );
+                                dispatch
+                                    .dispatch(&runtime, binding, &request)
+                                    .map(shell_output_values)
+                                    .map_err(dispatch_error)
+                            }
+                            Err(error) => Err(choregraph_execution_error(error)),
+                        }
+                    }
+                    EffectExecution::Compatibility => {
+                        execute_shell(shell_input, &self.local_process, std::sync::Arc::clone(&self.cancellation))
+                            .await
+                            .map_err(|error| error.to_string())
+                    }
+                };
 
                 match result {
                     Ok(shell_outputs) => completed_step_result(
@@ -1301,9 +1539,9 @@ impl Executor {
                         ),
                         false,
                     ),
-                    Err(e) => StepResult {
+                    Err(error) => StepResult {
                         node_id,
-                        status: NodeStatus::Failed { error: e.to_string() },
+                        status: NodeStatus::Failed { error },
                         input_hash,
                     },
                 }
@@ -1374,7 +1612,40 @@ impl Executor {
                     *timeout_secs,
                     inputs,
                 );
-                match self.http_client.execute(&request) {
+                let response = match effect {
+                    EffectExecution::Exact { binding, dispatch } => {
+                        let payload = crate::engine::effect::runtime::network_plan_identity(&request);
+                        if !authorized_request_matches_payload(binding, &payload) {
+                            Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned())
+                        } else {
+                            let runtime = crate::engine::effect::runtime::Adapters::new(
+                                dispatch,
+                                self.http_client.as_ref(),
+                                &self.local_process,
+                            );
+                            dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error)
+                        }
+                    }
+                    EffectExecution::Product(session) => {
+                        let payload = crate::engine::effect::runtime::network_plan_identity(&request);
+                        match session.bind_effect(node_id, &payload) {
+                            Ok(binding) => {
+                                let dispatch = session.dispatch();
+                                let runtime = crate::engine::effect::runtime::Adapters::new(
+                                    dispatch,
+                                    self.http_client.as_ref(),
+                                    &self.local_process,
+                                );
+                                dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error)
+                            }
+                            Err(error) => Err(choregraph_execution_error(error)),
+                        }
+                    }
+                    EffectExecution::Compatibility => {
+                        self.http_client.execute(&request).map_err(|error| error.to_string())
+                    }
+                };
+                match response {
                     Ok(response) => completed_step_result(
                         node_id,
                         input_hash,
@@ -1384,9 +1655,7 @@ impl Executor {
                     ),
                     Err(error) => StepResult {
                         node_id,
-                        status: NodeStatus::Failed {
-                            error: error.to_string(),
-                        },
+                        status: NodeStatus::Failed { error },
                         input_hash,
                     },
                 }
@@ -1450,7 +1719,43 @@ impl Executor {
                     &resolved_roots,
                     inputs,
                 );
-                match self.file_system.execute(&plan) {
+                let result = match effect {
+                    EffectExecution::Exact { binding, dispatch } => {
+                        authorized_file_request(&plan).and_then(|request| {
+                            let payload = crate::engine::effect::runtime::file_plan_identity(&request);
+                            if !authorized_request_matches_payload(binding, &payload) {
+                                return Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned());
+                            }
+                            let runtime = crate::engine::effect::runtime::Adapters::new(
+                                dispatch,
+                                self.http_client.as_ref(),
+                                &self.local_process,
+                            );
+                            dispatch
+                                .dispatch(&runtime, binding.clone(), &request)
+                                .map_err(dispatch_error)
+                                .and_then(authorized_file_output)
+                        })
+                    }
+                    EffectExecution::Product(session) => authorized_file_request(&plan).and_then(|request| {
+                        let payload = crate::engine::effect::runtime::file_plan_identity(&request);
+                        let binding = session.bind_effect(node_id, &payload).map_err(choregraph_execution_error)?;
+                        let dispatch = session.dispatch();
+                        let runtime = crate::engine::effect::runtime::Adapters::new(
+                            dispatch,
+                            self.http_client.as_ref(),
+                            &self.local_process,
+                        );
+                        dispatch
+                            .dispatch(&runtime, binding, &request)
+                            .map_err(dispatch_error)
+                            .and_then(authorized_file_output)
+                    }),
+                    EffectExecution::Compatibility => {
+                        self.file_system.execute(&plan).map_err(|error| error.to_string())
+                    }
+                };
+                match result {
                     Ok(result) => completed_step_result(
                         node_id,
                         input_hash,
@@ -1460,9 +1765,7 @@ impl Executor {
                     ),
                     Err(error) => StepResult {
                         node_id,
-                        status: NodeStatus::Failed {
-                            error: error.to_string(),
-                        },
+                        status: NodeStatus::Failed { error },
                         input_hash,
                     },
                 }
@@ -1748,13 +2051,27 @@ impl Executor {
         }
     }
 
-    /// Run the full workflow (topological order, parallel where possible).
+    /// Run the full workflow through the explicit compatibility adapter surface.
+    ///
+    /// Product entry points must use [`Self::run_authorized`].
     pub async fn run(
         &mut self,
         workflow: &Workflow,
         cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
     ) -> (RunId, Vec<StepResult>) {
-        self.run_with_bound_inputs(workflow, cache, &HashMap::new()).await
+        self.run_with_bound_inputs(workflow, cache, &HashMap::new(), None).await
+    }
+
+    // r[impl lattice.choregraph_effect_authority.binding]
+    // r[impl lattice.choregraph_effect_authority.denial]
+    /// Run a product workflow through one run-scoped Choregraph authority context.
+    pub async fn run_authorized(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        context: &crate::engine::effect::execution::RunContext,
+    ) -> (RunId, Vec<StepResult>) {
+        self.run_with_bound_inputs(workflow, cache, &HashMap::new(), Some(context)).await
     }
 
     pub async fn run_with_named_inputs(
@@ -1764,7 +2081,18 @@ impl Executor {
         named_inputs: &BTreeMap<String, Value>,
     ) -> Result<(RunId, Vec<StepResult>), crate::engine::child::SubworkflowExecutionError> {
         let bound_inputs = crate::engine::child::bind_named_inputs(workflow, named_inputs)?;
-        Ok(self.run_with_bound_inputs(workflow, cache, &bound_inputs).await)
+        Ok(self.run_with_bound_inputs(workflow, cache, &bound_inputs, None).await)
+    }
+
+    pub async fn run_authorized_with_named_inputs(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        named_inputs: &BTreeMap<String, Value>,
+        context: &crate::engine::effect::execution::RunContext,
+    ) -> Result<(RunId, Vec<StepResult>), crate::engine::child::SubworkflowExecutionError> {
+        let bound_inputs = crate::engine::child::bind_named_inputs(workflow, named_inputs)?;
+        Ok(self.run_with_bound_inputs(workflow, cache, &bound_inputs, Some(context)).await)
     }
 
     async fn run_with_bound_inputs(
@@ -1772,9 +2100,20 @@ impl Executor {
         workflow: &Workflow,
         cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
         bound_inputs: &HashMap<PortId, Value>,
+        product_context: Option<&crate::engine::effect::execution::RunContext>,
     ) -> (RunId, Vec<StepResult>) {
         let run_id = RunId(self.next_run_id);
-        self.next_run_id += 1;
+        self.next_run_id = self.next_run_id.saturating_add(1);
+        let mut product_session = match product_context {
+            Some(context) => match crate::engine::effect::execution::Session::new(workflow, context) {
+                Ok(session) => Some(session),
+                Err(error) => {
+                    let diagnostic = choregraph_execution_error(error);
+                    return (run_id, failed_product_run(workflow, &diagnostic));
+                }
+            },
+            None => None,
+        };
 
         let (runner_plan, topo) = match admitted_runner_execution(workflow) {
             Some(admitted) => admitted,
@@ -1822,6 +2161,12 @@ impl Executor {
             if decision != runner::DurableRunnerDecision::Execute {
                 debug!(node = ?node_id, ?decision, "shared graph lifecycle blocked node execution");
                 runner_states.insert(node_id.0, runner::RunnerStepState::Cancelled);
+                if let Some(session) = product_session.as_mut()
+                    && let Err(error) = session.cancel(node_id)
+                {
+                    results.push(failed_product_step(node_id, input_hash, &choregraph_execution_error(error)));
+                    continue;
+                }
                 results.push(StepResult {
                     node_id,
                     status: NodeStatus::Skipped,
@@ -1830,12 +2175,37 @@ impl Executor {
                 continue;
             }
 
+            if let Some(session) = product_session.as_mut()
+                && let Err(error) = session.mark_ready(node_id)
+            {
+                let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
+                runner_states.insert(node_id.0, runner_step_state(&step.status));
+                results.push(step);
+                continue;
+            }
+
             if let Some(cached_outputs) = cache.get(&input_hash) {
                 debug!(node = ?node_id, "cache hit, skipping execution");
                 let Some(node) = workflow.graph.node(node_id) else {
                     continue;
                 };
+                if let Some(session) = product_session.as_mut()
+                    && let Err(error) = session.start_pure(node_id)
+                {
+                    let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
+                    runner_states.insert(node_id.0, runner_step_state(&step.status));
+                    results.push(step);
+                    continue;
+                }
                 let step = completed_step_result(node_id, input_hash, node, cached_outputs.clone(), true);
+                if let Some(session) = product_session.as_mut()
+                    && let Err(error) = session.finish(node_id, &step.status)
+                {
+                    let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
+                    runner_states.insert(node_id.0, runner_step_state(&step.status));
+                    results.push(step);
+                    continue;
+                }
                 if let NodeStatus::Completed { ref outputs, .. } = step.status {
                     for (port_id, value) in outputs {
                         port_values.insert(*port_id, value.clone());
@@ -1847,9 +2217,37 @@ impl Executor {
             }
 
             let expression_context = expression_context_from_workflow_outputs(workflow, &port_values);
+            let has_effectful_config = workflow.node_config(node_id).and_then(effect_operation).is_some();
+            if !has_effectful_config
+                && let Some(session) = product_session.as_mut()
+                && let Err(error) = session.start_pure(node_id)
+            {
+                let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
+                runner_states.insert(node_id.0, runner_step_state(&step.status));
+                results.push(step);
+                continue;
+            }
+            let effect = match product_session.as_mut() {
+                Some(session) => EffectExecution::Product(session),
+                None => EffectExecution::Compatibility,
+            };
             let step = self
-                .execute_node_with_expression_context(workflow, node_id, &inputs, &expression_context, Some(run_id))
+                .execute_node_with_expression_context(NodeExecution {
+                    workflow,
+                    node_id,
+                    inputs: &inputs,
+                    expression_context: &expression_context,
+                    parent_run_id: Some(run_id),
+                    effect,
+                })
                 .await;
+            let step = match product_session.as_mut() {
+                Some(session) => match session.finish(node_id, &step.status) {
+                    Ok(()) => step,
+                    Err(error) => failed_product_step(node_id, input_hash, &choregraph_execution_error(error)),
+                },
+                None => step,
+            };
 
             // Store outputs for downstream nodes.
             if let NodeStatus::Completed { ref outputs, .. } = step.status {
@@ -1871,6 +2269,33 @@ impl Default for Executor {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn failed_product_run(workflow: &Workflow, diagnostic: &str) -> Vec<StepResult> {
+    workflow
+        .graph
+        .nodes()
+        .map(|node| failed_product_step(node.id, ContentHash::from_bytes(b""), diagnostic))
+        .collect()
+}
+
+fn failed_product_step(
+    node_id: crate::engine::workflow::NodeId,
+    input_hash: ContentHash,
+    diagnostic: &str,
+) -> StepResult {
+    StepResult {
+        node_id,
+        status: NodeStatus::Failed {
+            error: diagnostic.to_owned(),
+        },
+        input_hash,
+    }
+}
+
+#[must_use]
+pub fn authority_context_required_diagnostic() -> &'static str {
+    AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED
 }
 
 fn merged_shell_env(base: &HashMap<String, String>, secret_env: &HashMap<String, String>) -> HashMap<String, String> {
@@ -1900,11 +2325,10 @@ struct ShellExecutionInput<'a> {
 
 /// Execute a shell command through the shared blocking bounded-process shell.
 // r[impl lattice.workflow_execution.bounded_process_compatibility]
-async fn execute_shell(
-    input: ShellExecutionInput<'_>,
+fn shell_process_request(
+    input: &ShellExecutionInput<'_>,
     config: &LocalProcessConfig,
-    cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
-) -> Result<ShellOutputValues, crate::agent_node::ProcessError> {
+) -> crate::agent_node::ProcessRequest {
     let stdin = if input.should_pipe_stdin {
         input.stdin_value.map(Value::as_display_string).unwrap_or_default().into_bytes()
     } else {
@@ -1921,16 +2345,29 @@ async fn execute_shell(
     };
     debug_assert_eq!(request.args.len(), SHELL_ARGUMENT_COUNT);
     debug_assert_eq!(request.program, config.shell_program);
+    request
+}
+
+fn shell_output_values(output: crate::agent_node::ProcessOutput) -> ShellOutputValues {
+    ShellOutputValues {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        exit_code: output.status_code.unwrap_or(UNKNOWN_EXIT_CODE),
+    }
+}
+
+async fn execute_shell(
+    input: ShellExecutionInput<'_>,
+    config: &LocalProcessConfig,
+    cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<ShellOutputValues, crate::agent_node::ProcessError> {
+    let request = shell_process_request(&input, config);
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
     let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request, &cancellation))
         .await
         .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
 
-    Ok(ShellOutputValues {
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        exit_code: output.status_code.unwrap_or(UNKNOWN_EXIT_CODE),
-    })
+    Ok(shell_output_values(output))
 }
 
 /// Gather input values for a node from upstream edge outputs.

@@ -1,7 +1,9 @@
+mod common;
+
 use lattice::credentials::MapCredentialProvider;
 use lattice::credentials::SecretRef;
 use lattice::headless::HeadlessRunStatus;
-use lattice::headless::run_admitted_trigger_plan;
+use lattice::headless::run_admitted_trigger_plan_with_authority_provider;
 use lattice::scheduler::OverlapPolicy;
 use lattice::store::Store;
 use lattice::triggers::IdempotencyPolicy;
@@ -97,7 +99,13 @@ async fn valid_webhook_auth_admits_and_persists_no_plaintext_credentials() {
         panic!("valid authenticated request must be admitted");
     };
 
-    let summary = run_admitted_trigger_plan(&store, &plan).await.expect("admitted webhook runs");
+    let summary = run_admitted_trigger_plan_with_authority_provider(
+        &store,
+        &plan,
+        &common::authority::TestRunContextProvider::new(),
+    )
+    .await
+    .expect("admitted webhook runs");
     let records = store.list_trigger_runs(HISTORY_LIMIT).expect("valid webhook history lists");
     let record_json = serde_json::to_string(&records).expect("valid webhook history serializes");
     let persisted = std::fs::read(&database_path).expect("valid webhook store reads");

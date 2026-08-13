@@ -39,7 +39,6 @@ use crate::tui::app::NodeRunStatus;
 use crate::tui::app::PropertyEditField;
 use crate::tui::app::credentials_to_draft;
 use crate::tui::app::rendered_latest_node_output_lines;
-use crate::workflow_validation;
 use crate::workflow_validation::DiagnosticSeverity;
 
 const COMPACT_STATUS_HELP_WIDTH: u16 = 72;
@@ -573,7 +572,7 @@ fn render_diagnostics(app: &App, area: Rect, buf: &mut Buffer) {
                 DiagnosticSeverity::Fatal => Style::default().fg(Color::Red),
                 DiagnosticSeverity::Warning => Style::default().fg(Color::Yellow),
             };
-            Line::styled(workflow_validation::format_diagnostic(diagnostic), style)
+            Line::styled(crate::workflow_validation::format_diagnostic(diagnostic), style)
         })
         .collect::<Vec<_>>();
 

@@ -36,6 +36,9 @@ const NORMALIZED_ASSERTION_DENSITY_SUFFIX: &str = " has insufficient assertion d
 const NORMALIZED_FUNCTION_LENGTH_SUFFIX: &str = " exceeds configured function length";
 const ALLOWED_RESOLVED_FILE: &str = "src/workflow_validation.rs";
 const ALLOWED_RESOLVED_FUNCTION: &str = "workflow_diagnostic_from_runner";
+const ALLOWED_RESOLVED_HEADLESS_FILE: &str = "src/headless.rs";
+const ALLOWED_RESOLVED_IMPORT_LINT: &str = "non_trait_imports";
+const ALLOWED_RESOLVED_HEADLESS_IMPORTS: &[&str] = &["`replay`", "`workflow_validation`"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Migration {
@@ -134,6 +137,12 @@ fn read_json_lines(path: &Path) -> Result<Vec<Value>, String> {
 }
 
 fn candidate_baseline(old: &Value, findings: Vec<Value>, status: &Value) -> Result<Value, String> {
+    let mut unique = BTreeMap::new();
+    for finding in findings {
+        let stable_id = required_string(&finding, "stable_id")?;
+        unique.entry(stable_id).or_insert(finding);
+    }
+    let findings = unique.into_values().collect::<Vec<_>>();
     let schema_version = old
         .get("schema_version")
         .cloned()
@@ -308,13 +317,17 @@ fn migration_is_accepted(migration: &Migration) -> bool {
     if !migration.unmatched_candidate.is_empty() {
         return false;
     }
-    if migration.unmatched_old.is_empty() {
-        return true;
-    }
-    migration.unmatched_old.len() == 1
-        && migration.unmatched_old[0].contains(ASSERTION_DENSITY_LINT)
-        && migration.unmatched_old[0].contains(ALLOWED_RESOLVED_FILE)
-        && migration.unmatched_old[0].contains(ALLOWED_RESOLVED_FUNCTION)
+    migration.unmatched_old.iter().all(|diagnostic| allowed_resolved_finding(diagnostic))
+}
+
+fn allowed_resolved_finding(diagnostic: &str) -> bool {
+    let is_validation_resolution = diagnostic.contains(ASSERTION_DENSITY_LINT)
+        && diagnostic.contains(ALLOWED_RESOLVED_FILE)
+        && diagnostic.contains(ALLOWED_RESOLVED_FUNCTION);
+    let is_headless_import_resolution = diagnostic.contains(ALLOWED_RESOLVED_IMPORT_LINT)
+        && diagnostic.contains(ALLOWED_RESOLVED_HEADLESS_FILE)
+        && ALLOWED_RESOLVED_HEADLESS_IMPORTS.iter().any(|name| diagnostic.contains(name));
+    is_validation_resolution || is_headless_import_resolution
 }
 
 fn baseline_hash(stable_ids: &[String]) -> String {
@@ -387,6 +400,19 @@ fn self_test() -> Result<(), String> {
         return Err("negative semantic drift was not rejected".to_string());
     }
 
+    let duplicate_candidate = candidate_baseline(
+        &serde_json::json!({
+            "schema_version": BASELINE_SCHEMA_VERSION,
+            "finding_schema_version": BASELINE_SCHEMA_VERSION,
+            "findings": [],
+        }),
+        vec![finding("b3:duplicate", "lattice", "same finding"); 2],
+        &serde_json::json!({"metadata": {}}),
+    )?;
+    if findings(&duplicate_candidate)?.len() != 1 {
+        return Err("duplicate stable finding IDs were not deduplicated".to_string());
+    }
+
     let old_length = serde_json::json!({
         "findings": [file_length_finding("b3:old-length", "n8nclone", "source file is 10 lines (limit: 5)")]
     });
@@ -435,11 +461,33 @@ fn self_test() -> Result<(), String> {
         ALLOWED_RESOLVED_FILE,
         "function `workflow_diagnostic_from_runner` has 0 assertion(s) in 21 lines (need 2+)",
     );
-    let resolved_old = serde_json::json!({"findings": [retained.clone(), resolved]});
+    let resolved_import = finding_with_lint(
+        "b3:resolved-import",
+        "lattice",
+        ALLOWED_RESOLVED_IMPORT_LINT,
+        ALLOWED_RESOLVED_HEADLESS_FILE,
+        "non-trait import `replay` hides the owner path; prefer the qualified path at the use site",
+    );
+    let resolved_old = serde_json::json!({"findings": [retained.clone(), resolved, resolved_import]});
     let resolved_candidate = serde_json::json!({"findings": [retained]});
     let resolved_migration = migrate(&resolved_old, &resolved_candidate)?;
     if !migration_is_accepted(&resolved_migration) || resolved_migration.findings.len() != 1 {
         return Err("exact resolved-finding allowlist was not accepted".to_string());
+    }
+
+    let unapproved_import = finding_with_lint(
+        "b3:unapproved-import",
+        "lattice",
+        ALLOWED_RESOLVED_IMPORT_LINT,
+        ALLOWED_RESOLVED_HEADLESS_FILE,
+        "non-trait import `other` hides the owner path; prefer the qualified path at the use site",
+    );
+    let unapproved_import_migration = migrate(
+        &serde_json::json!({"findings": [unapproved_import]}),
+        &serde_json::json!({"findings": []}),
+    )?;
+    if migration_is_accepted(&unapproved_import_migration) {
+        return Err("unapproved resolved import was accepted".to_string());
     }
 
     let unapproved_old = serde_json::json!({"findings": [finding("b3:unapproved", "lattice", "removed finding")]});

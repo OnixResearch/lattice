@@ -72,11 +72,22 @@ impl WorkflowRepository for WorkflowCatalogRepository {
 
 pub struct RepositorySubworkflowRunnerShell<R> {
     repository: Arc<R>,
+    product_authority_required: bool,
 }
 
 impl<R> RepositorySubworkflowRunnerShell<R> {
     pub fn new(repository: Arc<R>) -> Self {
-        Self { repository }
+        Self {
+            repository,
+            product_authority_required: false,
+        }
+    }
+
+    pub fn product(repository: Arc<R>) -> Self {
+        Self {
+            repository,
+            product_authority_required: true,
+        }
     }
 }
 
@@ -105,8 +116,18 @@ where R: WorkflowRepository + Send + Sync
         .map_err(|_| super::SubworkflowExecutionError::WorkflowIdentityMismatch)?;
 
         let mut executor = Executor::new();
-        let (child_run_id, steps) =
-            executor.run_with_named_inputs(&workflow, &HashMap::new(), &invocation.inputs).await?;
+        let (child_run_id, steps) = if self.product_authority_required {
+            let context = crate::engine::effect::execution::RunContext::unavailable_for_store(
+                invocation.correlation.parent_run_id,
+                None,
+            )
+            .map_err(|_| super::SubworkflowExecutionError::ChildWorkflowExecutionFailed)?;
+            executor
+                .run_authorized_with_named_inputs(&workflow, &HashMap::new(), &invocation.inputs, &context)
+                .await?
+        } else {
+            executor.run_with_named_inputs(&workflow, &HashMap::new(), &invocation.inputs).await?
+        };
         if steps.iter().any(|step| matches!(step.status, NodeStatus::Failed { .. })) {
             return Err(super::SubworkflowExecutionError::ChildWorkflowExecutionFailed);
         }

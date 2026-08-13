@@ -6,9 +6,13 @@ const REQUIRED_FRAGMENTS: &[&str] = &[
     "const FUNCTION_LENGTH_LINT",
     "const ALLOWED_RESOLVED_FILE: &str = \"src/workflow_validation.rs\"",
     "const ALLOWED_RESOLVED_FUNCTION: &str = \"workflow_diagnostic_from_runner\"",
+    "const ALLOWED_RESOLVED_HEADLESS_IMPORTS: &[&str] = &[\"`replay`\", \"`workflow_validation`\"]",
     "if !migration.unmatched_candidate.is_empty()",
-    "migration.unmatched_old.len() == 1",
+    "migration.unmatched_old.iter().all(|diagnostic| allowed_resolved_finding(diagnostic))",
+    "unapproved resolved import was accepted",
     "unapproved resolved finding was accepted",
+    "unique.entry(stable_id).or_insert(finding)",
+    "duplicate stable finding IDs were not deduplicated",
     "semantic finding sets differ outside the exact resolved-finding allowlist",
 ];
 
@@ -22,8 +26,13 @@ fn migration_source_issues(source: &str) -> BTreeSet<&'static str> {
     if !source.contains("assertion-density identity migration did not normalize line-count drift") {
         issues.insert("migration.positive-test");
     }
-    if !source.contains("unapproved resolved finding was accepted") {
+    if !source.contains("unapproved resolved finding was accepted")
+        || !source.contains("unapproved resolved import was accepted")
+    {
         issues.insert("migration.negative-test");
+    }
+    if !source.contains("duplicate stable finding IDs were not deduplicated") {
+        issues.insert("migration.deduplication-test");
     }
     issues
 }
@@ -32,7 +41,7 @@ fn migration_source_issues(source: &str) -> BTreeSet<&'static str> {
 // r[verify lattice.repository_validation.octet_baseline_migration.scenario.dynamic]
 // r[verify lattice.repository_validation.octet_baseline_migration.scenario.resolved]
 #[test]
-fn octet_baseline_migration_is_bounded_to_dynamic_counts_and_one_resolved_finding() {
+fn octet_baseline_migration_is_bounded_to_dynamic_counts_and_exact_resolved_findings() {
     let issues = migration_source_issues(MIGRATION);
 
     assert!(issues.is_empty(), "migration issues: {issues:?}");

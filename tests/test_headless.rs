@@ -16,6 +16,9 @@ use lattice::config::DEFAULT_NODE_TEMPLATE_FILES;
 use lattice::config::NodeTemplate;
 use lattice::config::load_node_templates_with_diagnostics;
 use lattice::config::render_template_command;
+use lattice::engine::effect::authority;
+use lattice::engine::effect::dispatch;
+use lattice::engine::effect::execution;
 use lattice::engine::executor::RunId;
 use lattice::engine::executor::node_execution_cache_key;
 use lattice::engine::runner::RunnerEventKind;
@@ -34,6 +37,7 @@ use lattice::headless::process_result_for_summary;
 use lattice::headless::render_run_summary_text;
 use lattice::headless::run_saved_workflow;
 use lattice::headless::run_saved_workflow_with_agent_runtime_config;
+use lattice::headless::run_saved_workflow_with_authority_provider;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
 
@@ -98,6 +102,100 @@ const TEMPLATE_RUN_ID_START: u64 = 100;
 const TEMPLATE_WORKFLOW_NODE_COUNT: usize = 2;
 const TEMPLATE_WORKFLOW_STEP_COUNT: usize = 2;
 const PNG_FIXTURE: &[u8] = b"\x89PNG\r\n\x1a\nfixture";
+const TEST_GRANT_REF: &str = "blake3:3333333333333333333333333333333333333333333333333333333333333333";
+const TEST_RECEIPT_REF: &str = "blake3:4444444444444444444444444444444444444444444444444444444444444444";
+const TEST_AUTHORITY_REF: &str = "test-current-authority";
+const PROCESS_CONTRACT: &str = "lattice-process";
+
+struct CurrentAuthorityFacts;
+
+impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
+    fn load(&self, binding: &authority::IntentBinding) -> Result<authority::AuthorizationFacts, dispatch::Error> {
+        let resource = binding.resource.as_str().to_owned();
+        let ability = binding.ability.as_str().to_owned();
+        let request_ref = binding.request.as_str().to_owned();
+        Ok(authority::AuthorizationFacts {
+            binding: binding.clone(),
+            basalt_input: basalt::authority_core::AuthorityInput {
+                schema: basalt::authority_core::AUTHORITY_INPUT_SCHEMA.to_owned(),
+                request: basalt::authority_core::AuthorityRequest {
+                    contract_id: PROCESS_CONTRACT.to_owned(),
+                    resource: resource.clone(),
+                    ability: ability.clone(),
+                    request_ref: request_ref.clone(),
+                },
+                verified_grants: vec![basalt::authority_core::VerifiedGrantRef {
+                    grant_ref: TEST_GRANT_REF.to_owned(),
+                    verification_receipt_ref: TEST_RECEIPT_REF.to_owned(),
+                    resource,
+                    ability,
+                    kind: basalt::authority_core::VerifiedGrantKind::Direct,
+                }],
+                verification_receipts: vec![basalt::authority_core::UcanVerificationReceiptRef {
+                    receipt_ref: TEST_RECEIPT_REF.to_owned(),
+                    request_ref,
+                    verified_grant_refs: vec![TEST_GRANT_REF.to_owned()],
+                    disposition: basalt::authority_core::VerificationRefDisposition::Current,
+                }],
+                policy_refs: vec![dispatch::trusted_policy_ref(PROCESS_CONTRACT)],
+                caveat: basalt::authority_core::AuthorityCaveatDisposition::Satisfied,
+                replay: basalt::authority_core::AuthorityReplayDisposition::Admitted,
+                claims: vec![basalt::authority_core::AuthorityClaim::ExactRequest],
+                non_claims: basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned).to_vec(),
+            },
+            trusted_policy_ref: dispatch::trusted_policy_ref(PROCESS_CONTRACT),
+            scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
+            scope_snapshot: None,
+            revocation: authority::RevocationDisposition::Current,
+        })
+    }
+}
+
+struct NoScope;
+
+impl dispatch::ScopeSnapshotProvider for NoScope {
+    fn load_current(
+        &self,
+        _binding: &authority::IntentBinding,
+    ) -> Result<Option<authority::ScopeSnapshotFacts>, dispatch::Error> {
+        Ok(None)
+    }
+}
+
+struct NoRoots;
+
+impl dispatch::ConfiguredRootRegistry for NoRoots {
+    fn contains_root(&self, _root_id: &str) -> bool {
+        false
+    }
+
+    fn with_root(
+        &self,
+        _root_id: &str,
+        _operation: &mut dyn FnMut(&cap_std::fs::Dir) -> Result<(), dispatch::Error>,
+    ) -> Result<(), dispatch::Error> {
+        Err(dispatch::Error::UnknownRoot)
+    }
+}
+
+struct CurrentAuthorityProvider;
+
+impl execution::RunContextProvider for CurrentAuthorityProvider {
+    fn load(&self, run_id: RunId, store: Option<Store>) -> Result<execution::RunContext, execution::Error> {
+        let attempts: Box<dyn dispatch::EffectAttemptStore> = match store {
+            Some(store) => Box::new(execution::StoreAttempts::new(store)),
+            None => Box::new(execution::UnavailableAttempts),
+        };
+        let shell =
+            dispatch::Shell::new(Box::new(CurrentAuthorityFacts), Box::new(NoScope), attempts, Box::new(NoRoots));
+        Ok(execution::RunContext::new(
+            authority::RunIdentity::new(format!("test-run/{}", run_id.0))?,
+            authority::AuthorityIdentity::new(TEST_AUTHORITY_REF)?,
+            authority::CollaborationScopeBinding::Unscoped,
+            std::sync::Arc::new(shell),
+        ))
+    }
+}
 const HEADLESS_AGENT_FILE_NAME: &str = "headless-agent.sh";
 const HEADLESS_AGENT_OUTPUT: &str = "headless agent text";
 const HEADLESS_AGENT_IMAGE_PROMPT: &str = "create image";
@@ -341,9 +439,14 @@ async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     workflow.add_shell_node(SUCCESS_NODE_LABEL, SUCCESS_COMMAND);
     store.save_workflow(&workflow).expect("workflow saves");
 
-    let summary = run_saved_workflow(&store, SUCCESS_WORKFLOW_NAME, RunId(SUCCESS_RUN_ID))
-        .await
-        .expect("headless run succeeds");
+    let summary = run_saved_workflow_with_authority_provider(
+        &store,
+        SUCCESS_WORKFLOW_NAME,
+        RunId(SUCCESS_RUN_ID),
+        &CurrentAuthorityProvider,
+    )
+    .await
+    .expect("headless run succeeds");
 
     assert_eq!(summary.run_id, RunId(SUCCESS_RUN_ID));
     assert_eq!(summary.workflow_name, SUCCESS_WORKFLOW_NAME);
@@ -505,7 +608,9 @@ async fn default_template_catalog_runs_every_template_headlessly() {
         store.save_workflow(&workflow).expect("template workflow saves");
 
         let summary =
-            run_saved_workflow(&store, &workflow_name, run_id).await.expect("template workflow runs headlessly");
+            run_saved_workflow_with_authority_provider(&store, &workflow_name, run_id, &CurrentAuthorityProvider)
+                .await
+                .expect("template workflow runs headlessly");
 
         assert_eq!(summary.workflow_name, workflow_name);
         assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
@@ -548,12 +653,12 @@ fn cli_run_saved_workflow_emits_json_summary() {
         .output()
         .expect("cli run executes");
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(!output.status.success(), "default product execution must fail closed");
     let summary: lattice::headless::HeadlessRunSummary =
         serde_json::from_slice(&output.stdout).expect("json summary parses");
     assert_eq!(summary.workflow_name, SUCCESS_WORKFLOW_NAME);
-    assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
-    assert_eq!(summary.failures, NO_FAILURES);
+    assert_eq!(summary.status, HeadlessRunStatus::Failed);
+    assert_eq!(summary.failures, ONE_FAILURE);
 }
 
 // r[verify n8nclone.workflow_execution.headless.errors.load_failure]

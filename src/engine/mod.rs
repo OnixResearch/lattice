@@ -5,6 +5,7 @@
 
 pub mod child;
 pub mod domain;
+pub mod effect;
 pub mod executor;
 pub mod runner;
 pub mod value;

@@ -60,11 +60,7 @@ const OBSERVED_RUN_FAILURES: usize = 0;
 const OPERATOR_E2E_RUN_HISTORY_LIMIT: usize = 10;
 const EXPECTED_OBSERVED_RUN_COUNT: usize = 1;
 #[cfg(unix)]
-const EXPECTED_RESTART_INSTANCE_COUNT: usize = 1;
-#[cfg(unix)]
 const FORCED_DEATH_MARKER_FILE_NAME: &str = "orchestration-forced-death";
-#[cfg(unix)]
-const CRASH_SNAPSHOT_FILE_NAME: &str = "orchestration-crashed-state.redb";
 const RECOVERY_CONTENDER_CHILD_TEST_NAME: &str = "orchestration_recovery_contender_child_entrypoint";
 const RECOVERY_CONTENDER_CONFIG_ENV: &str = "LATTICE_RECOVERY_CONTENDER_CONFIG";
 const RECOVERY_CONTENDER_INSTANCE_ENV: &str = "LATTICE_RECOVERY_CONTENDER_INSTANCE";
@@ -95,9 +91,27 @@ fn fixture(completion: CompletionPolicy) -> (tempfile::TempDir, std::path::PathB
     fixture_with_shell_command(completion, SHELL_COMMAND)
 }
 
+fn effect_free_fixture(
+    completion: CompletionPolicy,
+) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
+    fixture_with_workflow(
+        completion,
+        Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()),
+    )
+}
+
 fn fixture_with_shell_command(
     completion: CompletionPolicy,
     shell_command: &str,
+) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
+    workflow.add_shell_node("cli", shell_command);
+    fixture_with_workflow(completion, workflow)
+}
+
+fn fixture_with_workflow(
+    completion: CompletionPolicy,
+    workflow: Workflow,
 ) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf, Store) {
     let directory = tempdir().expect("temporary directory must exist");
     let data_dir = directory.path().join("data");
@@ -112,8 +126,6 @@ fn fixture_with_shell_command(
     )
     .expect("config must write");
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store must open");
-    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    workflow.add_shell_node("cli", shell_command);
     store.save_workflow(&workflow).expect("workflow must persist");
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
@@ -416,7 +428,8 @@ fn cli_validates_starts_and_reports_json_status() {
         .expect("start command must execute");
     assert!(start.status.success(), "stderr: {}", String::from_utf8_lossy(&start.stderr));
     let instance: OrchestrationInstance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
-    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert_eq!(instance.status, OrchestrationStatus::Failed);
+    assert!(instance.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
 
     let status = command(&config_path)
         .arg("status")
@@ -453,10 +466,10 @@ fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
         .expect("retry command must execute");
     assert!(retry.status.success(), "stderr: {}", String::from_utf8_lossy(&retry.stderr));
     let completed: OrchestrationInstance = serde_json::from_slice(&retry.stdout).expect("retry JSON must parse");
-    assert_eq!(completed.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.status, OrchestrationStatus::Failed);
     assert_eq!(completed.round, ROUND_LIMIT);
     assert_eq!(completed.retry.admitted, RETRY_LIMIT);
-    assert!(completed.retry.retryable_failure.is_none());
+    assert!(completed.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
 
     let replay = command(&config_path)
         .arg("replay")
@@ -476,7 +489,7 @@ fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
 // r[verify lattice.agent_orchestration.cli]
 #[test]
 fn cli_pause_resume_and_replay_share_persisted_state_machine() {
-    let (_directory, config_path, definition_path, store) = fixture(CompletionPolicy::AwaitProposal);
+    let (_directory, config_path, definition_path, store) = effect_free_fixture(CompletionPolicy::AwaitProposal);
     drop(store);
     let start = command(&config_path)
         .arg("start")
@@ -769,16 +782,15 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
 
 #[cfg(unix)]
 #[test]
-fn operator_e2e_orchestration_recovery_after_forced_process_death_preserves_unknown_outcome() {
+fn operator_e2e_orchestration_denies_forced_death_effect_without_current_authority() {
     let marker_directory = tempdir().expect("temporary orchestration marker directory");
     let marker_path = marker_directory.path().join(FORCED_DEATH_MARKER_FILE_NAME);
     let shell_command = common::forced_parent_death_command(&marker_path);
     let (_directory, config_path, definition_path, store) =
         fixture_with_shell_command(CompletionPolicy::RunSucceeded, &shell_command);
-    let store_path = config_path.parent().expect("config has parent").join("data").join(STORE_FILE_NAME);
     drop(store);
 
-    let crashed = command(&config_path)
+    let denied = command(&config_path)
         .arg("start")
         .arg(&definition_path)
         .arg("--actor")
@@ -786,108 +798,28 @@ fn operator_e2e_orchestration_recovery_after_forced_process_death_preserves_unkn
         .arg("--output")
         .arg("json")
         .output()
-        .expect("orchestration process starts before forced death");
+        .expect("orchestration process returns a denied terminal result");
 
-    assert!(!crashed.status.success(), "forced-death orchestration unexpectedly succeeded");
-    assert!(crashed.status.code().is_none(), "forced-death orchestration was not terminated by a signal");
-    assert_eq!(
-        std::fs::read_to_string(&marker_path).expect("orchestration forced-death marker persists"),
-        common::FORCED_DEATH_MARKER_CONTENT,
-    );
-
-    let crash_snapshot_path = marker_directory.path().join(CRASH_SNAPSHOT_FILE_NAME);
-    let snapshot_bytes =
-        std::fs::copy(&store_path, &crash_snapshot_path).expect("crashed orchestration store snapshot copies");
-    assert!(snapshot_bytes > 0, "crashed orchestration store snapshot must not be empty");
-    let after_crash = Store::new(&crash_snapshot_path).expect("crashed orchestration snapshot repairs and reopens");
-    let instances = after_crash.list_orchestrations().expect("crashed orchestration instances list");
-    assert_eq!(instances.len(), EXPECTED_RESTART_INSTANCE_COUNT);
-    let pending = instances.into_iter().next().expect("crashed orchestration remains persisted");
-    let pending_dispatch = pending.pending_dispatch.as_ref().expect("crashed dispatch remains pending");
-    assert_eq!(pending.status, OrchestrationStatus::Running);
-    assert_eq!(pending_dispatch.status, DispatchStatus::Acknowledged);
-    assert!(after_crash.list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT).expect("crashed run history lists").is_empty());
-    drop(after_crash);
-
-    let recovery = command(&config_path)
-        .arg("recover")
-        .arg(&pending.id)
-        .arg("--output")
-        .arg("json")
-        .output()
-        .expect("restarted orchestration recovery process executes");
-    assert!(recovery.status.success(), "stderr: {}", String::from_utf8_lossy(&recovery.stderr));
-    assert!(String::from_utf8_lossy(&recovery.stdout).contains("PendingUnobserved"));
-
-    let retry = command(&config_path)
-        .arg("retry")
-        .arg(&pending.id)
-        .arg("--actor")
-        .arg(ACTOR)
-        .output()
-        .expect("restarted orchestration retry process executes");
-    assert!(!retry.status.success());
-    assert!(String::from_utf8_lossy(&retry.stderr).contains("pending and locally unobserved"));
-
-    let after_retry = Store::new(&store_path).expect("orchestration store reopens after rejected retry");
-    let unchanged = after_retry
-        .load_orchestration(&pending.id)
-        .expect("pending orchestration lookup succeeds")
-        .expect("pending orchestration remains");
-    assert_eq!(unchanged, pending);
-    assert!(
-        after_retry
-            .list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT)
-            .expect("unchanged run history lists")
-            .is_empty()
-    );
-    drop(after_retry);
-
-    let cancel = command(&config_path)
-        .arg("cancel")
-        .arg(&pending.id)
-        .arg("--actor")
-        .arg(ACTOR)
-        .arg("--output")
-        .arg("json")
-        .output()
-        .expect("post-restart cancellation process executes");
-    assert!(cancel.status.success(), "stderr: {}", String::from_utf8_lossy(&cancel.stderr));
-    let cancelled: OrchestrationInstance =
-        serde_json::from_slice(&cancel.stdout).expect("cancelled orchestration JSON parses");
-    assert_eq!(cancelled.status, OrchestrationStatus::Running);
-    assert!(cancelled.cancellation_requested);
-    assert_eq!(cancelled.pending_dispatch, pending.pending_dispatch);
-
-    let abandon = command(&config_path)
-        .arg("abandon")
-        .arg(&pending.id)
-        .arg("--actor")
-        .arg(ACTOR)
-        .arg("--output")
-        .arg("json")
-        .output()
-        .expect("authorized abandonment process executes");
-    assert!(abandon.status.success(), "stderr: {}", String::from_utf8_lossy(&abandon.stderr));
-    let abandoned: OrchestrationInstance =
-        serde_json::from_slice(&abandon.stdout).expect("abandoned orchestration JSON parses");
-    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
-    assert!(abandoned.pending_dispatch.is_none());
-    assert!(abandoned.budgets.reservations.is_empty());
-    assert!(String::from_utf8_lossy(&abandon.stdout).contains("remote outcome unknown"));
+    assert!(denied.status.success(), "stderr: {}", String::from_utf8_lossy(&denied.stderr));
+    assert!(!marker_path.exists(), "authority denial must occur before the shell effect");
+    let failed: OrchestrationInstance =
+        serde_json::from_slice(&denied.stdout).expect("denied orchestration JSON parses");
+    assert_eq!(failed.status, OrchestrationStatus::Failed);
+    assert!(failed.pending_dispatch.is_none());
+    assert!(failed.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&pending.id)
+        .arg(&failed.id)
         .arg("--output")
         .arg("json")
         .output()
-        .expect("post-restart replay process executes");
+        .expect("denied orchestration replay process executes");
     assert!(replay.status.success(), "stderr: {}", String::from_utf8_lossy(&replay.stderr));
     let report: lattice::orchestration::ReplayReport =
-        serde_json::from_slice(&replay.stdout).expect("post-restart replay JSON parses");
+        serde_json::from_slice(&replay.stdout).expect("denied orchestration replay JSON parses");
     assert!(report.valid);
-    assert_eq!(report.instance, abandoned);
+    assert_eq!(report.instance, failed);
 }
 
 #[test]

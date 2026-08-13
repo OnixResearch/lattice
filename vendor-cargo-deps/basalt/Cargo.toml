@@ -1,0 +1,86 @@
+[package]
+name = "basalt"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Hardened UCAN contract boundaries for Nickel and Steel policy backends."
+readme = "README.md"
+repository = "https://github.com/OnixResearch/basalt"
+homepage = "https://github.com/OnixResearch/basalt#readme"
+documentation = "https://github.com/OnixResearch/basalt#readme"
+keywords = ["ucan", "nickel", "policy", "capabilities", "authorization"]
+categories = ["authentication", "config"]
+include = [
+    "src/**",
+    "tests/**",
+    "contracts/policy.ncl",
+    "contracts/policy-prelude.ncl",
+    "contracts/generated/policy.json",
+    "contracts/policy-authoring/**",
+    "contracts/authority-core/contracts.ncl",
+    "contracts/authority-core/fixtures/**",
+    "contracts/ucan-semantics/contracts.ncl",
+    "contracts/ucan-semantics/fixtures/**",
+    "contracts/license-consumption/contracts.ncl",
+    "contracts/license-consumption/fixtures/**",
+    "contracts/nostr-identity/**",
+    "contracts/policy-identity/fixtures/**",
+    "contracts/secretspec-issuer/fixtures/**",
+    "docs/authority-core.md",
+    "docs/ast-grep-policy-audits.md",
+    "docs/cap-std-cli-policy-boundary.md",
+    "docs/license-consumption.md",
+    "docs/nostr-identity-bindings.md",
+    "docs/policy-authoring.md",
+    "docs/ucan-enforcement.md",
+    "docs/ucan-semantics-contract.md",
+    "docs/policy-identity.md",
+    "docs/secretspec-issuer.md",
+    "docs/vendored-ucan.md",
+    "tools/release-verify.rs",
+    "tools/release_verify/**",
+    "tools/ast-grep/**",
+    "tools/sync-vendored-ucan.rs",
+    "tools/sync_vendored_ucan/**",
+    "vendor/ucan/**",
+    "vendor/ucan-revision.txt",
+    "vendor/ucan.snapshot",
+    "README.md",
+    "Cargo.toml",
+    "Cargo.lock",
+]
+
+[features]
+default = []
+cli = ["dep:clap", "dep:cap-std"]
+
+[[bin]]
+name = "basalt"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+blake3 = "1.8"
+cap-std = { version = "4.0.2", optional = true }
+clap = { version = "4.5", features = ["derive"], optional = true }
+iddqd = "0.4.6"
+secretspec = { version = "=0.17.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+snafu = "0.8"
+ucan = { version = "0.1.0", path = "vendor/ucan" }
+ucan-nostr = { version = "0.1.0", path = "vendor/ucan/crates/ucan-nostr" }
+
+[dev-dependencies]
+k256 = { version = "=0.13.4", default-features = false, features = ["alloc", "arithmetic", "schnorr"] }
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+multiple_crate_versions = "allow"

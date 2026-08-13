@@ -1,0 +1,13 @@
+{
+  "schema": "basalt.ucan-semantics-receipt.v1",
+  "release_passed": true,
+  "fixture_schema": "basalt.ucan-semantics-fixture.v1",
+  "runtime_ucan_revision": "2aad993027d48ff148028c537cdaf91f6e5285ca",
+  "support_catalog_revision": "e362c3fa2236d5b9d61423921a820cd12dd64e51",
+  "support_catalog_blake3": "02fb9fec563b5df9f40a58bbbddfd0bcf5abe74da373ae0b506712647e0ee6ad",
+  "basalt_policy_blake3": "7d223f48abcf31c9ba932d7434babfa675122f393100547ff09a595ee1fe8adb",
+  "policy_freshness_passed": true,
+  "fixture_freshness_passed": true,
+  "runtime_replay_executed": true,
+  "runtime_replay_passed": true
+}

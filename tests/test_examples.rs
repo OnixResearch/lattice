@@ -1,5 +1,7 @@
 //! Tests for repository example templates and workflows.
 
+mod common;
+
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -17,7 +19,7 @@ use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessRunStatus;
-use lattice::headless::run_saved_workflow;
+use lattice::headless::run_saved_workflow_with_authority_provider;
 use lattice::store::Store;
 use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
@@ -171,9 +173,14 @@ async fn complex_example_templates_render_and_run_headlessly() {
         let template_input_hash = template_input_cache_key(&workflow, template_node_id, template_stdin);
         store.save_workflow(&workflow).expect("template workflow saves");
 
-        let summary = run_saved_workflow(&store, &workflow_name, run_id)
-            .await
-            .expect("example template workflow runs headlessly");
+        let summary = run_saved_workflow_with_authority_provider(
+            &store,
+            &workflow_name,
+            run_id,
+            &common::authority::TestRunContextProvider::new(),
+        )
+        .await
+        .expect("example template workflow runs headlessly");
 
         assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
         assert_eq!(summary.node_count, TEMPLATE_WORKFLOW_NODE_COUNT);
@@ -212,8 +219,14 @@ async fn complex_example_workflows_import_and_run_headlessly() {
         let run_id = RunId(WORKFLOW_RUN_ID_START + u64::try_from(workflow_index).expect("workflow index fits in u64"));
         store.save_workflow(&workflow).expect("example workflow saves");
 
-        let summary =
-            run_saved_workflow(&store, &workflow_name, run_id).await.expect("example workflow runs headlessly");
+        let summary = run_saved_workflow_with_authority_provider(
+            &store,
+            &workflow_name,
+            run_id,
+            &common::authority::TestRunContextProvider::new(),
+        )
+        .await
+        .expect("example workflow runs headlessly");
 
         assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
         assert_eq!(summary.node_count, workflow.graph.node_count());

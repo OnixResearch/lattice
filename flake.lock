@@ -182,6 +182,23 @@
         "type": "github"
       }
     },
+    "cap-root": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785189219,
+        "narHash": "sha256-RXiXKOomYgwNLJ06yYuf8ERg3VA1vgwoF37CvoApWnw=",
+        "ref": "refs/heads/main",
+        "rev": "545e77e5a49e4e1d34037aa9a82d924944ac0a1b",
+        "revCount": 3,
+        "type": "git",
+        "url": "https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git"
+      },
+      "original": {
+        "rev": "545e77e5a49e4e1d34037aa9a82d924944ac0a1b",
+        "type": "git",
+        "url": "https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git"
+      }
+    },
     "charon": {
       "inputs": {
         "crane": "crane_2",
@@ -207,16 +224,16 @@
     "choregraph": {
       "flake": false,
       "locked": {
-        "lastModified": 1785256565,
-        "narHash": "sha256-Wp7ZBrTXgQYvG62JSbi1nM2CeZx0mBFrK0tygwDpTSc=",
+        "lastModified": 1786046474,
+        "narHash": "sha256-LwDI9579RslL/+QlUlpKAKnnElhoi0o1pSSEhvvT078=",
         "ref": "refs/heads/main",
-        "rev": "81b260da2256147ec82cb5dd44c0a0c1dcb7500d",
-        "revCount": 35,
+        "rev": "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
+        "revCount": 58,
         "type": "git",
         "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       },
       "original": {
-        "rev": "81b260da2256147ec82cb5dd44c0a0c1dcb7500d",
+        "rev": "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
         "type": "git",
         "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       }
@@ -840,22 +857,24 @@
         "valence": "valence"
       },
       "locked": {
-        "lastModified": 1786322660,
-        "narHash": "sha256-E1CF0944VB2GUvbnXQyX+9ao67OBXD9iZO4MfZNOp30=",
+        "lastModified": 1786584286,
+        "narHash": "sha256-Y8qEti3wSJ1g2Dd08OGZpOPp7PrkaQoGMoHtByzuWik=",
         "owner": "OnixResearch",
         "repo": "octet",
-        "rev": "aa3fb4a2483439f332418aa1df3cfda04158f8fd",
+        "rev": "731571fbfffd0b7db11ac0cc9d3939105ddc71e2",
         "type": "github"
       },
       "original": {
         "owner": "OnixResearch",
         "repo": "octet",
+        "rev": "731571fbfffd0b7db11ac0cc9d3939105ddc71e2",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
         "bounded-exec": "bounded-exec",
+        "cap-root": "cap-root",
         "choregraph": "choregraph",
         "content-identity-core": "content-identity-core",
         "crane": "crane",

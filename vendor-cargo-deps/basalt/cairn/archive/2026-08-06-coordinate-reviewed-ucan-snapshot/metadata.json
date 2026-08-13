@@ -1,0 +1,24 @@
+{
+  "cross_repo_dependencies": [
+    {
+      "change": "coordinate-cross-stack-dependency-updates",
+      "expected_policy_hash": "701e6e61f1f083f3be11c273c832e473b42cf264a667627fed80bdd99877bded",
+      "expected_receipt_hash": "5532bf6767a0b7d9ec64c920668338a74aa36d44fe244bff2240e9daebbd5d91",
+      "expected_status": "pass",
+      "expected_subject_hash": "d7b96af8b64c440ebce55b975f56693ba0bf25b76f055b887ad3260c2734de17",
+      "id": "workspace-stack-dependency-apply",
+      "non_claims": [
+        "dependency satisfaction proves presented receipt linkage only",
+        "dependency satisfaction does not prove upstream correctness or remote trust",
+        "dependency satisfaction does not prove downstream integration correctness or release eligibility"
+      ],
+      "repo": "onixresearch-workspace",
+      "requires": "validation_receipt"
+    }
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

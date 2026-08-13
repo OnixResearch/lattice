@@ -1,0 +1,36 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flake-release:
+    name: sandbox-safe flake release gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Run sandbox-safe release gate
+        run: nix flake check -L
+
+      - name: Upload release verifier receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-release-verifier-receipts
+          path: |
+            result/summary.json
+            result/summary.md
+          if-no-files-found: ignore

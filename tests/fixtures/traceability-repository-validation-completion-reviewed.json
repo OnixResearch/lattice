@@ -415,7 +415,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "edf573e48f21a192dafa5225ade174d2506244f8641464b600b92d6a538a1680"
+          "blake3": "ef202b5241ba8908b2c397416672d8400624a40043b47752d51cae43454af01f"
         },
         {
           "path": "flake.nix",
@@ -423,11 +423,11 @@
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
-          "blake3": "af923558b39ecfb1b88eeecf86211ccaf112680c98e1fd3ac2b5df94ef2fe456"
+          "blake3": "d5cc802bf5d01910866d978b4504765ed84d1c181701cde5db9cd769cf2bd87d"
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.package-clippy-no-deps-with-deny-fixture"
@@ -439,7 +439,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "edf573e48f21a192dafa5225ade174d2506244f8641464b600b92d6a538a1680"
+          "blake3": "ef202b5241ba8908b2c397416672d8400624a40043b47752d51cae43454af01f"
         },
         {
           "path": "flake.nix",
@@ -447,11 +447,11 @@
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
-          "blake3": "af923558b39ecfb1b88eeecf86211ccaf112680c98e1fd3ac2b5df94ef2fe456"
+          "blake3": "d5cc802bf5d01910866d978b4504765ed84d1c181701cde5db9cd769cf2bd87d"
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.vendor-clippy-deny-excluded"
@@ -463,7 +463,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "27fab6c1dc7ad72956c86963dbe8f99765d4c41580d4bd360624d2cb0d159eda"
+          "blake3": "ce96acec45c2aa796f6c5da50df28c0980f700c3a17a6eac4ee81caa428519df"
         },
         {
           "path": "flake.nix",
@@ -471,7 +471,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.check-only-signing-override-and-external-policy"
@@ -483,7 +483,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "27fab6c1dc7ad72956c86963dbe8f99765d4c41580d4bd360624d2cb0d159eda"
+          "blake3": "ce96acec45c2aa796f6c5da50df28c0980f700c3a17a6eac4ee81caa428519df"
         },
         {
           "path": "flake.nix",
@@ -491,7 +491,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.missing-key-overridden-for-full-check"
@@ -503,7 +503,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "27fab6c1dc7ad72956c86963dbe8f99765d4c41580d4bd360624d2cb0d159eda"
+          "blake3": "ce96acec45c2aa796f6c5da50df28c0980f700c3a17a6eac4ee81caa428519df"
         },
         {
           "path": "flake.nix",
@@ -511,7 +511,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.flake-signing-policy-absent"
@@ -531,7 +531,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.package-format-excludes-vendor-fixture"
@@ -551,7 +551,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.nonconforming-vendor-format-excluded"
@@ -571,7 +571,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.nix-nextest-compiles-tracked-test-fixtures"
@@ -591,7 +591,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.filtered-json-fixture-compiles"
@@ -603,7 +603,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "edf573e48f21a192dafa5225ade174d2506244f8641464b600b92d6a538a1680"
+          "blake3": "ef202b5241ba8908b2c397416672d8400624a40043b47752d51cae43454af01f"
         },
         {
           "path": "flake.nix",
@@ -619,7 +619,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.git-and-nix-nested-source-admission"
@@ -631,7 +631,7 @@
       "evidence": [
         {
           "path": "Cargo.toml",
-          "blake3": "edf573e48f21a192dafa5225ade174d2506244f8641464b600b92d6a538a1680"
+          "blake3": "ef202b5241ba8908b2c397416672d8400624a40043b47752d51cae43454af01f"
         },
         {
           "path": "flake.nix",
@@ -647,7 +647,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "de75224d256f660bf2f2298e7c8b904e67e2e6e047e146c37d5044efc7292012"
+          "blake3": "6384315055549bc38894a939ad9ca839d59303a4ecaadbfd0def6ff490a86aa9"
         }
       ],
       "rationale_code": "assertions.nested-output-name-admitted"

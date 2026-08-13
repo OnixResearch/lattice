@@ -1,3 +1,5 @@
+mod common;
+
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
@@ -26,12 +28,15 @@ use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::OrchestrationStatus;
 use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
+use lattice::orchestration::ProductApproval;
+use lattice::orchestration::ProductExecution;
+use lattice::orchestration::ProductTriggerStart;
 use lattice::orchestration::RecoveryOutcome;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::RetryRequest;
 use lattice::orchestration::abandon_pending;
-use lattice::orchestration::approve;
+use lattice::orchestration::approve_with_execution;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::dispatch_identity;
 use lattice::orchestration::fact_identity;
@@ -40,8 +45,10 @@ use lattice::orchestration::new_instance;
 use lattice::orchestration::recover_pending;
 use lattice::orchestration::replay;
 use lattice::orchestration::retry;
-use lattice::orchestration::start;
+use lattice::orchestration::retry_with_execution;
 use lattice::orchestration::start_from_trigger;
+use lattice::orchestration::start_from_trigger_with_execution;
+use lattice::orchestration::start_with_execution;
 use lattice::orchestration::transition;
 use lattice::orchestration::validate_definition_in_store;
 use lattice::orchestration::workflow_revision;
@@ -72,6 +79,7 @@ const RESTART_PHASE_FIRST: &str = "first";
 const RESTART_PHASE_DUPLICATE: &str = "duplicate";
 const RESTART_PHASE_INVALID: &str = "invalid";
 const RETRY_MARKER_CONTENT: &str = "first-attempt-observed";
+const RETRY_ROOT_ID: &str = "retry-root";
 const FIRST_ALLOCATED_RUN_ID: u64 = 0;
 const SECOND_ALLOCATED_RUN_ID: u64 = 1;
 const RETRY_RUN_LIST_LIMIT: usize = 2;
@@ -114,6 +122,13 @@ fn parse_restart_result(value: &str) -> Result<RestartResult, &'static str> {
     })
 }
 
+fn test_execution(provider: &common::authority::TestRunContextProvider) -> ProductExecution<'_> {
+    ProductExecution {
+        agent_runtime: AgentRuntimeConfig::default(),
+        authority_provider: provider,
+    }
+}
+
 fn workflow(name: &str) -> Workflow {
     let mut workflow = Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("bounded", SHELL_COMMAND);
@@ -121,16 +136,19 @@ fn workflow(name: &str) -> Workflow {
 }
 
 fn fail_once_workflow(name: &str, marker: &Path) -> Workflow {
-    let marker_path = marker.to_string_lossy().into_owned();
-    let allowed_root = marker.parent().expect("retry marker must have a parent").to_string_lossy().into_owned();
+    let marker_name = marker
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .expect("retry marker file name must be UTF-8")
+        .to_owned();
     let mut workflow = Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_file_node("bounded", FileOperationKind::Read, &marker_path);
+    let node_id = workflow.add_file_node("bounded", FileOperationKind::Read, &marker_name);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Read,
-        path: marker_path,
+        path: marker_name,
         content: None,
         overwrite: false,
-        allowed_roots: vec![allowed_root],
+        allowed_roots: vec![RETRY_ROOT_ID.to_owned()],
     });
     workflow
 }
@@ -238,10 +256,15 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     let workflow = workflow(FIRST_WORKFLOW_NAME);
     store.save_workflow(&workflow).expect("workflow must persist");
 
-    let instance =
-        start(&store, definition(&workflow, CompletionPolicy::RunSucceeded), ACTOR, AgentRuntimeConfig::default())
-            .await
-            .expect("orchestration must run");
+    let provider = common::authority::TestRunContextProvider::new();
+    let instance = start_with_execution(
+        &store,
+        definition(&workflow, CompletionPolicy::RunSucceeded),
+        ACTOR,
+        test_execution(&provider),
+    )
+    .await
+    .expect("orchestration must run");
 
     assert_eq!(instance.status, OrchestrationStatus::Completed);
     assert_eq!(instance.round, FIRST_SEQUENCE);
@@ -293,10 +316,15 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
     let second = workflow(SECOND_WORKFLOW_NAME);
     store.save_workflow(&first).expect("first workflow must persist");
     store.save_workflow(&second).expect("second workflow must persist");
-    let waiting =
-        start(&store, definition(&first, CompletionPolicy::AwaitProposal), ACTOR, AgentRuntimeConfig::default())
-            .await
-            .expect("first round must run");
+    let provider = common::authority::TestRunContextProvider::new();
+    let waiting = start_with_execution(
+        &store,
+        definition(&first, CompletionPolicy::AwaitProposal),
+        ACTOR,
+        test_execution(&provider),
+    )
+    .await
+    .expect("first round must run");
     assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
 
     let proposal = make_proposal(
@@ -305,9 +333,14 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
         "operator-reviewed successor",
     )
     .expect("proposal must hash");
-    let advanced = approve(&store, &waiting.id, proposal, ACTOR, AgentRuntimeConfig::default())
-        .await
-        .expect("approved successor must run");
+    let advanced = approve_with_execution(&store, ProductApproval {
+        instance_id: waiting.id.clone(),
+        proposal,
+        actor: ACTOR.to_owned(),
+        execution: test_execution(&provider),
+    })
+    .await
+    .expect("approved successor must run");
 
     assert_eq!(advanced.status, OrchestrationStatus::WaitingForApproval);
     assert_eq!(advanced.round, ROUND_LIMIT);
@@ -326,24 +359,23 @@ async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     store.save_workflow(&workflow).expect("workflow must persist");
     store.save_orchestration_definition(&definition).expect("definition must persist");
 
-    let first = start_from_trigger(
-        &store,
-        DEFINITION_ID,
-        TRIGGER_ID,
-        OrchestrationTriggerKind::Webhook,
-        IDEMPOTENCY_KEY,
-        AgentRuntimeConfig::default(),
-    )
+    let provider = common::authority::TestRunContextProvider::new();
+    let first = start_from_trigger_with_execution(&store, ProductTriggerStart {
+        definition_id: DEFINITION_ID.to_owned(),
+        trigger_id: TRIGGER_ID.to_owned(),
+        trigger_kind: OrchestrationTriggerKind::Webhook,
+        idempotency_key: IDEMPOTENCY_KEY.to_owned(),
+        execution: test_execution(&provider),
+    })
     .await
     .expect("first trigger must run");
-    let duplicate = start_from_trigger(
-        &store,
-        DEFINITION_ID,
-        TRIGGER_ID,
-        OrchestrationTriggerKind::Webhook,
-        IDEMPOTENCY_KEY,
-        AgentRuntimeConfig::default(),
-    )
+    let duplicate = start_from_trigger_with_execution(&store, ProductTriggerStart {
+        definition_id: DEFINITION_ID.to_owned(),
+        trigger_id: TRIGGER_ID.to_owned(),
+        trigger_kind: OrchestrationTriggerKind::Webhook,
+        idempotency_key: IDEMPOTENCY_KEY.to_owned(),
+        execution: test_execution(&provider),
+    })
     .await
     .expect("duplicate trigger must return prior result");
 
@@ -463,15 +495,15 @@ fn run_restart_child(phase: RestartPhase, store_path: &Path, first_result_path: 
         .enable_all()
         .build()
         .expect("restart child runtime must build");
+    let provider = common::authority::TestRunContextProvider::new();
     let instance = runtime
-        .block_on(start_from_trigger(
-            &store,
-            DEFINITION_ID,
-            TRIGGER_ID,
-            OrchestrationTriggerKind::Webhook,
-            IDEMPOTENCY_KEY,
-            AgentRuntimeConfig::default(),
-        ))
+        .block_on(start_from_trigger_with_execution(&store, ProductTriggerStart {
+            definition_id: DEFINITION_ID.to_owned(),
+            trigger_id: TRIGGER_ID.to_owned(),
+            trigger_kind: OrchestrationTriggerKind::Webhook,
+            idempotency_key: IDEMPOTENCY_KEY.to_owned(),
+            execution: test_execution(&provider),
+        }))
         .expect("restart child trigger must succeed");
     let result = RestartResult {
         process_id: std::process::id(),
@@ -522,10 +554,15 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     let workflow = fail_once_workflow(FIRST_WORKFLOW_NAME, &marker);
     store.save_workflow(&workflow).expect("retry workflow must persist");
 
-    let failed =
-        start(&store, definition(&workflow, CompletionPolicy::RunSucceeded), ACTOR, AgentRuntimeConfig::default())
-            .await
-            .expect("first observed attempt must terminalize");
+    let provider = common::authority::TestRunContextProvider::new().with_root(RETRY_ROOT_ID, directory.path());
+    let failed = start_with_execution(
+        &store,
+        definition(&workflow, CompletionPolicy::RunSucceeded),
+        ACTOR,
+        test_execution(&provider),
+    )
+    .await
+    .expect("first observed attempt must terminalize");
     let first_record = store
         .load_run(RunId(FIRST_ALLOCATED_RUN_ID))
         .expect("first run lookup must succeed")
@@ -553,13 +590,13 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     assert_eq!(store.load_orchestration(&failed.id).expect("failed instance must load"), Some(failed.clone()));
     std::fs::write(&marker, RETRY_MARKER_CONTENT).expect("retry marker must persist");
 
-    let completed = retry(
+    let completed = retry_with_execution(
         &store,
         RetryRequest {
             instance_id: &failed.id,
             actor: ACTOR,
         },
-        AgentRuntimeConfig::default(),
+        test_execution(&provider),
     )
     .await
     .expect("authorized observed failure retry must run");

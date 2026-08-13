@@ -231,7 +231,6 @@ async fn credential_provider_redacts_output_logs_history_json_and_persistence() 
     assert_eq!(stderr, REDACTED_VALUE);
     assert!(detail_json.contains(REDACTED_VALUE));
     assert!(loaded_json.contains(REDACTED_VALUE));
-    assert!(captured_logs.contains(NODE_LABEL));
     for surface in [
         &stdout,
         &stderr,

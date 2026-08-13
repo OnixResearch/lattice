@@ -1,0 +1,16 @@
+## Tasks
+
+- [x] [serial] Record current effect adapters, local capability roots, durable attempt order, replay behavior, Basalt source, UCAN facts, and crash-boundary fixtures. r[lattice.choregraph_effect_authority.baseline]
+- [x] [serial] Define exact machine, workflow, run, node, transition, operation, resource, ability, request, payload, policy, authority, and optional collaboration-scope binding types. r[lattice.choregraph_effect_authority.binding]
+- [x] [serial] Define reviewed Nickel Basalt policy outside graph-authored declarations and record its BLAKE3 identity. r[lattice.choregraph_effect_authority.policy]
+- [x] [depends:intent-binding] Implement a pure authorization adapter over loaded Basalt policy and caller-supplied verified UCAN, caveat, revocation, and replay facts. r[lattice.choregraph_effect_authority.basalt]
+- [x] [depends:intent-binding] For scope-protected effects, validate current scope revision, membership epoch, audience, consent, resource, ability, request, and immutable snapshot bindings without changing `RunOwner`. r[lattice.choregraph_effect_authority.scope_currentness]
+- [x] [depends:intent-binding] Persist intent and attempt identities before product effects under existing Lattice durable rules. r[lattice.choregraph_effect_authority.durability]
+- [x] [depends:basalt-decision] Route denied decisions to deterministic outcome events without product effects. r[lattice.choregraph_effect_authority.denial]
+- [x] [depends:basalt-decision] Route allowed file intents through operator-configured root identifiers, `cap-root`, existing no-follow policy, and `cap-std` directory capabilities without graph-selected ambient roots. r[lattice.choregraph_effect_authority.files] r[lattice.choregraph_effect_authority.root_authority]
+- [x] [depends:basalt-decision] Route process and network intents through existing bounded adapters with exact intent bindings. r[lattice.choregraph_effect_authority.adapters]
+- [x] [serial] Prevent replayed intents and earlier authorization receipts from becoming fresh dispatch authority. r[lattice.choregraph_effect_authority.replay]
+- [x] [parallel] Add positive exact file, process, and selected network authorization fixtures. r[lattice.choregraph_effect_authority.fixtures]
+- [x] [parallel] Add negative missing, wrong-resource, wrong-ability, wrong-request, stale policy, stale scope, removed membership, wrong audience, withdrawn consent, revoked, replayed, root, path, symlink, adapter, duplicate-attempt, and crash fixtures. r[lattice.choregraph_effect_authority.fixtures] r[lattice.choregraph_effect_authority.scope_currentness]
+- [x] [serial] Resolve or record the authenticated Basalt UCAN source as a release blocker. r[lattice.choregraph_effect_authority.source]
+- [x] [serial] Run focused tests, scope-currentness tests, process and filesystem capability tests, crash fixtures, `scripts/check.rs`, Octet, Cairn gates, and bounded Nix checks and record exact non-claims. r[lattice.choregraph_effect_authority.validation] r[lattice.choregraph_effect_authority.non_claims] r[lattice.choregraph_effect_authority.scope_currentness]

@@ -1,0 +1,8 @@
+id: no-direct-enforcement-bypass
+language: rust
+severity: warning
+message: "Candidate direct enforcement-helper bypass; reviewed by Basalt boundary audit."
+rule:
+  kind: call_expression
+  pattern: "$$$CALL $$ARGS"
+note: "Advisory candidate evidence. Does not authorize or disprove authorization."

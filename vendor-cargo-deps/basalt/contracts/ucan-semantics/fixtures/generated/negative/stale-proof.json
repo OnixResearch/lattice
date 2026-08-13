@@ -1,0 +1,35 @@
+{
+  "basalt_policy_blake3": "5475d5473ec98cbf052a83512836b0739f5dad3e7b9b0ed201eb3094b1cf39bf",
+  "contract_id": "document-write",
+  "decisions": {
+    "caveat_evaluation": "satisfied",
+    "delegation": "accepted",
+    "proof_traversal": "stale",
+    "replay": "admitted"
+  },
+  "direct_capabilities": [
+    {
+      "ability": "document/write",
+      "resource": "did:key:z6Mkresource/docs/report"
+    }
+  ],
+  "effective_delegated_capabilities": [],
+  "expected": {
+    "allowed": false,
+    "reason_class": "proof-denied"
+  },
+  "fixture_id": "deny-stale-proof",
+  "non_claims": [
+    "revocation-backend-freshness",
+    "key-resolution-truth",
+    "ucan-cryptographic-correctness",
+    "consumer-replay-store-durability",
+    "application-authorization-completeness"
+  ],
+  "request_ability": "document/write",
+  "request_resource": "did:key:z6Mkresource/docs/report",
+  "runtime_ucan_revision": "277ab768eb532ac0c715a3bbff2a7dc37a702f11",
+  "schema": "basalt.ucan-semantics-fixture.v1",
+  "support_catalog_blake3": "9ffae46c16556feb27614dee3f5945e48321f08a38f0b7c8b1baf7e0e106d095",
+  "support_catalog_revision": "277ab768eb532ac0c715a3bbff2a7dc37a702f11"
+}

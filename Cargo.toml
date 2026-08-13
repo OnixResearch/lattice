@@ -9,6 +9,9 @@ members = [".", "crates/budget-ledger-core", "crates/lattice-core"]
 default-members = ["."]
 exclude = [
   "vendor-cargo-deps/animus",
+  "vendor-cargo-deps/basalt",
+  "vendor-cargo-deps/basalt/vendor/ucan",
+  "vendor-cargo-deps/basalt/vendor/ucan/vendor/verified-logic",
   "vendor-cargo-deps/host-control",
   "vendor-cargo-deps/host-control/crates/host-control-core",
 ]
@@ -70,9 +73,12 @@ nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
-choregraph-core = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d" }
-choregraph-nickel = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d" }
-seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d" }
+choregraph-core = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4" }
+choregraph-kamacite = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4" }
+choregraph-nickel = { git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4" }
+seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4" }
+cap-root-core = { git = "https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git", rev = "545e77e5a49e4e1d34037aa9a82d924944ac0a1b" }
+basalt = { path = "vendor-cargo-deps/basalt", default-features = false }
 rat-nodegraph = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
 rat-widgets = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-widgets" }
 rat-keymap = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-keymap" }

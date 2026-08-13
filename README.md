@@ -14,6 +14,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Workflow domain boundaries](docs/workflow-domain-boundaries.md) define ownership for Lattice, Choregraph, Subwayrat, persistence, and time.
 
+[Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
+
 ## Development
 
 ```bash
@@ -43,7 +45,7 @@ Lattice pins these packages from Choregraph:
 The source identity is:
 
 - RID: `rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF`
-- Revision: `81b260da2256147ec82cb5dd44c0a0c1dcb7500d`
+- Revision: `85ea5e35caaab23260fcb27bc7c5d995dec546c4`
 
 Cargo, Nix, and Crane use the same source. The old vendored execution-graph implementation is removed.
 
@@ -61,7 +63,7 @@ Lattice retains these functions:
 - persistence and retries
 - triggers, diagnostics, UI, and evidence
 
-Nickel workflow import converts decoded values into a bounded in-memory `lattice-workflow-v1` value.
+Nickel workflow import converts decoded values into a bounded in-memory `lattice-workflow-v2` value.
 
 The pure Choregraph lowerer must admit that value before Lattice finishes product decoding. The lowerer performs no I/O or runtime action.
 
@@ -324,7 +326,9 @@ verus verus/example_spec.rs
 - [Pi coding agent](https://pi.dev) — generic agent SDK and RPC reference.
 - [Clankers](https://github.com/brittonr/clankers) — generic coding-agent integration reference.
 - [Trellis](../trellis/) — verified graph, lifecycle, replay, effect, and identity primitives.
-- [Choregraph](https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git) — graph and machine source at revision `81b260da2256147ec82cb5dd44c0a0c1dcb7500d`.
+- [Choregraph](https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git) — graph and machine source at revision `85ea5e35caaab23260fcb27bc7c5d995dec546c4`.
+- [Basalt](https://github.com/OnixResearch/basalt) — policy core vendored from revision `bb8fb5f4a763f532df96b6e65407163ac668834e` because anonymous source access is unavailable. Nested Cargo manifests are normalized locally; `vendor-cargo-deps/basalt/NORMALIZATION.md` records that boundary.
+- [Cap Root](https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git) — lexical path admission at revision `545e77e5a49e4e1d34037aa9a82d924944ac0a1b`.
 - [execution-graph](https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git) — compatibility and rollback reference.
 - [Seaglass](https://github.com/brittonr/seaglass) — original compatibility vocabulary.
 - [Callee](https://github.com/baldaworks/callee) — provider-role and bounded loop reference.

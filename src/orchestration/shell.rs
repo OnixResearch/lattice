@@ -30,14 +30,32 @@ use crate::orchestration::core::OrchestrationTriggerContext;
 use crate::orchestration::core::OrchestrationTriggerKind;
 use crate::orchestration::core::ReplayReport;
 use crate::orchestration::core::RevisionProposal;
-use crate::store::RunRecord;
 use crate::store::Store;
 use crate::store::StoreError;
 use crate::store::TriggerAdmissionWrite;
-use crate::workflow_validation;
 use crate::workflow_validation::WorkflowDiagnostic;
 
 const ROUND_CHARGE: u64 = 1;
+
+pub struct ProductExecution<'a> {
+    pub agent_runtime: AgentRuntimeConfig,
+    pub authority_provider: &'a dyn crate::engine::effect::execution::RunContextProvider,
+}
+
+pub struct ProductApproval<'a> {
+    pub instance_id: String,
+    pub proposal: RevisionProposal,
+    pub actor: String,
+    pub execution: ProductExecution<'a>,
+}
+
+pub struct ProductTriggerStart<'a> {
+    pub definition_id: String,
+    pub trigger_id: String,
+    pub trigger_kind: OrchestrationTriggerKind,
+    pub idempotency_key: String,
+    pub execution: ProductExecution<'a>,
+}
 const AGENT_INVOCATION_CHARGE: u64 = 1;
 const UNOBSERVED_ROUND_FAILURE_SUMMARY: &str =
     "round execution failed before exact terminal run evidence was persisted";
@@ -53,7 +71,7 @@ pub struct DefinitionValidationReport {
 impl DefinitionValidationReport {
     pub fn valid(&self) -> bool {
         self.orchestration_diagnostics.is_empty()
-            && !workflow_validation::has_fatal_diagnostics(&self.workflow_diagnostics)
+            && !crate::workflow_validation::has_fatal_diagnostics(&self.workflow_diagnostics)
     }
 }
 
@@ -160,7 +178,7 @@ pub fn validate_definition_in_store(
 fn validation_report(definition: &OrchestrationDefinition, workflow: Option<&Workflow>) -> DefinitionValidationReport {
     let workflow_revision = workflow.and_then(|workflow| core::workflow_revision(workflow).ok());
     let orchestration_diagnostics = core::validate_definition(definition, workflow_revision.as_ref());
-    let workflow_diagnostics = workflow.map_or_else(Vec::new, workflow_validation::validate_workflow);
+    let workflow_diagnostics = workflow.map_or_else(Vec::new, crate::workflow_validation::validate_workflow);
     DefinitionValidationReport {
         definition_revision: core::definition_revision(definition).ok(),
         workflow_revision,
@@ -177,6 +195,20 @@ pub async fn start(
     actor: &str,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    start_with_execution(store, definition, actor, ProductExecution {
+        agent_runtime,
+        authority_provider: &authority_provider,
+    })
+    .await
+}
+
+pub async fn start_with_execution(
+    store: &Store,
+    definition: OrchestrationDefinition,
+    actor: &str,
+    execution: ProductExecution<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
     core::authorize_definition_actor(&definition, actor)?;
     let report = validate_definition_in_store(store, &definition)?;
     if !report.valid() {
@@ -186,7 +218,7 @@ pub async fn start(
     let sequence = store.next_orchestration_sequence()?;
     let instance = core::new_instance(definition, sequence, None)?;
     store.create_orchestration(&instance, &[])?;
-    execute_ready_round(store, instance, agent_runtime).await
+    execute_ready_round(store, instance, execution).await
 }
 
 // r[impl lattice.agent_orchestration.triggers]
@@ -198,8 +230,32 @@ pub async fn start_from_trigger(
     idempotency_key: &str,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
-    let definition_id = definition_id.into();
-    let trigger_id = trigger_id.as_ref();
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    start_from_trigger_with_execution(store, ProductTriggerStart {
+        definition_id: definition_id.into(),
+        trigger_id: trigger_id.as_ref().to_owned(),
+        trigger_kind,
+        idempotency_key: idempotency_key.to_owned(),
+        execution: ProductExecution {
+            agent_runtime,
+            authority_provider: &authority_provider,
+        },
+    })
+    .await
+}
+
+pub async fn start_from_trigger_with_execution(
+    store: &Store,
+    request: ProductTriggerStart<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let ProductTriggerStart {
+        definition_id,
+        trigger_id,
+        trigger_kind,
+        idempotency_key,
+        execution,
+    } = request;
+    let trigger_id = trigger_id.as_str();
     let definition = store
         .load_orchestration_definition(&definition_id)?
         .ok_or(OrchestrationShellError::WorkflowNotFound(definition_id))?;
@@ -216,7 +272,7 @@ pub async fn start_from_trigger(
         definition_revision: &definition_revision,
         trigger_id,
         trigger_kind,
-        idempotency_key,
+        idempotency_key: &idempotency_key,
         next_sequence: sequence,
         context: &context,
     })?;
@@ -226,7 +282,7 @@ pub async fn start_from_trigger(
             let instance = core::new_instance(definition, sequence, Some(plan.scoped_key.clone()))?;
             debug_assert_eq!(instance.id, plan.instance_id);
             match store.create_triggered_orchestration(&plan.scoped_key, &instance)? {
-                TriggerAdmissionWrite::Inserted => execute_ready_round(store, instance, agent_runtime).await,
+                TriggerAdmissionWrite::Inserted => execute_ready_round(store, instance, execution).await,
                 TriggerAdmissionWrite::Duplicate { instance_id } => load_instance(store, &instance_id),
             }
         }
@@ -237,7 +293,7 @@ pub async fn start_from_trigger(
 async fn execute_ready_round(
     store: &Store,
     instance: OrchestrationInstance,
-    agent_runtime: AgentRuntimeConfig,
+    execution: ProductExecution<'_>,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let workflow = load_validated_workflow(store, &instance.workflow_revision)?;
     debug_assert_eq!(workflow.meta.name, instance.workflow_revision.workflow_name);
@@ -268,7 +324,7 @@ async fn execute_ready_round(
         }
         Err(error) => return Err(error),
     };
-    execute_started_round(store, started, workflow, intent, agent_runtime).await
+    execute_started_round(store, started, workflow, intent, execution).await
 }
 
 async fn execute_started_round(
@@ -276,7 +332,7 @@ async fn execute_started_round(
     started: OrchestrationInstance,
     workflow: Workflow,
     intent: DispatchIntent,
-    agent_runtime: AgentRuntimeConfig,
+    execution: ProductExecution<'_>,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let run_id = intent.run_id;
     let acknowledged = apply_and_commit(store, &started, OrchestrationAction::DispatchAcknowledged {
@@ -290,15 +346,19 @@ async fn execute_started_round(
             .is_some_and(|dispatch| dispatch.status == DispatchStatus::Acknowledged)
     );
 
-    let result = headless::run_owned_workflow(store, headless::OwnedRunRequest {
-        workflow_name: workflow.meta.name.clone(),
-        run_id,
-        owner: crate::store::RunOwner::Orchestration {
-            instance_id: acknowledged.id.clone(),
-            dispatch_id: intent.id.clone(),
+    let result = headless::run_owned_workflow_with_authority_provider(
+        store,
+        headless::OwnedRunRequest {
+            workflow_name: workflow.meta.name.clone(),
+            run_id,
+            owner: crate::store::RunOwner::Orchestration {
+                instance_id: acknowledged.id.clone(),
+                dispatch_id: intent.id.clone(),
+            },
+            agent_runtime: execution.agent_runtime,
         },
-        agent_runtime,
-    })
+        execution.authority_provider,
+    )
     .await;
     let current = load_instance(store, &acknowledged.id)?;
     let (is_succeeded, is_retryable_observed_failure, summary) = match result {
@@ -350,8 +410,8 @@ fn load_validated_workflow(
             message: "stored workflow changed after orchestration revision admission".to_string(),
         }));
     }
-    let diagnostics = workflow_validation::validate_workflow(&workflow);
-    if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+    let diagnostics = crate::workflow_validation::validate_workflow(&workflow);
+    if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
         return Err(OrchestrationShellError::DefinitionInvalid(Box::new(DefinitionValidationReport {
             definition_revision: None,
             workflow_revision: Some(actual),
@@ -457,6 +517,11 @@ pub async fn approve(
     actor: &str,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    let execution = ProductExecution {
+        agent_runtime,
+        authority_provider: &authority_provider,
+    };
     let mut instance = load_instance(store, instance_id)?;
     match &instance.pending_proposal {
         None => {
@@ -471,14 +536,55 @@ pub async fn approve(
             ));
         }
     }
+    decide_approved_proposal(store, instance, proposal, actor, execution).await
+}
+
+pub async fn approve_with_execution(
+    store: &Store,
+    request: ProductApproval<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let ProductApproval {
+        instance_id,
+        proposal,
+        actor,
+        execution,
+    } = request;
+    let mut instance = load_instance(store, &instance_id)?;
+    debug_assert_eq!(instance.id, instance_id);
+    debug_assert_eq!(proposal.instance_id, instance_id);
+    match &instance.pending_proposal {
+        None => {
+            instance = apply_and_commit(store, &instance, OrchestrationAction::SubmitProposal {
+                proposal: proposal.clone(),
+            })?;
+        }
+        Some(pending) if pending.id == proposal.id => {}
+        Some(_) => {
+            return Err(OrchestrationShellError::InvalidProposal(
+                "a different proposal is already pending".to_string(),
+            ));
+        }
+    }
+    decide_approved_proposal(store, instance, proposal, &actor, execution).await
+}
+
+async fn decide_approved_proposal(
+    store: &Store,
+    instance: OrchestrationInstance,
+    proposal: RevisionProposal,
+    actor: &str,
+    execution: ProductExecution<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let successor_validated = load_validated_workflow(store, &proposal.successor).is_ok();
     let approval: ApprovalDecision = core::make_approval(&instance, &proposal, actor, true)?;
+    debug_assert!(approval.approved);
+    debug_assert_eq!(approval.proposal_id, proposal.id);
     let approved = apply_and_commit(store, &instance, OrchestrationAction::DecideProposal {
         approval,
         successor_validated,
     })?;
     if approved.status == OrchestrationStatus::Ready {
-        execute_ready_round(store, approved, agent_runtime).await
+        execute_ready_round(store, approved, execution).await
     } else {
         Ok(approved)
     }
@@ -504,6 +610,19 @@ pub async fn retry(
     request: RetryRequest<'_>,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    retry_with_execution(store, request, ProductExecution {
+        agent_runtime,
+        authority_provider: &authority_provider,
+    })
+    .await
+}
+
+pub async fn retry_with_execution(
+    store: &Store,
+    request: RetryRequest<'_>,
+    execution: ProductExecution<'_>,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, request.instance_id)?;
     reject_pending_retry(store, &instance)?;
     let workflow = load_validated_workflow(store, &instance.workflow_revision)?;
@@ -523,7 +642,7 @@ pub async fn retry(
         intent: intent.clone(),
         planned_charge: plan,
     })?;
-    execute_started_round(store, started, workflow, intent, agent_runtime).await
+    execute_started_round(store, started, workflow, intent, execution).await
 }
 
 fn reject_pending_retry(store: &Store, instance: &OrchestrationInstance) -> Result<(), OrchestrationShellError> {
@@ -589,7 +708,7 @@ pub fn abandon_pending(
 fn validate_run_owner(
     instance: &OrchestrationInstance,
     intent: &DispatchIntent,
-    record: &RunRecord,
+    record: &crate::store::RunRecord,
 ) -> Result<(), OrchestrationShellError> {
     if record.run_id != intent.run_id {
         return Err(OrchestrationShellError::RunIdentityMismatch { run_id: record.run_id });
@@ -616,7 +735,7 @@ fn reconcile_run_record(
     store: &Store,
     instance: &OrchestrationInstance,
     intent: &DispatchIntent,
-    record: &RunRecord,
+    record: &crate::store::RunRecord,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let observed_usage = observed_usage(instance, &intent.id).unwrap_or_default();
     let is_succeeded = record.failures == 0;

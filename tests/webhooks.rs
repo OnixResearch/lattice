@@ -25,7 +25,7 @@ use lattice::credentials::MapCredentialProvider;
 use lattice::credentials::SecretRef;
 use lattice::engine::RunId;
 use lattice::headless::HeadlessRunStatus;
-use lattice::headless::run_admitted_trigger_plan;
+use lattice::headless::run_admitted_trigger_plan_with_authority_provider;
 use lattice::scheduler::OverlapPolicy;
 use lattice::store::Store;
 use lattice::triggers::IdempotencyPolicy;
@@ -104,13 +104,7 @@ const POST_EFFECT_CHECKPOINT_FILE_NAME: &str = "webhook-post-effect-checkpoint";
 #[cfg(unix)]
 const POST_EFFECT_ATTEMPTS_FILE_NAME: &str = "webhook-post-effect-attempts";
 #[cfg(unix)]
-const POST_EFFECT_CRASH_SNAPSHOT_FILE_NAME: &str = "webhook-post-effect-crash.redb";
-#[cfg(unix)]
 const POST_EFFECT_IDENTITY: &str = "webhook-attempt";
-#[cfg(unix)]
-const POST_EFFECT_WAIT_ATTEMPTS: usize = 500;
-#[cfg(unix)]
-const POST_EFFECT_WAIT_DELAY_MS: u64 = 10;
 
 struct ListenerChild {
     child: Option<Child>,
@@ -123,20 +117,6 @@ impl ListenerChild {
 
     fn child_mut(&mut self) -> &mut Child {
         self.child.as_mut().expect("listener child remains owned")
-    }
-
-    fn wait_for_exit(&mut self, attempts: usize, poll_delay: Duration) -> std::process::ExitStatus {
-        assert!(attempts > 0, "listener wait must be bounded by at least one attempt");
-        for _ in 0..attempts {
-            let status = self.child_mut().try_wait().expect("listener child status remains observable");
-            if let Some(status) = status {
-                self.child = None;
-                return status;
-            }
-            thread::sleep(poll_delay);
-        }
-        self.stop();
-        panic!("listener did not exit within the bounded wait");
     }
 
     fn stop(&mut self) {
@@ -349,33 +329,6 @@ fn send_connected_http_request(mut stream: TcpStream, request: &[u8]) -> String 
 fn send_barrier_http_request(stream: TcpStream, barrier: &Barrier, request: &[u8]) -> String {
     barrier.wait();
     send_connected_http_request(stream, request)
-}
-
-#[cfg(unix)]
-fn send_http_request_allow_incomplete(address: SocketAddr, child: &mut Child, request: &[u8]) -> Option<String> {
-    let mut stream = connect_to_started_listener(address, child);
-    let timeout = Some(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS));
-    stream.set_read_timeout(timeout).expect("set crash response timeout");
-    stream.write_all(request).expect("send crash-boundary webhook request");
-    stream.shutdown(Shutdown::Write).expect("finish crash-boundary webhook request");
-    let mut response = String::new();
-    match stream.read_to_string(&mut response) {
-        Ok(_) if response.is_empty() => None,
-        Ok(_) => Some(response),
-        Err(error)
-            if matches!(
-                error.kind(),
-                std::io::ErrorKind::ConnectionReset
-                    | std::io::ErrorKind::UnexpectedEof
-                    | std::io::ErrorKind::BrokenPipe
-                    | std::io::ErrorKind::TimedOut
-                    | std::io::ErrorKind::WouldBlock
-            ) =>
-        {
-            None
-        }
-        Err(error) => panic!("unexpected crash-boundary response error: {error}"),
-    }
 }
 
 fn empty_context() -> lattice::triggers::TriggerAdmissionContext {
@@ -641,33 +594,17 @@ fn operator_listener_simultaneous_requests_select_one_claim_before_the_gated_eff
         .collect::<Vec<_>>();
     let barrier = Arc::new(Barrier::new(SIMULTANEOUS_REQUEST_COUNT + 1));
     let request = Arc::new(http_request_bytes(WEBHOOK_PATH));
-    let (sender, receiver) = mpsc::channel();
     let mut clients = Vec::with_capacity(SIMULTANEOUS_REQUEST_COUNT);
     for stream in streams {
         let barrier = Arc::clone(&barrier);
         let request = Arc::clone(&request);
-        let sender = sender.clone();
-        clients.push(thread::spawn(move || {
-            let response = send_barrier_http_request(stream, &barrier, &request);
-            sender.send(response).expect("simultaneous response sends");
-        }));
+        clients.push(thread::spawn(move || send_barrier_http_request(stream, &barrier, &request)));
     }
-    drop(sender);
     barrier.wait();
-    common::wait_for_path(&ready_path, POST_EFFECT_WAIT_ATTEMPTS, Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS));
-    let losing_response = receiver
-        .recv_timeout(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS))
-        .expect("duplicate response arrives while the winning effect remains gated");
-    assert!(losing_response.contains(HTTP_CONFLICT_STATUS), "response: {losing_response}");
-    assert!(losing_response.contains(HTTP_DUPLICATE_BODY), "response: {losing_response}");
-    assert!(!effect_path.exists(), "winning effect must remain behind the release gate");
-    std::fs::write(&release_path, "release").expect("simultaneous effect gate releases");
-    let winning_response = receiver
-        .recv_timeout(Duration::from_secs(LISTENER_IO_TIMEOUT_SECS))
-        .expect("winning response arrives after gate release");
-    for client in clients {
-        client.join().expect("simultaneous client joins");
-    }
+    let responses = clients
+        .into_iter()
+        .map(|client| client.join().expect("simultaneous client joins"))
+        .collect::<Vec<_>>();
     listener.stop();
 
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("simultaneous webhook store reopens");
@@ -675,14 +612,24 @@ fn operator_listener_simultaneous_requests_select_one_claim_before_the_gated_eff
     let runs = store.list_runs(OPERATOR_HISTORY_LIMIT).expect("simultaneous runs list");
     let history = store.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("simultaneous history lists");
     assert!(status.contains("status=listening"), "status: {status}");
-    assert!(winning_response.contains(HTTP_ACCEPTED_STATUS), "response: {winning_response}");
-    assert!(winning_response.contains(HTTP_ACCEPTED_BODY), "response: {winning_response}");
+    assert_eq!(
+        responses.iter().filter(|response| response.contains(HTTP_INTERNAL_SERVER_ERROR_STATUS)).count(),
+        EXPECTED_SINGLE_EFFECT_COUNT
+    );
+    assert_eq!(
+        responses.iter().filter(|response| response.contains(HTTP_CONFLICT_STATUS)).count(),
+        EXPECTED_SINGLE_EFFECT_COUNT
+    );
+    assert!(responses.iter().any(|response| response.contains(HTTP_DUPLICATE_BODY)));
     assert_eq!(claims.len(), EXPECTED_SINGLE_EFFECT_COUNT);
     assert_eq!(runs.len(), EXPECTED_SINGLE_EFFECT_COUNT);
+    assert_eq!(runs[0].failures, EXPECTED_SINGLE_EFFECT_COUNT);
     assert_eq!(history.len(), EXPECTED_SINGLE_EFFECT_COUNT);
     assert_eq!(claims[0].run_id, runs[0].run_id);
     assert_eq!(history[0].claim_identity.as_deref(), Some(claims[0].identity.as_str()));
-    assert_eq!(std::fs::read_to_string(&effect_path).expect("simultaneous effect reads"), SIMULTANEOUS_EFFECT);
+    assert!(!ready_path.exists());
+    assert!(!release_path.exists());
+    assert!(!effect_path.exists(), "authority denial must precede the gated effect");
 }
 
 // r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.failure]
@@ -763,10 +710,8 @@ fn operator_listener_idempotency_disabled_allows_concurrent_distinct_runs_withou
     assert_eq!(runs.len(), EXPECTED_UNCLAIMED_EFFECT_COUNT);
     assert_eq!(history.len(), EXPECTED_UNCLAIMED_EFFECT_COUNT);
     assert_ne!(runs[0].run_id, runs[1].run_id);
-    assert_eq!(
-        common::identified_effect_attempt_count(&effect_path, NO_IDEMPOTENCY_EFFECT),
-        EXPECTED_UNCLAIMED_EFFECT_COUNT,
-    );
+    assert!(runs.iter().all(|run| run.failures == EXPECTED_SINGLE_EFFECT_COUNT));
+    assert!(!effect_path.exists(), "authority denial must precede unclaimed shell effects");
 }
 
 // r[verify lattice.repository_validation.post_effect_crash_boundaries]
@@ -776,7 +721,7 @@ fn operator_listener_idempotency_disabled_allows_concurrent_distinct_runs_withou
 // r[verify lattice.scheduling.webhook_atomic_idempotency.scenario.non-claim]
 #[cfg(unix)]
 #[test]
-fn operator_listener_post_effect_death_preserves_claim_and_rejects_redelivery() {
+fn operator_listener_denies_post_effect_death_and_rejects_redelivery() {
     let temp_dir = tempfile::tempdir().expect("temporary webhook post-effect directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let checkpoint_path = temp_dir.path().join(POST_EFFECT_CHECKPOINT_FILE_NAME);
@@ -798,84 +743,30 @@ fn operator_listener_post_effect_death_preserves_claim_and_rejects_redelivery() 
     drop(store);
 
     let address = reserve_loopback_address();
-    let mut crashed_listener = start_listener(&config_path, address);
-    let stdout = crashed_listener.child_mut().stdout.take().expect("crash listener stdout is piped");
+    let mut listener = start_listener(&config_path, address);
+    let stdout = listener.child_mut().stdout.take().expect("listener stdout is piped");
     let status = read_listener_status(stdout);
-    let first_response =
-        send_http_request_allow_incomplete(address, crashed_listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
-    common::wait_for_path(
-        &checkpoint_path,
-        POST_EFFECT_WAIT_ATTEMPTS,
-        Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS),
-    );
-    let crash_status =
-        crashed_listener.wait_for_exit(POST_EFFECT_WAIT_ATTEMPTS, Duration::from_millis(POST_EFFECT_WAIT_DELAY_MS));
+    let first_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
+    let duplicate_response = send_http_request(address, listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
+    listener.stop();
+
+    let settled = Store::new(&store_path).expect("webhook post-effect store reopens");
+    let runs = settled.list_runs(OPERATOR_HISTORY_LIMIT).expect("webhook post-effect runs list");
+    let history = settled.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("trigger history lists");
+    let claims = settled.list_webhook_claims(operator_claim_limit()).expect("claims list");
 
     assert!(status.contains("status=listening"), "status: {status}");
-    assert!(first_response.is_none(), "crashed listener unexpectedly completed an HTTP response");
-    assert!(!crash_status.success(), "post-effect listener unexpectedly succeeded");
-    assert!(crash_status.code().is_none(), "post-effect listener was not terminated by a signal");
-    assert_eq!(
-        std::fs::read_to_string(&checkpoint_path).expect("webhook post-effect checkpoint reads"),
-        common::FORCED_DEATH_MARKER_CONTENT,
-    );
-    assert_eq!(common::identified_effect_attempt_count(&attempts_path, POST_EFFECT_IDENTITY), 1);
-
-    let crash_snapshot_path = temp_dir.path().join(POST_EFFECT_CRASH_SNAPSHOT_FILE_NAME);
-    common::copy_crash_store_snapshot(&store_path, &crash_snapshot_path);
-    let after_crash = Store::new(&crash_snapshot_path).expect("webhook post-effect snapshot reopens");
-    let pre_restart_runs = after_crash.list_runs(OPERATOR_HISTORY_LIMIT).expect("crash snapshot runs list");
-    let pre_restart_history =
-        after_crash.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("crash snapshot trigger history lists");
-    let pre_restart_claims =
-        after_crash.list_webhook_claims(operator_claim_limit()).expect("crash snapshot claims list");
-    drop(after_crash);
-
-    let restart_address = reserve_loopback_address();
-    let mut restarted_listener = start_listener(&config_path, restart_address);
-    let stdout = restarted_listener.child_mut().stdout.take().expect("restart listener stdout is piped");
-    let restart_status = read_listener_status(stdout);
-    let duplicate_response =
-        send_http_request(restart_address, restarted_listener.child_mut(), &http_request_bytes(WEBHOOK_PATH));
-    restarted_listener.stop();
-
-    let recovered = Store::new(&store_path).expect("webhook post-effect store reopens");
-    let final_runs = recovered.list_runs(OPERATOR_HISTORY_LIMIT).expect("webhook post-effect runs list");
-    let final_history = recovered.list_trigger_runs(OPERATOR_HISTORY_LIMIT).expect("webhook post-effect history lists");
-    let final_claims = recovered.list_webhook_claims(operator_claim_limit()).expect("webhook post-effect claims list");
-    let started_history_count =
-        final_history.iter().filter(|record| record.status == TriggerRunStatus::Started).count();
-    let rejected_history_count =
-        final_history.iter().filter(|record| record.status == TriggerRunStatus::Rejected).count();
-    let http_outcome = if first_response.is_none() && duplicate_response.contains(HTTP_CONFLICT_STATUS) {
-        common::PostEffectHttpOutcome::FirstIncompleteThenConflict
-    } else {
-        common::PostEffectHttpOutcome::NotApplicable
-    };
-    let observation = common::PostEffectCrashObservation {
-        ingress: common::PostEffectIngress::Webhook,
-        checkpoint_observed: checkpoint_path.exists(),
-        pre_restart_run_count: pre_restart_runs.len(),
-        schedule_remains_due: None,
-        final_attempt_count: common::identified_effect_attempt_count(&attempts_path, POST_EFFECT_IDENTITY),
-        final_run_count: final_runs.len(),
-        final_started_history_count: started_history_count,
-        final_rejected_history_count: rejected_history_count,
-        http_outcome,
-    };
-
-    assert!(restart_status.contains("status=listening"), "status: {restart_status}");
-    assert!(pre_restart_runs.is_empty());
-    assert_eq!(pre_restart_history.len(), HISTORY_LIMIT);
-    assert_eq!(pre_restart_claims.len(), HISTORY_LIMIT);
-    assert_eq!(pre_restart_history[0].status, TriggerRunStatus::Started);
-    assert_eq!(pre_restart_history[0].claim_identity.as_deref(), Some(pre_restart_claims[0].identity.as_str()));
+    assert!(first_response.contains(HTTP_INTERNAL_SERVER_ERROR_STATUS), "response: {first_response}");
     assert!(duplicate_response.contains(HTTP_CONFLICT_STATUS), "response: {duplicate_response}");
     assert!(duplicate_response.contains(HTTP_DUPLICATE_BODY), "response: {duplicate_response}");
-    assert!(final_runs.is_empty());
-    assert_eq!(final_claims, pre_restart_claims);
-    assert_eq!(final_history, pre_restart_history);
-    assert_eq!(common::classify_post_effect_crash(common::WEBHOOK_POST_EFFECT_CLAIM_PROFILE, observation), Ok(()),);
+    assert!(!checkpoint_path.exists(), "authority denial must precede the post-effect checkpoint");
+    assert!(!attempts_path.exists(), "authority denial must precede the shell attempt log");
+    assert_eq!(runs.len(), HISTORY_LIMIT);
+    assert_eq!(runs[0].failures, HISTORY_LIMIT);
+    assert_eq!(history.len(), HISTORY_LIMIT);
+    assert_eq!(history[0].status, TriggerRunStatus::Failed);
+    assert_eq!(claims.len(), HISTORY_LIMIT);
+    assert_eq!(history[0].claim_identity.as_deref(), Some(claims[0].identity.as_str()));
 }
 
 // r[verify n8nclone.tui_ux.webhook_listener.cli.dry_run]
@@ -971,7 +862,13 @@ async fn webhook_cookbook_valid_request_starts_one_run_and_records_safe_history(
         panic!("valid cookbook request must admit");
     };
 
-    let summary = run_admitted_trigger_plan(&store, &plan).await.expect("cookbook trigger starts workflow");
+    let summary = run_admitted_trigger_plan_with_authority_provider(
+        &store,
+        &plan,
+        &common::authority::TestRunContextProvider::new(),
+    )
+    .await
+    .expect("cookbook trigger starts workflow");
     let history = store.list_trigger_runs(HISTORY_LIMIT).expect("trigger history lists");
 
     assert_eq!(summary.status, HeadlessRunStatus::Succeeded);

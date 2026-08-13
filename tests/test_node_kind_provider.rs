@@ -2,6 +2,7 @@
 
 use lattice::config::AppConfig;
 use lattice::engine::workflow::NodeConfig;
+use lattice::file_node::FileOperationKind;
 use lattice::node_kind_provider::NodeKindValidationCode;
 use lattice::node_kind_provider::property_lines_for_config;
 use lattice::node_kind_provider::provider_for_config;
@@ -18,6 +19,8 @@ const EMPTY_COMMAND: &str = "   ";
 const COMMAND_LABEL: &str = "Cmd";
 const TYPE_LABEL: &str = "Type";
 const SHELL_NODE_LABEL: &str = "Shell";
+const PRODUCT_ROOT_ID: &str = "operator-root";
+const PRODUCT_RELATIVE_PATH: &str = "nested/item.txt";
 
 fn test_config(temp_dir: &tempfile::TempDir) -> AppConfig {
     let data_dir = temp_dir.path().join("data");
@@ -51,6 +54,31 @@ fn provider_validation_accepts_valid_shell_and_rejects_empty_command() {
 
     assert!(valid_issues.is_empty());
     assert!(invalid_issues.iter().any(|issue| issue.code == NodeKindValidationCode::EmptyShellCommand));
+}
+
+#[test]
+fn provider_validation_accepts_product_root_ids_and_rejects_unsafe_relative_paths() {
+    let valid = NodeConfig::File {
+        operation: FileOperationKind::Read,
+        path: PRODUCT_RELATIVE_PATH.to_owned(),
+        content: None,
+        overwrite: false,
+        allowed_roots: vec![PRODUCT_ROOT_ID.to_owned()],
+    };
+    let invalid = NodeConfig::File {
+        operation: FileOperationKind::Read,
+        path: "../escape.txt".to_owned(),
+        content: None,
+        overwrite: false,
+        allowed_roots: vec![PRODUCT_ROOT_ID.to_owned()],
+    };
+
+    assert!(validate_config_for_kind(NODE_LABEL, &valid).is_empty());
+    assert!(
+        validate_config_for_kind(NODE_LABEL, &invalid)
+            .iter()
+            .any(|issue| issue.code == NodeKindValidationCode::UnsafeFilePath)
+    );
 }
 
 // r[verify n8nclone.workflow_format.node_kind_provider]

@@ -1,0 +1,5 @@
+revision: bb8fb5f4a763f532df96b6e65407163ac668834e
+archive-blake3: 1492cc103aab54c9b5f9400b74cbbc623f3a8ab924197a9d4f47275876019e85
+ucan-revision: 277ab768eb532ac0c715a3bbff2a7dc37a702f11
+source: git@github.com:OnixResearch/basalt.git
+owner-grant: OnixResearch-owned source authorized for Lattice reuse

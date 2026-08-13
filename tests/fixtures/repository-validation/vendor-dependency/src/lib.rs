@@ -2,4 +2,6 @@
 
 pub mod coverage;
 
-pub fn lint_boundary(values:&Vec<String>)->usize{values.len()}
+pub fn lint_boundary(values: &Vec<String>) -> usize {
+    values.len()
+}

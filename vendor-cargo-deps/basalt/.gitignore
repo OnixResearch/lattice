@@ -1,0 +1,6 @@
+/target
+/result
+/.direnv
+.pi/
+/contracts/generated/policy.json
+.pi/

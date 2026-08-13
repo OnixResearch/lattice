@@ -1,10 +1,10 @@
 //! Static adoption checks for exact Choregraph source and authority boundaries.
 
-const CHOREGRAPH_REVISION: &str = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
-const CHOREGRAPH_ROLLBACK_REVISION: &str = "c8d56ad83a57287064edb85f58808f53e4bf4536";
+const CHOREGRAPH_REVISION: &str = "85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+const CHOREGRAPH_ROLLBACK_REVISION: &str = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
 const CHOREGRAPH_URL: &str = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
 const VCS_REVISION_HEX_LENGTH: usize = 40;
-const CARGO_PIN_COUNT: usize = 3;
+const CARGO_PIN_COUNT: usize = 4;
 const CARGO_MANIFEST: &str = include_str!("../Cargo.toml");
 const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const SOURCE_ADMISSION: &str = include_str!("fixtures/radicle/choregraph-source-admission-v1.ncl");
@@ -16,6 +16,8 @@ const EXECUTOR_SHELL: &str = include_str!("../src/engine/executor.rs");
 const RUNNER_TESTS: &str = include_str!("test_runner_core.rs");
 const MIGRATION_TESTS: &str = include_str!("test_choregraph_migration.rs");
 const CHECK_SCRIPT: &str = include_str!("../scripts/check.rs");
+const BASALT_SOURCE: &str = include_str!("../vendor-cargo-deps/basalt/SOURCE");
+const BASALT_NORMALIZATION: &str = include_str!("../vendor-cargo-deps/basalt/NORMALIZATION.md");
 const FORBIDDEN_LOWERING_MARKERS: &[&str] = &[
     "std::fs",
     "std::process",
@@ -40,6 +42,7 @@ fn exact_source_and_prerequisites_are_aligned() {
     assert!(CARGO_MANIFEST.contains("choregraph-core"));
     assert!(CARGO_MANIFEST.contains("choregraph-nickel"));
     assert!(CARGO_MANIFEST.contains("choregraph-seaglass"));
+    assert!(CARGO_MANIFEST.contains("choregraph-kamacite"));
     assert!(CARGO_MANIFEST.contains(CHOREGRAPH_URL));
     assert!(FLAKE_SOURCE.contains(CHOREGRAPH_REVISION));
     assert!(FLAKE_SOURCE.contains(CHOREGRAPH_URL));
@@ -82,4 +85,8 @@ fn adoption_boundaries_and_evidence_paths_remain_present() {
     assert!(CHECK_SCRIPT.contains("name: \"tests\""));
     assert_eq!(CHOREGRAPH_ROLLBACK_REVISION.len(), VCS_REVISION_HEX_LENGTH);
     assert_ne!(CHOREGRAPH_ROLLBACK_REVISION, CHOREGRAPH_REVISION);
+    assert!(BASALT_SOURCE.contains("revision: bb8fb5f4a763f532df96b6e65407163ac668834e"));
+    assert!(BASALT_SOURCE.contains("ucan-revision: 277ab768eb532ac0c715a3bbff2a7dc37a702f11"));
+    assert!(BASALT_NORMALIZATION.contains("not a byte-identical copy"));
+    assert!(BASALT_NORMALIZATION.contains("no runtime, sibling, or network fallback"));
 }

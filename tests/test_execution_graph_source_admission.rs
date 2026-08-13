@@ -9,15 +9,16 @@ const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
 const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
-const REVISION: &str = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
-const ARCHIVE_BLAKE3: &str = "41adfbdae4bc5b688ef92ab11cd39ed9c8f572bf6214f522d9b4a1290e5f84d5";
+const REVISION: &str = "85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+const ARCHIVE_BLAKE3: &str = "b9bbe165260d6b30290ac90b02440b498a35d07dd94969b9fc56c69149ffcc04";
 const LICENSE: &str = "AGPL-3.0-or-later";
 const HTTPS_URL: &str = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
-const NAR_HASH: &str = "sha256-Wp7ZBrTXgQYvG62JSbi1nM2CeZx0mBFrK0tygwDpTSc=";
-const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"81b260da2256147ec82cb5dd44c0a0c1dcb7500d\" }";
-const LOCK_SOURCE: &str = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
-const FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d\";";
-const CARGO_LOCK_PACKAGE_COUNT: usize = 3;
+const NAR_HASH: &str = "sha256-LwDI9579RslL/+QlUlpKAKnnElhoi0o1pSSEhvvT078=";
+const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"85ea5e35caaab23260fcb27bc7c5d995dec546c4\" }";
+const LOCK_SOURCE: &str = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+const FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4\";";
+const CARGO_LOCK_PACKAGE_COUNT: usize = 4;
+const HISTORICAL_PUBLICATION_REVISION: &str = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
 
 const ISSUE_RECEIPT: &str = "source.receipt";
 const ISSUE_CARGO: &str = "source.cargo";
@@ -58,6 +59,8 @@ fn admission_matches(source: &str) -> bool {
         format!("license = \"{LICENSE}\""),
         format!("cargo_revision = \"{REVISION}\""),
         format!("nix_revision = \"{REVISION}\""),
+        format!("publication_receipt_revision = \"{HISTORICAL_PUBLICATION_REVISION}\""),
+        "publication_receipt_matches_revision = false".to_owned(),
         "execution_graph_baseline = true".to_owned(),
         "forbidden_fallbacks = [\"floating\", \"github\", \"sibling\", \"vendor\", \"runtime\"]".to_owned(),
     ];

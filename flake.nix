@@ -9,13 +9,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
-    octet.url = "github:OnixResearch/octet";
+    octet.url = "github:OnixResearch/octet/731571fbfffd0b7db11ac0cc9d3939105ddc71e2";
     bounded-exec = {
       url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
     };
     choregraph = {
-      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
+      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+      flake = false;
+    };
+    cap-root = {
+      url = "git+https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git?rev=545e77e5a49e4e1d34037aa9a82d924944ac0a1b";
       flake = false;
     };
     nickel-eval = {
@@ -77,6 +81,12 @@
             toString path
           )
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/themes/" (toString path);
+        isPolicyAssetPath =
+          path:
+          pkgs.lib.hasPrefix "${sourceRoot}/policy/" (toString path)
+          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/contracts/generated/policy.json"
+          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE"
+          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
@@ -95,15 +105,16 @@
             || isSourceFixturePath path
             || isAnimusCompileTimeAssetPath path
             || isRatsCompileTimeAssetPath path
+            || isPolicyAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
-        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=81b260da2256147ec82cb5dd44c0a0c1dcb7500d#81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
+        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
-        cargoVendorDir = craneLib.vendorCargoDeps {
+        baseCargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
             packages: checkout:
@@ -126,6 +137,18 @@
             else
               checkout;
         };
+        cargoVendorDir = pkgs.runCommand "lattice-cargo-vendor" { } ''
+          cp -RL ${baseCargoVendorDir}/. "$out"
+          chmod -R u+w "$out"
+          substituteInPlace "$out/config.toml" \
+            --replace-fail "${baseCargoVendorDir}" "$out"
+
+          # Choregraph keeps its reviewed Kamacite codec above the package root.
+          # Restore that exact pinned file where rustc resolves the module path.
+          install -D -m 0444 \
+            ${choregraph}/vendor/kamacite-core-selected/preserves/codec.rs \
+            "$out/vendor/kamacite-core-selected/preserves/codec.rs"
+        '';
 
         # Common build inputs
         nativeBuildInputs = with pkgs; [
@@ -393,12 +416,12 @@
                 .admission.schema == "lattice.choregraph-source-admission.v1"
                 and .admission.status == "accepted"
                 and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
-                and .admission.revision == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
+                and .admission.revision == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
                 and .admission.cargo_revision == .admission.revision
                 and .admission.nix_revision == .admission.revision
-                and .admission.source_archive_blake3 == "41adfbdae4bc5b688ef92ab11cd39ed9c8f572bf6214f522d9b4a1290e5f84d5"
-                and .admission.release_bundle_blake3 == "6912c485313908411040fa533bd75a1cfd2611d7589605268ae111b3ba1472bc"
-                and .admission.candidate_blake3 == "c493ef88a648eb30b621e74fa5c0f7294df9048501a379395403ad3dcd8a4c65"
+                and .admission.source_archive_blake3 == "b9bbe165260d6b30290ac90b02440b498a35d07dd94969b9fc56c69149ffcc04"
+                and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
+                and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
                 and ([.admission.prerequisites[]] | all(. == true))
                 and ([.admission.evidence[]] | all(. == true))
                 and .admission.forbidden_fallbacks == ["floating", "github", "sibling", "vendor", "runtime"]
@@ -413,14 +436,14 @@
 
               grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
               grep --fixed-strings 'git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'rev = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4"' ${self}/Cargo.toml > /dev/null
               test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-nickel"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
               grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq --exit-status '
-                .nodes.choregraph.locked.rev == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
-                and .nodes.choregraph.original.rev == "81b260da2256147ec82cb5dd44c0a0c1dcb7500d"
+                .nodes.choregraph.locked.rev == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+                and .nodes.choregraph.original.rev == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
               ' ${self}/flake.lock > /dev/null
 
               test -f ${choregraph}/crates/choregraph-core/Cargo.toml
@@ -428,8 +451,12 @@
               test -f ${choregraph}/crates/choregraph-seaglass/Cargo.toml
               grep --fixed-strings 'GNU AFFERO GENERAL PUBLIC LICENSE' ${choregraph}/LICENSE > /dev/null
               test ! -e ${self}/vendor-cargo-deps/seaglass-execution-graph
-              test "$(grep -R -l 'seaglass_execution_graph' ${self}/src --include='*.rs')" = \
-                "${self}/src/engine/runner.rs"
+              grep -R -l 'seaglass_execution_graph' ${src}/src --include='*.rs' | sort > "$TMPDIR/seaglass-import-files"
+              printf '%s\n%s\n' \
+                "${src}/src/engine/runner.rs" \
+                "${src}/src/engine/effect/choregraph.rs" \
+                | sort > "$TMPDIR/expected-seaglass-import-files"
+              cmp "$TMPDIR/expected-seaglass-import-files" "$TMPDIR/seaglass-import-files"
               grep -R -l 'choregraph_nickel' ${self}/src --include='*.rs' | sort > "$TMPDIR/choregraph-import-files"
               printf '%s\n%s\n' \
                 "${self}/src/workflow_format.rs" \

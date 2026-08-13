@@ -16,6 +16,8 @@ use lattice::control_flow::MergePolicy;
 use lattice::control_flow::SubworkflowNodeConfig;
 use lattice::credentials::NodeCredentialRefs;
 use lattice::credentials::SecretRef;
+use lattice::engine::effect::authority;
+use lattice::engine::effect::choregraph;
 use lattice::engine::runner::build_runner_plan;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::NodeRunnerSettings;
@@ -60,6 +62,8 @@ const ROLE_PROMPT_PATH: &str = "roles/researcher.md";
 const ROLE_PROMPT_BODY: &str = "# Researcher\n\nFind primary evidence and report uncertainty.\n";
 const ROLE_PROMPT_LABEL: &str = "Researcher";
 const OVERSIZED_PROMPT_EXTRA_BYTES: usize = 1;
+const EFFECT_REQUEST_REF: &str = "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const EFFECT_PAYLOAD_REF: &str = "blake3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 fn write_test_config(temp_dir: &tempfile::TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let data_dir = temp_dir.path().join("data");
@@ -142,13 +146,57 @@ fn decoded_workflow_lowers_in_memory_through_choregraph() {
 
     let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
 
-    assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV1);
+    assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV2);
     assert_eq!(lowered.machine.node_ids().len(), IMPORTED_NODE_COUNT);
     assert_eq!(lowered.machine.edges().len(), IMPORTED_EDGE_COUNT);
+    assert_eq!(lowered.machine.concrete_effect_declarations().len(), IMPORTED_NODE_COUNT);
     assert_eq!(lowered.import_closure.import_count, 0);
 }
 
 // r[verify lattice.choregraph_adoption.lowering]
+#[test]
+fn lowered_v2_effect_handoff_binds_exact_runtime_identities() {
+    let (workflow, source, _target) = common::two_node_pipeline();
+    let portable = workflow_to_portable(&workflow);
+    let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
+    let mut state = lowered.machine.initial_state();
+    let choregraph_node = format!("lattice-node/{}", source.0);
+    let ready = choregraph_core::ConcreteEvent::new(choregraph_node.clone(), choregraph_core::Action::MarkReady);
+    let context = choregraph::TransitionContext {
+        machine: authority::MachineIdentity::new("machine-v2").expect("machine identity"),
+        workflow_revision: authority::WorkflowRevisionIdentity::new("revision-v2").expect("revision identity"),
+        run: authority::RunIdentity::new("run-v2").expect("run identity"),
+        authority: authority::AuthorityIdentity::new("authority-v2").expect("authority identity"),
+        scope: authority::CollaborationScopeBinding::Unscoped,
+    };
+    let choregraph::TransitionResult::Accepted { next, bindings } =
+        choregraph::transition(&lowered.machine, &state, &ready, &context)
+    else {
+        panic!("mark-ready transition accepted");
+    };
+    assert!(bindings.is_empty());
+    state = next;
+    let start = choregraph::requested_event(choregraph::EventRequest {
+        declaration_key: format!("lattice-effect-{}", source.0),
+        node_id: choregraph_node.clone(),
+        source_node_id: source.0.to_string(),
+        action: choregraph_core::Action::Start,
+        request_ref: EFFECT_REQUEST_REF.to_owned(),
+        payload_ref: EFFECT_PAYLOAD_REF.to_owned(),
+    });
+
+    let choregraph::TransitionResult::Accepted { bindings, .. } =
+        choregraph::transition(&lowered.machine, &state, &start, &context)
+    else {
+        panic!("start transition accepted");
+    };
+    assert_eq!(bindings.len(), 1);
+    assert_eq!(bindings[0].request.as_str(), EFFECT_REQUEST_REF);
+    assert_eq!(bindings[0].payload.as_str(), EFFECT_PAYLOAD_REF);
+    assert_eq!(bindings[0].node.as_str(), choregraph_node);
+    assert_eq!(bindings[0].transition.as_str(), "ready->start");
+}
+
 #[test]
 fn decoded_workflow_cycle_fails_choregraph_admission() {
     let (workflow, source, target) = common::two_node_pipeline();

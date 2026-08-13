@@ -1,0 +1,97 @@
+{
+  "backends": {
+    "nickel": {
+      "description": "Nickel-authored static policy contracts.",
+      "id": "nickel",
+      "supports_higher_order": false
+    },
+    "steel": {
+      "description": "Steel Scheme dynamic predicate contracts.",
+      "id": "steel",
+      "supports_higher_order": true
+    }
+  },
+  "contracts": {
+    "document-read": {
+      "abilities": [
+        "document/read"
+      ],
+      "description": "Read bounded document resources.",
+      "id": "document-read",
+      "resource_prefixes": [
+        "did:key:z6Mkresource/docs/"
+      ]
+    },
+    "document-write": {
+      "abilities": [
+        "document/write"
+      ],
+      "description": "Write bounded document resources.",
+      "id": "document-write",
+      "resource_prefixes": [
+        "did:key:z6Mkresource/docs/"
+      ]
+    },
+    "onixos-state-sync-admin": {
+      "abilities": [
+        "state_sync.admin"
+      ],
+      "description": "Administer one OnixOS state-sync update.",
+      "id": "onixos-state-sync-admin",
+      "resource_prefixes": [
+        "onix://state-sync/"
+      ]
+    },
+    "onixos-state-sync-delete": {
+      "abilities": [
+        "state_sync.delete"
+      ],
+      "description": "Delete one OnixOS state-sync update.",
+      "id": "onixos-state-sync-delete",
+      "resource_prefixes": [
+        "onix://state-sync/"
+      ]
+    },
+    "onixos-state-sync-publish": {
+      "abilities": [
+        "state_sync.publish"
+      ],
+      "description": "Publish one OnixOS state-sync update.",
+      "id": "onixos-state-sync-publish",
+      "resource_prefixes": [
+        "onix://state-sync/"
+      ]
+    },
+    "onixos-target-candidate-activation": {
+      "abilities": [
+        "onix/target-candidate-activation"
+      ],
+      "description": "Activate one OnixOS candidate target.",
+      "id": "onixos-target-candidate-activation",
+      "resource_prefixes": [
+        "did:key:z6Mkonix/onixos/"
+      ]
+    },
+    "onixos-target-generation-persistence": {
+      "abilities": [
+        "onix/target-generation-persistence"
+      ],
+      "description": "Persist one OnixOS generation.",
+      "id": "onixos-target-generation-persistence",
+      "resource_prefixes": [
+        "did:key:z6Mkonix/onixos/"
+      ]
+    },
+    "onixos-target-rollback": {
+      "abilities": [
+        "onix/target-rollback"
+      ],
+      "description": "Roll back one OnixOS target.",
+      "id": "onixos-target-rollback",
+      "resource_prefixes": [
+        "did:key:z6Mkonix/onixos/"
+      ]
+    }
+  },
+  "schema_version": "ucan-nickel-contracts.policy.v1"
+}

@@ -48,7 +48,6 @@ use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::engine::workflow::WorkflowNodeIdentity;
-use crate::replay;
 use crate::replay::ReplayCursor;
 use crate::replay::ReplayTimeline;
 use crate::store::RunDetailRecord;
@@ -58,7 +57,6 @@ use crate::store::RunRecord;
 use crate::store::Store;
 use crate::tui::input;
 use crate::tui::panels;
-use crate::workflow_validation;
 use crate::workflow_validation::WorkflowDiagnostic;
 
 const INITIAL_VIEWPORT_WIDTH: u16 = 80;
@@ -153,7 +151,7 @@ struct ActiveRun {
 enum RunEvent {
     ReplayStarted {
         run_id: RunId,
-        events: Vec<replay::ReplayEventRecord>,
+        events: Vec<crate::replay::ReplayEventRecord>,
     },
     Completed {
         run_id: RunId,
@@ -758,7 +756,7 @@ impl RunHistoryState {
             detail_record: None,
             selected_detail_node: 0,
             replay_timeline: None,
-            replay_cursor: replay::replay_cursor(0),
+            replay_cursor: crate::replay::replay_cursor(0),
             message: None,
         }
     }
@@ -772,7 +770,7 @@ impl RunHistoryState {
             detail_record: None,
             selected_detail_node: 0,
             replay_timeline: None,
-            replay_cursor: replay::replay_cursor(0),
+            replay_cursor: crate::replay::replay_cursor(0),
             message,
         }
     }
@@ -923,6 +921,7 @@ pub struct App {
     dirty: bool,
     confirm_quit: bool,
     executor_factory: Arc<dyn Fn() -> Executor + Send + Sync>,
+    authority_provider: Arc<dyn crate::engine::effect::execution::RunContextProvider>,
 }
 
 impl App {
@@ -974,12 +973,21 @@ impl App {
             dirty: false,
             confirm_quit: false,
             executor_factory: Arc::new(move || Executor::new_with_agent_runtime_config(agent_runtime.clone())),
+            authority_provider: Arc::new(crate::engine::effect::execution::UnavailableRunContextSource),
         }
     }
 
     #[cfg(test)]
     fn set_executor_factory(&mut self, factory: Arc<dyn Fn() -> Executor + Send + Sync>) {
         self.executor_factory = factory;
+    }
+
+    pub fn with_authority_provider(
+        mut self,
+        provider: Arc<dyn crate::engine::effect::execution::RunContextProvider>,
+    ) -> Self {
+        self.authority_provider = provider;
+        self
     }
 
     /// Return whether the workflow has unsaved changes.
@@ -1038,7 +1046,7 @@ impl App {
         self.workflow_browser = WorkflowBrowserState::closed();
         self.add_node_flow = AddNodeFlowState::closed();
         self.run_history = RunHistoryState::closed();
-        self.diagnostics = DiagnosticsState::open(workflow_validation::validate_workflow(&self.workflow));
+        self.diagnostics = DiagnosticsState::open(crate::workflow_validation::validate_workflow(&self.workflow));
     }
 
     /// Close the diagnostics modal without mutating workflow state.
@@ -1428,7 +1436,7 @@ impl App {
         }
         let last_index = self.run_history.records.len() - 1;
         if self.run_history.replay_timeline.is_some() {
-            self.run_history.replay_cursor = replay::move_replay_cursor(self.run_history.replay_cursor, 1);
+            self.run_history.replay_cursor = crate::replay::move_replay_cursor(self.run_history.replay_cursor, 1);
             return;
         }
         if let Some(detail_record) = &self.run_history.detail_record {
@@ -1442,7 +1450,7 @@ impl App {
 
     pub fn select_previous_run_history(&mut self) {
         if self.run_history.replay_timeline.is_some() {
-            self.run_history.replay_cursor = replay::move_replay_cursor(self.run_history.replay_cursor, -1);
+            self.run_history.replay_cursor = crate::replay::move_replay_cursor(self.run_history.replay_cursor, -1);
             return;
         }
         if self.run_history.detail_record.is_some() {
@@ -1502,19 +1510,19 @@ impl App {
         };
         match store.load_run_replay_events(run_id) {
             Ok(Some(events)) => {
-                let timeline = replay::build_replay_timeline(run_id, &events, None);
-                self.run_history.replay_cursor = replay::replay_cursor(timeline.frames.len());
+                let timeline = crate::replay::build_replay_timeline(run_id, &events, None);
+                self.run_history.replay_cursor = crate::replay::replay_cursor(timeline.frames.len());
                 self.run_history.replay_timeline = Some(timeline);
             }
             Ok(None) => {
                 self.run_history.replay_timeline = None;
-                self.run_history.replay_cursor = replay::replay_cursor(0);
+                self.run_history.replay_cursor = crate::replay::replay_cursor(0);
             }
             Err(error) => {
                 let message = format!("Replay load failed: {error}");
                 self.output.push_line(&message);
                 self.run_history.replay_timeline = None;
-                self.run_history.replay_cursor = replay::replay_cursor(0);
+                self.run_history.replay_cursor = crate::replay::replay_cursor(0);
             }
         }
     }
@@ -2154,19 +2162,19 @@ impl App {
             return false;
         }
 
-        let diagnostics = workflow_validation::validate_workflow(&self.workflow);
+        let diagnostics = crate::workflow_validation::validate_workflow(&self.workflow);
         self.diagnostics.diagnostics = diagnostics.clone();
         self.diagnostics.open = false;
-        if workflow_validation::has_fatal_diagnostics(&diagnostics) {
+        if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
             self.diagnostics = DiagnosticsState::open(diagnostics.clone());
             self.output.push_line("Workflow validation failed; open diagnostics for details");
-            for diagnostic in workflow_validation::fatal_diagnostics(&diagnostics) {
-                self.output.push_line(&workflow_validation::format_diagnostic(&diagnostic));
+            for diagnostic in crate::workflow_validation::fatal_diagnostics(&diagnostics) {
+                self.output.push_line(&crate::workflow_validation::format_diagnostic(&diagnostic));
             }
             return false;
         }
         for diagnostic in &diagnostics {
-            self.output.push_line(&workflow_validation::format_diagnostic(diagnostic));
+            self.output.push_line(&crate::workflow_validation::format_diagnostic(diagnostic));
         }
 
         let workflow = self.workflow.clone();
@@ -2194,13 +2202,15 @@ impl App {
 
         let active_workflow = workflow.clone();
         let executor_factory = self.executor_factory.clone();
+        let authority_provider = Arc::clone(&self.authority_provider);
+        let authority_store = self.store.clone();
         let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let executor_cancellation = Arc::clone(&cancellation);
         let handle = tokio::spawn(async move {
             if sender
                 .send(RunEvent::ReplayStarted {
                     run_id,
-                    events: replay::active_events(run_id, &workflow, ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS),
+                    events: crate::replay::active_events(run_id, &workflow, ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS),
                 })
                 .is_err()
             {
@@ -2208,7 +2218,20 @@ impl App {
             }
             let mut executor = executor_factory().with_cancellation(executor_cancellation);
             let cache = HashMap::new();
-            let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
+            let results = match authority_provider.load(run_id, authority_store) {
+                Ok(authority) => executor.run_authorized(&workflow, &cache, &authority).await.1,
+                Err(error) => workflow
+                    .graph
+                    .nodes()
+                    .map(|node| StepResult {
+                        node_id: node.id,
+                        status: NodeStatus::Failed {
+                            error: format!("Choregraph product execution failed: {error}"),
+                        },
+                        input_hash: crate::engine::ContentHash::from_bytes(b""),
+                    })
+                    .collect(),
+            };
             if sender
                 .send(RunEvent::Completed {
                     run_id,
@@ -2248,9 +2271,9 @@ impl App {
         let workflow_name = active_run.workflow.meta.name.clone();
         let replay_timestamp_epoch_ms = chrono::Utc::now().timestamp_millis();
         let replay_events =
-            replay::cancelled_replay_events(active_run.run_id, &active_run.workflow, replay_timestamp_epoch_ms);
+            crate::replay::cancelled_replay_events(active_run.run_id, &active_run.workflow, replay_timestamp_epoch_ms);
         self.run_state.active_replay_timeline =
-            Some(replay::build_replay_timeline(active_run.run_id, &replay_events, None));
+            Some(crate::replay::build_replay_timeline(active_run.run_id, &replay_events, None));
         self.save_run_record(active_run.run_id, &workflow_name, 0, 0, self.run_state.node_statuses.len());
         self.save_run_detail_record(canceled_run_detail_record(
             active_run.run_id,
@@ -2275,7 +2298,7 @@ impl App {
             match event {
                 RunEvent::ReplayStarted { run_id, events } => {
                     if self.run_state.active {
-                        let timeline = replay::build_replay_timeline(run_id, &events, None);
+                        let timeline = crate::replay::build_replay_timeline(run_id, &events, None);
                         debug_assert!(timeline.diagnostics.iter().all(|diagnostic| !diagnostic.fatal));
                         self.run_state.active_replay_timeline = Some(timeline);
                     }
@@ -2332,14 +2355,15 @@ impl App {
             .filter(|step| matches!(step.status, NodeStatus::Completed { cached: true, .. }))
             .count();
         let replay_finished_epoch_ms = chrono::Utc::now().timestamp_millis();
-        let replay_events = replay::replay_events_from_results(
+        let replay_events = crate::replay::replay_events_from_results(
             run_id,
             run_workflow,
             &results,
             replay_finished_epoch_ms,
             Some(replay_finished_epoch_ms),
         );
-        self.run_state.active_replay_timeline = Some(replay::build_replay_timeline(run_id, &replay_events, None));
+        self.run_state.active_replay_timeline =
+            Some(crate::replay::build_replay_timeline(run_id, &replay_events, None));
         self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
         self.save_run_detail_record(run_detail_record_from_results(run_id, run_workflow, &results));
         self.save_run_replay_events(run_id, replay_events);
@@ -2384,7 +2408,7 @@ impl App {
 
     // r[impl n8nclone.workflow_execution.replay.event_store]
     // r[impl n8nclone.tui_ux.replay_debugger.active_run]
-    fn save_run_replay_events(&mut self, run_id: RunId, events: Vec<replay::ReplayEventRecord>) {
+    fn save_run_replay_events(&mut self, run_id: RunId, events: Vec<crate::replay::ReplayEventRecord>) {
         let Some(store) = &self.store else {
             return;
         };
@@ -3516,7 +3540,12 @@ mod tests {
     async fn completed_background_run_is_persisted_to_history() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
         let mut app = App::new(test_config(&temp_dir));
-        app.add_shell_node("Ok", "echo ok");
+        app.add_condition_node("Ok", ConditionNodeConfig {
+            branches: vec![ConditionBranch {
+                label: "always".to_string(),
+                predicate: control_flow::ConditionPredicate::Always,
+            }],
+        });
 
         assert!(app.start_workflow_run());
         for _ in 0..RUN_EVENT_POLL_LIMIT {

@@ -50,6 +50,8 @@ const ORCHESTRATION_EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new(
 const ORCHESTRATION_TRIGGER_ADMISSIONS: TableDefinition<&str, &str> =
     TableDefinition::new("orchestration_trigger_admissions");
 const ORCHESTRATION_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("orchestration_counters");
+const EFFECT_ATTEMPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("effect_attempts_v1");
+const EFFECT_OUTCOMES: TableDefinition<&str, &[u8]> = TableDefinition::new("effect_outcomes_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -154,6 +156,25 @@ pub trait ValueStore {
     fn get_value(&self, hash: &ContentHash) -> Result<Option<Value>, StoreError>;
 }
 
+pub trait EffectAttemptRepository {
+    fn reserve_effect_attempt(
+        &self,
+        binding: crate::engine::effect::authority::IntentBinding,
+    ) -> Result<crate::engine::effect::authority::Attempt, StoreError>;
+    fn save_effect_outcome(
+        &self,
+        event: &crate::engine::effect::authority::AuthorizationOutcomeEvent,
+    ) -> Result<(), StoreError>;
+    fn load_effect_attempt(
+        &self,
+        identity: &crate::engine::effect::authority::AttemptIdentity,
+    ) -> Result<Option<crate::engine::effect::authority::Attempt>, StoreError>;
+    fn load_effect_outcome(
+        &self,
+        identity: &str,
+    ) -> Result<Option<crate::engine::effect::authority::AuthorizationOutcomeEvent>, StoreError>;
+}
+
 // r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
 pub trait ScheduleStore {
     fn save_schedule(&self, schedule: &ScheduleDefinition) -> Result<(), StoreError>;
@@ -209,8 +230,9 @@ pub trait OrchestrationStore {
 }
 
 /// Persistent store backed by redb.
+#[derive(Clone)]
 pub struct Store {
-    db: Database,
+    db: std::sync::Arc<Database>,
 }
 
 // Occurrence admission stays isolated so its atomic transaction does not couple
@@ -240,6 +262,8 @@ impl Store {
             let _ = txn.open_table(ORCHESTRATION_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(ORCHESTRATION_TRIGGER_ADMISSIONS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(ORCHESTRATION_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(EFFECT_ATTEMPTS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(EFFECT_OUTCOMES).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -251,7 +275,9 @@ impl Store {
         let p = path.as_ref();
         Self::open(p)?;
         let db = Database::create(p).map_err(|e| StoreError::Db(e.to_string()))?;
-        Ok(Self { db })
+        Ok(Self {
+            db: std::sync::Arc::new(db),
+        })
     }
 
     // -- workflows ----------------------------------------------------------
@@ -1023,6 +1049,97 @@ fn trigger_run_record_key(record: &TriggerRunRecord) -> String {
         .or_else(|| record.idempotency_key.clone())
         .unwrap_or_else(|| record.message.clone());
     format!("{}:{suffix}", record.trigger_id)
+}
+
+// r[impl lattice.choregraph_effect_authority.durability]
+impl EffectAttemptRepository for Store {
+    fn reserve_effect_attempt(
+        &self,
+        binding: crate::engine::effect::authority::IntentBinding,
+    ) -> Result<crate::engine::effect::authority::Attempt, StoreError> {
+        let existing = std::collections::BTreeSet::new();
+        let attempt = crate::engine::effect::authority::reserve_attempt(binding, &existing)
+            .map_err(|error| StoreError::Conflict(format!("effect attempt reservation failed: {error:?}")))?;
+        let data = serialize(&attempt)?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table = txn.open_table(EFFECT_ATTEMPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if table.get(attempt.identity.as_str()).map_err(|error| StoreError::Db(error.to_string()))?.is_some() {
+                return Err(StoreError::Conflict("effect attempt already exists".to_owned()));
+            }
+            table
+                .insert(attempt.identity.as_str(), data.as_slice())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(attempt)
+    }
+
+    fn save_effect_outcome(
+        &self,
+        event: &crate::engine::effect::authority::AuthorizationOutcomeEvent,
+    ) -> Result<(), StoreError> {
+        let data = serialize(event)?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let attempts = txn.open_table(EFFECT_ATTEMPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if attempts.get(event.attempt.as_str()).map_err(|error| StoreError::Db(error.to_string()))?.is_none() {
+                return Err(StoreError::NotFound("effect attempt is not persisted".to_owned()));
+            }
+            let mut outcomes = txn.open_table(EFFECT_OUTCOMES).map_err(|error| StoreError::Table(error.to_string()))?;
+            outcomes
+                .insert(event.identity.as_str(), data.as_slice())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(())
+    }
+
+    fn load_effect_attempt(
+        &self,
+        identity: &crate::engine::effect::authority::AttemptIdentity,
+    ) -> Result<Option<crate::engine::effect::authority::Attempt>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(EFFECT_ATTEMPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+        table
+            .get(identity.as_str())
+            .map_err(|error| StoreError::Db(error.to_string()))?
+            .map(|data| deserialize(data.value()))
+            .transpose()
+    }
+
+    fn load_effect_outcome(
+        &self,
+        identity: &str,
+    ) -> Result<Option<crate::engine::effect::authority::AuthorizationOutcomeEvent>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(EFFECT_OUTCOMES).map_err(|error| StoreError::Table(error.to_string()))?;
+        table
+            .get(identity)
+            .map_err(|error| StoreError::Db(error.to_string()))?
+            .map(|data| deserialize(data.value()))
+            .transpose()
+    }
+}
+
+impl crate::engine::effect::dispatch::EffectAttemptStore for Store {
+    fn reserve(
+        &self,
+        binding: crate::engine::effect::authority::IntentBinding,
+    ) -> Result<crate::engine::effect::authority::Attempt, crate::engine::effect::dispatch::Error> {
+        self.reserve_effect_attempt(binding).map_err(|error| match error {
+            StoreError::Conflict(_) => crate::engine::effect::dispatch::Error::DuplicateAttempt,
+            _ => crate::engine::effect::dispatch::Error::AttemptPersistence,
+        })
+    }
+
+    fn record_outcome(
+        &self,
+        event: &crate::engine::effect::authority::AuthorizationOutcomeEvent,
+    ) -> Result<(), crate::engine::effect::dispatch::Error> {
+        self.save_effect_outcome(event)
+            .map_err(|_| crate::engine::effect::dispatch::Error::OutcomePersistence)
+    }
 }
 
 /// Store errors.

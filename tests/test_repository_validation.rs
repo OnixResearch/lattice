@@ -32,6 +32,7 @@ const UNANCHORED_COVERAGE_IGNORE: &str = "coverage/";
 const UNANCHORED_RESULT_IGNORE: &str = "result*";
 const NESTED_VENDOR_PATH: &str = "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs";
 const VENDOR_SENTINEL: &str = "nested-output-name-admitted";
+const VENDOR_SENTINEL_DECLARATION: &str = "pub const SENTINEL:&str=";
 const GIT_PROGRAM: &str = "git";
 const RUSTFMT_PROGRAM: &str = "rustfmt";
 const GIT_NOT_IGNORED_STATUS: i32 = 1;
@@ -186,7 +187,7 @@ fn validate_contract(inputs: ContractInputs<'_>) -> BTreeSet<&'static str> {
     {
         issues.insert(ISSUE_PATH_DEPENDENCY);
     }
-    if !inputs.vendor_result.contains(VENDOR_SENTINEL) || !inputs.vendor_result.contains("pub const SENTINEL:&str=") {
+    if !inputs.vendor_result.contains(VENDOR_SENTINEL) || !inputs.vendor_result.contains(VENDOR_SENTINEL_DECLARATION) {
         issues.insert(ISSUE_NESTED_RESULT);
     }
     if !validates_json(inputs.json_fixture) {
@@ -202,7 +203,7 @@ fn validate_contract(inputs: ContractInputs<'_>) -> BTreeSet<&'static str> {
     if !inputs.flake.contains(FORMAT_SCOPE) {
         issues.insert(ISSUE_FORMAT_SCOPE);
     }
-    if !inputs.vendor_result.contains("pub const SENTINEL:&str=") {
+    if !inputs.vendor_result.contains(VENDOR_SENTINEL_DECLARATION) {
         issues.insert(ISSUE_FORMAT_PRECONDITION);
     }
     if !inputs.flake.contains(CLIPPY_SCOPE) {
@@ -404,7 +405,7 @@ fn repository_check_contract_mutations_fail_closed() {
     inputs.json_fixture = "{";
     inputs.vendor_manifest = "[package]";
     inputs.vendor_lib = "pub fn lint_boundary(values: &[String]) -> usize { values.len() }";
-    inputs.vendor_result = "pub const SENTINEL: &str = \"formatted\";";
+    inputs.vendor_result = "pub const OTHER: &str = \"formatted\";";
     inputs.bounded_exec_source_admission = "{}";
     inputs.bounded_exec_crates_present = false;
     let issues = validate_contract(inputs);

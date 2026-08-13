@@ -27,6 +27,7 @@ const DISPLAY_CONDITION: &str = "Condition";
 const DISPLAY_MERGE: &str = "Merge";
 const DISPLAY_SUBWORKFLOW: &str = "Subworkflow";
 const MIN_IMAGE_BYTE_BUDGET: usize = 1;
+const PRODUCT_FILE_ROOT_COUNT: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
@@ -223,6 +224,17 @@ fn shell_property_lines(
     lines
 }
 
+fn valid_product_file_target(path: &str, allowed_roots: &[String]) -> bool {
+    let [root_id] = allowed_roots else {
+        return false;
+    };
+    debug_assert_eq!(allowed_roots.len(), PRODUCT_FILE_ROOT_COUNT);
+    !root_id.trim().is_empty()
+        && !root_id.contains('/')
+        && !root_id.contains('\\')
+        && cap_root_core::RootRelativePath::new(path, cap_root_core::AdmissionMode::NonEmptyRelative).is_ok()
+}
+
 fn property_line(label: &'static str, value: impl Into<String>) -> NodePropertyLine {
     NodePropertyLine {
         label,
@@ -260,7 +272,9 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
         NodeConfig::File {
             path, allowed_roots, ..
         } => {
-            if let Err(error) = file_node::validate_path_allowed(path, allowed_roots) {
+            if !valid_product_file_target(path, allowed_roots)
+                && let Err(error) = file_node::validate_path_allowed(path, allowed_roots)
+            {
                 issues.push(issue(NodeKindValidationCode::UnsafeFilePath, error.to_string()));
             }
         }

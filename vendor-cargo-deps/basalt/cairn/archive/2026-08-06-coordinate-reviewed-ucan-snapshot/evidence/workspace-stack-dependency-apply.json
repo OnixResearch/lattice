@@ -1,0 +1,75 @@
+{
+  "schema": "cairn.cross-repo-receipt-summary.v1",
+  "repo": "onixresearch-workspace",
+  "change": "coordinate-cross-stack-dependency-updates",
+  "receipt_kind": "validation_receipt",
+  "status": "pass",
+  "policy_hash": "701e6e61f1f083f3be11c273c832e473b42cf264a667627fed80bdd99877bded",
+  "subject_hash": "d7b96af8b64c440ebce55b975f56693ba0bf25b76f055b887ad3260c2734de17",
+  "receipt_hash": "5532bf6767a0b7d9ec64c920668338a74aa36d44fe244bff2240e9daebbd5d91",
+  "diagnostic_summary": "current passing stack dependency apply receipt",
+  "receipt": {
+    "adapter_results": [
+      {
+        "diagnostic": "sync-vendored-ucan.rs completed successfully",
+        "id": "basalt-vendored-ucan-v1",
+        "status": "pass"
+      },
+      {
+        "diagnostic": "all changed paths match the plan",
+        "id": "changed-path-admission",
+        "status": "pass"
+      }
+    ],
+    "changed_paths": [],
+    "check_results": [
+      {
+        "diagnostic": "sync-vendored-ucan.rs completed successfully",
+        "id": "basalt-vendored-source-parity",
+        "status": "pass"
+      },
+      {
+        "diagnostic": "sync-vendored-ucan.rs completed successfully",
+        "id": "basalt-vendored-snapshot",
+        "status": "pass"
+      },
+      {
+        "diagnostic": "nix completed successfully",
+        "id": "basalt-focused-tests",
+        "status": "pass"
+      },
+      {
+        "diagnostic": "nix completed successfully",
+        "id": "basalt-release-verifier",
+        "status": "pass"
+      }
+    ],
+    "claims": [
+      "observed-dependency-state",
+      "executed-declared-adapter",
+      "ran-declared-consumer-checks"
+    ],
+    "non_claims": [
+      "does-not-prove-upstream-correctness",
+      "does-not-prove-semantic-compatibility",
+      "does-not-prove-release-readiness",
+      "does-not-prove-whole-stack-correctness"
+    ],
+    "observations": [
+      {
+        "blocker": null,
+        "candidate_revision": "34449ba1f1a9ef991225e4e6683b5d6aca8c07cf",
+        "consumer_revision": "34449ba1f1a9ef991225e4e6683b5d6aca8c07cf",
+        "relationship": "ucan-to-basalt-vendored-snapshot",
+        "source_identity": "git:https://github.com/OnixResearch/ucan",
+        "state": "current"
+      }
+    ],
+    "operation": "apply",
+    "plan_blake3": "d7b96af8b64c440ebce55b975f56693ba0bf25b76f055b887ad3260c2734de17",
+    "receipt_blake3": "f36ac73ff54fbc35b66dcd57925d01564e3338df5c187f35d4f1ef1472af89a8",
+    "relationship": "ucan-to-basalt-vendored-snapshot",
+    "schema": "onixresearch.stack-dependency-receipt.v1",
+    "verdict": "pass"
+  }
+}

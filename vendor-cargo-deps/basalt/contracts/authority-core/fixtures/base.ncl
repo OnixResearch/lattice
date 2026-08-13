@@ -1,0 +1,42 @@
+let Contracts = import "../contracts.ncl" in
+{
+  schema | default = Contracts.identity.fixture_schema,
+  fixture_id | default = "base-authority",
+  input = {
+    schema | default = Contracts.identity.input_schema,
+    request = {
+      contract_id | default = "document-write",
+      resource | default = "did:key:z6Mkresource/docs/report",
+      ability | default = "document/write",
+      request_ref | default = "blake3:1111111111111111111111111111111111111111111111111111111111111111",
+    },
+    verified_grants | default = [{
+      grant_ref = "blake3:2222222222222222222222222222222222222222222222222222222222222222",
+      verification_receipt_ref = "blake3:3333333333333333333333333333333333333333333333333333333333333333",
+      resource = "did:key:z6Mkresource/docs/report",
+      ability = "document/write",
+      kind = "direct",
+    }],
+    verification_receipts | default = [{
+      receipt_ref = "blake3:3333333333333333333333333333333333333333333333333333333333333333",
+      request_ref = "blake3:1111111111111111111111111111111111111111111111111111111111111111",
+      verified_grant_refs = [
+        "blake3:2222222222222222222222222222222222222222222222222222222222222222",
+      ],
+      disposition = "current",
+    }],
+    policy_refs | default = [{
+      artifact_ref = "blake3:5475d5473ec98cbf052a83512836b0739f5dad3e7b9b0ed201eb3094b1cf39bf",
+      schema_version = "ucan-nickel-contracts.policy.v1",
+      contract_id = "document-write",
+    }],
+    caveat | default = "satisfied",
+    replay | default = "admitted",
+    claims | default = ["exact-request"],
+    non_claims | default = Contracts.required_non_claims,
+  },
+  expected = {
+    allowed | default = true,
+    diagnostic | default = "none",
+  },
+}

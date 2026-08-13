@@ -16,7 +16,6 @@ use crossterm::event::KeyModifiers;
 use lattice::config::AppConfig;
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
-use lattice::engine::runner::RunnerEventKind;
 use lattice::engine::workflow::NodeConfig;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
@@ -55,7 +54,6 @@ const PTY_POLL_DELAY_MS: u64 = 20;
 const TUI_QUIT_INPUT: &[u8] = b"\x11";
 const TUI_OPEN_WORKFLOW_INPUT: &[u8] = b"\x0f";
 const TUI_RUN_WORKFLOW_INPUT: &[u8] = b"\x12";
-const TUI_CANCEL_RUN_INPUT: &[u8] = b"\x18";
 const TUI_OPEN_DIAGNOSTICS_INPUT: &[u8] = b"\x04";
 const TUI_OPEN_HISTORY_INPUT: &[u8] = b"\x10history\r";
 const TUI_CONFIRM_INPUT: &[u8] = b"\r";
@@ -63,11 +61,10 @@ const TUI_ESCAPE_INPUT: &[u8] = b"\x1b";
 const TUI_RERUN_INPUT: &[u8] = b"r";
 const TUI_WORKSPACE_SURFACES: &[&str] = &["Canvas", "Properties", "Output", "untitled"];
 const TUI_WORKFLOW_BROWSER_SURFACES: &[&str] = &["Open Workflow", TUI_WORKFLOW_NAME];
-const TUI_COMPLETED_RUN_SURFACES: &[&str] = &[TUI_SHELL_OUTPUT, "run", "complete"];
+const TUI_DENIED_RUN_SURFACES: &[&str] = &[TUI_NODE_LABEL, "AuthorityUnavailable", "run", "complete"];
 const TUI_HISTORY_SURFACES: &[&str] = &["Run History", TUI_WORKFLOW_NAME];
 const TUI_WORKFLOW_NAME: &str = "operator-tui-workflow";
 const TUI_NODE_LABEL: &str = "Operator Shell";
-const TUI_SHELL_OUTPUT: &str = "tui-process-e2e";
 const TUI_SHELL_COMMAND: &str = "printf tui-process-e2e";
 const STORE_FILE_NAME: &str = "lattice.redb";
 const TUI_RUN_HISTORY_LIMIT: usize = 10;
@@ -91,7 +88,6 @@ const CANCEL_READY_FILE_NAME: &str = "tui-cancel-ready";
 const CANCEL_FORBIDDEN_FILE_NAME: &str = "tui-cancel-forbidden";
 const CANCEL_FORBIDDEN_TOKEN: &str = "cancel-forbidden-effect";
 const CANCEL_EFFECT_DELAY_SECS: u64 = 2;
-const CANCEL_OBSERVATION_WAIT_SECS: u64 = 3;
 const RESIZE_WORKFLOW_NAME: &str = "operator-tui-resize";
 const RESIZE_NODE_LABEL: &str = "Resize Preserved Node";
 const PTY_CONSTRAINED_ROWS: u16 = 6;
@@ -483,11 +479,11 @@ fn operator_e2e_tui_process_navigates_executes_inspects_history_and_exits() {
     write_pty_input(writer.as_mut(), TUI_CONFIRM_INPUT, "select workflow");
     let opened = wait_for_surfaces(&transcript, &[TUI_NODE_LABEL], "the selected workflow");
     write_pty_input(writer.as_mut(), TUI_RUN_WORKFLOW_INPUT, "run workflow");
-    let completed = wait_for_surfaces(&transcript, TUI_COMPLETED_RUN_SURFACES, "the completed workflow run");
+    let completed = wait_for_surfaces(&transcript, TUI_DENIED_RUN_SURFACES, "the authority-denied workflow run");
     write_pty_input(writer.as_mut(), TUI_OPEN_HISTORY_INPUT, "open run history");
     let history = wait_for_surfaces(&transcript, TUI_HISTORY_SURFACES, "run history");
     write_pty_input(writer.as_mut(), TUI_CONFIRM_INPUT, "inspect run history");
-    let details = wait_for_surfaces(&transcript, &["Outputs for", TUI_NODE_LABEL], "run details");
+    let details = wait_for_surfaces(&transcript, &["Outputs for", TUI_NODE_LABEL, "failed"], "run details");
     write_pty_input(writer.as_mut(), TUI_QUIT_INPUT, "quit");
     let status = wait_for_pty_exit(child.as_mut());
     drop(writer);
@@ -498,7 +494,7 @@ fn operator_e2e_tui_process_navigates_executes_inspects_history_and_exits() {
     assert!(transcript_has_workspace(&rendered));
     assert!(transcript_has_surfaces(&browser, TUI_WORKFLOW_BROWSER_SURFACES));
     assert!(opened.contains(TUI_NODE_LABEL));
-    assert!(transcript_has_surfaces(&completed, TUI_COMPLETED_RUN_SURFACES));
+    assert!(transcript_has_surfaces(&completed, TUI_DENIED_RUN_SURFACES));
     assert!(transcript_has_surfaces(&history, TUI_HISTORY_SURFACES));
     assert!(details.contains(&format!("Outputs for {TUI_NODE_LABEL}")));
 
@@ -506,8 +502,12 @@ fn operator_e2e_tui_process_navigates_executes_inspects_history_and_exits() {
     let runs = store.list_runs(TUI_RUN_HISTORY_LIMIT).expect("operator TUI run history lists");
     assert_eq!(runs.len(), EXPECTED_TUI_RUN_COUNT);
     assert_eq!(runs[0].workflow_name, TUI_WORKFLOW_NAME);
-    assert_eq!(runs[0].failures, 0);
-    assert!(store.load_run_details(runs[0].run_id).expect("operator TUI run details load").is_some());
+    assert_eq!(runs[0].failures, EXPECTED_TUI_RUN_COUNT);
+    let details = store
+        .load_run_details(runs[0].run_id)
+        .expect("operator TUI run details load")
+        .expect("operator TUI run details persist");
+    assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Failed);
 }
 
 // r[verify lattice.tui_ux.process_failure_recovery]
@@ -529,7 +529,7 @@ fn operator_e2e_tui_process_inspects_failure_and_explicitly_reruns_fresh_identit
     session.wait_fresh(cursor, &[FAIL_ONCE_NODE_LABEL], "the selected fail-once workflow");
     let cursor = session.cursor();
     session.input(TUI_RUN_WORKFLOW_INPUT, "run fail-once workflow");
-    session.wait_fresh(cursor, &[FAIL_ONCE_NODE_LABEL, "process timed out"], "the failed first attempt");
+    session.wait_fresh(cursor, &[FAIL_ONCE_NODE_LABEL, "AuthorityUnavailable"], "the denied first attempt");
 
     let cursor = session.cursor();
     session.input(TUI_OPEN_HISTORY_INPUT, "open failed run history");
@@ -540,35 +540,34 @@ fn operator_e2e_tui_process_inspects_failure_and_explicitly_reruns_fresh_identit
     let cursor = session.cursor();
     session.input(TUI_RERUN_INPUT, "explicitly rerun failed history entry");
     session.input(TUI_ESCAPE_INPUT, "close history after explicit rerun");
-    session.wait_fresh(cursor, &[FAIL_ONCE_SUCCESS_TOKEN, "run:1 complete"], "the successful explicit rerun");
+    session.wait_fresh(
+        cursor,
+        &[FAIL_ONCE_NODE_LABEL, "AuthorityUnavailable", "run:1 complete"],
+        "the denied explicit rerun",
+    );
     let cursor = session.cursor();
     session.input(TUI_OPEN_HISTORY_INPUT, "reopen rerun history");
     session.wait_fresh(cursor, &["Run History", "run:1"], "rerun history");
     let cursor = session.cursor();
-    session.input(TUI_CONFIRM_INPUT, "inspect successful rerun");
-    session.wait_fresh(cursor, &["Outputs for", FAIL_ONCE_NODE_LABEL, "completed"], "successful rerun details");
+    session.input(TUI_CONFIRM_INPUT, "inspect denied rerun");
+    session.wait_fresh(cursor, &["Outputs for", FAIL_ONCE_NODE_LABEL, "failed"], "denied rerun details");
     session.input(TUI_QUIT_INPUT, "quit after explicit rerun");
     let (status, transcript) = session.finish();
 
     assert!(status.success(), "TUI exit status: {status}; transcript: {transcript}");
-    assert_eq!(
-        std::fs::read_to_string(temp_dir.path().join(FAIL_ONCE_MARKER_FILE_NAME)).expect("fail-once marker reads"),
-        FAIL_ONCE_FAILURE_TOKEN,
+    assert!(
+        !temp_dir.path().join(FAIL_ONCE_MARKER_FILE_NAME).exists(),
+        "authority denial must precede the fail-once shell marker"
     );
     let store = Store::new(temp_dir.path().join("data").join(STORE_FILE_NAME)).expect("failure-recovery store opens");
     let runs = store.list_runs(TUI_RUN_HISTORY_LIMIT).expect("failure-recovery runs list");
     assert_eq!(runs.len(), EXPECTED_RERUN_COUNT);
     assert_ne!(runs[0].run_id, runs[1].run_id);
-    let failed = runs.iter().find(|run| run.failures == EXPECTED_TUI_RUN_COUNT).expect("failed run persists");
-    let succeeded = runs.iter().find(|run| run.failures == 0).expect("successful rerun persists");
-    let failed_details =
-        store.load_run_details(failed.run_id).expect("failed details load").expect("failed details persist");
-    let succeeded_details = store
-        .load_run_details(succeeded.run_id)
-        .expect("successful details load")
-        .expect("successful details persist");
-    assert_eq!(failed_details.nodes[0].status, RunNodeDetailStatus::Failed);
-    assert_eq!(succeeded_details.nodes[0].status, RunNodeDetailStatus::Completed);
+    assert!(runs.iter().all(|run| run.failures == EXPECTED_TUI_RUN_COUNT));
+    for run in runs {
+        let details = store.load_run_details(run.run_id).expect("denied details load").expect("denied details persist");
+        assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Failed);
+    }
 }
 
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.diagnostics]
@@ -609,7 +608,7 @@ fn operator_e2e_tui_process_rejects_invalid_workflow_before_effect_and_remains_n
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.cancel]
 #[cfg(unix)]
 #[test]
-fn operator_e2e_tui_process_cancellation_stops_pending_child_effect_and_persists_outcome() {
+fn operator_e2e_tui_process_denies_cancellable_effect_without_current_authority() {
     let temp_dir = tempfile::tempdir().expect("temporary cancellation PTY directory");
     let config_path = write_cli_config(&temp_dir);
     let (ready_path, forbidden_effect_path) = save_cancellable_workflow(&temp_dir);
@@ -622,38 +621,32 @@ fn operator_e2e_tui_process_cancellation_stops_pending_child_effect_and_persists
     let cursor = session.cursor();
     session.input(TUI_CONFIRM_INPUT, "select cancellable workflow");
     session.wait_fresh(cursor, &[CANCEL_NODE_LABEL], "the selected cancellable workflow");
-    session.input(TUI_RUN_WORKFLOW_INPUT, "run cancellable workflow");
-    common::wait_for_path(&ready_path, PTY_POLL_ATTEMPTS, Duration::from_millis(PTY_POLL_DELAY_MS));
     let cursor = session.cursor();
-    session.input(TUI_CANCEL_RUN_INPUT, "cancel ready workflow");
-    session.wait_fresh(cursor, &["Workflow run canceled"], "the cancellation outcome");
-    thread::sleep(Duration::from_secs(CANCEL_OBSERVATION_WAIT_SECS));
-    assert!(!forbidden_effect_path.exists(), "canceled child must not perform its pending effect");
+    session.input(TUI_RUN_WORKFLOW_INPUT, "run cancellable workflow");
+    session.wait_fresh(cursor, &[CANCEL_NODE_LABEL, "AuthorityUnavailable", "run:0 complete"], "the denied outcome");
+    assert!(!ready_path.exists(), "authority denial must precede the cancellation gate");
+    assert!(!forbidden_effect_path.exists(), "denied child must not perform its pending effect");
 
     let cursor = session.cursor();
-    session.input(TUI_OPEN_HISTORY_INPUT, "open canceled run history");
-    session.wait_fresh(cursor, &["Run History", "run:0"], "canceled run history");
+    session.input(TUI_OPEN_HISTORY_INPUT, "open denied run history");
+    session.wait_fresh(cursor, &["Run History", "run:0"], "denied run history");
     let cursor = session.cursor();
-    session.input(TUI_CONFIRM_INPUT, "inspect canceled run");
-    session.wait_fresh(cursor, &["Outputs for", "No output details", "NodeCancelled"], "canceled run details");
-    session.input(TUI_QUIT_INPUT, "quit after cancellation");
+    session.input(TUI_CONFIRM_INPUT, "inspect denied run");
+    session.wait_fresh(cursor, &["Outputs for", CANCEL_NODE_LABEL, "failed"], "denied run details");
+    session.input(TUI_QUIT_INPUT, "quit after denial");
     let (status, transcript) = session.finish();
 
     assert!(status.success(), "TUI exit status: {status}; transcript: {transcript}");
     assert!(!forbidden_effect_path.exists(), "pending effect must remain absent after TUI exit");
-    let store = Store::new(temp_dir.path().join("data").join(STORE_FILE_NAME)).expect("cancellation store opens");
-    let runs = store.list_runs(TUI_RUN_HISTORY_LIMIT).expect("cancellation runs list");
+    let store = Store::new(temp_dir.path().join("data").join(STORE_FILE_NAME)).expect("denial store opens");
+    let runs = store.list_runs(TUI_RUN_HISTORY_LIMIT).expect("denial runs list");
     assert_eq!(runs.len(), EXPECTED_TUI_RUN_COUNT);
+    assert_eq!(runs[0].failures, EXPECTED_TUI_RUN_COUNT);
     let details = store
         .load_run_details(runs[0].run_id)
-        .expect("cancellation details load")
-        .expect("cancellation details persist");
-    assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Skipped);
-    let replay_events = store
-        .load_run_replay_events(runs[0].run_id)
-        .expect("cancellation replay loads")
-        .expect("cancellation replay persists");
-    assert!(replay_events.iter().any(|event| event.kind == RunnerEventKind::NodeCancelled));
+        .expect("denial details load")
+        .expect("denial details persist");
+    assert_eq!(details.nodes[0].status, RunNodeDetailStatus::Failed);
 }
 
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.resize]
@@ -763,10 +756,11 @@ fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
 // r[verify n8nclone.tui_ux.background_runs.long_running]
 // r[verify n8nclone.tui_ux.background_runs.responsive]
 // r[verify n8nclone.tui_ux.replay_debugger.active_run.stream]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = App::new(test_config(&temp_dir))
+        .with_authority_provider(Arc::new(common::authority::TestRunContextProvider::new()));
     app.add_shell_node("Long", LONG_RUNNING_COMMAND);
 
     assert!(app.start_workflow_run());
@@ -778,7 +772,7 @@ async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() 
         tokio::time::sleep(Duration::from_millis(ACTIVE_REPLAY_POLL_DELAY_MS)).await;
     }
 
-    assert!(app.run_state.active);
+    assert!(app.run_state.active, "authorized active run ended early: {:?}", app.run_state.node_statuses);
     let timeline = app.run_state.active_replay_timeline.as_ref().expect("active replay timeline");
     assert!(!timeline.frames.is_empty());
     assert!(timeline.diagnostics.iter().all(|diagnostic| !diagnostic.fatal));

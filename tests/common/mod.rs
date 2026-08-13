@@ -1,6 +1,8 @@
 //! Shared test helpers — workflow builders, temp stores, assertion utilities.
 #![allow(dead_code)]
 
+pub mod authority;
+
 use std::collections::HashMap;
 
 use lattice::engine::value::ContentHash;

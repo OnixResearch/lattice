@@ -1,11 +1,3 @@
-//! Headless workflow execution support.
-//!
-//! The pure core in this module summarizes executor results and renders stable
-//! output. The shell function loads workflows, invokes the executor, and persists
-//! run records.
-
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,17 +7,14 @@ use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
 use crate::engine::workflow::Workflow;
-use crate::replay;
-use crate::store::ExecutionCache;
-use crate::store::RunHistoryStore;
 use crate::store::RunRecord;
 use crate::store::Store;
 use crate::store::StoreError;
-use crate::store::WorkflowRepository;
 use crate::triggers;
 use crate::triggers::TriggerRunPlan;
-use crate::workflow_validation;
 use crate::workflow_validation::WorkflowDiagnostic;
+
+mod shell;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,14 +48,6 @@ pub struct HeadlessRunSummary {
     pub completed: usize,
     pub failures: usize,
     pub cache_hits: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct OwnedRunRequest {
-    pub workflow_name: String,
-    pub run_id: RunId,
-    pub owner: crate::store::RunOwner,
-    pub agent_runtime: AgentRuntimeConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,24 +134,33 @@ pub fn run_record_from_summary(
     started_epoch_ms: i64,
     finished_epoch_ms: Option<i64>,
 ) -> RunRecord {
-    run_record_from_summary_with_owner(summary, started_epoch_ms, finished_epoch_ms, crate::store::RunOwner::Unscoped)
-}
-
-fn run_record_from_summary_with_owner(
-    summary: &HeadlessRunSummary,
-    started_epoch_ms: i64,
-    finished_epoch_ms: Option<i64>,
-    owner: crate::store::RunOwner,
-) -> RunRecord {
     RunRecord {
         run_id: summary.run_id,
-        owner,
+        owner: crate::store::RunOwner::Unscoped,
         workflow_name: summary.workflow_name.clone(),
         started_epoch_ms,
         finished_epoch_ms,
         node_count: summary.node_count,
         cache_hits: summary.cache_hits,
         failures: summary.failures,
+    }
+}
+
+fn run_started_epoch_ms() -> i64 {
+    let started: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
+    started.timestamp_millis()
+}
+
+fn run_finished_epoch_ms() -> i64 {
+    let finished: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
+    finished.timestamp_millis()
+}
+
+fn persist_completed_outputs_to_cache(store: &impl crate::store::ExecutionCache, results: &[StepResult]) {
+    for step in results {
+        if let NodeStatus::Completed { outputs, .. } = &step.status {
+            let _ = store.put_cache(&step.input_hash, outputs);
+        }
     }
 }
 
@@ -182,11 +172,34 @@ pub async fn run_saved_workflow(
     workflow_name: &str,
     run_id: RunId,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    run_saved_workflow_with_executor_factory(
-        store,
-        workflow_name,
-        run_id,
-        crate::store::RunOwner::Unscoped,
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    shell::run_saved_workflow_with_executor_factory(
+        shell::ProductRunRequest {
+            store,
+            workflow_name,
+            run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider: &authority_provider,
+        },
+        Executor::new,
+    )
+    .await
+}
+
+pub async fn run_saved_workflow_with_authority_provider(
+    store: &Store,
+    workflow_name: &str,
+    run_id: RunId,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    shell::run_saved_workflow_with_executor_factory(
+        shell::ProductRunRequest {
+            store,
+            workflow_name,
+            run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider,
+        },
         Executor::new,
     )
     .await
@@ -198,8 +211,18 @@ pub async fn run_admitted_trigger_plan(
     store: &Store,
     plan: &TriggerRunPlan,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    run_admitted_trigger_plan_with_authority_provider(store, plan, &authority_provider).await
+}
+
+pub async fn run_admitted_trigger_plan_with_authority_provider(
+    store: &Store,
+    plan: &TriggerRunPlan,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
     let run_id = store.next_run_id()?;
-    let summary = run_saved_workflow(store, &plan.workflow_name, run_id).await?;
+    let summary =
+        run_saved_workflow_with_authority_provider(store, &plan.workflow_name, run_id, authority_provider).await?;
     let record = triggers::trigger_run_record_started(plan, summary.run_id);
     store.save_trigger_run(&record)?;
     Ok(summary)
@@ -211,7 +234,17 @@ pub async fn run_claimed_trigger_plan(
     plan: &TriggerRunPlan,
     run_id: RunId,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    run_saved_workflow(store, &plan.workflow_name, run_id).await
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    run_claimed_trigger_plan_with_authority_provider(store, plan, run_id, &authority_provider).await
+}
+
+pub async fn run_claimed_trigger_plan_with_authority_provider(
+    store: &Store,
+    plan: &TriggerRunPlan,
+    run_id: RunId,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    run_saved_workflow_with_authority_provider(store, &plan.workflow_name, run_id, authority_provider).await
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
@@ -221,72 +254,20 @@ pub async fn run_saved_workflow_with_agent_runtime_config(
     run_id: RunId,
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    run_saved_workflow_with_executor_factory(store, workflow_name, run_id, crate::store::RunOwner::Unscoped, || {
-        Executor::new_with_agent_runtime_config(agent_runtime.clone())
-    })
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    shell::run_saved_workflow_with_executor_factory(
+        shell::ProductRunRequest {
+            store,
+            workflow_name,
+            run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider: &authority_provider,
+        },
+        || Executor::new_with_agent_runtime_config(agent_runtime.clone()),
+    )
     .await
 }
 
-// r[impl lattice.agent_orchestration.run_identity]
-pub async fn run_owned_workflow(
-    store: &Store,
-    request: OwnedRunRequest,
-) -> Result<HeadlessRunSummary, HeadlessRunError> {
-    let workflow_name = request.workflow_name;
-    let agent_runtime = request.agent_runtime;
-    run_saved_workflow_with_executor_factory(store, &workflow_name, request.run_id, request.owner, || {
-        Executor::new_with_agent_runtime_config(agent_runtime)
-    })
-    .await
-}
-
-// r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
-async fn run_saved_workflow_with_executor_factory<S>(
-    store: &S,
-    workflow_name: &str,
-    run_id: RunId,
-    owner: crate::store::RunOwner,
-    executor_factory: impl FnOnce() -> Executor,
-) -> Result<HeadlessRunSummary, HeadlessRunError>
-where
-    S: WorkflowRepository + ExecutionCache + RunHistoryStore,
-{
-    let workflow = store
-        .load_workflow(workflow_name)?
-        .ok_or_else(|| HeadlessRunError::WorkflowNotFound(workflow_name.to_string()))?;
-    let diagnostics = workflow_validation::validate_workflow(&workflow);
-    if workflow_validation::has_fatal_diagnostics(&diagnostics) {
-        return Err(HeadlessRunError::Validation(workflow_validation::fatal_diagnostics(&diagnostics)));
-    }
-
-    let started_epoch_ms = chrono::Utc::now().timestamp_millis();
-    let workflow_catalog = std::sync::Arc::new(crate::engine::WorkflowCatalogRepository::from_repository(store)?);
-    let subworkflow_shell = crate::engine::RepositorySubworkflowRunnerShell::new(workflow_catalog);
-    let mut executor = executor_factory().with_subworkflow_runner_shell(Box::new(subworkflow_shell));
-    let cache = HashMap::new();
-    let (_executor_run_id, results) = executor.run(&workflow, &cache).await;
-    persist_completed_outputs_to_cache(store, &results);
-
-    let summary = summarize_run(run_id, &workflow, &results);
-    let finished_epoch_ms = chrono::Utc::now().timestamp_millis();
-    let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
-    let details = crate::run::history::detail_record_from_results(run_id, &workflow, &results);
-    debug_assert_eq!(details.run_id, run_id);
-    debug_assert_eq!(details.nodes.len(), results.len());
-    store.save_run(&record)?;
-    // r[impl lattice.workflow_execution.headless_run_details]
-    store.save_run_details(&details)?;
-    let replay_events =
-        replay::replay_events_from_results(run_id, &workflow, &results, started_epoch_ms, Some(finished_epoch_ms));
-    store.save_run_replay_events(run_id, &replay_events)?;
-
-    Ok(summary)
-}
-
-fn persist_completed_outputs_to_cache(store: &impl ExecutionCache, results: &[StepResult]) {
-    for step in results {
-        if let NodeStatus::Completed { outputs, .. } = &step.status {
-            let _ = store.put_cache(&step.input_hash, outputs);
-        }
-    }
-}
+pub use shell::OwnedRunRequest;
+pub use shell::run_owned_workflow;
+pub use shell::run_owned_workflow_with_authority_provider;

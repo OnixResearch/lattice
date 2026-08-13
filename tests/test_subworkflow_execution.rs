@@ -105,7 +105,7 @@ async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port
 }
 
 #[tokio::test]
-async fn headless_production_shell_loads_and_executes_the_saved_child() {
+async fn headless_production_shell_denies_effectful_child_without_child_authority() {
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Store::new(temporary.path().join("lattice.redb")).expect("open store");
     let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
@@ -127,8 +127,8 @@ async fn headless_production_shell_loads_and_executes_the_saved_child() {
         .expect("headless child execution");
 
     assert_eq!(summary.run_id, HEADLESS_RUN_ID);
-    assert_eq!(summary.failures, 0);
-    assert_eq!(summary.completed, EXPECTED_STEP_COUNT);
+    assert_eq!(summary.failures, EXPECTED_STEP_COUNT);
+    assert_eq!(summary.completed, 0);
 }
 
 #[derive(Default)]

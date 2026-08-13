@@ -25,6 +25,12 @@ const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "2024",
     "scripts/check-workflow-domain-boundaries.rs",
 ];
+const EFFECT_AUTHORITY_SCRIPT_FORMAT_ARGS: &[&str] = &[
+    "--check",
+    "--edition",
+    "2024",
+    "scripts/check-choregraph-effect-authority.rs",
+];
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
@@ -39,6 +45,7 @@ const WORKFLOW_BOUNDARY_SELF_TEST_ARGS: &[&str] = &[
     "--self-test",
 ];
 const WORKFLOW_BOUNDARY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-workflow-domain-boundaries.rs"];
+const EFFECT_AUTHORITY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-choregraph-effect-authority.rs"];
 const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
@@ -89,6 +96,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "effect authority script format",
+        program: RUSTFMT_PROGRAM,
+        args: EFFECT_AUTHORITY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "inventory script smoke",
         program: CARGO_PROGRAM,
         args: INVENTORY_SCRIPT_SMOKE_ARGS,
@@ -104,6 +117,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "workflow boundary guard",
         program: CARGO_PROGRAM,
         args: WORKFLOW_BOUNDARY_CHECK_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "effect authority guard",
+        program: CARGO_PROGRAM,
+        args: EFFECT_AUTHORITY_CHECK_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
