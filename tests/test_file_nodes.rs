@@ -44,7 +44,7 @@ fn memory_fs() -> MemoryFileSystem {
 // r[verify n8nclone.workflow_execution.file_nodes.config]
 #[test]
 fn add_file_node_records_config_and_ports() {
-    let mut workflow = Workflow::new("file-workflow");
+    let mut workflow = Workflow::new("file-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, PATH_ALLOWED);
     let node = workflow.graph.node(node_id).expect("file node exists");
 
@@ -65,7 +65,7 @@ fn add_file_node_records_config_and_ports() {
 // r[verify n8nclone.workflow_execution.file_nodes.read]
 #[tokio::test]
 async fn read_file_node_reads_content_through_interface() {
-    let mut workflow = Workflow::new("read-workflow");
+    let mut workflow = Workflow::new("read-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, PATH_ALLOWED);
     let executor = Executor::new_with_file_system(Box::new(memory_fs()));
 
@@ -88,7 +88,7 @@ async fn read_file_node_reads_content_through_interface() {
 // r[verify n8nclone.workflow_execution.file_nodes.read]
 #[tokio::test]
 async fn missing_file_marks_node_failed() {
-    let mut workflow = Workflow::new("missing-read");
+    let mut workflow = Workflow::new("missing-read", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, PATH_OTHER);
     let executor = Executor::new_with_file_system(Box::new(memory_fs()));
 
@@ -106,7 +106,7 @@ async fn missing_file_marks_node_failed() {
 #[tokio::test]
 async fn write_file_node_writes_content_and_reports_bytes() {
     let fs = MemoryFileSystem::new(HashMap::new());
-    let mut workflow = Workflow::new("write-workflow");
+    let mut workflow = Workflow::new("write-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(WRITE_NODE_LABEL, FileOperationKind::Write, PATH_ALLOWED);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Write,
@@ -136,7 +136,7 @@ async fn write_file_node_writes_content_and_reports_bytes() {
 #[tokio::test]
 async fn append_file_node_appends_input_content() {
     let fs = memory_fs();
-    let mut workflow = Workflow::new("append-workflow");
+    let mut workflow = Workflow::new("append-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(APPEND_NODE_LABEL, FileOperationKind::Append, PATH_ALLOWED);
     let node = workflow.graph.node(node_id).expect("file node exists");
     let content_input = node.input_ports[CONTENT_INPUT_INDEX].id;
@@ -153,7 +153,7 @@ async fn append_file_node_appends_input_content() {
 // r[verify n8nclone.workflow_execution.file_nodes.safety]
 #[test]
 fn path_outside_allowed_roots_is_validation_diagnostic() {
-    let mut workflow = Workflow::new("unsafe-file");
+    let mut workflow = Workflow::new("unsafe-file", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, PATH_OTHER);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Read,
@@ -173,7 +173,7 @@ fn path_outside_allowed_roots_is_validation_diagnostic() {
 #[tokio::test]
 async fn write_without_overwrite_fails_without_modifying_existing_file() {
     let fs = memory_fs();
-    let mut workflow = Workflow::new("overwrite-file");
+    let mut workflow = Workflow::new("overwrite-file", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(WRITE_NODE_LABEL, FileOperationKind::Write, PATH_ALLOWED);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Write,
@@ -201,7 +201,7 @@ async fn default_executor_reads_local_file_within_allowed_root() {
     std::fs::write(&path, INITIAL_CONTENT).expect("write local fixture");
     let path = path.to_string_lossy().into_owned();
     let allowed_root = directory.path().to_string_lossy().into_owned();
-    let mut workflow = Workflow::new("local-read");
+    let mut workflow = Workflow::new("local-read", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node(READ_NODE_LABEL, FileOperationKind::Read, &path);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Read,

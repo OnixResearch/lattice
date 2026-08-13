@@ -88,7 +88,8 @@ async fn valid_webhook_auth_admits_and_persists_no_plaintext_credentials() {
     let temp_dir = tempfile::tempdir().expect("temporary valid webhook directory");
     let database_path = temp_dir.path().join(STORE_FILE_NAME);
     let store = Store::new(&database_path).expect("valid webhook store opens");
-    let mut workflow = lattice::engine::workflow::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::workflow::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(NODE_NAME, "printf ok".to_string());
     store.save_workflow(&workflow).expect("webhook workflow saves");
     let decision = webhooks::decide_request(&request(SECRET_VALUE), &[trigger()], &provider(), &context(), limits());

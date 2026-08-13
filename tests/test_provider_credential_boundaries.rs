@@ -69,8 +69,8 @@ fn credential_refs(secret_ref: SecretRef) -> NodeCredentialRefs {
 fn workflow_for_side_effect(
     secret_ref: SecretRef,
     side_effect_path: &std::path::Path,
-) -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+) -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let command = format!(
         "test -n \"${SECRET_ENV_NAME}\" && printf {SIDE_EFFECT_CONTENT} > {:?}",
         side_effect_path.display().to_string(),

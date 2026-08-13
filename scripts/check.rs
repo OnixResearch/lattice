@@ -19,6 +19,12 @@ const LINE_NUMBER_BASE: usize = 1;
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
+const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
+    "--check",
+    "--edition",
+    "2024",
+    "scripts/check-workflow-domain-boundaries.rs",
+];
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
@@ -26,6 +32,13 @@ const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "hash",
     "tests/fixtures/traceability-inventory-coverage.json",
 ];
+const WORKFLOW_BOUNDARY_SELF_TEST_ARGS: &[&str] = &[
+    "-q",
+    "-Zscript",
+    "scripts/check-workflow-domain-boundaries.rs",
+    "--self-test",
+];
+const WORKFLOW_BOUNDARY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-workflow-domain-boundaries.rs"];
 const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
@@ -70,9 +83,27 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "workflow boundary script format",
+        program: RUSTFMT_PROGRAM,
+        args: WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "inventory script smoke",
         program: CARGO_PROGRAM,
         args: INVENTORY_SCRIPT_SMOKE_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "workflow boundary guard self-test",
+        program: CARGO_PROGRAM,
+        args: WORKFLOW_BOUNDARY_SELF_TEST_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "workflow boundary guard",
+        program: CARGO_PROGRAM,
+        args: WORKFLOW_BOUNDARY_CHECK_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {

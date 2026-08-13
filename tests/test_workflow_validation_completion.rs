@@ -75,7 +75,7 @@ fn rendered_frame_text(app: &mut App) -> String {
 }
 
 fn credential_workflow(secret_ref: SecretRef) -> Workflow {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(NODE_LABEL, VALID_COMMAND);
     workflow.set_node_credentials(node_id, NodeCredentialRefs {
         env: [(ENV_NAME.to_string(), secret_ref)].into(),
@@ -177,13 +177,13 @@ fn generic_graph_admission_rejects_all_bounded_invalid_classes_without_mutation(
 // r[verify n8nclone.workflow_validation.generic_runner_admission.effects]
 #[test]
 fn selected_runtime_rejects_unsupported_effect_policy_and_accepts_its_own() {
-    let mut rejected = Workflow::new(WORKFLOW_NAME);
+    let mut rejected = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let rejected_id = rejected.add_shell_node(NODE_LABEL, VALID_COMMAND);
     let mut rejected_settings = NodeRunnerSettings::new("shell", "default");
     rejected_settings.effect_policy = UNSUPPORTED_EFFECT.to_string();
     rejected.set_node_runner_settings(rejected_id, rejected_settings);
 
-    let mut accepted = Workflow::new(WORKFLOW_NAME);
+    let mut accepted = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let accepted_id = accepted.add_shell_node(NODE_LABEL, VALID_COMMAND);
     let mut accepted_settings = NodeRunnerSettings::new("shell", "default");
     accepted_settings.effect_policy = SUPPORTED_SHELL_EFFECT.to_string();
@@ -207,7 +207,7 @@ fn selected_runtime_rejects_unsupported_effect_policy_and_accepts_its_own() {
 // r[verify n8nclone.workflow_validation.generic_runner_admission.terminal_state]
 #[test]
 fn terminal_runner_transition_is_rejected_without_workflow_mutation() {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(NODE_LABEL, VALID_COMMAND);
     let before = serialized(&workflow);
 
@@ -220,7 +220,7 @@ fn terminal_runner_transition_is_rejected_without_workflow_mutation() {
 // r[verify n8nclone.workflow_validation.node_kind_provider]
 #[test]
 fn every_builtin_node_kind_has_provider_validation_and_runtime_admission() {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("shell", VALID_COMMAND);
     workflow.add_http_node("http", "GET", "https://example.test");
     workflow.add_file_node("file", FileOperationKind::Read, "input.txt");
@@ -270,7 +270,7 @@ fn unknown_subworkflow_mapping_is_fatal_and_preserves_configuration() {
         }],
         output_mappings: Vec::new(),
     };
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_subworkflow_node(NODE_LABEL, config);
     workflow.graph.node_mut(node_id).expect("subworkflow node").input_ports[TARGET_INPUT_INDEX].label =
         MUTATED_INPUT.to_string();

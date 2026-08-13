@@ -4,9 +4,12 @@ mod common;
 
 use lattice::agent_node::AgentOutputMode;
 use lattice::agent_node::AgentTarget;
+use lattice::engine::workflow::GraphError;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use lattice::engine::workflow::WorkflowMeta;
+use lattice::engine::workflow::WorkflowTimestamp;
 use pretty_assertions::assert_eq;
 
 const AGENT_PROMPT: &str = "summarize this";
@@ -17,18 +20,24 @@ const AGENT_PROMPT: &str = "summarize this";
 
 #[test]
 fn meta_new_sets_name() {
-    let m = WorkflowMeta::new("my workflow");
+    let m = WorkflowMeta::new("my workflow", WorkflowTimestamp::epoch());
     assert_eq!(m.name, "my workflow");
     assert!(m.description.is_empty());
 }
 
 #[test]
-fn meta_timestamps_are_recent() {
-    let before = chrono::Utc::now();
-    let m = WorkflowMeta::new("ts test");
-    let after = chrono::Utc::now();
-    assert!(m.created >= before && m.created <= after);
-    assert_eq!(m.created, m.modified);
+fn equal_explicit_timestamps_create_equal_metadata() {
+    let timestamp = WorkflowTimestamp::epoch();
+    let first = WorkflowMeta::new("ts test", timestamp);
+    let second = WorkflowMeta::new("ts test", timestamp);
+    assert_eq!(first.created, second.created);
+    assert_eq!(first.modified, second.modified);
+}
+
+#[test]
+fn malformed_explicit_timestamp_is_rejected() {
+    let result = serde_json::from_str::<WorkflowTimestamp>("\"not-a-timestamp\"");
+    assert!(result.is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +180,7 @@ fn agent_config_defaults() {
 
 #[test]
 fn new_workflow_starts_empty() {
-    let wf = Workflow::new("empty");
+    let wf = Workflow::new("empty", lattice::engine::workflow::WorkflowTimestamp::epoch());
     assert_eq!(wf.meta.name, "empty");
     assert_eq!(wf.graph.node_count(), 0);
     assert_eq!(wf.graph.edge_count(), 0);
@@ -180,7 +189,7 @@ fn new_workflow_starts_empty() {
 
 #[test]
 fn add_shell_node_registers_config() {
-    let mut wf = Workflow::new("test");
+    let mut wf = Workflow::new("test", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("echo", "echo hi");
     assert_eq!(wf.graph.node_count(), 1);
     let cfg = wf.node_config(id).expect("config should exist");
@@ -189,7 +198,7 @@ fn add_shell_node_registers_config() {
 
 #[test]
 fn add_shell_node_has_correct_ports() {
-    let mut wf = Workflow::new("test");
+    let mut wf = Workflow::new("test", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("node", "true");
     let node = wf.graph.node(id).unwrap();
     assert_eq!(node.input_ports.len(), 1, "one input: stdin");
@@ -202,7 +211,7 @@ fn add_shell_node_has_correct_ports() {
 
 #[test]
 fn add_multiple_nodes() {
-    let mut wf = Workflow::new("multi");
+    let mut wf = Workflow::new("multi", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let a = wf.add_shell_node("a", "echo a");
     let b = wf.add_shell_node("b", "echo b");
     let c = wf.add_shell_node("c", "echo c");
@@ -220,7 +229,7 @@ fn connect_nodes_creates_edge() {
 
 #[test]
 fn dag_mode_prevents_cycles() {
-    let mut wf = Workflow::new("cycle");
+    let mut wf = Workflow::new("cycle", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let a = wf.add_shell_node("a", "true");
     let b = wf.add_shell_node("b", "true");
 
@@ -237,7 +246,7 @@ fn dag_mode_prevents_cycles() {
 
 #[test]
 fn self_loop_rejected() {
-    let mut wf = Workflow::new("selfloop");
+    let mut wf = Workflow::new("selfloop", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let a = wf.add_shell_node("a", "true");
     let a_out = wf.graph.node(a).unwrap().output_ports[0].id;
     let a_in = wf.graph.node(a).unwrap().input_ports[0].id;
@@ -246,8 +255,26 @@ fn self_loop_rejected() {
 }
 
 #[test]
+fn incompatible_port_types_are_rejected_without_an_edge() {
+    let mut wf = Workflow::new("typed edge", WorkflowTimestamp::epoch());
+    let source = wf.graph.add_node("source", &[], &[PortSpec::new("value", "string")]);
+    let target = wf.graph.add_node("target", &[PortSpec::new("value", "json")], &[]);
+    let source_port = wf.graph.node(source).expect("source").output_ports[0].id;
+    let target_port = wf.graph.node(target).expect("target").input_ports[0].id;
+
+    assert_eq!(
+        wf.graph.add_edge(source_port, target_port),
+        Err(GraphError::IncompatibleTypes {
+            source_tag: "string".to_string(),
+            target_tag: "json".to_string(),
+        })
+    );
+    assert_eq!(wf.graph.edge_count(), 0);
+}
+
+#[test]
 fn set_node_config_replaces_existing() {
-    let mut wf = Workflow::new("replace");
+    let mut wf = Workflow::new("replace", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("node", "old-command");
     wf.set_node_config(id, NodeConfig::shell("new-command"));
     match wf.node_config(id).unwrap() {
@@ -257,12 +284,12 @@ fn set_node_config_replaces_existing() {
 }
 
 #[test]
-fn touch_updates_modified() {
-    let mut wf = Workflow::new("touch");
+fn touch_uses_the_supplied_timestamp() {
+    let mut wf = Workflow::new("touch", WorkflowTimestamp::epoch());
     let before = wf.meta.modified;
-    std::thread::sleep(std::time::Duration::from_millis(5));
-    wf.touch();
-    assert!(wf.meta.modified > before);
+    let after = before + chrono::Duration::seconds(1);
+    wf.touch(WorkflowTimestamp::from_datetime(after));
+    assert_eq!(wf.meta.modified, after);
 }
 
 #[test]

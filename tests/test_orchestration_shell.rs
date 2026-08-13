@@ -115,7 +115,7 @@ fn parse_restart_result(value: &str) -> Result<RestartResult, &'static str> {
 }
 
 fn workflow(name: &str) -> Workflow {
-    let mut workflow = Workflow::new(name);
+    let mut workflow = Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("bounded", SHELL_COMMAND);
     workflow
 }
@@ -123,7 +123,7 @@ fn workflow(name: &str) -> Workflow {
 fn fail_once_workflow(name: &str, marker: &Path) -> Workflow {
     let marker_path = marker.to_string_lossy().into_owned();
     let allowed_root = marker.parent().expect("retry marker must have a parent").to_string_lossy().into_owned();
-    let mut workflow = Workflow::new(name);
+    let mut workflow = Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_file_node("bounded", FileOperationKind::Read, &marker_path);
     workflow.set_node_config(node_id, NodeConfig::File {
         operation: FileOperationKind::Read,

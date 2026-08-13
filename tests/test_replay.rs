@@ -71,7 +71,7 @@ fn known_nodes() -> BTreeSet<u64> {
 
 #[test]
 fn active_replay_events_expose_run_start_and_ready_nodes_without_terminal_claims() {
-    let mut workflow = Workflow::new("active-replay");
+    let mut workflow = Workflow::new("active-replay", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node("ready", "sleep 1");
 
     let events = active_events(RUN_ID, &workflow, 0);
@@ -88,7 +88,11 @@ fn active_replay_events_expose_run_start_and_ready_nodes_without_terminal_claims
         Some(&ReplayNodeState::Ready)
     );
 
-    let empty_events = active_events(RUN_ID, &Workflow::new("empty-active-replay"), 0);
+    let empty_events = active_events(
+        RUN_ID,
+        &Workflow::new("empty-active-replay", lattice::engine::workflow::WorkflowTimestamp::epoch()),
+        0,
+    );
     assert_eq!(empty_events.len(), 1);
     assert_eq!(empty_events[0].kind, RunnerEventKind::RunStarted);
 }

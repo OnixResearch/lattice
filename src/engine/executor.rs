@@ -7,9 +7,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use rat_nodegraph::model::Node;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::debug;
@@ -32,7 +29,9 @@ use crate::engine::child::SubworkflowRunnerShell;
 use crate::engine::runner;
 use crate::engine::value::ContentHash;
 use crate::engine::value::Value;
+use crate::engine::workflow::Node;
 use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::PortId;
 use crate::engine::workflow::Workflow;
 use crate::expressions;
 use crate::expressions::ExpressionContext;
@@ -175,13 +174,17 @@ struct AgentOutputPortIds {
 }
 
 // r[impl n8nclone.workflow_execution.cache_key.shell_config]
-pub fn node_execution_cache_key(node_id: NodeId, config: &NodeConfig, inputs: &HashMap<PortId, Value>) -> ContentHash {
+pub fn node_execution_cache_key(
+    node_id: crate::engine::workflow::NodeId,
+    config: &NodeConfig,
+    inputs: &HashMap<PortId, Value>,
+) -> ContentHash {
     node_execution_cache_key_with_credentials(node_id, config, None, inputs)
 }
 
 // r[impl n8nclone.credentials.cache_identity]
 pub fn node_execution_cache_key_with_credentials(
-    node_id: NodeId,
+    node_id: crate::engine::workflow::NodeId,
     config: &NodeConfig,
     credentials: Option<&NodeCredentialRefs>,
     inputs: &HashMap<PortId, Value>,
@@ -401,7 +404,7 @@ fn expression_context_from_workflow_outputs(
     for node in workflow.graph.nodes() {
         for port in &node.output_ports {
             if let Some(value) = port_values.get(&port.id) {
-                context.insert(node.id.0, port.id, value.clone());
+                context.insert(node.id.0, expressions::ExpressionPortId(port.id.0), value.clone());
             }
         }
     }
@@ -844,7 +847,7 @@ fn value_to_json(value: &Value) -> serde_json::Value {
 
 // r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
 fn completed_step_result(
-    node_id: NodeId,
+    node_id: crate::engine::workflow::NodeId,
     input_hash: ContentHash,
     node: &Node,
     outputs: HashMap<PortId, Value>,
@@ -947,7 +950,7 @@ pub enum NodeStatus {
 /// Result of executing a single step (one node).
 #[derive(Debug, Clone)]
 pub struct StepResult {
-    pub node_id: NodeId,
+    pub node_id: crate::engine::workflow::NodeId,
     pub status: NodeStatus,
     pub input_hash: ContentHash,
 }
@@ -1147,7 +1150,7 @@ impl Executor {
     pub async fn execute_node(
         &self,
         workflow: &Workflow,
-        node_id: NodeId,
+        node_id: crate::engine::workflow::NodeId,
         inputs: &HashMap<PortId, Value>,
     ) -> StepResult {
         self.execute_node_with_expression_context(
@@ -1163,7 +1166,7 @@ impl Executor {
     async fn execute_node_with_expression_context(
         &self,
         workflow: &Workflow,
-        node_id: NodeId,
+        node_id: crate::engine::workflow::NodeId,
         inputs: &HashMap<PortId, Value>,
         expression_context: &ExpressionContext,
         parent_run_id: Option<RunId>,
@@ -1931,7 +1934,11 @@ async fn execute_shell(
 }
 
 /// Gather input values for a node from upstream edge outputs.
-fn gather_inputs(workflow: &Workflow, node_id: NodeId, port_values: &HashMap<PortId, Value>) -> HashMap<PortId, Value> {
+fn gather_inputs(
+    workflow: &Workflow,
+    node_id: crate::engine::workflow::NodeId,
+    port_values: &HashMap<PortId, Value>,
+) -> HashMap<PortId, Value> {
     let mut inputs = HashMap::new();
 
     let node = match workflow.graph.node(node_id) {
@@ -1967,10 +1974,14 @@ fn runner_step_state(status: &NodeStatus) -> runner::RunnerStepState {
 // r[impl n8nclone.workflow_execution.runner_core.compatibility]
 // r[impl n8nclone.workflow_execution.trait_boundaries.compatibility]
 // r[impl n8nclone.workflow_execution.seaglass_graph_core]
-fn admitted_runner_execution(workflow: &Workflow) -> Option<(runner::RunnerWorkflow, Vec<NodeId>)> {
+fn admitted_runner_execution(
+    workflow: &Workflow,
+) -> Option<(runner::RunnerWorkflow, Vec<crate::engine::workflow::NodeId>)> {
     let plan = runner::build_runner_plan(workflow).plan?;
     match runner::admit_runner_plan(&plan) {
-        runner::RunnerAdmission::Accepted { topo_order } => Some((plan, topo_order.into_iter().map(NodeId).collect())),
+        runner::RunnerAdmission::Accepted { topo_order } => {
+            Some((plan, topo_order.into_iter().map(crate::engine::workflow::NodeId).collect()))
+        }
         runner::RunnerAdmission::Rejected { .. } => None,
     }
 }

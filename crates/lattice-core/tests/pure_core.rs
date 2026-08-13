@@ -8,11 +8,11 @@ use lattice_core::control_flow::ControlFlowError;
 use lattice_core::control_flow::evaluate_condition;
 use lattice_core::control_flow::parse_condition_predicate;
 use lattice_core::expressions::ExpressionContext;
+use lattice_core::expressions::ExpressionPortId;
 use lattice_core::expressions::evaluate_expression_template;
 use lattice_core::expressions::parse_expression_template;
 use lattice_core::value::ContentHash;
 use lattice_core::value::Value;
-use rat_nodegraph::model::PortId;
 
 const NODE_ID: u64 = 7;
 const PORT_ID: u64 = 11;
@@ -24,7 +24,7 @@ const READY_VALUE: &str = "ready";
 #[test]
 fn expression_evaluation_reads_typed_context_values() {
     let mut context = ExpressionContext::new(HashMap::new());
-    context.insert(NODE_ID, PortId(PORT_ID), Value::from_string("  ready  ".to_owned()));
+    context.insert(NODE_ID, ExpressionPortId(PORT_ID), Value::from_string("  ready  ".to_owned()));
     let source = format!("{{{{node:{NODE_ID}:port:{PORT_ID}|trim|upper}}}}");
     let template = parse_expression_template(&source).expect("valid expression");
 

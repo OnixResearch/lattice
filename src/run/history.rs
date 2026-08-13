@@ -53,7 +53,7 @@ fn node_detail_from_step(
 }
 
 fn terminal_detail(
-    node_id: rat_nodegraph::model::NodeId,
+    node_id: crate::engine::workflow::NodeId,
     node_label: String,
     status: crate::store::RunNodeDetailStatus,
     error: Option<String>,
@@ -72,8 +72,8 @@ fn terminal_detail(
 
 fn completed_output_details(
     workflow: &crate::engine::workflow::Workflow,
-    node_id: rat_nodegraph::model::NodeId,
-    outputs: &std::collections::HashMap<rat_nodegraph::model::PortId, crate::engine::value::Value>,
+    node_id: crate::engine::workflow::NodeId,
+    outputs: &std::collections::HashMap<crate::engine::workflow::PortId, crate::engine::value::Value>,
 ) -> Vec<crate::store::RunOutputDetail> {
     let mut details = Vec::with_capacity(outputs.len());
     if let Some(node) = workflow.graph.node(node_id) {
@@ -97,7 +97,7 @@ fn completed_output_details(
 }
 
 fn value_details(
-    port_id: rat_nodegraph::model::PortId,
+    port_id: crate::engine::workflow::PortId,
     port_label: &str,
     value: &crate::engine::value::Value,
 ) -> Vec<crate::store::RunOutputDetail> {

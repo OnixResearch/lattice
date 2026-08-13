@@ -112,7 +112,7 @@ fn fixture_with_shell_command(
     )
     .expect("config must write");
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store must open");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("cli", shell_command);
     store.save_workflow(&workflow).expect("workflow must persist");
     let definition = OrchestrationDefinition {

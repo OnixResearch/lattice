@@ -461,7 +461,9 @@ fn durable_transitions_require_missing_active_run_and_remain_bounded() {
 #[tokio::test]
 async fn shell_claims_before_execution_and_settles_exact_owned_run() {
     let (store, _dir) = common::temp_store();
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("workflow saves");
     store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("shell schedule saves");
     let ScheduleOccurrenceClaimResolution::Inserted(occurrence) =
         claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("shell occurrence claims")
@@ -495,14 +497,16 @@ async fn shell_claims_before_execution_and_settles_exact_owned_run() {
 #[tokio::test]
 async fn shell_rejects_changed_workflow_revision_before_effects() {
     let (store, _dir) = common::temp_store();
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("initial workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("initial workflow saves");
     store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("revision schedule saves");
     let ScheduleOccurrenceClaimResolution::Inserted(occurrence) =
         claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("revision occurrence claims")
     else {
         panic!("first revision occurrence must insert");
     };
-    let mut changed = Workflow::new(WORKFLOW_NAME);
+    let mut changed = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     changed.add_shell_node("changed", CHANGED_WORKFLOW_COMMAND);
     store.save_workflow(&changed).expect("changed workflow saves");
 
@@ -522,7 +526,9 @@ async fn shell_rejects_changed_workflow_revision_before_effects() {
 #[test]
 fn shell_recovery_rejects_legacy_unscoped_run_evidence() {
     let (store, _dir) = common::temp_store();
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("workflow saves");
     store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("legacy schedule saves");
     let ScheduleOccurrenceClaimResolution::Inserted(occurrence) =
         claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("legacy occurrence claims")
@@ -545,7 +551,9 @@ fn shell_recovery_rejects_legacy_unscoped_run_evidence() {
 #[tokio::test]
 async fn shell_retry_is_explicit_fresh_and_terminal() {
     let (store, _dir) = common::temp_store();
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("workflow saves");
     store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("retry shell schedule saves");
     let ScheduleOccurrenceClaimResolution::Inserted(initial) =
         claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("retry shell occurrence claims")
@@ -573,7 +581,9 @@ async fn shell_retry_is_explicit_fresh_and_terminal() {
 #[test]
 fn shell_abandon_closes_without_creating_run_evidence() {
     let (store, _dir) = common::temp_store();
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("workflow saves");
     store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("abandon shell schedule saves");
     let ScheduleOccurrenceClaimResolution::Inserted(initial) =
         claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("abandon shell occurrence claims")

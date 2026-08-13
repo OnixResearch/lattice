@@ -32,11 +32,11 @@ use lattice::engine::runner::runner_event;
 use lattice::engine::runner::transition_step_state;
 use lattice::engine::runner::validate_runtime_bindings;
 use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeId;
 use lattice::engine::workflow::NodeRunnerSettings;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 use serde_json::json;
 
 const NODE_COUNT_TWO: usize = 2;
@@ -121,7 +121,7 @@ fn runner_plan_preserves_typed_nodes_edges_and_runtime_bindings() {
 // r[verify n8nclone.workflow_execution.runner_core.plan_ir]
 #[test]
 fn runner_plan_rejects_missing_node_config_without_panicking() {
-    let mut workflow = Workflow::new("missing-config");
+    let mut workflow = Workflow::new("missing-config", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.graph.add_node(BROKEN_LABEL, &[], &[]);
 
     let build = build_runner_plan(&workflow);

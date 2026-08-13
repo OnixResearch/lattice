@@ -159,7 +159,7 @@ fn trigger_validation_accepts_saved_workflow_and_rejects_missing_workflow() {
     let valid = webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly);
     let mut missing = valid.clone();
     missing.workflow_name = MISSING_WORKFLOW.to_string();
-    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());
+    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string(), lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(missing.clone());
 
     assert!(validate_trigger_definition(&valid, &workflow_names()).is_empty());
@@ -313,7 +313,7 @@ fn schedule_trigger_preserves_schedule_semantics() {
 // r[verify n8nclone.workflow_format.triggers.nickel.import]
 #[test]
 fn workflow_format_round_trips_triggers_through_portable_and_nickel() {
-    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());
+    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string(), lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly));
     let portable = workflow_to_portable(&workflow);
     let nickel = workflow_to_nickel(&workflow);
@@ -354,7 +354,7 @@ fn store_persists_triggers_and_trigger_history() {
 async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
     let tempdir = tempfile::tempdir().expect("tempdir");
     let store = Store::new(tempdir.path().join(STORE_FILE)).expect("open store");
-    let workflow = Workflow::new(WORKFLOW_NAME.to_string());
+    let workflow = Workflow::new(WORKFLOW_NAME.to_string(), lattice::engine::workflow::WorkflowTimestamp::epoch());
     let trigger = webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly);
     let plan = admit_trigger_event(&trigger, &webhook_event(None), &empty_context()).expect("event admitted");
     store.save_workflow(&workflow).expect("save workflow");
@@ -378,7 +378,7 @@ async fn admitted_trigger_plan_starts_headless_run_and_records_history() {
 // r[verify n8nclone.tui_ux.triggers.manage.list]
 #[test]
 fn tui_exposes_minimal_trigger_status_lines() {
-    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string());
+    let mut workflow = Workflow::new(WORKFLOW_NAME.to_string(), lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(webhook_trigger(WebhookAuthPolicy::NoAuthLocalOnly));
     let temp_dir = tempfile::tempdir().expect("temporary trigger status directory");
     let data_dir = temp_dir.path().join("data");

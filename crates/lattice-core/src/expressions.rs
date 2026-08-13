@@ -27,10 +27,13 @@ pub enum ExpressionSegment {
     Reference(ExpressionReference),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ExpressionPortId(pub u64);
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExpressionReference {
     pub node_id: u64,
-    pub port_id: rat_nodegraph::model::PortId,
+    pub port_id: ExpressionPortId,
     pub transforms: Vec<ExpressionTransform>,
 }
 
@@ -45,14 +48,8 @@ pub enum ExpressionTransform {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpressionError {
     InvalidSyntax(String),
-    MissingReference {
-        node_id: u64,
-        port_id: rat_nodegraph::model::PortId,
-    },
-    TypeMismatch {
-        transform: String,
-        actual: String,
-    },
+    MissingReference { node_id: u64, port_id: ExpressionPortId },
+    TypeMismatch { transform: String, actual: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -63,15 +60,15 @@ pub struct ExpressionValue {
 
 #[derive(Debug, Clone, Default)]
 pub struct ExpressionContext {
-    values: HashMap<(u64, rat_nodegraph::model::PortId), Value>,
+    values: HashMap<(u64, ExpressionPortId), Value>,
 }
 
 impl ExpressionContext {
-    pub fn new(values: HashMap<(u64, rat_nodegraph::model::PortId), Value>) -> Self {
+    pub fn new(values: HashMap<(u64, ExpressionPortId), Value>) -> Self {
         Self { values }
     }
 
-    pub fn insert(&mut self, node_id: u64, port_id: rat_nodegraph::model::PortId, value: Value) {
+    pub fn insert(&mut self, node_id: u64, port_id: ExpressionPortId, value: Value) {
         self.values.insert((node_id, port_id), value);
     }
 
@@ -142,7 +139,7 @@ fn parse_reference(body: &str) -> Result<ExpressionReference, ExpressionError> {
     let transforms = parts.map(parse_transform).collect::<Result<Vec<_>, _>>()?;
     Ok(ExpressionReference {
         node_id,
-        port_id: rat_nodegraph::model::PortId(port_id),
+        port_id: ExpressionPortId(port_id),
         transforms,
     })
 }

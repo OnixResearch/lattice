@@ -4,6 +4,7 @@
 //! Supports both step-through debug and async parallel execution.
 
 pub mod child;
+pub mod domain;
 pub mod executor;
 pub mod runner;
 pub mod value;
@@ -19,6 +20,8 @@ pub use child::SubworkflowExecutionError;
 pub use child::SubworkflowInvocation;
 pub use child::SubworkflowRunnerShell;
 pub use child::WorkflowCatalogRepository;
+pub use domain::NodeId;
+pub use domain::PortId;
 pub use executor::ExecutionMode;
 pub use executor::Executor;
 pub use executor::RunId;
@@ -31,3 +34,4 @@ pub use value::ValueData;
 pub use workflow::NodeConfig;
 pub use workflow::Workflow;
 pub use workflow::WorkflowMeta;
+pub use workflow::WorkflowTimestamp;

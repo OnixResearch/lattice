@@ -8,7 +8,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
-use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -20,6 +19,7 @@ use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
 use crate::engine::runner::ArtifactReference;
 use crate::engine::runner::RunnerEventKind;
+use crate::engine::workflow::PortId;
 
 const REPLAY_BUNDLE_SCHEMA_VERSION: u32 = 1;
 const FIRST_EVENT_SEQUENCE: u64 = 0;

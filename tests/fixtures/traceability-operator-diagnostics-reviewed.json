@@ -699,7 +699,7 @@
         },
         {
           "path": "tests/test_doctor.rs",
-          "blake3": "3458911c03fd9367aaf0c1087acba70d71ec508a4d9d4df54914d6cd970b3a91"
+          "blake3": "906b8a24375fe38fa7a73c4a2dbb4ea0a56c0e6d2ea0c0bd34c15b34914f977f"
         }
       ],
       "rationale_code": "assertions.sensitive-values-redacted"

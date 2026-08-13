@@ -435,8 +435,8 @@ fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
     let did_mutate = may_mutate && !actions.is_empty();
     app.graph_state.apply_actions(&actions);
 
-    // Sync graph changes back to workflow.
-    app.workflow.graph = app.graph_state.graph.clone();
+    // Sync graph changes back to the Lattice-owned workflow model.
+    app.sync_workflow_graph_from_state();
     if did_mutate {
         app.mark_workflow_dirty();
     }
@@ -608,7 +608,7 @@ fn nearest_port_snap_target(
 
 fn apply_graph_actions(app: &mut App, actions: &[GraphAction]) {
     app.graph_state.apply_actions(actions);
-    app.workflow.graph = app.graph_state.graph.clone();
+    app.sync_workflow_graph_from_state();
 }
 
 fn apply_graph_actions_and_mark_count_changes(app: &mut App, before: GraphCounts, actions: &[GraphAction]) {

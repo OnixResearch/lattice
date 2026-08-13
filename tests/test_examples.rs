@@ -12,15 +12,15 @@ use lattice::engine::executor::node_execution_cache_key;
 use lattice::engine::value::Value;
 use lattice::engine::value::ValueData;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
+use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessRunStatus;
 use lattice::headless::run_saved_workflow;
 use lattice::store::Store;
 use lattice::workflow_format::load_workflow_nickel_file;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
-use rat_nodegraph::model::PortSpec;
 use tempfile::TempDir;
 
 const EXAMPLE_TEMPLATES_DIR: &str = "examples/templates";
@@ -335,7 +335,10 @@ fn template_workflow(
     template: &NodeTemplate,
     case: &ExampleTemplateCase,
 ) -> (Workflow, NodeId, PortId, PortId, PortId) {
-    let mut workflow = Workflow::new(format!("{TEMPLATE_WORKFLOW_NAME_PREFIX}{}", template.name));
+    let mut workflow = Workflow::new(
+        format!("{TEMPLATE_WORKFLOW_NAME_PREFIX}{}", template.name),
+        lattice::engine::workflow::WorkflowTimestamp::epoch(),
+    );
     let source_id = workflow.add_shell_node(TEMPLATE_SOURCE_NODE_LABEL, TEMPLATE_SOURCE_COMMAND);
     let input_specs = template
         .input_ports

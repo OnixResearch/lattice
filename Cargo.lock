@@ -2440,7 +2440,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "content-identity-core",
- "rat-nodegraph",
  "serde",
  "serde_json",
 ]

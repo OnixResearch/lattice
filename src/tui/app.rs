@@ -16,8 +16,6 @@ use rat_fuzzy::FuzzyState;
 use rat_nodegraph::layout::LayoutConfig;
 use rat_nodegraph::layout::auto_layout;
 use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
-use rat_nodegraph::model::PortSpec;
 use rat_nodegraph::view::NodeGraphState;
 use rat_nodegraph::view::node_bounds;
 use rat_streaming::StreamingOutput;
@@ -49,6 +47,7 @@ use crate::engine::executor::StepResult;
 use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
+use crate::engine::workflow::WorkflowNodeIdentity;
 use crate::replay;
 use crate::replay::ReplayCursor;
 use crate::replay::ReplayTimeline;
@@ -69,6 +68,10 @@ const RUN_HISTORY_LIMIT: usize = 20;
 const TRIGGER_STATUS_HISTORY_LIMIT: usize = 100;
 const INITIAL_TUI_RUN_ID: u64 = 0;
 const ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS: i64 = 0;
+const AUTO_LAYOUT_HORIZONTAL_SPACING_COLUMNS: u16 = 6;
+const AUTO_LAYOUT_VERTICAL_SPACING_ROWS: u16 = 2;
+const AUTO_LAYOUT_NODE_WIDTH_COLUMNS: u16 = 20;
+const AUTO_LAYOUT_NODE_HEIGHT_ROWS: u16 = 5;
 const CREDENTIAL_ENTRY_SEPARATOR: &str = ",";
 const CREDENTIAL_BINDING_SEPARATOR: &str = "=";
 const SECRET_IDENTITY_SEPARATOR: &str = ":";
@@ -450,8 +453,8 @@ pub fn trigger_status_lines_from_history(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunOutputLine {
     pub run_id: RunId,
-    pub node_id: NodeId,
-    pub port_id: PortId,
+    pub node_id: crate::engine::workflow::NodeId,
+    pub port_id: crate::engine::workflow::PortId,
     pub port_label: String,
     pub text: String,
 }
@@ -465,8 +468,9 @@ impl RunOutputLine {
 pub fn latest_node_output_records(
     records: &[RunOutputLine],
     workflow: &Workflow,
-    node_id: NodeId,
+    node_id: impl WorkflowNodeIdentity,
 ) -> Vec<RunOutputLine> {
+    let node_id = node_id.workflow_node_id();
     let mut latest_by_port = HashMap::new();
     for record in records.iter().filter(|record| record.node_id == node_id) {
         latest_by_port.insert(record.port_id, record.clone());
@@ -484,7 +488,7 @@ pub fn latest_node_output_records(
 pub fn rendered_latest_node_output_lines(
     records: &[RunOutputLine],
     workflow: &Workflow,
-    node_id: NodeId,
+    node_id: impl WorkflowNodeIdentity,
 ) -> Vec<String> {
     latest_node_output_records(records, workflow, node_id)
         .into_iter()
@@ -495,15 +499,15 @@ pub fn rendered_latest_node_output_lines(
 fn completed_output_records(
     run_id: RunId,
     workflow: &Workflow,
-    node_id: NodeId,
-    outputs: &HashMap<PortId, Value>,
+    node_id: crate::engine::workflow::NodeId,
+    outputs: &HashMap<crate::engine::workflow::PortId, Value>,
 ) -> Vec<RunOutputLine> {
-    let mut records = Vec::new();
+    let mut records = Vec::with_capacity(outputs.len());
 
     if let Some(node) = workflow.graph.node(node_id) {
         for port in &node.output_ports {
             if let Some(value) = outputs.get(&port.id) {
-                append_output_value_records(&mut records, run_id, node_id, port.id, &port.label, value);
+                records.extend(output_value_records(run_id, node_id, port.id, &port.label, value));
             }
         }
         return records;
@@ -512,32 +516,34 @@ fn completed_output_records(
     let mut fallback_outputs = outputs.iter().collect::<Vec<_>>();
     fallback_outputs.sort_by_key(|(port_id, _)| port_id.0);
     for (port_id, value) in fallback_outputs {
-        append_output_value_records(&mut records, run_id, node_id, *port_id, &format!("port {}", port_id.0), value);
+        records.extend(output_value_records(run_id, node_id, *port_id, &format!("port {}", port_id.0), value));
     }
 
     records
 }
 
-fn append_output_value_records(
-    records: &mut Vec<RunOutputLine>,
+fn output_value_records(
     run_id: RunId,
-    node_id: NodeId,
-    port_id: PortId,
+    node_id: crate::engine::workflow::NodeId,
+    port_id: crate::engine::workflow::PortId,
     port_label: &str,
     value: &Value,
-) {
+) -> Vec<RunOutputLine> {
     let display = value.as_display_string();
     if display.is_empty() {
-        return;
+        return Vec::new();
     }
 
-    records.extend(display.lines().map(|line| RunOutputLine {
-        run_id,
-        node_id,
-        port_id,
-        port_label: port_label.to_string(),
-        text: line.to_string(),
-    }));
+    display
+        .lines()
+        .map(|line| RunOutputLine {
+            run_id,
+            node_id,
+            port_id,
+            port_label: port_label.to_string(),
+            text: line.to_string(),
+        })
+        .collect()
 }
 
 // r[impl n8nclone.tui_ux.run_history.details.persist]
@@ -922,8 +928,10 @@ pub struct App {
 impl App {
     /// Create a new app with an empty workflow.
     pub fn new(config: AppConfig) -> Self {
-        let workflow = Workflow::new("untitled");
-        let graph_state = NodeGraphState::new(workflow.graph.clone(), INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
+        let timestamp = crate::engine::workflow::WorkflowTimestamp::from_datetime(chrono::Utc::now());
+        let workflow = Workflow::new("untitled", timestamp);
+        let graph = crate::tui::graph::empty_subwayrat();
+        let graph_state = NodeGraphState::new(graph, INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
         let agent_runtime = config.effective_agent_runtime();
 
         let store = match Store::new(crate::config::store_path(&config.data_dir)) {
@@ -986,7 +994,8 @@ impl App {
 
     /// Mark the current workflow as dirty after a user-visible mutation.
     pub fn mark_workflow_dirty(&mut self) {
-        self.workflow.touch();
+        let timestamp = crate::engine::workflow::WorkflowTimestamp::from_datetime(chrono::Utc::now());
+        self.workflow.touch(timestamp);
         self.dirty = true;
     }
 
@@ -1315,12 +1324,12 @@ impl App {
         let inputs = template
             .input_ports
             .iter()
-            .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+            .map(|port| crate::engine::workflow::PortSpec::new(port.label.clone(), port.type_tag.clone()))
             .collect::<Vec<_>>();
         let outputs = template
             .output_ports
             .iter()
-            .map(|port| PortSpec::new(port.label.clone(), port.type_tag.clone()))
+            .map(|port| crate::engine::workflow::PortSpec::new(port.label.clone(), port.type_tag.clone()))
             .collect::<Vec<_>>();
         let parameter_values = template_parameter_values(template, &self.add_node_flow.parameter_values);
         let command = match render_template_command(template, &parameter_values) {
@@ -2087,16 +2096,16 @@ impl App {
         self.mark_workflow_dirty();
     }
 
-    fn place_new_node(&mut self, id: NodeId) {
-        // Position the new node so it doesn't overlap existing ones.
-        // Find the rightmost edge of all existing nodes, then place after a gap.
+    fn place_new_node(&mut self, id: crate::engine::workflow::NodeId) {
+        self.sync_graph_state();
+        let id = crate::tui::graph::subwayrat_node_id(id);
         let mut max_right: i32 = 0;
         let mut stack_y: i32 = 0;
-        for node in self.workflow.graph.nodes() {
+        for node in self.graph_state.graph.nodes() {
             if node.id == id {
                 continue;
             }
-            if let Some(bounds) = node_bounds(&self.workflow.graph, node.id) {
+            if let Some(bounds) = node_bounds(&self.graph_state.graph, node.id) {
                 let right = bounds.x.get() + i32::from(bounds.width);
                 if right > max_right {
                     max_right = right;
@@ -2104,16 +2113,18 @@ impl App {
                 }
             }
         }
-        let has_others = self.workflow.graph.node_count() > 1;
-        if let Some(node) = self.workflow.graph.node_mut(id)
+        let has_others = self.graph_state.graph.node_count() > 1;
+        if let Some(node) = self.graph_state.graph.node_mut(id)
             && has_others
         {
             node.x = max_right + NEW_NODE_HORIZONTAL_GAP;
             node.y = stack_y;
         }
+        self.sync_workflow_graph_from_state();
     }
 
-    fn select_node(&mut self, id: NodeId) {
+    fn select_node(&mut self, id: impl WorkflowNodeIdentity) {
+        let id = crate::tui::graph::subwayrat_node_id(id.workflow_node_id());
         self.graph_state.selected.clear();
         self.graph_state.selected.insert(id);
         self.graph_state.focused = Some(id);
@@ -2121,8 +2132,17 @@ impl App {
 
     /// Run auto-layout on the graph.
     pub fn auto_layout(&mut self) {
-        auto_layout(&mut self.workflow.graph, &LayoutConfig::default());
-        self.sync_graph_state();
+        let layout = LayoutConfig {
+            direction: rat_nodegraph::layout::LayoutDirection::LeftToRight,
+            h_spacing: AUTO_LAYOUT_HORIZONTAL_SPACING_COLUMNS,
+            v_spacing: AUTO_LAYOUT_VERTICAL_SPACING_ROWS,
+            grid_size: 0,
+            node_width: AUTO_LAYOUT_NODE_WIDTH_COLUMNS,
+            node_height: AUTO_LAYOUT_NODE_HEIGHT_ROWS,
+            partial: false,
+        };
+        auto_layout(&mut self.graph_state.graph, &layout);
+        self.sync_workflow_graph_from_state();
         self.mark_workflow_dirty();
         self.output.push_line("Auto-layout applied");
     }
@@ -2390,14 +2410,23 @@ impl App {
         }
     }
 
-    /// Rebuild graph_state from workflow.graph.
+    /// Rebuild the Subwayrat state from the Lattice-owned workflow graph.
     fn sync_graph_state(&mut self) {
         let old_viewport = self.graph_state.viewport.clone();
-        let mut graph = self.workflow.graph.clone();
-        // Re-apply the "any" type compatibility function (lost on clone).
-        graph.set_compatibility(Box::new(|src, tgt| src == tgt || src == "any" || tgt == "any"));
+        let Ok(graph) = crate::tui::graph::to_subwayrat(&self.workflow.graph) else {
+            self.output.push_line("Canvas graph conversion failed; the current canvas was preserved");
+            return;
+        };
         self.graph_state = NodeGraphState::new(graph, old_viewport.width, old_viewport.height);
         self.graph_state.viewport = old_viewport;
+    }
+
+    /// Admit current Subwayrat edit state into the Lattice-owned workflow graph.
+    pub(crate) fn sync_workflow_graph_from_state(&mut self) {
+        match crate::tui::graph::from_subwayrat(&self.graph_state.graph) {
+            Ok(graph) => self.workflow.graph = graph,
+            Err(_) => self.output.push_line("Canvas graph conversion was rejected; workflow state was preserved"),
+        }
     }
 
     /// Run the TUI event loop.
@@ -2716,7 +2745,7 @@ mod tests {
         app.workflow.meta.name = "saved".to_string();
         app.add_shell_node("Saved", "echo saved");
         app.save_workflow();
-        app.workflow = Workflow::new("current");
+        app.workflow = Workflow::new("current", crate::engine::workflow::WorkflowTimestamp::epoch());
         app.sync_graph_state();
 
         app.open_workflow_browser();
@@ -2733,7 +2762,7 @@ mod tests {
     fn workflow_browser_load_failure_preserves_current_workflow() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
         let mut app = App::new(test_config(&temp_dir));
-        app.workflow = Workflow::new("current");
+        app.workflow = Workflow::new("current", crate::engine::workflow::WorkflowTimestamp::epoch());
         app.sync_graph_state();
 
         assert!(!app.load_workflow_by_name("missing"));
@@ -3171,7 +3200,7 @@ mod tests {
 
     #[test]
     fn completed_output_lines_are_port_labeled_and_ordered() {
-        let mut workflow = Workflow::new("display");
+        let mut workflow = Workflow::new("display", crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = workflow.add_shell_node("grep", "grep world");
         let node = workflow.graph.node(node_id).expect("node exists");
         let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
@@ -3193,7 +3222,7 @@ mod tests {
     // r[verify n8nclone.tui_ux.image_nodes.preview.output_panel]
     #[test]
     fn completed_image_outputs_render_bounded_preview_metadata() {
-        let mut workflow = Workflow::new("image-preview");
+        let mut workflow = Workflow::new("image-preview", crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = workflow.add_agent_node("Image agent", AgentTarget::Clankers, "make art", AgentOutputMode::Image);
         let node = workflow.graph.node(node_id).expect("node exists");
         let image_port = node.output_ports[AGENT_IMAGE_OUTPUT_INDEX].id;
@@ -3216,7 +3245,7 @@ mod tests {
 
     #[test]
     fn completed_output_records_preserve_run_node_and_port_metadata() {
-        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME, crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
         let node = workflow.graph.node(node_id).expect("node exists");
         let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
@@ -3237,7 +3266,7 @@ mod tests {
 
     #[test]
     fn latest_node_output_records_return_latest_lines_in_port_order() {
-        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let mut workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME, crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
         let other_node_id = workflow.add_shell_node(MUTATED_NODE_LABEL, SNAPSHOT_COMMAND);
         let node = workflow.graph.node(node_id).expect("node exists");
@@ -3286,7 +3315,7 @@ mod tests {
 
     #[test]
     fn completed_output_lines_omit_empty_streams_for_no_match() {
-        let mut workflow = Workflow::new("display");
+        let mut workflow = Workflow::new("display", crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = workflow.add_shell_node("grep", "grep world");
         let node = workflow.graph.node(node_id).expect("node exists");
         let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;
@@ -3307,7 +3336,8 @@ mod tests {
     fn finish_workflow_run_logs_executed_workflow_snapshot() {
         let temp_dir = tempfile::tempdir().expect("temporary app directory");
         let mut app = App::new(test_config(&temp_dir));
-        let mut run_workflow = Workflow::new(SNAPSHOT_WORKFLOW_NAME);
+        let mut run_workflow =
+            Workflow::new(SNAPSHOT_WORKFLOW_NAME, crate::engine::workflow::WorkflowTimestamp::epoch());
         let node_id = run_workflow.add_shell_node(SNAPSHOT_NODE_LABEL, SNAPSHOT_COMMAND);
         let node = run_workflow.graph.node(node_id).expect("node exists");
         let stdout_port = node.output_ports[SHELL_STDOUT_OUTPUT_INDEX].id;

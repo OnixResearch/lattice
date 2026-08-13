@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn workflow_definition() -> Result<Workflow, Box<dyn std::error::Error>> {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.meta.description = WORKFLOW_DESCRIPTION.to_string();
     let node_id = workflow.add_agent_node(NODE_LABEL, AgentTarget::Animus, NODE_PROMPT, AgentOutputMode::Text);
     let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node_id).cloned() else {

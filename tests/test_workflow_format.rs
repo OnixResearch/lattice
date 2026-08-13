@@ -96,7 +96,7 @@ fn custom_runner_settings() -> NodeRunnerSettings {
 }
 
 fn markdown_agent_workflow(prompt_file: &str) -> Workflow {
-    let mut workflow = Workflow::new("markdown-agent-workflow");
+    let mut workflow = Workflow::new("markdown-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(ROLE_PROMPT_LABEL, AgentTarget::Pi, ROLE_PROMPT_BODY, AgentOutputMode::Text);
     let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node_id).cloned() else {
         panic!("agent config exists");
@@ -277,7 +277,7 @@ fn cli_export_missing_workflow_writes_no_file() {
 // r[verify n8nclone.workflow_format.agent_nodes.nickel.round_trip]
 #[test]
 fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
-    let mut workflow = Workflow::new("image-agent-workflow");
+    let mut workflow = Workflow::new("image-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let image_id = workflow.add_image_input_node("Selfie", IMAGE_PATH);
     let agent_id =
         workflow.add_agent_node("Fine art agent", AgentTarget::Clankers, AGENT_PROMPT, AgentOutputMode::Image);
@@ -307,7 +307,8 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
 
 #[test]
 fn nickel_export_import_preserves_agent_credential_references() {
-    let mut workflow = Workflow::new("credentialed-agent-workflow");
+    let mut workflow =
+        Workflow::new("credentialed-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let agent_id = workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
     let mut credentials = NodeCredentialRefs::default();
     credentials
@@ -327,7 +328,7 @@ fn nickel_export_import_preserves_agent_credential_references() {
 
 #[test]
 fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
-    let mut workflow = Workflow::new("all-credentialed-kinds");
+    let mut workflow = Workflow::new("all-credentialed-kinds", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let nodes = [
         ("Shell", workflow.add_shell_node("Shell", "true")),
         ("HTTP", workflow.add_http_node("HTTP", "GET", "https://example.com")),
@@ -378,7 +379,7 @@ fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
 fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
     let temp_dir = tempfile::tempdir().expect("temporary deletion directory");
     let store = Store::new(temp_dir.path().join(STORE_FILE_NAME)).expect("store opens");
-    let mut workflow = Workflow::new("deleted-node-round-trip");
+    let mut workflow = Workflow::new("deleted-node-round-trip", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let removed = workflow.add_agent_node("Removed", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
     let kept = workflow.add_shell_node("Kept", "true");
     let removed_output = workflow.graph.node(removed).expect("removed node").output_ports[0].id;
@@ -408,13 +409,13 @@ fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
         imported
             .configs
             .keys()
-            .all(|node_id| imported.graph.node(rat_nodegraph::model::NodeId(*node_id)).is_some())
+            .all(|node_id| imported.graph.node(lattice::engine::workflow::NodeId(*node_id)).is_some())
     );
     assert!(
         imported
             .runner
             .keys()
-            .all(|node_id| imported.graph.node(rat_nodegraph::model::NodeId(*node_id)).is_some())
+            .all(|node_id| imported.graph.node(lattice::engine::workflow::NodeId(*node_id)).is_some())
     );
 }
 
@@ -556,7 +557,7 @@ fn markdown_agent_prompt_symlink_escape_fails_closed() {
 fn image_workflow_static_import_export_and_validation_do_not_read_image_bytes() {
     let temp_dir = tempfile::tempdir().expect("temporary workflow format directory");
     let missing_path = temp_dir.path().join(STATIC_MISSING_IMAGE_FILE_NAME).display().to_string();
-    let mut workflow = Workflow::new("static-image-workflow");
+    let mut workflow = Workflow::new("static-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node("Missing static image", &missing_path);
     let workflow_path = temp_dir.path().join(EXPORTED_WORKFLOW_FILE_NAME);
 
@@ -579,7 +580,9 @@ fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store()
     let temp_dir = tempfile::tempdir().expect("temporary image import directory");
     let (config_path, data_dir) = write_test_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store opens");
-    store.save_workflow(&Workflow::new(EXISTING_WORKFLOW_NAME)).expect("existing workflow saves");
+    store
+        .save_workflow(&Workflow::new(EXISTING_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("existing workflow saves");
     drop(store);
 
     let output = Command::new(env!("CARGO_BIN_EXE_lattice"))
@@ -608,7 +611,7 @@ fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store()
 // r[verify n8nclone.workflow_format.agent_nodes.invalid.target]
 #[test]
 fn portable_import_rejects_invalid_agent_target() {
-    let mut workflow = Workflow::new("invalid-agent-workflow");
+    let mut workflow = Workflow::new("invalid-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
     let mut portable = workflow_to_portable(&workflow);
     let config = portable.configs.first_mut().expect("agent config");
@@ -621,7 +624,7 @@ fn portable_import_rejects_invalid_agent_target() {
 
 #[test]
 fn portable_import_rejects_invalid_agent_output_mode() {
-    let mut workflow = Workflow::new("invalid-agent-workflow");
+    let mut workflow = Workflow::new("invalid-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
     let mut portable = workflow_to_portable(&workflow);
     let config = portable.configs.first_mut().expect("agent config");
@@ -636,7 +639,8 @@ fn portable_import_rejects_invalid_agent_output_mode() {
 // r[verify n8nclone.workflow_format.agent_nodes.invalid.port_type]
 #[test]
 fn portable_import_rejects_incompatible_image_agent_port() {
-    let mut workflow = Workflow::new("invalid-image-port-workflow");
+    let mut workflow =
+        Workflow::new("invalid-image-port-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let image_id = workflow.add_image_input_node("Selfie", IMAGE_PATH);
     let shell_id = workflow.add_shell_node("String consumer", "cat");
     let image_output = workflow.graph.node(image_id).expect("image node").output_ports[0].id;

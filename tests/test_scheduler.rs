@@ -165,7 +165,7 @@ fn operator_e2e_scheduler_daemon_runs_due_shell_and_isolates_missing_and_future_
     let temp_dir = tempfile::tempdir().expect("temporary operator E2E directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("operator E2E store opens");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("scheduler", OPERATOR_E2E_SHELL_COMMAND);
     store.save_workflow(&workflow).expect("operator E2E workflow saves");
     let due = schedule(START_EPOCH_MS);
@@ -226,7 +226,9 @@ fn scheduler_occurrence_cli_lists_shows_and_rejects_invalid_bounds() {
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let store_path = data_dir.join(STORE_FILE_NAME);
     let store = Store::new(&store_path).expect("occurrence CLI store opens");
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("occurrence CLI workflow saves");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("occurrence CLI workflow saves");
     store.save_schedule(&schedule(START_EPOCH_MS)).expect("occurrence CLI schedule saves");
     drop(store);
 
@@ -283,7 +285,7 @@ fn operator_e2e_scheduler_restart_requires_explicit_retry_after_pre_effect_death
     let recovery_effect_path = temp_dir.path().join(RECOVERY_EFFECT_FILE_NAME);
     let store_path = data_dir.join(STORE_FILE_NAME);
     let store = Store::new(&store_path).expect("scheduler restart store opens");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         "scheduler-restart",
         common::forced_parent_death_once_then_write_command(&marker_path, &recovery_effect_path, RECOVERY_EFFECT),
@@ -366,7 +368,7 @@ fn operator_e2e_scheduler_post_effect_death_suppresses_restart_and_allows_abando
     let attempts_path = temp_dir.path().join(POST_EFFECT_ATTEMPTS_FILE_NAME);
     let store_path = data_dir.join(STORE_FILE_NAME);
     let store = Store::new(&store_path).expect("scheduler post-effect store opens");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         "scheduler-post-effect",
         common::post_effect_parent_death_once_then_repeat_command(
@@ -467,7 +469,7 @@ fn operator_e2e_scheduler_concurrent_daemons_admit_one_store_owner_and_one_durab
     let effect_path = temp_dir.path().join(CONCURRENT_EFFECT_FILE_NAME);
     let store_path = data_dir.join(STORE_FILE_NAME);
     let store = Store::new(&store_path).expect("concurrent scheduler store opens");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         "scheduler-concurrent",
         common::gated_write_command(&ready_path, &release_path, &effect_path, CONCURRENT_EFFECT),
@@ -668,7 +670,9 @@ fn daemon_runner_reports_load_failure_without_blocking_other_schedules() {
 fn validation_accepts_schedule_for_existing_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary store directory");
     let store = Store::new(temp_dir.path().join("workflow-schedule.redb")).expect("store opens");
-    store.save_workflow(&Workflow::new(WORKFLOW_NAME)).expect("workflow saved");
+    store
+        .save_workflow(&Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+        .expect("workflow saved");
     let workflows = store.list_workflows().expect("workflows list").into_iter().collect::<HashSet<_>>();
 
     assert!(validate_schedule(&schedule(START_EPOCH_MS), &workflows).is_empty());

@@ -10,8 +10,11 @@ use lattice::engine::executor::node_execution_cache_key;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use lattice::expressions::ExpressionContext;
+use lattice::expressions::ExpressionPortId;
 use lattice::expressions::ExpressionSegment;
 use lattice::expressions::ExpressionTransform;
 use lattice::expressions::evaluate_expression_template;
@@ -23,7 +26,6 @@ use lattice::http::HttpResponse;
 use lattice::workflow_validation::WorkflowDiagnosticCode;
 use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::PortId;
 
 const SOURCE_LABEL: &str = "source";
 const TARGET_LABEL: &str = "target";
@@ -60,17 +62,17 @@ impl HttpClient for RecordingHttpClient {
     }
 }
 
-fn stdout_port(workflow: &Workflow, node_id: rat_nodegraph::model::NodeId) -> PortId {
+fn stdout_port(workflow: &Workflow, node_id: NodeId) -> PortId {
     workflow.graph.node(node_id).expect("node exists").output_ports[STDOUT_OUTPUT_INDEX].id
 }
 
-fn expression_for(node_id: rat_nodegraph::model::NodeId, port_id: PortId) -> String {
+fn expression_for(node_id: NodeId, port_id: PortId) -> String {
     format!("{{{{node:{}:port:{}}}}}", node_id.0, port_id.0)
 }
 
 fn cache_for_node(
     workflow: &Workflow,
-    node_id: rat_nodegraph::model::NodeId,
+    node_id: NodeId,
     outputs: HashMap<PortId, Value>,
 ) -> HashMap<ContentHash, HashMap<PortId, Value>> {
     let key = node_execution_cache_key(node_id, workflow.node_config(node_id).expect("node config"), &HashMap::new());
@@ -87,7 +89,7 @@ fn parses_output_reference_expression() {
     match &template.segments[1] {
         ExpressionSegment::Reference(reference) => {
             assert_eq!(reference.node_id, 1);
-            assert_eq!(reference.port_id, PortId(2));
+            assert_eq!(reference.port_id, ExpressionPortId(2));
             assert_eq!(reference.transforms, vec![ExpressionTransform::Trim, ExpressionTransform::Upper]);
         }
         other => panic!("expected reference segment, got {other:?}"),
@@ -97,7 +99,7 @@ fn parses_output_reference_expression() {
 // r[verify n8nclone.workflow_execution.expression_mapping.syntax.invalid]
 #[test]
 fn invalid_expression_syntax_is_validation_diagnostic() {
-    let mut workflow = Workflow::new("invalid-expression");
+    let mut workflow = Workflow::new("invalid-expression", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(TARGET_LABEL, "echo {{node:bad}}");
 
     let diagnostics = validate_workflow(&workflow);
@@ -114,7 +116,7 @@ fn invalid_expression_syntax_is_validation_diagnostic() {
 #[test]
 fn evaluates_bounded_transforms_without_side_effects() {
     let mut context = ExpressionContext::default();
-    context.insert(1, PortId(2), Value::from_string("  hello  ".to_string()));
+    context.insert(1, ExpressionPortId(2), Value::from_string("  hello  ".to_string()));
     let template = parse_expression_template("{{node:1:port:2|trim|upper}}").expect("parse expression");
 
     let value = evaluate_expression_template(&template, &context).expect("evaluate expression");
@@ -127,7 +129,7 @@ fn evaluates_bounded_transforms_without_side_effects() {
 // r[verify n8nclone.workflow_execution.expression_mapping.config.command]
 #[tokio::test]
 async fn shell_command_resolves_upstream_stdout_expression() {
-    let mut workflow = Workflow::new("command-expression");
+    let mut workflow = Workflow::new("command-expression", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source_id = workflow.add_shell_node(SOURCE_LABEL, "unused");
     let source_stdout = stdout_port(&workflow, source_id);
     let target_id = workflow.add_shell_node(TARGET_LABEL, "placeholder");
@@ -156,7 +158,7 @@ async fn shell_command_resolves_upstream_stdout_expression() {
 // r[verify n8nclone.workflow_execution.expression_mapping.config.http_body]
 #[tokio::test]
 async fn http_body_resolves_upstream_expression() {
-    let mut workflow = Workflow::new("http-body-expression");
+    let mut workflow = Workflow::new("http-body-expression", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source_id = workflow.add_shell_node(SOURCE_LABEL, "unused");
     let source_stdout = stdout_port(&workflow, source_id);
     let http_id = workflow.add_http_node(HTTP_LABEL, "POST", HTTP_URL);
@@ -188,7 +190,7 @@ async fn http_body_resolves_upstream_expression() {
 // r[verify n8nclone.workflow_execution.expression_mapping.errors.missing]
 #[tokio::test]
 async fn missing_expression_reference_fails_before_adapter_execution() {
-    let mut workflow = Workflow::new("missing-expression");
+    let mut workflow = Workflow::new("missing-expression", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let target_id = workflow.add_shell_node(TARGET_LABEL, "printf '{{node:999:port:999}}'");
     let executor = Executor::new();
 
@@ -204,7 +206,7 @@ async fn missing_expression_reference_fails_before_adapter_execution() {
 #[test]
 fn json_transform_on_string_reports_type_mismatch() {
     let mut context = ExpressionContext::default();
-    context.insert(1, PortId(2), Value::from_string("not-json".to_string()));
+    context.insert(1, ExpressionPortId(2), Value::from_string("not-json".to_string()));
     let template = parse_expression_template("{{node:1:port:2|json:name}}").expect("parse expression");
 
     let error = evaluate_expression_template(&template, &context).expect_err("type mismatch");
@@ -216,7 +218,7 @@ fn json_transform_on_string_reports_type_mismatch() {
 // r[verify n8nclone.workflow_execution.expression_mapping.redaction.secret]
 #[tokio::test]
 async fn secret_derived_expression_output_is_redacted() {
-    let mut workflow = Workflow::new("redacted-expression");
+    let mut workflow = Workflow::new("redacted-expression", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source_id = workflow.add_shell_node(SOURCE_LABEL, "unused");
     let source_stdout = stdout_port(&workflow, source_id);
     let target_id = workflow.add_shell_node(TARGET_LABEL, "placeholder");

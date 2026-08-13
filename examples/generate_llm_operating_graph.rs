@@ -6,11 +6,11 @@ use std::io;
 use lattice::agent_node::AgentOutputMode;
 use lattice::agent_node::AgentTarget;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use lattice::file_node::FileOperationKind;
 use lattice::workflow_format::workflow_to_nickel;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 
 const WORKFLOW_NAME: &str = "llm-operating-graph";
 const WORKFLOW_DESCRIPTION: &str = "Markdown-backed role graph with explicit shared-state reads, fan-out, aggregation, publishing, and output effects.";
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn build_fixture() -> Result<Workflow, Box<dyn std::error::Error>> {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let timestamp = chrono::DateTime::parse_from_rfc3339(FIXTURE_TIMESTAMP_RFC3339)?.with_timezone(&chrono::Utc);
     workflow.meta.description = WORKFLOW_DESCRIPTION.to_string();
     workflow.meta.created = timestamp;

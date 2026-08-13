@@ -34,7 +34,7 @@ const ROUND_LIMIT: u64 = 3;
 const RETRY_LIMIT: u64 = 1;
 
 fn definition() -> OrchestrationDefinition {
-    let workflow = Workflow::new(WORKFLOW_NAME);
+    let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     OrchestrationDefinition {
         schema_version: current_schema_version(),
         id: DEFINITION_ID.to_string(),
@@ -109,7 +109,9 @@ fn proposal_nickel_round_trip_preserves_hash_bound_identity() {
     let directory = tempdir().expect("temporary directory must exist");
     let path = directory.path().join("proposal.ncl");
     let instance = new_instance(definition(), FIRST_SEQUENCE, None).expect("instance must hash");
-    let successor = workflow_revision(&Workflow::new(SUCCESSOR_NAME)).expect("successor must hash");
+    let successor =
+        workflow_revision(&Workflow::new(SUCCESSOR_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch()))
+            .expect("successor must hash");
     let expected = make_proposal(&instance, successor, "bounded successor").expect("proposal must hash");
     std::fs::write(&path, proposal_to_nickel(&expected).expect("proposal must render")).expect("proposal must write");
 

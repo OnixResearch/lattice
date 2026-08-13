@@ -77,7 +77,7 @@ const REMOTE_EFFECT_SCOPE: &str = "remote-effects-may-be-at-least-once";
 const HEX_CHARS_PER_BYTE: usize = 2;
 
 fn workflow(name: &str) -> Workflow {
-    Workflow::new(name)
+    Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch())
 }
 
 fn definition(completion: CompletionPolicy) -> OrchestrationDefinition {

@@ -23,6 +23,9 @@ use lattice::engine::value::TypeTag;
 use lattice::engine::value::Value;
 use lattice::engine::value::ValueData;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
+use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessProcessResult;
 use lattice::headless::HeadlessRunError;
@@ -33,9 +36,6 @@ use lattice::headless::run_saved_workflow;
 use lattice::headless::run_saved_workflow_with_agent_runtime_config;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
-use rat_nodegraph::model::PortSpec;
 
 const SUCCESS_WORKFLOW_NAME: &str = "headless-success";
 const MISSING_WORKFLOW_NAME: &str = "missing-workflow";
@@ -242,7 +242,10 @@ fn template_workflow(
     template: &NodeTemplate,
     case: &TemplateHeadlessCase,
 ) -> (Workflow, NodeId, PortId, PortId, PortId) {
-    let mut workflow = Workflow::new(format!("{TEMPLATE_WORKFLOW_NAME_PREFIX}{}", template.name));
+    let mut workflow = Workflow::new(
+        format!("{TEMPLATE_WORKFLOW_NAME_PREFIX}{}", template.name),
+        lattice::engine::workflow::WorkflowTimestamp::epoch(),
+    );
     let source_id = workflow.add_shell_node(TEMPLATE_SOURCE_NODE_LABEL, TEMPLATE_SOURCE_COMMAND);
     let input_specs = template
         .input_ports
@@ -334,7 +337,7 @@ fn string_output(outputs: &HashMap<PortId, Value>, port: PortId) -> &str {
 #[tokio::test]
 async fn headless_run_saved_workflow_succeeds_and_persists_history() {
     let (store, _temp_dir) = temp_store();
-    let mut workflow = Workflow::new(SUCCESS_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(SUCCESS_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(SUCCESS_NODE_LABEL, SUCCESS_COMMAND);
     store.save_workflow(&workflow).expect("workflow saves");
 
@@ -377,7 +380,7 @@ async fn headless_run_loads_local_image_with_default_executor() {
     let (store, temp_dir) = temp_store();
     let image_path = temp_dir.path().join(HEADLESS_IMAGE_FILE_NAME);
     std::fs::write(&image_path, PNG_FIXTURE).expect("headless image fixture written");
-    let mut workflow = Workflow::new(IMAGE_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(IMAGE_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let image_path_label = image_path.display().to_string();
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, &image_path_label);
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
@@ -412,7 +415,7 @@ async fn headless_run_loads_local_image_with_default_executor() {
 async fn headless_run_uses_configured_production_agent_runtime() {
     let (store, temp_dir) = temp_store();
     let command = write_agent_script(&temp_dir);
-    let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, "summarize this", AgentOutputMode::Text);
     let text_port = output_port_id(&workflow, node_id, AGENT_TEXT_OUTPUT_PORT_LABEL);
     let input_hash = node_execution_cache_key(
@@ -444,7 +447,7 @@ async fn headless_run_maps_agent_image_handoff_to_image_output_port() {
     fs::write(temp_dir.path().join(HEADLESS_AGENT_IMAGE_FILE_NAME), PNG_FIXTURE).expect("agent image written");
     let envelope = serde_json::json!({"path": HEADLESS_AGENT_IMAGE_FILE_NAME, "media_type": "image/png"});
     let command = write_agent_script_with_body(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
-    let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id =
         workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, HEADLESS_AGENT_IMAGE_PROMPT, AgentOutputMode::Image);
     if let Some(NodeConfig::Agent(settings)) = workflow.configs.get_mut(&node_id.0) {
@@ -530,7 +533,7 @@ fn cli_run_saved_workflow_emits_json_summary() {
     let temp_dir = tempfile::tempdir().expect("temporary cli directory");
     let (config_path, data_dir) = write_test_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store opens");
-    let mut workflow = Workflow::new(SUCCESS_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(SUCCESS_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(SUCCESS_NODE_LABEL, SUCCESS_COMMAND);
     store.save_workflow(&workflow).expect("workflow saves");
     drop(store);
@@ -578,7 +581,7 @@ async fn headless_run_missing_workflow_fails_without_history_record() {
 #[tokio::test]
 async fn headless_run_failed_node_returns_failure_summary() {
     let (store, _temp_dir) = temp_store();
-    let mut workflow = Workflow::new(BROKEN_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(BROKEN_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(BROKEN_NODE_LABEL, SUCCESS_COMMAND);
     workflow.set_node_config(node_id, NodeConfig::Shell {
         command: SUCCESS_COMMAND.to_string(),

@@ -496,7 +496,7 @@
       "evidence": [
         {
           "path": "tests/openai/execution.rs",
-          "blake3": "e1eb27eded9b965ce65049f293b054fbad23ed5ce89751fc84d5f1f7451f523e"
+          "blake3": "1be77b537c6f874ce959317ab0f0543c77d07fb8f4cac6d41c5e807928a8e529"
         }
       ],
       "rationale_code": "assertions.plain-text-and-json-preserved"

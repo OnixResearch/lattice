@@ -54,8 +54,8 @@ fn subworkflow_config(child_output: &str) -> SubworkflowNodeConfig {
     }
 }
 
-fn parent_workflow(child_output: &str) -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut workflow = Workflow::new(PARENT_WORKFLOW);
+fn parent_workflow(child_output: &str) -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut workflow = Workflow::new(PARENT_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_subworkflow_node("Saved child", subworkflow_config(child_output));
     (workflow, node_id)
 }
@@ -64,7 +64,7 @@ fn named_parent_inputs() -> BTreeMap<String, Value> {
     BTreeMap::from([(PARENT_INPUT.to_string(), Value::from_string("parent-value".to_string()))])
 }
 
-fn completed_outputs(step_status: &NodeStatus) -> &HashMap<rat_nodegraph::model::PortId, Value> {
+fn completed_outputs(step_status: &NodeStatus) -> &HashMap<lattice::engine::workflow::PortId, Value> {
     match step_status {
         NodeStatus::Completed { outputs, .. } => outputs,
         other => panic!("expected completed subworkflow step, got {other:?}"),
@@ -76,7 +76,7 @@ fn completed_outputs(step_status: &NodeStatus) -> &HashMap<rat_nodegraph::model:
 async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port() {
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Arc::new(Store::new(temporary.path().join("lattice.redb")).expect("open store"));
-    let mut child = Workflow::new(CHILD_WORKFLOW);
+    let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     child.add_shell_node("Child result", format!("printf {CHILD_RESULT}"));
     store.save_workflow(&child).expect("save child workflow");
 
@@ -108,10 +108,10 @@ async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port
 async fn headless_production_shell_loads_and_executes_the_saved_child() {
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Store::new(temporary.path().join("lattice.redb")).expect("open store");
-    let mut child = Workflow::new(CHILD_WORKFLOW);
+    let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     child.add_shell_node("Child result", format!("printf {CHILD_RESULT}"));
     store.save_workflow(&child).expect("save child workflow");
-    let mut parent = Workflow::new(PARENT_WORKFLOW);
+    let mut parent = Workflow::new(PARENT_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     parent.add_subworkflow_node("Saved child", SubworkflowNodeConfig {
         workflow_name: CHILD_WORKFLOW.to_string(),
         input_mappings: Vec::new(),
@@ -236,7 +236,7 @@ async fn missing_runner_missing_child_output_and_correlation_drift_fail_without_
 
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Arc::new(Store::new(temporary.path().join("lattice.redb")).expect("open store"));
-    let mut child = Workflow::new(CHILD_WORKFLOW);
+    let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     child.add_shell_node("Child result", format!("printf {CHILD_RESULT}"));
     store.save_workflow(&child).expect("save child workflow");
     let (missing_output_parent, _) = parent_workflow("missing-output");
@@ -258,7 +258,7 @@ async fn missing_runner_missing_child_output_and_correlation_drift_fail_without_
 
 #[tokio::test]
 async fn recursive_child_reference_is_rejected_before_runner_dispatch() {
-    let mut workflow = Workflow::new(PARENT_WORKFLOW);
+    let mut workflow = Workflow::new(PARENT_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_subworkflow_node("Recursive child", SubworkflowNodeConfig {
         workflow_name: PARENT_WORKFLOW.to_string(),
         input_mappings: Vec::new(),

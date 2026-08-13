@@ -5,10 +5,10 @@ use std::collections::HashMap;
 
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use lattice::store::Store;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 use tempfile::TempDir;
 
 const SHELL_STDOUT_OUTPUT_INDEX: usize = 0;
@@ -346,8 +346,8 @@ pub fn classify_post_effect_crash(
 
 /// Build a simple linear two-node workflow: echo → grep.
 /// Returns (workflow, node_a_id, node_b_id).
-pub fn two_node_pipeline() -> (Workflow, rat_nodegraph::model::NodeId, rat_nodegraph::model::NodeId) {
-    let mut wf = Workflow::new("test-pipeline");
+pub fn two_node_pipeline() -> (Workflow, lattice::engine::workflow::NodeId, lattice::engine::workflow::NodeId) {
+    let mut wf = Workflow::new("test-pipeline", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let a = wf.add_shell_node("echo-hello", "echo hello world");
     let b = wf.add_shell_node("grep-hello", "grep hello");
 
@@ -368,12 +368,12 @@ pub fn two_node_pipeline() -> (Workflow, rat_nodegraph::model::NodeId, rat_nodeg
 ///       D
 pub fn diamond_workflow() -> (
     Workflow,
-    rat_nodegraph::model::NodeId,
-    rat_nodegraph::model::NodeId,
-    rat_nodegraph::model::NodeId,
-    rat_nodegraph::model::NodeId,
+    lattice::engine::workflow::NodeId,
+    lattice::engine::workflow::NodeId,
+    lattice::engine::workflow::NodeId,
+    lattice::engine::workflow::NodeId,
 ) {
-    let mut wf = Workflow::new("diamond");
+    let mut wf = Workflow::new("diamond", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let a = wf.add_shell_node("source", "echo diamond");
     let b = wf.add_shell_node("left", "cat");
     let c = wf.add_shell_node("right", "cat");
@@ -399,8 +399,8 @@ pub fn diamond_workflow() -> (
 }
 
 /// Build a single standalone node (no edges).
-pub fn standalone_node(label: &str, command: &str) -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut wf = Workflow::new("standalone");
+pub fn standalone_node(label: &str, command: &str) -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut wf = Workflow::new("standalone", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node(label, command);
     (wf, id)
 }

@@ -12,13 +12,16 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 `lattice-core` has no filesystem, process, network, persistence, clock, provider, or terminal authority.
 
+[Workflow domain boundaries](docs/workflow-domain-boundaries.md) define ownership for Lattice, Choregraph, Subwayrat, persistence, and time.
+
 ## Development
 
 ```bash
 nix develop          # enter devshell
 pre-commit install   # install the Octet pre-commit hook
-scripts/check.rs        # run operator E2E, fmt, tests, and clippy with repo-local target artifacts
-scripts/operator-e2e.rs # exercise TUI PTY, webhook TCP, scheduler process, and orchestration recovery boundaries
+scripts/check.rs                              # run operator E2E, guards, fmt, tests, and clippy
+scripts/check-workflow-domain-boundaries.rs   # reject core clock reads and non-TUI Subwayrat leakage
+scripts/operator-e2e.rs                       # exercise TUI PTY, webhook TCP, scheduler process, and orchestration recovery boundaries
 octet-precommit-check  # run the fail-closed Octet stable-ID gate
 cargo octet check    # inspect raw warning-level Octet output
 cargo check          # quick compile check

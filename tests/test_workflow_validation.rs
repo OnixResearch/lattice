@@ -5,6 +5,7 @@ mod common;
 use lattice::config::AppConfig;
 use lattice::engine::executor::RunId;
 use lattice::engine::workflow::NodeRunnerSettings;
+use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessRunError;
 use lattice::headless::run_saved_workflow;
@@ -15,7 +16,6 @@ use lattice::workflow_validation::WorkflowDiagnosticCode;
 use lattice::workflow_validation::has_fatal_diagnostics;
 use lattice::workflow_validation::validate_workflow;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::PortSpec;
 use serde_json::json;
 use tempfile::TempDir;
 
@@ -42,7 +42,7 @@ fn test_config(temp_dir: &TempDir) -> AppConfig {
 }
 
 fn workflow_with_missing_config() -> Workflow {
-    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow
         .graph
         .add_node(BROKEN_NODE_LABEL, &[PortSpec::new("stdin", TYPE_TAG_STRING)], &[PortSpec::new(
@@ -75,7 +75,7 @@ fn workflow_with_cycle() -> Workflow {
 // r[verify n8nclone.workflow_validation.diagnostics.core.valid]
 #[test]
 fn valid_workflow_has_no_fatal_diagnostics() {
-    let mut workflow = Workflow::new(VALID_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(VALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("valid", VALID_COMMAND);
 
     let diagnostics = validate_workflow(&workflow);
@@ -87,7 +87,7 @@ fn valid_workflow_has_no_fatal_diagnostics() {
 // r[verify n8nclone.workflow_validation.run_gate.warning]
 #[test]
 fn warning_only_workflow_does_not_block_run_gate() {
-    let workflow = Workflow::new(VALID_WORKFLOW_NAME);
+    let workflow = Workflow::new(VALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     let diagnostics = validate_workflow(&workflow);
 
@@ -102,7 +102,7 @@ fn warning_only_workflow_does_not_block_run_gate() {
 // r[verify n8nclone.workflow_validation.node_kind_provider.fallback]
 #[test]
 fn empty_shell_command_is_fatal() {
-    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(BROKEN_NODE_LABEL, EMPTY_COMMAND);
 
     let diagnostics = validate_workflow(&workflow);
@@ -153,7 +153,7 @@ fn runner_cycle_admission_is_fatal_validation_diagnostic() {
 // r[verify n8nclone.workflow_validation.node_kind_provider.runtime_binding]
 #[test]
 fn missing_runtime_binding_is_fatal_validation_diagnostic() {
-    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(BROKEN_NODE_LABEL, VALID_COMMAND);
     workflow.set_node_runner_settings(node_id, NodeRunnerSettings::new(MISSING_RUNTIME_KIND, MISSING_RUNTIME_KEY));
 

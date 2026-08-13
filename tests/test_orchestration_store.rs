@@ -40,7 +40,7 @@ const RETRY_LIMIT: u64 = 2;
 const BUDGET_LIMIT: u64 = 10;
 
 fn definition() -> OrchestrationDefinition {
-    let workflow = Workflow::new(WORKFLOW_NAME);
+    let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     OrchestrationDefinition {
         schema_version: current_schema_version(),
         id: DEFINITION_ID.to_string(),

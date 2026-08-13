@@ -38,8 +38,8 @@ fn http_response() -> HttpResponse {
     }
 }
 
-fn workflow_with_http_node() -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut workflow = Workflow::new("http-workflow");
+fn workflow_with_http_node() -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut workflow = Workflow::new("http-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_http_node(HTTP_NODE_LABEL, HTTP_METHOD_GET, HTTP_URL);
     (workflow, node_id)
 }
@@ -102,7 +102,7 @@ async fn http_node_executes_through_client_and_maps_outputs() {
 // r[verify n8nclone.workflow_execution.http_node.errors]
 #[test]
 fn invalid_http_method_and_url_are_validation_diagnostics() {
-    let mut workflow = Workflow::new("invalid-http");
+    let mut workflow = Workflow::new("invalid-http", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_http_node(HTTP_NODE_LABEL, HTTP_METHOD_INVALID, HTTP_INVALID_URL);
 
     let diagnostics = validate_workflow(&workflow);
@@ -155,7 +155,7 @@ fn http_cache_key_changes_when_request_config_changes() {
     let original_key =
         node_execution_cache_key(node_id, workflow.node_config(node_id).expect("config"), &HashMap::new());
 
-    let mut changed_workflow = Workflow::new("changed-http");
+    let mut changed_workflow = Workflow::new("changed-http", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let changed_node_id = changed_workflow.add_http_node(HTTP_NODE_LABEL, HTTP_METHOD_POST, HTTP_OTHER_URL);
     let changed_key = node_execution_cache_key(
         node_id,

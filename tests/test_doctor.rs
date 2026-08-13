@@ -144,7 +144,7 @@ fn doctor_cli_reports_missing_credential_provider_without_secret_values() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
     let (config_path, data_dir) = write_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store created");
-    let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(doctor_trigger());
     store.save_workflow(&workflow).expect("workflow with trigger saved");
     store.save_trigger(&workflow.triggers[0]).expect("trigger saved");
@@ -163,7 +163,7 @@ fn doctor_cli_never_discloses_a_present_environment_secret() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
     let (config_path, data_dir) = write_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store created");
-    let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(DOCTOR_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(doctor_trigger());
     store.save_workflow(&workflow).expect("workflow with trigger saved");
     store.save_trigger(&workflow.triggers[0]).expect("trigger saved");

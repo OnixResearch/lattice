@@ -108,7 +108,10 @@ async fn executor_passes_resolved_node_credential_to_native_adapter() {
         API_KEY_REFERENCE.to_string(),
         API_KEY_VALUE.to_string(),
     )]));
-    let mut workflow = lattice::engine::workflow::Workflow::new("native-openai-credential");
+    let mut workflow = lattice::engine::workflow::Workflow::new(
+        "native-openai-credential",
+        lattice::engine::workflow::WorkflowTimestamp::epoch(),
+    );
     let node_id = workflow.add_agent_node("native-openai", AgentTarget::Pi, PROMPT, AgentOutputMode::Text);
     workflow.set_node_credentials(node_id, lattice::credentials::NodeCredentialRefs {
         env: HashMap::from([(

@@ -56,8 +56,8 @@ fn write_local_fixture(temp_dir: &tempfile::TempDir, file_name: &str, bytes: &[u
     path.display().to_string()
 }
 
-fn local_image_workflow(path: &str) -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut workflow = Workflow::new("local-image-workflow");
+fn local_image_workflow(path: &str) -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut workflow = Workflow::new("local-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, path);
     let allowed_root = std::path::Path::new(path).parent().expect("local image parent").to_string_lossy().into_owned();
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
@@ -71,7 +71,7 @@ fn local_image_workflow(path: &str) -> (Workflow, rat_nodegraph::model::NodeId) 
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[test]
 fn add_image_input_node_records_config_and_ports() {
-    let mut workflow = Workflow::new("image-workflow");
+    let mut workflow = Workflow::new("image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_ALLOWED_PNG);
     let node = workflow.graph.node(node_id).expect("image node exists");
 
@@ -87,7 +87,7 @@ fn add_image_input_node_records_config_and_ports() {
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn image_input_node_loads_png_through_interface() {
-    let mut workflow = Workflow::new("image-workflow");
+    let mut workflow = Workflow::new("image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_ALLOWED_PNG);
     let executor = Executor::new_with_image_io(Box::new(image_io()));
 
@@ -109,7 +109,7 @@ async fn image_input_node_loads_png_through_interface() {
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn image_input_node_loads_jpeg_through_interface() {
-    let mut workflow = Workflow::new("image-workflow");
+    let mut workflow = Workflow::new("image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_ALLOWED_JPEG);
     let executor = Executor::new_with_image_io(Box::new(image_io()));
 
@@ -187,7 +187,7 @@ async fn default_executor_loads_local_image_file() {
 #[tokio::test]
 async fn unsupported_image_format_marks_node_failed() {
     let io = MemoryImageIo::new([(PATH_ALLOWED_PNG.to_string(), BAD_IMAGE_FIXTURE.to_vec())].into());
-    let mut workflow = Workflow::new("bad-image-workflow");
+    let mut workflow = Workflow::new("bad-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_ALLOWED_PNG);
     let executor = Executor::new_with_image_io(Box::new(io));
 
@@ -203,7 +203,7 @@ async fn unsupported_image_format_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn missing_image_marks_node_failed() {
-    let mut workflow = Workflow::new("missing-image-workflow");
+    let mut workflow = Workflow::new("missing-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_MISSING);
     let executor = Executor::new_with_image_io(Box::new(image_io()));
 
@@ -219,7 +219,7 @@ async fn missing_image_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[tokio::test]
 async fn oversized_image_marks_node_failed() {
-    let mut workflow = Workflow::new("oversized-image-workflow");
+    let mut workflow = Workflow::new("oversized-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_ALLOWED_PNG);
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: PATH_ALLOWED_PNG.to_string(),
@@ -358,7 +358,7 @@ async fn default_executor_reports_local_image_permission_denied() {
 // r[verify n8nclone.workflow_execution.image_input_nodes.load]
 #[test]
 fn path_outside_allowed_roots_is_validation_diagnostic() {
-    let mut workflow = Workflow::new("unsafe-image-workflow");
+    let mut workflow = Workflow::new("unsafe-image-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_image_input_node(IMAGE_NODE_LABEL, PATH_OTHER);
     workflow.set_node_config(node_id, NodeConfig::ImageInput {
         path: PATH_OTHER.to_string(),

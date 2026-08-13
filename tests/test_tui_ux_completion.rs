@@ -170,7 +170,7 @@ fn save_tui_workflow(temp_dir: &TempDir, workflow: &Workflow) {
 }
 
 fn save_operator_tui_workflow(temp_dir: &TempDir) {
-    let mut workflow = Workflow::new(TUI_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(TUI_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(TUI_NODE_LABEL, TUI_SHELL_COMMAND);
     save_tui_workflow(temp_dir, &workflow);
 }
@@ -178,7 +178,7 @@ fn save_operator_tui_workflow(temp_dir: &TempDir) {
 #[cfg(unix)]
 fn save_fail_once_workflow(temp_dir: &TempDir) {
     let marker_path = temp_dir.path().join(FAIL_ONCE_MARKER_FILE_NAME);
-    let mut workflow = Workflow::new(FAIL_ONCE_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(FAIL_ONCE_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(
         FAIL_ONCE_NODE_LABEL,
         common::timeout_once_then_succeed_command(
@@ -206,7 +206,7 @@ fn save_fail_once_workflow(temp_dir: &TempDir) {
 #[cfg(unix)]
 fn save_invalid_workflow(temp_dir: &TempDir) -> std::path::PathBuf {
     let effect_path = temp_dir.path().join(INVALID_EFFECT_FILE_NAME);
-    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(INVALID_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(INVALID_NODE_LABEL, "");
     workflow.add_shell_node(
         INVALID_EFFECT_NODE_LABEL,
@@ -220,7 +220,7 @@ fn save_invalid_workflow(temp_dir: &TempDir) -> std::path::PathBuf {
 fn save_cancellable_workflow(temp_dir: &TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
     let ready_path = temp_dir.path().join(CANCEL_READY_FILE_NAME);
     let forbidden_path = temp_dir.path().join(CANCEL_FORBIDDEN_FILE_NAME);
-    let mut workflow = Workflow::new(CANCEL_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(CANCEL_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         CANCEL_NODE_LABEL,
         common::ready_then_delayed_effect_command(
@@ -236,7 +236,7 @@ fn save_cancellable_workflow(temp_dir: &TempDir) -> (std::path::PathBuf, std::pa
 
 #[cfg(unix)]
 fn save_resize_workflow(temp_dir: &TempDir) {
-    let mut workflow = Workflow::new(RESIZE_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(RESIZE_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(RESIZE_NODE_LABEL, TUI_SHELL_COMMAND);
     save_tui_workflow(temp_dir, &workflow);
 }
@@ -801,7 +801,7 @@ fn canvas_renders_bounded_image_metadata_fallback_without_raw_bytes() {
     let port_id = app.workflow.graph.node(node_id).expect("image node").output_ports[0].id;
     app.run_output_lines.push(RunOutputLine {
         run_id: RunId(0),
-        node_id,
+        node_id: lattice::tui::graph::workflow_node_id(node_id),
         port_id,
         port_label: IMAGE_OUTPUT_LABEL.to_string(),
         text: IMAGE_SUMMARY.to_string(),

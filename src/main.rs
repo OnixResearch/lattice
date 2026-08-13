@@ -1626,7 +1626,8 @@ fn import_n8n_workflow_command(app_config: &config::AppConfig, args: &ImportN8nW
             return ExitCode::FAILURE;
         }
     };
-    let result = n8n_json::import_n8n_json_str(&input);
+    let timestamp = lattice::engine::workflow::WorkflowTimestamp::from_datetime(chrono::Utc::now());
+    let result = n8n_json::import_n8n_json_str(&input, timestamp);
     if let Some(report_path) = &args.report
         && let Err(error) = write_n8n_report(report_path, &result.report)
     {

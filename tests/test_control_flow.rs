@@ -126,7 +126,7 @@ fn condition_predicates_match_typed_values_and_reject_malformed_input() {
 // r[verify n8nclone.workflow_execution.control_flow.condition.no_match]
 #[tokio::test]
 async fn executor_emits_only_matching_condition_branch_and_allows_no_match() {
-    let mut workflow = Workflow::new("condition-workflow");
+    let mut workflow = Workflow::new("condition-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_condition_node(DECISION_LABEL, ready_condition_config());
     let node = workflow.graph.node(node_id).expect("condition node exists");
     let input_port = node.input_ports.first().expect("condition input port").id;
@@ -212,7 +212,7 @@ fn subworkflow_reference_check_accepts_present_child_and_rejects_missing_or_recu
 // r[verify n8nclone.workflow_validation.control_flow.missing_branch]
 #[test]
 fn validation_rejects_condition_branches_without_matching_ports() {
-    let mut workflow = Workflow::new("broken-condition");
+    let mut workflow = Workflow::new("broken-condition", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_condition_node(DECISION_LABEL, ready_condition_config());
     workflow.graph.node_mut(node_id).expect("condition node exists").output_ports.clear();
 
@@ -229,7 +229,7 @@ fn validation_rejects_condition_branches_without_matching_ports() {
 // r[verify n8nclone.workflow_validation.control_flow.merge_types]
 #[test]
 fn validation_rejects_merge_inputs_incompatible_with_typed_output() {
-    let mut workflow = Workflow::new("typed-merge");
+    let mut workflow = Workflow::new("typed-merge", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let shell_id = workflow.add_shell_node("Text", "printf text");
     let http_id = workflow.add_http_node("HTTP", "GET", "https://example.test");
     let merge_id = workflow.add_merge_node(MERGE_LABEL, merge_config(MergePolicy::All));
@@ -256,7 +256,7 @@ fn validation_rejects_merge_inputs_incompatible_with_typed_output() {
 // r[verify n8nclone.workflow_format.control_flow.compatibility.existing]
 #[test]
 fn portable_format_round_trips_control_flow_configs() {
-    let mut workflow = Workflow::new("control-flow-format");
+    let mut workflow = Workflow::new("control-flow-format", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_condition_node(DECISION_LABEL, ready_condition_config());
     workflow.add_merge_node(MERGE_LABEL, merge_config(MergePolicy::Collect));
     workflow.add_subworkflow_node(SUBWORKFLOW_LABEL, subworkflow_config(CHILD_WORKFLOW));
@@ -280,7 +280,7 @@ fn portable_format_round_trips_control_flow_configs() {
 // r[verify n8nclone.workflow_format.control_flow.compatibility.invalid]
 #[test]
 fn portable_import_rejects_malformed_control_flow_without_partial_workflow() {
-    let mut workflow = Workflow::new("malformed-control-flow");
+    let mut workflow = Workflow::new("malformed-control-flow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let condition_id = workflow.add_condition_node(DECISION_LABEL, ready_condition_config());
     let mut portable = workflow_to_portable(&workflow);
     let condition = portable

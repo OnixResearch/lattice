@@ -9,6 +9,7 @@ use std::sync::Arc;
 use lattice::engine::executor::RunId;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use lattice::store::ExecutionCache;
 use lattice::store::RunOwner;
@@ -16,7 +17,6 @@ use lattice::store::RunRecord;
 use lattice::store::Store;
 use lattice::store::WorkflowRepository;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::PortId;
 
 const INITIAL_NEXT_RUN_ID: u64 = 0;
 const FIRST_SAVED_RUN_ID: u64 = 3;
@@ -77,7 +77,7 @@ fn load_nonexistent_workflow_returns_none() {
 fn workflow_repository_trait_saves_loads_and_reports_missing_workflows() {
     let (store, _dir) = common::temp_store();
     let repository: &dyn WorkflowRepository = &store;
-    let workflow = Workflow::new("trait-workflow");
+    let workflow = Workflow::new("trait-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     repository.save_workflow(&workflow).expect("trait save succeeds");
     let loaded = repository.load_workflow("trait-workflow").expect("trait load succeeds");
@@ -98,8 +98,8 @@ fn list_workflows_empty() {
 fn list_workflows_returns_all() {
     let (store, _dir) = common::temp_store();
 
-    let wf1 = Workflow::new("alpha");
-    let wf2 = Workflow::new("beta");
+    let wf1 = Workflow::new("alpha", lattice::engine::workflow::WorkflowTimestamp::epoch());
+    let wf2 = Workflow::new("beta", lattice::engine::workflow::WorkflowTimestamp::epoch());
     store.save_workflow(&wf1).unwrap();
     store.save_workflow(&wf2).unwrap();
 
@@ -112,7 +112,7 @@ fn list_workflows_returns_all() {
 fn save_workflow_overwrites() {
     let (store, _dir) = common::temp_store();
 
-    let mut wf = Workflow::new("overwrite-test");
+    let mut wf = Workflow::new("overwrite-test", lattice::engine::workflow::WorkflowTimestamp::epoch());
     store.save_workflow(&wf).unwrap();
 
     // Modify and re-save.
@@ -126,7 +126,7 @@ fn save_workflow_overwrites() {
 #[test]
 fn delete_workflow() {
     let (store, _dir) = common::temp_store();
-    let wf = Workflow::new("doomed");
+    let wf = Workflow::new("doomed", lattice::engine::workflow::WorkflowTimestamp::epoch());
     store.save_workflow(&wf).unwrap();
 
     store.delete_workflow("doomed").unwrap();

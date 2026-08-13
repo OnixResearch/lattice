@@ -11,6 +11,8 @@ use lattice::engine::executor::RunId;
 use lattice::engine::executor::StepResult;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
 use lattice::replay::active_events;
 use lattice::run::history::detail_record_from_results;
@@ -24,8 +26,6 @@ use lattice::tui::App;
 use lattice::tui::app::run_detail_record_from_results as tui_run_detail_record_from_results;
 use lattice::tui::panels;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use tempfile::TempDir;
@@ -210,14 +210,14 @@ fn app_reports_missing_run_history_details() {
 async fn app_reruns_history_workflow_without_replacing_current_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
     let mut app = App::new(test_config(&temp_dir));
-    let mut saved_workflow = Workflow::new(WORKFLOW_NAME);
+    let mut saved_workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     saved_workflow.add_shell_node(NODE_LABEL, NODE_COMMAND);
     {
         let store = app.store.as_ref().expect("app store available");
         store.save_workflow(&saved_workflow).expect("workflow saves");
         store.save_run(&run_record(RunId(SECOND_RUN_ID_VALUE), WORKFLOW_NAME)).expect("run saves");
     }
-    app.workflow = Workflow::new(CURRENT_WORKFLOW_NAME);
+    app.workflow = Workflow::new(CURRENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     app.mark_workflow_dirty();
 
     app.open_run_history();
@@ -237,7 +237,7 @@ fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
     let mut app = App::new(test_config(&temp_dir));
     let run_id = RunId(RUN_ID_VALUE);
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(NODE_LABEL, NODE_COMMAND);
     {
         let store = app.store.as_ref().expect("app store available");
@@ -283,7 +283,7 @@ fn app_renders_empty_node_output_and_unavailable_rerun_as_recoverable() {
         store.save_run(&run_record(run_id, WORKFLOW_NAME)).expect("run saves");
         store.save_run_details(&empty_detail).expect("empty details save");
     }
-    app.workflow = Workflow::new(CURRENT_WORKFLOW_NAME);
+    app.workflow = Workflow::new(CURRENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     app.open_run_history();
     app.inspect_selected_run_history();

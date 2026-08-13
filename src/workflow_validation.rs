@@ -1,14 +1,14 @@
 //! Pure workflow validation diagnostics.
 
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortDirection;
-use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::credentials;
 use crate::engine::runner;
+use crate::engine::workflow::Node;
 use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::PortDirection;
+use crate::engine::workflow::PortId;
 use crate::engine::workflow::Workflow;
 use crate::expressions;
 use crate::node_kind_provider;
@@ -62,7 +62,7 @@ pub enum WorkflowDiagnosticCode {
 pub struct WorkflowDiagnostic {
     pub severity: DiagnosticSeverity,
     pub code: WorkflowDiagnosticCode,
-    pub node_id: Option<NodeId>,
+    pub node_id: Option<crate::engine::workflow::NodeId>,
     pub port_id: Option<PortId>,
     pub message: String,
 }
@@ -150,7 +150,7 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
     }
 
     for node_id in workflow.configs.keys() {
-        let node_id = NodeId(*node_id);
+        let node_id = crate::engine::workflow::NodeId(*node_id);
         if workflow.graph.node(node_id).is_none() {
             diagnostics.push(fatal(
                 WorkflowDiagnosticCode::ConfigWithoutNode,
@@ -179,7 +179,11 @@ fn validate_triggers(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnost
     }
 }
 
-fn provider_diagnostics(node_id: NodeId, node_label: &str, config: &NodeConfig) -> Vec<WorkflowDiagnostic> {
+fn provider_diagnostics(
+    node_id: crate::engine::workflow::NodeId,
+    node_label: &str,
+    config: &NodeConfig,
+) -> Vec<WorkflowDiagnostic> {
     node_kind_provider::provider_for_config(config)
         .validate_config(node_label, config)
         .into_iter()
@@ -203,7 +207,11 @@ fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDia
     }
 }
 
-fn validate_config_expressions(node_id: NodeId, config: &NodeConfig, diagnostics: &mut Vec<WorkflowDiagnostic>) {
+fn validate_config_expressions(
+    node_id: crate::engine::workflow::NodeId,
+    config: &NodeConfig,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
     match config {
         NodeConfig::Shell { command, cwd, env, .. } => {
             validate_expression_field(node_id, "command", command, diagnostics);
@@ -273,7 +281,7 @@ fn validate_config_expressions(node_id: NodeId, config: &NodeConfig, diagnostics
 }
 
 fn validate_expression_field(
-    node_id: NodeId,
+    node_id: crate::engine::workflow::NodeId,
     field_name: &str,
     value: &str,
     diagnostics: &mut Vec<WorkflowDiagnostic>,
@@ -290,7 +298,7 @@ fn validate_expression_field(
 
 fn validate_credentials(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
     for (node_id, refs) in &workflow.credentials {
-        let node_id = NodeId(*node_id);
+        let node_id = crate::engine::workflow::NodeId(*node_id);
         if workflow.graph.node(node_id).is_none() {
             diagnostics.push(fatal(
                 WorkflowDiagnosticCode::CredentialRefWithoutNode,
@@ -330,7 +338,7 @@ fn validate_credentials_with_registry(
 ) {
     validate_credentials(workflow, diagnostics);
     for (node_id, refs) in &workflow.credentials {
-        let node_id = NodeId(*node_id);
+        let node_id = crate::engine::workflow::NodeId(*node_id);
         if workflow.graph.node(node_id).is_none() {
             continue;
         }
@@ -372,7 +380,7 @@ fn validate_control_flow_topology(workflow: &Workflow, diagnostics: &mut Vec<Wor
 }
 
 fn validate_condition_topology(
-    node: &rat_nodegraph::model::Node,
+    node: &Node,
     config: &crate::control_flow::ConditionNodeConfig,
     diagnostics: &mut Vec<WorkflowDiagnostic>,
 ) {
@@ -403,14 +411,12 @@ fn validate_condition_topology(
     }
 }
 
-fn validate_merge_topology(
-    workflow: &Workflow,
-    node: &rat_nodegraph::model::Node,
-    diagnostics: &mut Vec<WorkflowDiagnostic>,
-) {
+fn validate_merge_topology(workflow: &Workflow, node: &Node, diagnostics: &mut Vec<WorkflowDiagnostic>) {
     let Some(output_port) = node.output_ports.first() else {
         return;
     };
+    debug_assert_eq!(output_port.direction, PortDirection::Output);
+    debug_assert!(node.input_ports.iter().all(|port| port.direction == PortDirection::Input));
     if output_port.type_tag == "any" {
         return;
     }
@@ -435,7 +441,7 @@ fn validate_merge_topology(
 
 fn validate_subworkflow_topology(
     workflow: &Workflow,
-    node: &rat_nodegraph::model::Node,
+    node: &Node,
     config: &crate::control_flow::SubworkflowNodeConfig,
     diagnostics: &mut Vec<WorkflowDiagnostic>,
 ) {
@@ -580,7 +586,7 @@ fn port_types_compatible(source: &str, target: &str) -> bool {
 
 fn fatal(
     code: WorkflowDiagnosticCode,
-    node_id: Option<NodeId>,
+    node_id: Option<crate::engine::workflow::NodeId>,
     port_id: Option<PortId>,
     message: String,
 ) -> WorkflowDiagnostic {
@@ -595,7 +601,7 @@ fn fatal(
 
 fn warning(
     code: WorkflowDiagnosticCode,
-    node_id: Option<NodeId>,
+    node_id: Option<crate::engine::workflow::NodeId>,
     port_id: Option<PortId>,
     message: String,
 ) -> WorkflowDiagnostic {

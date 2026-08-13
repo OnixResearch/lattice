@@ -3,9 +3,9 @@
 type OrderedMap<K, V> = std::collections::BTreeMap<K, V>;
 type OrderedSet<T> = std::collections::BTreeSet<T>;
 type HashMap<K, V> = std::collections::HashMap<K, V>;
-type Node = rat_nodegraph::model::Node;
-type NodeId = rat_nodegraph::model::NodeId;
-type PortId = rat_nodegraph::model::PortId;
+type Node = crate::engine::workflow::Node;
+type NodeId = crate::engine::workflow::NodeId;
+type PortId = crate::engine::workflow::PortId;
 type SubworkflowNodeConfig = crate::control_flow::SubworkflowNodeConfig;
 type Value = crate::engine::Value;
 type Workflow = crate::engine::Workflow;

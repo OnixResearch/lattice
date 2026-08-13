@@ -10,7 +10,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 
-use rat_nodegraph::model::PortSpec;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -33,6 +32,7 @@ use crate::credentials::SecretRef;
 use crate::engine::runner;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::NodeRunnerSettings;
+use crate::engine::workflow::PortSpec;
 use crate::engine::workflow::Workflow;
 use crate::file_node::FileOperationKind;
 use crate::node_kind_provider;
@@ -488,7 +488,7 @@ pub fn workflow_to_portable(workflow: &Workflow) -> PortableWorkflow {
     }
 }
 
-fn port_to_portable(port: &rat_nodegraph::model::Port) -> PortablePort {
+fn port_to_portable(port: &crate::engine::workflow::Port) -> PortablePort {
     PortablePort {
         id: port.id.0,
         label: port.label.clone(),
@@ -522,7 +522,7 @@ fn portable_runner_fields(config: &NodeConfig, settings: Option<&NodeRunnerSetti
 }
 
 fn workflow_for_config(config: NodeConfig) -> Workflow {
-    let mut workflow = Workflow::new("portable-runner-config");
+    let mut workflow = Workflow::new("portable-runner-config", crate::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = match &config {
         NodeConfig::Shell { command, .. } => workflow.add_shell_node("node", command),
         NodeConfig::Http { method, url, .. } => workflow.add_http_node("node", method, url),
@@ -1280,7 +1280,8 @@ fn portable_to_runtime_with_agent_prompts(
 
     let created = parse_timestamp(&portable.meta.created)?;
     let modified = parse_timestamp(&portable.meta.modified)?;
-    let mut workflow = Workflow::new(portable.meta.name.clone());
+    let timestamp = crate::engine::workflow::WorkflowTimestamp::from_datetime(created);
+    let mut workflow = Workflow::new(portable.meta.name.clone(), timestamp);
     workflow.meta.description = portable.meta.description.clone();
     workflow.meta.created = created;
     workflow.meta.modified = modified;

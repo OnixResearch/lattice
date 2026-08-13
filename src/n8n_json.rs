@@ -6,7 +6,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use rat_nodegraph::model::NodeId;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -14,6 +13,7 @@ use serde_json::Value as JsonValue;
 use crate::credentials::NodeCredentialRefs;
 use crate::credentials::SecretRef;
 use crate::engine::workflow::NodeConfig;
+use crate::engine::workflow::PortId;
 use crate::engine::workflow::Workflow;
 
 const N8N_EXECUTE_COMMAND_TYPE: &str = "n8n-nodes-base.executeCommand";
@@ -127,17 +127,20 @@ struct N8nConnectionJson {
 // r[impl n8nclone.workflow_format.n8n_json.import]
 // r[impl n8nclone.workflow_validation.n8n_json.unsupported]
 // r[impl n8nclone.credentials.n8n_json.placeholders]
-pub fn import_n8n_json_str(input: &str) -> N8nImportResult {
+pub fn import_n8n_json_str(input: &str, timestamp: crate::engine::workflow::WorkflowTimestamp) -> N8nImportResult {
     let parsed = match serde_json::from_str::<JsonValue>(input) {
         Ok(value) => value,
         Err(error) => return failed_import_report("unknown", malformed_json_diagnostic(error.to_string())),
     };
-    import_n8n_json_value(parsed)
+    import_n8n_json_value(parsed, timestamp)
 }
 
 // r[impl n8nclone.workflow_format.n8n_json.import]
 // r[impl n8nclone.workflow_validation.n8n_json.unsupported]
-pub fn import_n8n_json_value(value: JsonValue) -> N8nImportResult {
+pub fn import_n8n_json_value(
+    value: JsonValue,
+    timestamp: crate::engine::workflow::WorkflowTimestamp,
+) -> N8nImportResult {
     let decoded = match serde_json::from_value::<N8nWorkflowJson>(value) {
         Ok(decoded) => decoded,
         Err(error) => return failed_import_report("unknown", malformed_json_diagnostic(error.to_string())),
@@ -153,7 +156,7 @@ pub fn import_n8n_json_value(value: JsonValue) -> N8nImportResult {
         return failed_import_report(&workflow_name, plaintext_workflow_credentials_diagnostic());
     }
 
-    let mut workflow = Workflow::new(workflow_name.clone());
+    let mut workflow = Workflow::new(workflow_name.clone(), timestamp);
     let mut entries = Vec::new();
     let mut diagnostics = Vec::new();
     let mut node_ids_by_name = HashMap::new();
@@ -172,6 +175,8 @@ pub fn import_n8n_json_value(value: JsonValue) -> N8nImportResult {
     }
 
     diagnostics.extend(import_connections(&mut workflow, &decoded.connections, &node_ids_by_name, &configs_by_node_id));
+    debug_assert!(node_ids_by_name.len() <= nodes.len());
+    debug_assert!(configs_by_node_id.len() <= node_ids_by_name.len());
 
     let report = N8nMappingReport {
         workflow_name,
@@ -187,7 +192,7 @@ pub fn import_n8n_json_value(value: JsonValue) -> N8nImportResult {
 }
 
 struct ImportedNode {
-    node_id: Option<NodeId>,
+    node_id: Option<crate::engine::workflow::NodeId>,
     entry: N8nMappingEntry,
 }
 
@@ -247,7 +252,7 @@ fn import_execute_command_node(
     workflow: &mut Workflow,
     node: &N8nNodeJson,
     entry: &mut N8nMappingEntry,
-) -> Option<NodeId> {
+) -> Option<crate::engine::workflow::NodeId> {
     let Some(command) = string_parameter(&node.parameters, "command") else {
         entry.diagnostics.push(N8nDiagnostic {
             code: N8nDiagnosticCode::MissingWorkflowField,
@@ -264,7 +269,7 @@ fn import_http_request_node(
     workflow: &mut Workflow,
     node: &N8nNodeJson,
     entry: &mut N8nMappingEntry,
-) -> Option<NodeId> {
+) -> Option<crate::engine::workflow::NodeId> {
     let Some(url) = string_parameter(&node.parameters, "url") else {
         entry.diagnostics.push(N8nDiagnostic {
             code: N8nDiagnosticCode::MissingWorkflowField,
@@ -291,8 +296,8 @@ fn import_http_request_node(
 fn import_connections(
     workflow: &mut Workflow,
     connections: &BTreeMap<String, N8nConnectionGroups>,
-    node_ids_by_name: &HashMap<String, NodeId>,
-    configs_by_node_id: &HashMap<NodeId, NodeConfig>,
+    node_ids_by_name: &HashMap<String, crate::engine::workflow::NodeId>,
+    configs_by_node_id: &HashMap<crate::engine::workflow::NodeId, NodeConfig>,
 ) -> Vec<N8nDiagnostic> {
     let mut diagnostics = Vec::new();
     for (source_name, groups) in connections {
@@ -330,9 +335,9 @@ fn import_connections(
 
 fn main_output_port(
     workflow: &Workflow,
-    node_id: NodeId,
-    configs_by_node_id: &HashMap<NodeId, NodeConfig>,
-) -> Option<rat_nodegraph::model::PortId> {
+    node_id: crate::engine::workflow::NodeId,
+    configs_by_node_id: &HashMap<crate::engine::workflow::NodeId, NodeConfig>,
+) -> Option<PortId> {
     let node = workflow.graph.node(node_id)?;
     match configs_by_node_id.get(&node_id) {
         Some(NodeConfig::Http { .. }) => node.output_ports.get(HTTP_BODY_OUTPUT_INDEX).map(|port| port.id),
@@ -340,7 +345,7 @@ fn main_output_port(
     }
 }
 
-fn apply_position(workflow: &mut Workflow, node_id: NodeId, position: Option<&[i32]>) {
+fn apply_position(workflow: &mut Workflow, node_id: crate::engine::workflow::NodeId, position: Option<&[i32]>) {
     let Some(node) = workflow.graph.node_mut(node_id) else {
         return;
     };
@@ -492,7 +497,7 @@ pub fn export_workflow_to_n8n_json(workflow: &Workflow) -> N8nExportResult {
 
 fn export_node_to_n8n_json(
     workflow: &Workflow,
-    node_id: NodeId,
+    node_id: crate::engine::workflow::NodeId,
     label: &str,
     x: i32,
     y: i32,
@@ -544,7 +549,10 @@ fn export_credentials(credentials: Option<&NodeCredentialRefs>) -> JsonValue {
     JsonValue::Object(exported)
 }
 
-fn export_connections(workflow: &Workflow, names_by_node_id: &HashMap<NodeId, String>) -> JsonValue {
+fn export_connections(
+    workflow: &Workflow,
+    names_by_node_id: &HashMap<crate::engine::workflow::NodeId, String>,
+) -> JsonValue {
     let mut connections = serde_json::Map::new();
     for edge in workflow.graph.edges() {
         let Some(source_node_id) = workflow.graph.port_owner(edge.source) else {
@@ -648,7 +656,11 @@ fn connection_diagnostic(source_name: &str, message: &str) -> N8nDiagnostic {
     }
 }
 
-fn export_unsupported_node_diagnostic(node_id: NodeId, node_label: &str, reason: &str) -> N8nDiagnostic {
+fn export_unsupported_node_diagnostic(
+    node_id: crate::engine::workflow::NodeId,
+    node_label: &str,
+    reason: &str,
+) -> N8nDiagnostic {
     N8nDiagnostic {
         code: N8nDiagnosticCode::UnsupportedExportNode,
         source_id: Some(node_id.0.to_string()),

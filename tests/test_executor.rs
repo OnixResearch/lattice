@@ -13,11 +13,11 @@ use lattice::engine::executor::NodeStatus;
 use lattice::engine::executor::node_execution_cache_key;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::NodeConfig;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
+use lattice::engine::workflow::PortSpec;
 use lattice::engine::workflow::Workflow;
 use pretty_assertions::assert_eq;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
-use rat_nodegraph::model::PortSpec;
 
 const EXIT_CODE_SUCCESS_DISPLAY: &str = "exit code: 0";
 const EXIT_CODE_FAILURE_DISPLAY: &str = "exit code: 1";
@@ -106,7 +106,7 @@ struct CacheConfigCase {
 }
 
 fn shell_pipeline(source_command: &str, target_command: &str) -> (Workflow, NodeId, NodeId) {
-    let mut workflow = Workflow::new("test-pipeline");
+    let mut workflow = Workflow::new("test-pipeline", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source = workflow.add_shell_node("source", source_command);
     let target = workflow.add_shell_node("target", target_command);
     let source_stdout = common::stdout_port_id(&workflow, source);
@@ -183,7 +183,7 @@ fn workflow_with_config(config: NodeConfig) -> (Workflow, NodeId) {
         NodeConfig::Shell { command, .. } => command.clone(),
         _ => panic!("workflow_with_config expects shell config"),
     };
-    let mut workflow = Workflow::new("cache-key");
+    let mut workflow = Workflow::new("cache-key", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node("cache", command);
     workflow.set_node_config(node_id, config);
     (workflow, node_id)
@@ -310,9 +310,9 @@ async fn explicit_cancellation_token_stops_bounded_shell_before_pending_effect()
 
 #[tokio::test]
 async fn execute_node_not_in_graph() {
-    let wf = Workflow::new("empty");
+    let wf = Workflow::new("empty", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let executor = Executor::new();
-    let fake_id = rat_nodegraph::model::NodeId(9999);
+    let fake_id = lattice::engine::workflow::NodeId(9999);
     let result = executor.execute_node(&wf, fake_id, &HashMap::new()).await;
 
     match &result.status {
@@ -326,8 +326,8 @@ async fn execute_node_not_in_graph() {
 #[tokio::test]
 async fn execute_node_missing_config() {
     // Add a node to the graph but don't register a config.
-    let mut wf = Workflow::new("no-config");
-    let id = wf.graph.add_node("orphan", &[], &[rat_nodegraph::model::PortSpec::new("out", "string")]);
+    let mut wf = Workflow::new("no-config", lattice::engine::workflow::WorkflowTimestamp::epoch());
+    let id = wf.graph.add_node("orphan", &[], &[lattice::engine::workflow::PortSpec::new("out", "string")]);
     // Deliberately skip wf.configs.insert().
 
     let executor = Executor::new();
@@ -378,7 +378,7 @@ async fn execute_captures_stderr() {
 
 #[tokio::test]
 async fn execute_timeout() {
-    let mut wf = Workflow::new("timeout");
+    let mut wf = Workflow::new("timeout", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("slow", "sleep 60");
     // Override timeout to 1 second.
     wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
@@ -494,7 +494,7 @@ async fn run_two_node_pipeline_with_match_outputs_matching_line() {
 
 #[tokio::test]
 async fn run_multi_input_shell_uses_labeled_stdin_port() {
-    let mut workflow = Workflow::new("multi-input");
+    let mut workflow = Workflow::new("multi-input", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let aux_source = workflow.add_shell_node("aux", AUX_SOURCE_COMMAND);
     let stdin_source = workflow.add_shell_node("stdin", SELECTED_STDIN_SOURCE_COMMAND);
     let target = add_custom_multi_input_shell_node(&mut workflow, "target", CAT_COMMAND);
@@ -515,7 +515,7 @@ async fn run_multi_input_shell_uses_labeled_stdin_port() {
 
 #[tokio::test]
 async fn run_stderr_output_can_feed_downstream_stdin() {
-    let mut workflow = Workflow::new("stderr-pipeline");
+    let mut workflow = Workflow::new("stderr-pipeline", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source = workflow.add_shell_node("stderr-source", STDERR_SOURCE_COMMAND);
     let target = workflow.add_shell_node("cat", CAT_COMMAND);
     let source_stderr = common::stderr_port_id(&workflow, source);
@@ -531,7 +531,7 @@ async fn run_stderr_output_can_feed_downstream_stdin() {
 
 #[tokio::test]
 async fn run_pipe_stdin_false_ignores_connected_input() {
-    let mut workflow = Workflow::new("pipe-disabled");
+    let mut workflow = Workflow::new("pipe-disabled", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let source = workflow.add_shell_node("source", PIPE_DISABLED_SOURCE_COMMAND);
     let target = workflow.add_shell_node("cat", CAT_COMMAND);
     workflow.set_node_config(target, shell_config(CAT_COMMAND, None, &[], CACHE_BASE_TIMEOUT_SECS, false));
@@ -606,7 +606,7 @@ async fn run_increments_run_id() {
 
 #[tokio::test]
 async fn run_empty_workflow() {
-    let wf = Workflow::new("empty");
+    let wf = Workflow::new("empty", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let mut executor = Executor::new();
     let cache = HashMap::new();
 
@@ -813,7 +813,7 @@ async fn input_hash_is_stable_across_runs() {
 
 #[tokio::test]
 async fn execute_with_env_vars() {
-    let mut wf = Workflow::new("env-test");
+    let mut wf = Workflow::new("env-test", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("env", "echo $MY_VAR");
     wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
         command: "echo $MY_VAR".into(),
@@ -842,7 +842,7 @@ async fn execute_with_env_vars() {
 
 #[tokio::test]
 async fn execute_with_cwd() {
-    let mut wf = Workflow::new("cwd-test");
+    let mut wf = Workflow::new("cwd-test", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let id = wf.add_shell_node("pwd", "pwd");
     wf.set_node_config(id, lattice::engine::workflow::NodeConfig::Shell {
         command: "pwd".into(),

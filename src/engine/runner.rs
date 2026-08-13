@@ -7,11 +7,11 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortDirection;
-use rat_nodegraph::model::PortId;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::engine::workflow::PortDirection;
+use crate::engine::workflow::PortId;
 
 /// Decision returned when durable execution considers resuming a node.
 pub type DurableRunnerDecision = seaglass_execution_graph::ResumeDecision;
@@ -202,7 +202,7 @@ pub enum RunnerDiagnosticCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunnerDiagnostic {
     pub code: RunnerDiagnosticCode,
-    pub node_id: Option<NodeId>,
+    pub node_id: Option<crate::engine::workflow::NodeId>,
     pub port_id: Option<PortId>,
     pub message: String,
 }
@@ -352,7 +352,7 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
     }
 
     for node_id in workflow.configs.keys() {
-        let node_id = NodeId(*node_id);
+        let node_id = crate::engine::workflow::NodeId(*node_id);
         if workflow.graph.node(node_id).is_none() {
             diagnostics.push(runner_diagnostic(
                 RunnerDiagnosticCode::ConfigWithoutNode,
@@ -364,7 +364,7 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
     }
 
     debug_assert!(nodes.len() <= workflow.configs.len());
-    debug_assert!(nodes.iter().all(|node| workflow.graph.node(NodeId(node.id)).is_some()));
+    debug_assert!(nodes.iter().all(|node| workflow.graph.node(crate::engine::workflow::NodeId(node.id)).is_some()));
 
     let edges = runner_edges_from_workflow(workflow, &mut diagnostics);
     if diagnostics.is_empty() {
@@ -446,7 +446,7 @@ fn credential_ref_count(refs: &crate::credentials::NodeCredentialRefs) -> usize 
     refs.env.len()
 }
 
-fn runner_port_from_graph_port(port: &rat_nodegraph::model::Port) -> RunnerPort {
+fn runner_port_from_graph_port(port: &crate::engine::workflow::Port) -> RunnerPort {
     RunnerPort {
         id: port.id.0,
         label: port.label.clone(),
@@ -774,7 +774,11 @@ fn shared_graph_diagnostic(diagnostic: &seaglass_execution_graph::GraphDiagnosti
         | seaglass_execution_graph::GraphDiagnosticCode::MissingTargetNode
         | seaglass_execution_graph::GraphDiagnosticCode::GraphTooLarge => RunnerDiagnosticCode::RuntimeFailure,
     };
-    let node_id = diagnostic.node_id.as_deref().and_then(|node_id| node_id.parse::<RunnerNodeId>().ok()).map(NodeId);
+    let node_id = diagnostic
+        .node_id
+        .as_deref()
+        .and_then(|node_id| node_id.parse::<RunnerNodeId>().ok())
+        .map(crate::engine::workflow::NodeId);
     runner_diagnostic(code, node_id, None, diagnostic.to_string())
 }
 
@@ -825,7 +829,7 @@ pub fn validate_runtime_bindings(plan: &RunnerWorkflow, registry: &RuntimeRegist
         .map(|node| {
             runner_diagnostic(
                 RunnerDiagnosticCode::MissingRuntimeBinding,
-                Some(NodeId(node.id)),
+                Some(crate::engine::workflow::NodeId(node.id)),
                 None,
                 format!(
                     "node '{}' references missing runtime '{}:{}'",
@@ -851,7 +855,7 @@ fn unsupported_runtime_policy_diagnostic(node: &RunnerNode) -> Option<RunnerDiag
     }
     Some(runner_diagnostic(
         RunnerDiagnosticCode::UnsupportedRuntimePolicy,
-        Some(NodeId(node.id)),
+        Some(crate::engine::workflow::NodeId(node.id)),
         None,
         format!(
             "node '{}' declares unsupported effect policy '{}' for runtime '{}:{}'",
@@ -894,7 +898,7 @@ fn runtime_output_diagnostic(
     let Some(expected_type) = declared.get(&output.port_id) else {
         return Some(runner_diagnostic(
             RunnerDiagnosticCode::RuntimeOutputPortMissing,
-            Some(NodeId(node.id)),
+            Some(crate::engine::workflow::NodeId(node.id)),
             Some(PortId(output.port_id)),
             format!("runtime output for node '{}' references undeclared output port", node.label),
         ));
@@ -902,7 +906,7 @@ fn runtime_output_diagnostic(
     if !port_types_compatible(&output.type_tag, expected_type) {
         return Some(runner_diagnostic(
             RunnerDiagnosticCode::RuntimeOutputTypeMismatch,
-            Some(NodeId(node.id)),
+            Some(crate::engine::workflow::NodeId(node.id)),
             Some(PortId(output.port_id)),
             format!(
                 "runtime output for node '{}' has type '{}' but port expects '{}'",
@@ -1002,7 +1006,7 @@ pub fn durable_runner_decision(
 
 fn runner_diagnostic(
     code: RunnerDiagnosticCode,
-    node_id: Option<NodeId>,
+    node_id: Option<crate::engine::workflow::NodeId>,
     port_id: Option<PortId>,
     message: String,
 ) -> RunnerDiagnostic {

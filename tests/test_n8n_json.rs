@@ -159,7 +159,7 @@ fn assert_report_matches_golden(actual: &lattice::n8n_json::N8nMappingReport, go
 #[test]
 fn parity_supported_fixtures_import_validate_and_match_golden_reports() {
     for fixture in SUPPORTED_PARITY_FIXTURES {
-        let result = import_n8n_json_str(fixture.text);
+        let result = import_n8n_json_str(fixture.text, lattice::engine::workflow::WorkflowTimestamp::epoch());
         let workflow = result.workflow.expect("supported parity fixture imports");
         let validation = workflow_validation::validate_workflow(&workflow);
         let report_json = report_to_pretty_json(&result.report);
@@ -189,7 +189,7 @@ fn parity_supported_fixtures_import_validate_and_match_golden_reports() {
 #[test]
 fn parity_unsupported_fixtures_fail_with_stable_safe_diagnostics() {
     for fixture in UNSUPPORTED_PARITY_FIXTURES {
-        let result = import_n8n_json_str(fixture.text);
+        let result = import_n8n_json_str(fixture.text, lattice::engine::workflow::WorkflowTimestamp::epoch());
         let report_json = report_to_pretty_json(&result.report);
 
         assert!(result.workflow.is_none(), "{} must not partially import", fixture.file_name);
@@ -220,7 +220,7 @@ fn parity_fixture_documentation_lists_all_tested_fixture_files() {
 // r[verify n8nclone.workflow_format.n8n_json.fixtures.supported]
 #[test]
 fn supported_shell_fixture_imports_to_typed_workflow() {
-    let result = import_n8n_json_str(SHELL_FIXTURE);
+    let result = import_n8n_json_str(SHELL_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let workflow = result.workflow.expect("supported shell fixture imports");
 
     assert_eq!(workflow.meta.name, IMPORTED_SHELL_WORKFLOW_NAME);
@@ -239,7 +239,7 @@ fn supported_shell_fixture_imports_to_typed_workflow() {
 // r[verify n8nclone.credentials.n8n_json.placeholders]
 #[test]
 fn supported_http_fixture_imports_credential_placeholder() {
-    let result = import_n8n_json_str(HTTP_FIXTURE);
+    let result = import_n8n_json_str(HTTP_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let workflow = result.workflow.expect("supported HTTP fixture imports");
     let node = workflow.graph.nodes().next().expect("node imported");
     let credentials = workflow.node_credentials(node.id).expect("credential refs imported");
@@ -261,7 +261,7 @@ fn supported_http_fixture_imports_credential_placeholder() {
 // r[verify n8nclone.workflow_format.n8n_json.export.supported]
 #[test]
 fn supported_shell_workflow_exports_to_n8n_json() {
-    let mut workflow = Workflow::new("exportable");
+    let mut workflow = Workflow::new("exportable", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node("Echo", "printf hello");
     let node = workflow.graph.node_mut(node_id).expect("export node exists");
     node.x = 10;
@@ -281,7 +281,7 @@ fn supported_shell_workflow_exports_to_n8n_json() {
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported.node_kind]
 #[test]
 fn unsupported_node_fixture_reports_fatal_diagnostic() {
-    let result = import_n8n_json_str(UNSUPPORTED_NODE_FIXTURE);
+    let result = import_n8n_json_str(UNSUPPORTED_NODE_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     assert!(result.workflow.is_none());
     assert!(diagnostic_codes(&result).contains(&N8nDiagnosticCode::UnsupportedNodeKind));
@@ -290,7 +290,8 @@ fn unsupported_node_fixture_reports_fatal_diagnostic() {
 // r[verify n8nclone.credentials.n8n_json.placeholders]
 #[test]
 fn plaintext_credentials_are_rejected() {
-    let result = import_n8n_json_str(PLAINTEXT_CREDENTIAL_FIXTURE);
+    let result =
+        import_n8n_json_str(PLAINTEXT_CREDENTIAL_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     assert!(result.workflow.is_none());
     assert!(diagnostic_codes(&result).contains(&N8nDiagnosticCode::PlaintextCredentialMaterial));
@@ -300,7 +301,7 @@ fn plaintext_credentials_are_rejected() {
 // r[verify n8nclone.workflow_format.n8n_json.import.malformed]
 #[test]
 fn malformed_json_is_rejected() {
-    let result = import_n8n_json_str(MALFORMED_FIXTURE);
+    let result = import_n8n_json_str(MALFORMED_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     assert!(result.workflow.is_none());
     assert!(diagnostic_codes(&result).contains(&N8nDiagnosticCode::MalformedJson));
@@ -310,7 +311,8 @@ fn malformed_json_is_rejected() {
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported.connection]
 #[test]
 fn malformed_connections_are_rejected() {
-    let result = import_n8n_json_str(MALFORMED_CONNECTION_FIXTURE);
+    let result =
+        import_n8n_json_str(MALFORMED_CONNECTION_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     assert!(result.workflow.is_none());
     assert!(diagnostic_codes(&result).contains(&N8nDiagnosticCode::MalformedConnection));
@@ -320,7 +322,8 @@ fn malformed_connections_are_rejected() {
 // r[verify n8nclone.workflow_validation.n8n_json.unsupported.expression]
 #[test]
 fn unsupported_expressions_are_rejected() {
-    let result = import_n8n_json_str(UNSUPPORTED_EXPRESSION_FIXTURE);
+    let result =
+        import_n8n_json_str(UNSUPPORTED_EXPRESSION_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
 
     assert!(result.workflow.is_none());
     assert!(diagnostic_codes(&result).contains(&N8nDiagnosticCode::UnsupportedExpression));
@@ -331,7 +334,7 @@ fn unsupported_expressions_are_rejected() {
 // r[verify n8nclone.workflow_format.n8n_json.export.unsupported]
 #[test]
 fn unsupported_export_node_reports_diagnostic() {
-    let mut workflow = Workflow::new("unsupported-export");
+    let mut workflow = Workflow::new("unsupported-export", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_file_node("Read", FileOperationKind::Read, "input.txt");
 
     let result = export_workflow_to_n8n_json(&workflow);
@@ -377,7 +380,7 @@ fn export_n8n_cli_writes_workflow_and_report() {
     let temp_dir = tempfile::tempdir().expect("temp dir created");
     let (config_path, data_dir) = write_test_config(&temp_dir);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store opens");
-    let mut workflow = Workflow::new("cli-export");
+    let mut workflow = Workflow::new("cli-export", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("Echo", "printf hello");
     store.save_workflow(&workflow).expect("workflow saved");
     drop(store);

@@ -94,8 +94,8 @@ fn credential_refs(secret_ref: SecretRef) -> NodeCredentialRefs {
     }
 }
 
-fn workflow_with_secret_ref() -> (Workflow, rat_nodegraph::model::NodeId) {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+fn workflow_with_secret_ref() -> (Workflow, lattice::engine::workflow::NodeId) {
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     workflow.set_node_credentials(node_id, credential_refs(secret_ref()));
     (workflow, node_id)
@@ -103,8 +103,8 @@ fn workflow_with_secret_ref() -> (Workflow, rat_nodegraph::model::NodeId) {
 
 fn output_text(
     workflow: &Workflow,
-    node_id: rat_nodegraph::model::NodeId,
-    outputs: &HashMap<rat_nodegraph::model::PortId, lattice::engine::Value>,
+    node_id: lattice::engine::workflow::NodeId,
+    outputs: &HashMap<lattice::engine::workflow::PortId, lattice::engine::Value>,
     label: &str,
 ) -> String {
     let node = workflow.graph.node(node_id).expect("node exists");
@@ -280,7 +280,7 @@ fn redaction_masks_overlapping_duplicate_and_empty_secret_values() {
 // r[verify n8nclone.credentials.validation.malformed]
 #[test]
 fn malformed_secret_reference_is_a_fatal_validation_diagnostic() {
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     workflow.set_node_credentials(node_id, credential_refs(SecretRef::new("", SECRET_KEY, None)));
 
@@ -294,7 +294,7 @@ fn malformed_secret_reference_is_a_fatal_validation_diagnostic() {
 #[test]
 fn validation_text_and_json_preserve_reference_identity_without_plaintext_value() {
     let field_ref = SecretRef::new(PROVIDER_NAME, SECRET_KEY, Some("field".to_string()));
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     workflow.set_node_credentials(node_id, credential_refs(field_ref.clone()));
     let mut registry = CredentialProviderRegistry::new();
@@ -332,7 +332,7 @@ fn cache_identity_uses_secret_reference_not_secret_value() {
     let key_from_ref =
         node_execution_cache_key_with_credentials(node_id, config, workflow.node_credentials(node_id), &HashMap::new());
 
-    let mut changed_workflow = Workflow::new(WORKFLOW_NAME);
+    let mut changed_workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let changed_node_id = changed_workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     changed_workflow
         .set_node_credentials(changed_node_id, credential_refs(SecretRef::new(PROVIDER_NAME, OTHER_SECRET_KEY, None)));
@@ -384,7 +384,7 @@ fn registry_resolves_registered_provider_and_validation_rejects_unknown_provider
     let (workflow, _node_id) = workflow_with_secret_ref();
     let value = registry.resolve(&secret_ref()).expect("registered provider resolves");
     let unknown_ref = SecretRef::new("missing", SECRET_KEY, None);
-    let mut unknown_workflow = Workflow::new(WORKFLOW_NAME);
+    let mut unknown_workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = unknown_workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     unknown_workflow.set_node_credentials(node_id, credential_refs(unknown_ref));
 
@@ -406,7 +406,7 @@ fn registry_validation_rejects_unsupported_field_access() {
     registry
         .insert_provider(provider_metadata(PROVIDER_NAME), Box::new(MapCredentialProvider::default()))
         .expect("provider registered");
-    let mut workflow = Workflow::new(WORKFLOW_NAME);
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(NODE_LABEL, PRINT_TOKEN_COMMAND);
     workflow.set_node_credentials(
         node_id,

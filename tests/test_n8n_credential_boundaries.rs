@@ -104,7 +104,7 @@ fn output_text(output: &std::process::Output) -> String {
 }
 
 fn designated_plaintext_diagnostic_is_safe() {
-    let result = import_n8n_json_str(PARITY_PLAINTEXT_FIXTURE);
+    let result = import_n8n_json_str(PARITY_PLAINTEXT_FIXTURE, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let report = report_to_pretty_json(&result.report);
 
     assert!(result.workflow.is_none());
@@ -130,7 +130,8 @@ async fn imported_placeholder_resolves_before_execution_and_missing_value_blocks
         "test -n \"${CREDENTIAL_BINDING}\" && printf {SIDE_EFFECT_CONTENT} > {:?}",
         side_effect_path.display().to_string(),
     );
-    let result = import_n8n_json_str(&imported_shell_fixture(&command));
+    let result =
+        import_n8n_json_str(&imported_shell_fixture(&command), lattice::engine::workflow::WorkflowTimestamp::epoch());
     let workflow = result.workflow.expect("opaque credential fixture imports");
     let node_id = workflow.graph.nodes().next().expect("imported node exists").id;
     let imported_ref = workflow
@@ -159,7 +160,7 @@ async fn resolved_reference_stays_opaque_across_save_raw_store_and_cli_export() 
     let temp_dir = tempfile::tempdir().expect("temporary export directory");
     let (config_path, data_dir) = write_test_config(&temp_dir);
     let database_path = data_dir.join(STORE_FILE_NAME);
-    let mut workflow = Workflow::new(EXPORT_WORKFLOW_NAME);
+    let mut workflow = Workflow::new(EXPORT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_shell_node(EXPORTED_NODE_NAME, format!("test -n \"${CREDENTIAL_BINDING}\""));
     workflow.set_node_credentials(node_id, credential_refs(EXPORT_CREDENTIAL_KEY));
 

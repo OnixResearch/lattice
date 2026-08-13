@@ -565,7 +565,8 @@ fn missing_path_disabled_bad_method_bad_content_and_malformed_body_reject_withou
 fn operator_listener_loads_persisted_trigger_and_accepts_loopback_request() {
     let temp_dir = tempfile::tempdir().expect("temporary live listener directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
-    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.triggers.push(webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly));
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("live listener store opens");
     save_workflow_with_triggers(&store, &workflow);
@@ -620,7 +621,8 @@ fn operator_listener_simultaneous_requests_select_one_claim_before_the_gated_eff
     let ready_path = temp_dir.path().join(SIMULTANEOUS_READY_FILE_NAME);
     let release_path = temp_dir.path().join(SIMULTANEOUS_RELEASE_FILE_NAME);
     let effect_path = temp_dir.path().join(SIMULTANEOUS_EFFECT_FILE_NAME);
-    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         "gated-webhook-effect",
         common::gated_write_command(&ready_path, &release_path, &effect_path, SIMULTANEOUS_EFFECT),
@@ -688,7 +690,8 @@ fn operator_listener_simultaneous_requests_select_one_claim_before_the_gated_eff
 fn operator_listener_failed_winner_retains_claim_and_rejects_implicit_retry() {
     let temp_dir = tempfile::tempdir().expect("temporary failed webhook directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
-    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node("invalid-webhook-effect", "");
     workflow.triggers.push(webhook_trigger(true, WebhookAuthPolicy::NoAuthLocalOnly));
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("failed webhook store opens");
@@ -723,7 +726,8 @@ fn operator_listener_idempotency_disabled_allows_concurrent_distinct_runs_withou
     let temp_dir = tempfile::tempdir().expect("temporary unclaimed webhook directory");
     let (config_path, data_dir) = write_cli_config(&temp_dir);
     let effect_path = temp_dir.path().join(NO_IDEMPOTENCY_EFFECT_FILE_NAME);
-    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow
         .add_shell_node("unclaimed-webhook-effect", common::append_effect_command(&effect_path, NO_IDEMPOTENCY_EFFECT));
     workflow.triggers.push(unclaimed_webhook_trigger());
@@ -778,7 +782,8 @@ fn operator_listener_post_effect_death_preserves_claim_and_rejects_redelivery() 
     let checkpoint_path = temp_dir.path().join(POST_EFFECT_CHECKPOINT_FILE_NAME);
     let attempts_path = temp_dir.path().join(POST_EFFECT_ATTEMPTS_FILE_NAME);
     let store_path = data_dir.join(STORE_FILE_NAME);
-    let mut workflow = lattice::engine::Workflow::new(WORKFLOW_NAME);
+    let mut workflow =
+        lattice::engine::Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(
         "webhook-post-effect",
         common::post_effect_parent_death_once_then_repeat_command(

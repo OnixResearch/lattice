@@ -14,6 +14,8 @@ let LatticeTraceabilityProfile = {
     { root = "cairn-policy", source_kind = "nickel_source", extensions = ["ncl"] },
   ],
   marker_verbs = ["impl", "verify", "depends", "related"],
+  assurance_level = "declared",
+  anchor_kind = "exact_marker_bytes",
 } in
 let TrellisTraceabilityProfile = {
   id = "trellis-rust",
@@ -25,6 +27,8 @@ let TrellisTraceabilityProfile = {
     { root = "tests", source_kind = "rust_source", extensions = ["rs"] },
   ],
   marker_verbs = ["impl", "verify", "depends", "related"],
+  assurance_level = "declared",
+  anchor_kind = "exact_marker_bytes",
 } in
 Upstream & {
   name | force = "lattice-default",

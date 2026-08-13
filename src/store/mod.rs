@@ -12,8 +12,6 @@ mod admission;
 use std::collections::HashMap;
 use std::path::Path;
 
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 use redb::Database;
 use redb::ReadableDatabase;
 use redb::ReadableTable;
@@ -26,6 +24,7 @@ use crate::engine::ContentHash;
 use crate::engine::RunId;
 use crate::engine::Value;
 use crate::engine::Workflow;
+use crate::engine::workflow::PortId;
 use crate::orchestration::OrchestrationDefinition;
 use crate::orchestration::OrchestrationEvent;
 use crate::orchestration::OrchestrationInstance;
@@ -109,7 +108,7 @@ pub struct RunOutputDetail {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunNodeDetail {
-    pub node_id: NodeId,
+    pub node_id: crate::engine::workflow::NodeId,
     pub node_label: String,
     pub status: RunNodeDetailStatus,
     pub cached: bool,

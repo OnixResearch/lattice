@@ -4,6 +4,8 @@ use std::process::Command;
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
 use lattice::engine::runner::RunnerEventKind;
+use lattice::engine::workflow::NodeId;
+use lattice::engine::workflow::PortId;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -47,8 +49,6 @@ use lattice::store::RunOutputDetail;
 use lattice::store::RunOwner;
 use lattice::store::RunRecord;
 use lattice::store::Store;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortId;
 
 const CONFIG_FILE_NAME: &str = "config.ncl";
 const STORE_FILE_NAME: &str = "lattice.redb";
@@ -141,7 +141,7 @@ fn assert_private_content_absent(rendered: &str) {
 }
 
 fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
-    let workflow = Workflow::new(PRIVATE_PROMPT);
+    let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
         id: ORCHESTRATION_ID.to_string(),
@@ -215,7 +215,7 @@ fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, S
 }
 
 fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
-    let workflow = Workflow::new(PRIVATE_PROMPT);
+    let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
         id: ORCHESTRATION_ID.to_string(),

@@ -630,7 +630,7 @@ fn decode_agent_command_output_reports_nonzero_stderr() {
 // r[verify n8nclone.workflow_execution.agent_nodes.config]
 #[test]
 fn add_agent_node_records_config_and_ports() {
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
 
@@ -658,7 +658,7 @@ async fn pi_agent_node_executes_text_request_through_adapter() {
         metadata: serde_json::json!({"adapter": "pi"}),
     });
     let observed_adapter = adapter.clone();
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let prompt_input = node.input_ports[PROMPT_INPUT_INDEX].id;
@@ -697,7 +697,7 @@ async fn clankers_agent_node_executes_image_request_through_adapter() {
         metadata: serde_json::json!({"adapter": "clankers"}),
     });
     let observed_adapter = adapter.clone();
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let image_input = node.input_ports[IMAGE_INPUT_INDEX].id;
@@ -728,7 +728,7 @@ async fn output_mode_mismatch_marks_node_failed() {
         output: AgentOutput::Text(TEXT_OUTPUT.to_string()),
         metadata: serde_json::json!({}),
     });
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
@@ -746,7 +746,7 @@ async fn output_mode_mismatch_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.agent_nodes.cache_key]
 #[test]
 fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let image_input = node.input_ports[IMAGE_INPUT_INDEX].id;
@@ -767,7 +767,7 @@ fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
 // r[verify n8nclone.workflow_execution.agent_nodes.config]
 #[test]
 fn empty_agent_prompt_is_validation_diagnostic() {
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, "", AgentOutputMode::Text);
 
     let diagnostics = validate_workflow(&workflow);
@@ -780,7 +780,7 @@ fn empty_agent_prompt_is_validation_diagnostic() {
 #[tokio::test]
 async fn preflight_rejection_marks_node_failed() {
     let adapter = ErrorAgentAdapter::new(AgentError::PreflightRejected("missing model".to_string()));
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
@@ -797,7 +797,7 @@ async fn preflight_rejection_marks_node_failed() {
 #[tokio::test]
 async fn session_failure_marks_node_failed() {
     let adapter = ErrorAgentAdapter::new(AgentError::Session("session unavailable".to_string()));
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
@@ -814,7 +814,7 @@ async fn session_failure_marks_node_failed() {
 #[tokio::test]
 async fn adapter_failure_marks_node_failed() {
     let adapter = ErrorAgentAdapter::new(AgentError::Adapter("adapter exploded".to_string()));
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
@@ -832,7 +832,7 @@ async fn adapter_failure_marks_node_failed() {
 async fn credential_failure_skips_agent_adapter_call() {
     let adapter = ErrorAgentAdapter::new(AgentError::Adapter("should not be called".to_string()));
     let observed_adapter = adapter.clone();
-    let mut workflow = Workflow::new("agent-workflow");
+    let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
     workflow.set_node_credentials(node_id, NodeCredentialRefs {
         env: [(SECRET_ENV_NAME.to_string(), SecretRef::new(SECRET_PROVIDER, SECRET_KEY, None))].into(),

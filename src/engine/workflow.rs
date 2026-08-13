@@ -1,13 +1,10 @@
-//! Workflow definition — the node graph + per-node configuration.
+//! Workflow definition: Lattice-owned graph state and per-node configuration.
 //!
-//! A Workflow wraps a rat-nodegraph Graph and attaches execution config
-//! (shell commands, environment, etc.) to each node.
+//! The workflow core owns deterministic product state and aggregate mutations.
+//! Choregraph owns graph admission. Subwayrat stays behind the TUI adapter.
 
 use std::collections::HashMap;
 
-use rat_nodegraph::model::Graph;
-use rat_nodegraph::model::NodeId;
-use rat_nodegraph::model::PortSpec;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -18,10 +15,44 @@ use crate::control_flow::ConditionNodeConfig;
 use crate::control_flow::MergeNodeConfig;
 use crate::control_flow::SubworkflowNodeConfig;
 use crate::credentials::NodeCredentialRefs;
+pub use crate::engine::domain::Edge;
+pub use crate::engine::domain::GraphError;
+pub use crate::engine::domain::Node;
+pub use crate::engine::domain::NodeId;
+pub use crate::engine::domain::Port;
+pub use crate::engine::domain::PortDirection;
+pub use crate::engine::domain::PortId;
+pub use crate::engine::domain::PortSpec;
+pub use crate::engine::domain::WorkflowGraph;
+pub use crate::engine::domain::WorkflowNodeIdentity;
+pub use crate::engine::domain::WorkflowPortIdentity;
 use crate::engine::value::TypeTag;
 use crate::file_node::FileOperationKind;
 use crate::image_node::DEFAULT_MAX_IMAGE_BYTES;
 use crate::triggers::TriggerDefinition;
+
+/// A validated explicit UTC timestamp for workflow-domain decisions.
+#[allow(unknown_lints)]
+#[allow(
+    path_segment_repetition,
+    reason = "the public type names its workflow-owned time domain explicitly"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowTimestamp(chrono::DateTime<chrono::Utc>);
+
+impl WorkflowTimestamp {
+    pub const fn from_datetime(value: chrono::DateTime<chrono::Utc>) -> Self {
+        Self(value)
+    }
+
+    pub const fn into_datetime(self) -> chrono::DateTime<chrono::Utc> {
+        self.0
+    }
+
+    pub const fn epoch() -> Self {
+        Self(chrono::DateTime::<chrono::Utc>::UNIX_EPOCH)
+    }
+}
 
 /// Metadata about a workflow (stored alongside the graph).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,13 +64,13 @@ pub struct WorkflowMeta {
 }
 
 impl WorkflowMeta {
-    pub fn new(name: impl Into<String>) -> Self {
-        let now = chrono::Utc::now();
+    pub fn new(name: impl Into<String>, timestamp: WorkflowTimestamp) -> Self {
+        let timestamp = timestamp.into_datetime();
         Self {
             name: name.into(),
             description: String::new(),
-            created: now,
-            modified: now,
+            created: timestamp,
+            modified: timestamp,
         }
     }
 }
@@ -184,7 +215,7 @@ impl NodeRunnerSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
     pub meta: WorkflowMeta,
-    pub graph: Graph,
+    pub graph: WorkflowGraph,
     pub configs: HashMap<u64, NodeConfig>,
     #[serde(default)]
     pub credentials: HashMap<u64, NodeCredentialRefs>,
@@ -197,13 +228,14 @@ pub struct Workflow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MutationError {
     NodeNotFound(NodeId),
+    StaleEdit(NodeId),
     ConditionConfigNotFound(NodeId),
     InvalidConditionConfig(crate::control_flow::ControlFlowError),
-    Graph(rat_nodegraph::model::GraphError),
+    Graph(GraphError),
 }
 
-impl From<rat_nodegraph::model::GraphError> for MutationError {
-    fn from(error: rat_nodegraph::model::GraphError) -> Self {
+impl From<GraphError> for MutationError {
+    fn from(error: GraphError) -> Self {
         Self::Graph(error)
     }
 }
@@ -221,14 +253,11 @@ pub struct ConditionBranchReconciliationPlan {
 }
 
 impl Workflow {
-    pub fn new(name: impl Into<String>) -> Self {
-        let mut graph = Graph::new();
-        graph.dag_mode = true;
-        // Accept "any" type on either side of an edge.
-        graph.set_compatibility(Box::new(|src, tgt| src == tgt || src == "any" || tgt == "any"));
+    pub fn new(name: impl Into<String>, timestamp: WorkflowTimestamp) -> Self {
+        let graph = WorkflowGraph::new();
 
         Self {
-            meta: WorkflowMeta::new(name),
+            meta: WorkflowMeta::new(name, timestamp),
             graph,
             configs: HashMap::new(),
             credentials: HashMap::new(),
@@ -373,16 +402,19 @@ impl Workflow {
         id
     }
 
-    pub fn plan_node_removal(&self, node_id: NodeId) -> Result<NodeRemovalPlan, MutationError> {
+    pub fn plan_node_removal(&self, node_id: impl WorkflowNodeIdentity) -> Result<NodeRemovalPlan, MutationError> {
+        let node_id = node_id.workflow_node_id();
         if self.graph.node(node_id).is_none() {
             return Err(MutationError::NodeNotFound(node_id));
         }
         Ok(NodeRemovalPlan { node_id })
     }
 
-    /// Remove a node and all node-owned workflow state as one lifecycle operation.
-    pub fn remove_node(&mut self, node_id: NodeId) -> Result<(), MutationError> {
-        let plan = self.plan_node_removal(node_id)?;
+    /// Apply a planned removal only while its selected node still exists.
+    pub fn apply_node_removal(&mut self, plan: NodeRemovalPlan) -> Result<(), MutationError> {
+        if self.graph.node(plan.node_id).is_none() {
+            return Err(MutationError::StaleEdit(plan.node_id));
+        }
         self.graph.remove_node(plan.node_id)?;
         self.configs.remove(&plan.node_id.0);
         self.credentials.remove(&plan.node_id.0);
@@ -390,11 +422,18 @@ impl Workflow {
         Ok(())
     }
 
+    /// Remove a node and all node-owned workflow state as one lifecycle operation.
+    pub fn remove_node(&mut self, node_id: impl WorkflowNodeIdentity) -> Result<(), MutationError> {
+        let plan = self.plan_node_removal(node_id)?;
+        self.apply_node_removal(plan)
+    }
+
     pub fn plan_condition_branch_reconciliation(
         &self,
-        node_id: NodeId,
+        node_id: impl WorkflowNodeIdentity,
         branches: Vec<crate::control_flow::ConditionBranch>,
     ) -> Result<ConditionBranchReconciliationPlan, MutationError> {
+        let node_id = node_id.workflow_node_id();
         if self.graph.node(node_id).is_none() {
             return Err(MutationError::NodeNotFound(node_id));
         }
@@ -418,36 +457,33 @@ impl Workflow {
     /// Reconcile condition branches and output ports without stale ownership or edges.
     pub fn replace_condition_branches(
         &mut self,
-        node_id: NodeId,
+        node_id: impl WorkflowNodeIdentity,
         branches: Vec<crate::control_flow::ConditionBranch>,
     ) -> Result<(), MutationError> {
         let plan = self.plan_condition_branch_reconciliation(node_id, branches)?;
-        self.graph.reconcile_node_ports(
-            plan.node_id,
-            rat_nodegraph::model::PortDirection::Output,
-            &plan.requested_specs,
-        )?;
+        self.graph.reconcile_node_ports(plan.node_id, PortDirection::Output, &plan.requested_specs)?;
         self.configs.insert(plan.node_id.0, NodeConfig::Condition(plan.config));
         Ok(())
     }
 
     /// Get the config for a node.
-    pub fn node_config(&self, id: NodeId) -> Option<&NodeConfig> {
-        self.configs.get(&id.0)
+    pub fn node_config(&self, id: impl WorkflowNodeIdentity) -> Option<&NodeConfig> {
+        self.configs.get(&id.workflow_node_id().0)
     }
 
     /// Set or replace the config for a node.
-    pub fn set_node_config(&mut self, id: NodeId, config: NodeConfig) {
-        self.configs.insert(id.0, config);
+    pub fn set_node_config(&mut self, id: impl WorkflowNodeIdentity, config: NodeConfig) {
+        self.configs.insert(id.workflow_node_id().0, config);
     }
 
     /// Get credential references for a node.
-    pub fn node_credentials(&self, id: NodeId) -> Option<&NodeCredentialRefs> {
-        self.credentials.get(&id.0)
+    pub fn node_credentials(&self, id: impl WorkflowNodeIdentity) -> Option<&NodeCredentialRefs> {
+        self.credentials.get(&id.workflow_node_id().0)
     }
 
     /// Set or replace credential references for a node.
-    pub fn set_node_credentials(&mut self, id: NodeId, refs: NodeCredentialRefs) {
+    pub fn set_node_credentials(&mut self, id: impl WorkflowNodeIdentity, refs: NodeCredentialRefs) {
+        let id = id.workflow_node_id();
         if refs.is_empty() {
             self.credentials.remove(&id.0);
         } else {
@@ -456,18 +492,18 @@ impl Workflow {
     }
 
     /// Get generic runner settings for a node.
-    pub fn node_runner_settings(&self, id: NodeId) -> Option<&NodeRunnerSettings> {
-        self.runner.get(&id.0)
+    pub fn node_runner_settings(&self, id: impl WorkflowNodeIdentity) -> Option<&NodeRunnerSettings> {
+        self.runner.get(&id.workflow_node_id().0)
     }
 
     /// Set or replace generic runner settings for a node.
-    pub fn set_node_runner_settings(&mut self, id: NodeId, settings: NodeRunnerSettings) {
-        self.runner.insert(id.0, settings);
+    pub fn set_node_runner_settings(&mut self, id: impl WorkflowNodeIdentity, settings: NodeRunnerSettings) {
+        self.runner.insert(id.workflow_node_id().0, settings);
     }
 
-    /// Touch the modified timestamp.
-    pub fn touch(&mut self) {
-        self.meta.modified = chrono::Utc::now();
+    /// Set the modified timestamp from one shell-owned clock observation.
+    pub fn touch(&mut self, timestamp: WorkflowTimestamp) {
+        self.meta.modified = timestamp.into_datetime();
     }
 }
 
@@ -486,7 +522,7 @@ mod tests {
 
     #[test]
     fn remove_node_cleans_all_owned_state_and_incident_edges() {
-        let mut workflow = Workflow::new("aggregate deletion");
+        let mut workflow = Workflow::new("aggregate deletion", crate::engine::workflow::WorkflowTimestamp::epoch());
         let source = workflow.add_shell_node("source", "printf source");
         let target = workflow.add_shell_node("target", "cat");
         let source_port = workflow.graph.node(source).expect("source node").output_ports[0].id;
@@ -510,7 +546,7 @@ mod tests {
 
     #[test]
     fn remove_node_cleans_owned_state_for_every_builtin_config_kind() {
-        let mut workflow = Workflow::new("all built-in deletion");
+        let mut workflow = Workflow::new("all built-in deletion", crate::engine::workflow::WorkflowTimestamp::epoch());
         let nodes = [
             workflow.add_shell_node("shell", "true"),
             workflow.add_http_node("http", "GET", "https://example.com"),
@@ -549,7 +585,7 @@ mod tests {
 
     #[test]
     fn remove_missing_node_fails_without_mutating_workflow() {
-        let mut workflow = Workflow::new("failed deletion");
+        let mut workflow = Workflow::new("failed deletion", crate::engine::workflow::WorkflowTimestamp::epoch());
         let node = workflow.add_shell_node("kept", "true");
         let missing = NodeId(u64::MAX);
 
@@ -560,8 +596,24 @@ mod tests {
     }
 
     #[test]
+    fn stale_removal_plan_fails_without_mutating_current_state() {
+        let mut workflow = Workflow::new("stale deletion", crate::engine::workflow::WorkflowTimestamp::epoch());
+        let stale_node = workflow.add_shell_node("stale", "true");
+        let retained_node = workflow.add_shell_node("retained", "true");
+        let plan = workflow.plan_node_removal(stale_node).expect("removal plan");
+        workflow.remove_node(stale_node).expect("initial removal");
+        let node_count = workflow.graph.node_count();
+
+        assert_eq!(workflow.apply_node_removal(plan), Err(MutationError::StaleEdit(stale_node)));
+        assert_eq!(workflow.graph.node_count(), node_count);
+        assert!(workflow.graph.node(retained_node).is_some());
+        assert!(workflow.node_config(retained_node).is_some());
+    }
+
+    #[test]
     fn condition_reconciliation_preserves_matching_ports_and_drops_removed_edges() {
-        let mut workflow = Workflow::new("condition reconciliation");
+        let mut workflow =
+            Workflow::new("condition reconciliation", crate::engine::workflow::WorkflowTimestamp::epoch());
         let condition = workflow.add_condition_node("route", ConditionNodeConfig {
             branches: vec![branch("keep"), branch("remove")],
         });
@@ -592,7 +644,8 @@ mod tests {
 
     #[test]
     fn invalid_condition_reconciliation_preserves_config_ports_and_edges() {
-        let mut workflow = Workflow::new("rejected condition reconciliation");
+        let mut workflow =
+            Workflow::new("rejected condition reconciliation", crate::engine::workflow::WorkflowTimestamp::epoch());
         let condition = workflow.add_condition_node("route", ConditionNodeConfig {
             branches: vec![branch("first"), branch("second")],
         });
