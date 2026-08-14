@@ -857,17 +857,17 @@
         "valence": "valence"
       },
       "locked": {
-        "lastModified": 1786584286,
-        "narHash": "sha256-Y8qEti3wSJ1g2Dd08OGZpOPp7PrkaQoGMoHtByzuWik=",
+        "lastModified": 1786673660,
+        "narHash": "sha256-3UEYZ5BncMXjAaEsbWvGar2YBeamGXH97j2MIAyaY6k=",
         "owner": "OnixResearch",
         "repo": "octet",
-        "rev": "731571fbfffd0b7db11ac0cc9d3939105ddc71e2",
+        "rev": "bac0f3220ada38110c03498ccf2beae5ee83e642",
         "type": "github"
       },
       "original": {
         "owner": "OnixResearch",
         "repo": "octet",
-        "rev": "731571fbfffd0b7db11ac0cc9d3939105ddc71e2",
+        "rev": "bac0f3220ada38110c03498ccf2beae5ee83e642",
         "type": "github"
       }
     },

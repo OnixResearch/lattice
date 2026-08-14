@@ -44,7 +44,7 @@ const REMOTE_EFFECT_EVIDENCE_SCOPE: &str = "remote-effects-may-be-at-least-once"
 #[serde(deny_unknown_fields)]
 pub struct WorkflowRevisionRef {
     pub workflow_name: String,
-    pub content_hash: String,
+    pub content_hash: super::identity::WorkflowRevision,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,12 +64,12 @@ pub struct RetryPolicy {
 pub use budget_ledger_core::BudgetCharge;
 pub use budget_ledger_core::BudgetChargePlan;
 pub use budget_ledger_core::BudgetDimensions;
-pub use budget_ledger_core::BudgetLedger;
 pub use budget_ledger_core::BudgetLimits;
 pub use budget_ledger_core::BudgetPolicy;
-pub use budget_ledger_core::BudgetReservation;
 pub use budget_ledger_core::BudgetSettlement;
-pub use budget_ledger_core::remaining_budget;
+
+pub type BudgetLedger = budget_ledger_core::BudgetLedger<super::identity::ReservationId>;
+pub type BudgetReservation = budget_ledger_core::BudgetReservation<super::identity::ReservationId>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -88,7 +88,7 @@ pub enum OrchestrationTriggerKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrchestrationTriggerBinding {
-    pub trigger_id: String,
+    pub trigger_id: super::identity::TriggerId,
     pub kind: OrchestrationTriggerKind,
 }
 
@@ -102,7 +102,7 @@ pub struct RedactionPolicy {
 #[serde(deny_unknown_fields)]
 pub struct OrchestrationDefinition {
     pub schema_version: u32,
-    pub id: String,
+    pub id: super::identity::DefinitionId,
     pub objective: String,
     pub workflow: WorkflowRevisionRef,
     pub completion: CompletionPolicy,
@@ -117,7 +117,7 @@ pub struct OrchestrationDefinition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RetryableFailure {
     pub run_id: RunId,
-    pub dispatch_id: String,
+    pub dispatch_id: super::identity::DispatchId,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,7 +154,7 @@ pub enum DispatchStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispatchIntent {
-    pub id: String,
+    pub id: super::identity::DispatchId,
     pub run_id: RunId,
     pub workflow_revision: WorkflowRevisionRef,
     pub status: DispatchStatus,
@@ -162,9 +162,9 @@ pub struct DispatchIntent {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RevisionProposal {
-    pub id: String,
-    pub instance_id: String,
-    pub base_definition_revision: String,
+    pub id: super::identity::ProposalId,
+    pub instance_id: super::identity::InstanceId,
+    pub base_definition_revision: super::identity::DefinitionRevision,
     pub base_epoch: u64,
     pub base_workflow_revision: WorkflowRevisionRef,
     pub successor: WorkflowRevisionRef,
@@ -173,22 +173,22 @@ pub struct RevisionProposal {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalDecision {
-    pub id: String,
-    pub instance_id: String,
+    pub id: super::identity::ApprovalId,
+    pub instance_id: super::identity::InstanceId,
     pub epoch: u64,
     pub base_workflow_revision: WorkflowRevisionRef,
-    pub proposal_id: String,
-    pub authority_policy_hash: String,
+    pub proposal_id: super::identity::ProposalId,
+    pub authority_policy_hash: super::identity::AuthorityPolicyIdentity,
     pub actor: String,
     pub approved: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrchestrationInstance {
-    pub id: String,
+    pub id: super::identity::InstanceId,
     pub sequence: u64,
-    pub trigger_idempotency_key: Option<String>,
-    pub definition_revision: String,
+    pub trigger_idempotency_key: Option<super::identity::TriggerScopedKey>,
+    pub definition_revision: super::identity::DefinitionRevision,
     pub definition: OrchestrationDefinition,
     pub epoch: u64,
     pub version: u64,
@@ -204,15 +204,15 @@ pub struct OrchestrationInstance {
     pub budgets: BudgetLedger,
     #[serde(default, skip_serializing_if = "RetryLedger::is_empty")]
     pub retry: RetryLedger,
-    pub accepted_fact_ids: BTreeSet<String>,
+    pub accepted_fact_ids: BTreeSet<super::identity::FactId>,
     pub last_event_sequence: Option<u64>,
-    pub event_head: Option<String>,
+    pub event_head: Option<super::identity::LedgerHeadId>,
     pub terminal_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrchestrationFact {
-    pub id: String,
+    pub id: super::identity::FactId,
     pub action: OrchestrationAction,
 }
 
@@ -229,10 +229,10 @@ pub enum OrchestrationAction {
         planned_charge: BudgetChargePlan,
     },
     DispatchAcknowledged {
-        dispatch_id: String,
+        dispatch_id: super::identity::DispatchId,
     },
     RunFinished {
-        dispatch_id: String,
+        dispatch_id: super::identity::DispatchId,
         run_id: RunId,
         succeeded: bool,
         #[serde(default, skip_serializing_if = "is_false")]
@@ -249,7 +249,7 @@ pub enum OrchestrationAction {
     },
     RejectProposal {
         actor: String,
-        proposal_id: String,
+        proposal_id: super::identity::ProposalId,
     },
     PauseRequested {
         actor: String,
@@ -266,7 +266,7 @@ pub enum OrchestrationAction {
     },
     AbandonPendingDispatch {
         actor: String,
-        dispatch_id: String,
+        dispatch_id: super::identity::DispatchId,
         run_id: RunId,
     },
     BudgetExhausted {
@@ -295,11 +295,11 @@ pub enum OrchestrationEventKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrchestrationEvent {
-    pub instance_id: String,
+    pub instance_id: super::identity::InstanceId,
     pub sequence: u64,
-    pub prior_hash: Option<String>,
-    pub event_hash: String,
-    pub state_hash: String,
+    pub prior_hash: Option<super::identity::PreviousEventId>,
+    pub event_hash: super::identity::EventId,
+    pub state_hash: super::identity::StateDigest,
     pub kind: OrchestrationEventKind,
     pub fact: OrchestrationFact,
 }
@@ -371,31 +371,31 @@ pub struct ReplayReport {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrchestrationTriggerContext {
-    pub accepted: BTreeMap<String, String>,
+    pub accepted: BTreeMap<super::identity::TriggerScopedKey, super::identity::InstanceId>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TriggerStartRequest<'a> {
     pub definition: &'a OrchestrationDefinition,
-    pub definition_revision: &'a str,
-    pub trigger_id: &'a str,
+    pub definition_revision: &'a super::identity::DefinitionRevision,
+    pub trigger_id: &'a super::identity::TriggerId,
     pub trigger_kind: OrchestrationTriggerKind,
-    pub idempotency_key: &'a str,
+    pub idempotency_key: &'a super::identity::TriggerIdempotencyKey,
     pub next_sequence: u64,
     pub context: &'a OrchestrationTriggerContext,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrchestrationTriggerPlan {
-    pub scoped_key: String,
-    pub instance_id: String,
-    pub definition_revision: String,
+    pub scoped_key: super::identity::TriggerScopedKey,
+    pub instance_id: super::identity::InstanceId,
+    pub definition_revision: super::identity::DefinitionRevision,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OrchestrationTriggerAdmission {
     Accepted(OrchestrationTriggerPlan),
-    Duplicate { instance_id: String },
+    Duplicate { instance_id: super::identity::InstanceId },
 }
 
 pub fn current_schema_version() -> u32 {
@@ -409,7 +409,8 @@ fn is_false(value: &bool) -> bool {
 // r[impl lattice.agent_orchestration.model]
 pub fn workflow_revision(workflow: &Workflow) -> Result<WorkflowRevisionRef, OrchestrationDiagnostic> {
     let portable_workflow = crate::workflow_format::workflow_to_portable(workflow);
-    let content_hash = hash_serializable(WORKFLOW_HASH_LABEL, &portable_workflow)?;
+    let content_hash =
+        super::identity::WorkflowRevision::from_generated(hash_serializable(WORKFLOW_HASH_LABEL, &portable_workflow)?);
     Ok(WorkflowRevisionRef {
         workflow_name: workflow.meta.name.clone(),
         content_hash,
@@ -417,32 +418,45 @@ pub fn workflow_revision(workflow: &Workflow) -> Result<WorkflowRevisionRef, Orc
 }
 
 // r[impl lattice.agent_orchestration.model]
-pub fn definition_revision(definition: &OrchestrationDefinition) -> Result<String, OrchestrationDiagnostic> {
-    hash_serializable(DEFINITION_HASH_LABEL, definition)
+pub fn definition_revision(
+    definition: &OrchestrationDefinition,
+) -> Result<super::identity::DefinitionRevision, OrchestrationDiagnostic> {
+    Ok(super::identity::DefinitionRevision::from_generated(hash_serializable(
+        DEFINITION_HASH_LABEL,
+        definition,
+    )?))
 }
 
-pub fn authority_policy_hash(policy: &AuthorityPolicy) -> Result<String, OrchestrationDiagnostic> {
-    hash_serializable(AUTHORITY_HASH_LABEL, policy)
+pub fn authority_policy_hash(
+    policy: &AuthorityPolicy,
+) -> Result<super::identity::AuthorityPolicyIdentity, OrchestrationDiagnostic> {
+    Ok(super::identity::AuthorityPolicyIdentity::from_generated(hash_serializable(
+        AUTHORITY_HASH_LABEL,
+        policy,
+    )?))
 }
 
-pub fn proposal_identity(proposal: &RevisionProposal) -> Result<String, OrchestrationDiagnostic> {
+pub fn proposal_identity(proposal: &RevisionProposal) -> Result<super::identity::ProposalId, OrchestrationDiagnostic> {
     let mut unhashed = proposal.clone();
-    unhashed.id.clear();
-    hash_serializable(PROPOSAL_HASH_LABEL, &unhashed)
+    unhashed.id.clear_for_hash();
+    Ok(super::identity::ProposalId::from_generated(hash_serializable(PROPOSAL_HASH_LABEL, &unhashed)?))
 }
 
-pub fn approval_identity(approval: &ApprovalDecision) -> Result<String, OrchestrationDiagnostic> {
+pub fn approval_identity(approval: &ApprovalDecision) -> Result<super::identity::ApprovalId, OrchestrationDiagnostic> {
     let mut unhashed = approval.clone();
-    unhashed.id.clear();
-    hash_serializable(APPROVAL_HASH_LABEL, &unhashed)
+    unhashed.id.clear_for_hash();
+    Ok(super::identity::ApprovalId::from_generated(hash_serializable(APPROVAL_HASH_LABEL, &unhashed)?))
 }
 
 pub fn fact_identity(
-    instance_id: &str,
+    instance_id: &super::identity::InstanceId,
     version: u64,
     action: &OrchestrationAction,
-) -> Result<String, OrchestrationDiagnostic> {
-    hash_serializable(FACT_HASH_LABEL, &(instance_id, version, action))
+) -> Result<super::identity::FactId, OrchestrationDiagnostic> {
+    Ok(super::identity::FactId::from_generated(hash_serializable(
+        FACT_HASH_LABEL,
+        &(instance_id, version, action),
+    )?))
 }
 
 // r[impl lattice.agent_orchestration.model]
@@ -452,9 +466,6 @@ pub fn validate_definition(
 ) -> Vec<OrchestrationDiagnostic> {
     let mut diagnostics = Vec::new();
     if let Some(diagnostic) = schema_version_diagnostic(definition.schema_version) {
-        diagnostics.push(diagnostic);
-    }
-    if let Some(diagnostic) = empty_definition_id_diagnostic(&definition.id) {
         diagnostics.push(diagnostic);
     }
     if let Some(diagnostic) = empty_objective_diagnostic(&definition.objective) {
@@ -482,12 +493,6 @@ fn schema_version_diagnostic(schema_version: u32) -> Option<OrchestrationDiagnos
     })
 }
 
-fn empty_definition_id_diagnostic(definition_id: &str) -> Option<OrchestrationDiagnostic> {
-    definition_id.trim().is_empty().then(|| {
-        diagnostic(OrchestrationDiagnosticCode::EmptyDefinitionId, "orchestration definition id cannot be empty")
-    })
-}
-
 fn empty_objective_diagnostic(objective: &str) -> Option<OrchestrationDiagnostic> {
     objective
         .trim()
@@ -499,12 +504,6 @@ fn validate_workflow_ref(reference: &WorkflowRevisionRef, diagnostics: &mut Vec<
     if reference.workflow_name.trim().is_empty() {
         diagnostics
             .push(diagnostic(OrchestrationDiagnosticCode::EmptyWorkflowName, "workflow revision name cannot be empty"));
-    }
-    if !is_blake3_hex(&reference.content_hash) {
-        diagnostics.push(diagnostic(
-            OrchestrationDiagnosticCode::InvalidContentHash,
-            "workflow revision content hash must be a BLAKE3 hex digest",
-        ));
     }
 }
 
@@ -546,12 +545,6 @@ fn validate_authority_policy(policy: &AuthorityPolicy, diagnostics: &mut Vec<Orc
 fn validate_trigger_bindings(bindings: &[OrchestrationTriggerBinding], diagnostics: &mut Vec<OrchestrationDiagnostic>) {
     let mut ids = BTreeSet::new();
     for binding in bindings {
-        if binding.trigger_id.trim().is_empty() {
-            diagnostics.push(diagnostic(
-                OrchestrationDiagnosticCode::EmptyTriggerId,
-                "orchestration trigger id cannot be empty",
-            ));
-        }
         if !ids.insert(binding.trigger_id.clone()) {
             diagnostics.push(diagnostic(
                 OrchestrationDiagnosticCode::DuplicateTriggerId,
@@ -628,13 +621,17 @@ fn validate_configured_charge(
 pub fn new_instance(
     definition: OrchestrationDefinition,
     sequence: u64,
-    trigger_idempotency_key: Option<String>,
+    trigger_idempotency_key: Option<super::identity::TriggerScopedKey>,
 ) -> Result<OrchestrationInstance, OrchestrationDiagnostic> {
     let definition_revision = definition_revision(&definition)?;
-    let id = hash_serializable(
+    let id = super::identity::InstanceId::from_generated(hash_serializable(
         INSTANCE_HASH_LABEL,
-        &(definition_revision.as_str(), sequence, trigger_idempotency_key.as_deref()),
-    )?;
+        &(
+            definition_revision.as_str(),
+            sequence,
+            trigger_idempotency_key.as_ref().map(super::identity::TriggerScopedKey::as_str),
+        ),
+    )?);
     let workflow_revision = definition.workflow.clone();
     let policy = definition.budgets;
     let instance = OrchestrationInstance {
@@ -670,6 +667,8 @@ pub fn new_instance(
 }
 
 // r[impl lattice.agent_orchestration.core]
+// r[impl lattice.agent_orchestration.nominal_identities.transitions]
+// r[impl lattice.agent_orchestration.nominal_identities.failure_matrix]
 pub fn transition(
     instance: &OrchestrationInstance,
     fact: OrchestrationFact,
@@ -681,9 +680,6 @@ pub fn transition(
             duplicate: true,
         });
     }
-    if fact.id.trim().is_empty() {
-        return Err(diagnostic(OrchestrationDiagnosticCode::InvalidIdentity, "orchestration fact id cannot be empty"));
-    }
     if !matches!(fact.action, OrchestrationAction::RetryRound { .. }) {
         reject_terminal_mutation(instance)?;
     }
@@ -694,7 +690,7 @@ pub fn transition(
     next.version = next.version.saturating_add(INSTANCE_VERSION_INCREMENT);
     let event = build_event(instance, &next, kind, fact)?;
     next.last_event_sequence = Some(event.sequence);
-    next.event_head = Some(event.event_hash.clone());
+    next.event_head = Some(super::identity::LedgerHeadId::from_event(&event.event_hash));
     Ok(OrchestrationTransition {
         instance: next,
         event: Some(event),
@@ -714,7 +710,7 @@ fn reject_terminal_mutation(instance: &OrchestrationInstance) -> Result<(), Orch
 
 #[derive(Debug, Clone, Copy)]
 struct RunFinishedInput<'a> {
-    dispatch_id: &'a str,
+    dispatch_id: &'a super::identity::DispatchId,
     run_id: RunId,
     is_succeeded: bool,
     is_retryable_observed_failure: bool,
@@ -819,7 +815,9 @@ pub fn preflight_retry(
 ) -> Result<RetryableFailure, OrchestrationDiagnostic> {
     let failed = retryable_failure(instance, actor)?;
     let mut budget = instance.budgets.clone();
-    reserve_budget(&mut budget, RETRY_PREFLIGHT_RESERVATION_ID, planned_charge)?;
+    let preflight_id =
+        super::identity::ReservationId::try_from_text(RETRY_PREFLIGHT_RESERVATION_ID).map_err(identity_error)?;
+    reserve_budget(&mut budget, preflight_id, planned_charge)?;
     Ok(failed)
 }
 
@@ -876,7 +874,7 @@ fn begin_dispatch(
             "new dispatch intent must begin in pending state",
         ));
     }
-    reserve_budget(&mut instance.budgets, &intent.id, planned_charge)?;
+    reserve_budget(&mut instance.budgets, super::identity::ReservationId::from_dispatch(&intent.id), planned_charge)?;
     instance.round = instance.round.saturating_add(ROUND_INCREMENT);
     instance.active_run_id = Some(intent.run_id);
     instance.pending_dispatch = Some(intent.clone());
@@ -889,7 +887,7 @@ fn begin_dispatch(
 
 fn acknowledge_dispatch(
     instance: &mut OrchestrationInstance,
-    dispatch_id: &str,
+    dispatch_id: &super::identity::DispatchId,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     let dispatch = matching_dispatch_mut(instance, dispatch_id)?;
     dispatch.status = DispatchStatus::Acknowledged;
@@ -914,7 +912,8 @@ fn finish_run(
             "successful run cannot be marked as observed retryable failure",
         ));
     }
-    let settlement = settle_budget(&mut instance.budgets, input.dispatch_id, input.observed_usage)?;
+    let reservation_id = super::identity::ReservationId::from_dispatch(input.dispatch_id);
+    let settlement = settle_budget(&mut instance.budgets, &reservation_id, input.observed_usage)?;
     instance.active_run_id = None;
     instance.pending_dispatch = None;
     instance.retry.retryable_failure = None;
@@ -938,7 +937,7 @@ fn finish_run(
         if input.is_retryable_observed_failure && instance.definition.retry.is_some() {
             instance.retry.retryable_failure = Some(RetryableFailure {
                 run_id: input.run_id,
-                dispatch_id: input.dispatch_id.to_string(),
+                dispatch_id: input.dispatch_id.clone(),
             });
         }
         debug_assert!(instance.active_run_id.is_none());
@@ -1004,7 +1003,7 @@ fn decide_proposal(
 fn reject_proposal(
     instance: &mut OrchestrationInstance,
     actor: &str,
-    proposal_id: &str,
+    proposal_id: &super::identity::ProposalId,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     authorize_actor(instance, actor)?;
     if instance.status != OrchestrationStatus::WaitingForApproval {
@@ -1013,7 +1012,7 @@ fn reject_proposal(
     let proposal = instance.pending_proposal.as_ref().ok_or_else(|| {
         diagnostic(OrchestrationDiagnosticCode::ProposalMismatch, "no proposal is pending for rejection")
     })?;
-    if proposal.id != proposal_id {
+    if &proposal.id != proposal_id {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::ProposalMismatch,
             "proposal rejection identity does not match the pending proposal",
@@ -1088,7 +1087,7 @@ fn observe_cancellation(
 fn abandon_pending_dispatch(
     instance: &mut OrchestrationInstance,
     actor: &str,
-    dispatch_id: &str,
+    dispatch_id: &super::identity::DispatchId,
     run_id: RunId,
 ) -> Result<OrchestrationEventKind, OrchestrationDiagnostic> {
     authorize_actor(instance, actor)?;
@@ -1112,7 +1111,7 @@ fn abandon_pending_dispatch(
             instance
                 .budgets
                 .reservations
-                .get(dispatch_id)
+                .get(&super::identity::ReservationId::from_dispatch(dispatch_id))
                 .ok_or_else(|| {
                     diagnostic(
                         OrchestrationDiagnosticCode::MissingReservation,
@@ -1122,7 +1121,8 @@ fn abandon_pending_dispatch(
                 .charge
         }
     };
-    let settlement = settle_budget(&mut instance.budgets, dispatch_id, observed_usage)?;
+    let reservation_id = super::identity::ReservationId::from_dispatch(dispatch_id);
+    let settlement = settle_budget(&mut instance.budgets, &reservation_id, observed_usage)?;
     let safe_summary = match dispatch_status {
         DispatchStatus::Pending => ABANDONED_PENDING_SUMMARY,
         DispatchStatus::Acknowledged => ABANDONED_ACKNOWLEDGED_SUMMARY,
@@ -1235,9 +1235,9 @@ fn authorize_actor(instance: &OrchestrationInstance, actor: &str) -> Result<(), 
 
 fn matching_dispatch<'a>(
     instance: &'a OrchestrationInstance,
-    dispatch_id: &str,
+    dispatch_id: &super::identity::DispatchId,
 ) -> Result<&'a DispatchIntent, OrchestrationDiagnostic> {
-    instance.pending_dispatch.as_ref().filter(|intent| intent.id == dispatch_id).ok_or_else(|| {
+    instance.pending_dispatch.as_ref().filter(|intent| &intent.id == dispatch_id).ok_or_else(|| {
         diagnostic(
             OrchestrationDiagnosticCode::DispatchMismatch,
             "dispatch identity does not match the pending orchestration dispatch",
@@ -1247,9 +1247,9 @@ fn matching_dispatch<'a>(
 
 fn matching_dispatch_mut<'a>(
     instance: &'a mut OrchestrationInstance,
-    dispatch_id: &str,
+    dispatch_id: &super::identity::DispatchId,
 ) -> Result<&'a mut DispatchIntent, OrchestrationDiagnostic> {
-    instance.pending_dispatch.as_mut().filter(|intent| intent.id == dispatch_id).ok_or_else(|| {
+    instance.pending_dispatch.as_mut().filter(|intent| &intent.id == dispatch_id).ok_or_else(|| {
         diagnostic(
             OrchestrationDiagnosticCode::DispatchMismatch,
             "dispatch identity does not match the pending orchestration dispatch",
@@ -1261,18 +1261,18 @@ fn matching_dispatch_mut<'a>(
 // r[impl lattice.budget_ledger_incubation.boundary]
 pub fn reserve_budget(
     ledger: &mut BudgetLedger,
-    reservation_id: &str,
+    reservation_id: super::identity::ReservationId,
     plan: BudgetChargePlan,
 ) -> Result<BudgetCharge, OrchestrationDiagnostic> {
-    budget_ledger_core::reserve_budget(ledger, reservation_id, plan).map_err(ledger_error)
+    budget_ledger_core::reserve_budget_for(ledger, reservation_id, plan).map_err(ledger_error)
 }
 
 pub fn settle_budget(
     ledger: &mut BudgetLedger,
-    reservation_id: &str,
+    reservation_id: &super::identity::ReservationId,
     observed: BudgetCharge,
 ) -> Result<BudgetSettlement, OrchestrationDiagnostic> {
-    budget_ledger_core::settle_budget(ledger, reservation_id, observed).map_err(ledger_error)
+    budget_ledger_core::settle_budget_for(ledger, reservation_id, observed).map_err(ledger_error)
 }
 
 fn ledger_error(error: budget_ledger_core::LedgerError) -> OrchestrationDiagnostic {
@@ -1304,6 +1304,8 @@ fn build_event(
     kind: OrchestrationEventKind,
     fact: OrchestrationFact,
 ) -> Result<OrchestrationEvent, OrchestrationDiagnostic> {
+    debug_assert_eq!(prior.id, next.id);
+    debug_assert_eq!(next.version, prior.version.saturating_add(INSTANCE_VERSION_INCREMENT));
     let sequence = prior
         .last_event_sequence
         .map(|sequence| sequence.saturating_add(EVENT_SEQUENCE_INCREMENT))
@@ -1312,8 +1314,10 @@ fn build_event(
     let mut event = OrchestrationEvent {
         instance_id: next.id.clone(),
         sequence,
-        prior_hash: prior.event_head.clone(),
-        event_hash: String::new(),
+        prior_hash: prior.event_head.as_ref().map(super::identity::PreviousEventId::from_ledger_head),
+        event_hash: super::identity::EventId::from_generated(
+            "0".repeat(blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE)),
+        ),
         state_hash,
         kind,
         fact,
@@ -1322,24 +1326,27 @@ fn build_event(
     Ok(event)
 }
 
-fn event_identity(event: &OrchestrationEvent) -> Result<String, OrchestrationDiagnostic> {
+fn event_identity(event: &OrchestrationEvent) -> Result<super::identity::EventId, OrchestrationDiagnostic> {
     let mut unhashed = event.clone();
-    unhashed.event_hash.clear();
-    hash_serializable(EVENT_HASH_LABEL, &unhashed)
+    unhashed.event_hash.clear_for_hash();
+    Ok(super::identity::EventId::from_generated(hash_serializable(EVENT_HASH_LABEL, &unhashed)?))
 }
 
-fn semantic_state_hash(instance: &OrchestrationInstance) -> Result<String, OrchestrationDiagnostic> {
+fn semantic_state_hash(
+    instance: &OrchestrationInstance,
+) -> Result<super::identity::StateDigest, OrchestrationDiagnostic> {
     let mut state = instance.clone();
     state.last_event_sequence = None;
     state.event_head = None;
-    hash_serializable(STATE_HASH_LABEL, &state)
+    Ok(super::identity::StateDigest::from_generated(hash_serializable(STATE_HASH_LABEL, &state)?))
 }
 
 // r[impl lattice.agent_orchestration.events]
+// r[impl lattice.agent_orchestration.nominal_identities.events]
 pub fn replay_events(
     initial: &OrchestrationInstance,
     events: &[OrchestrationEvent],
-    expected_head: Option<&str>,
+    expected_head: Option<&super::identity::LedgerHeadId>,
 ) -> ReplayReport {
     let mut instance = initial.clone();
     let mut diagnostics = Vec::with_capacity(MAX_REPLAY_DIAGNOSTICS);
@@ -1374,7 +1381,7 @@ pub fn replay_events(
             }
         }
     }
-    if replay_head_mismatch(&diagnostics, instance.event_head.as_deref(), expected_head) {
+    if replay_head_mismatch(&diagnostics, instance.event_head.as_ref(), expected_head) {
         diagnostics.push(diagnostic(
             OrchestrationDiagnosticCode::ReplayHeadMismatch,
             "orchestration event chain does not match the supplied current head or checkpoint",
@@ -1395,7 +1402,7 @@ pub fn admit_trigger_start(
         .definition
         .triggers
         .iter()
-        .any(|binding| binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
+        .any(|binding| &binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
     {
         return Err(diagnostic(
             OrchestrationDiagnosticCode::TriggerNotBound,
@@ -1407,30 +1414,30 @@ pub fn admit_trigger_start(
             .definition
             .triggers
             .iter()
-            .any(|binding| binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
+            .any(|binding| &binding.trigger_id == request.trigger_id && binding.kind == request.trigger_kind)
     );
     let scoped_key = scoped_trigger_key(request.definition_revision, request.trigger_id, request.idempotency_key)?;
-    debug_assert!(!scoped_key.is_empty());
+    debug_assert!(!scoped_key.as_str().is_empty());
     if let Some(instance_id) = request.context.accepted.get(&scoped_key) {
         return Ok(OrchestrationTriggerAdmission::Duplicate {
             instance_id: instance_id.clone(),
         });
     }
-    let instance_id = hash_serializable(
+    let instance_id = super::identity::InstanceId::from_generated(hash_serializable(
         INSTANCE_HASH_LABEL,
         &(request.definition_revision, request.next_sequence, Some(scoped_key.as_str())),
-    )?;
+    )?);
     Ok(OrchestrationTriggerAdmission::Accepted(OrchestrationTriggerPlan {
         scoped_key,
         instance_id,
-        definition_revision: request.definition_revision.to_string(),
+        definition_revision: request.definition_revision.clone(),
     }))
 }
 
 fn replay_head_mismatch(
     diagnostics: &[OrchestrationDiagnostic],
-    actual_head: Option<&str>,
-    expected_head: Option<&str>,
+    actual_head: Option<&super::identity::LedgerHeadId>,
+    expected_head: Option<&super::identity::LedgerHeadId>,
 ) -> bool {
     if !diagnostics.is_empty() {
         return false;
@@ -1439,11 +1446,14 @@ fn replay_head_mismatch(
 }
 
 pub fn scoped_trigger_key(
-    definition_revision: &str,
-    trigger_id: &str,
-    idempotency_key: &str,
-) -> Result<String, OrchestrationDiagnostic> {
-    hash_serializable(TRIGGER_HASH_LABEL, &(definition_revision, trigger_id, idempotency_key))
+    definition_revision: &super::identity::DefinitionRevision,
+    trigger_id: &super::identity::TriggerId,
+    idempotency_key: &super::identity::TriggerIdempotencyKey,
+) -> Result<super::identity::TriggerScopedKey, OrchestrationDiagnostic> {
+    Ok(super::identity::TriggerScopedKey::from_generated(hash_serializable(
+        TRIGGER_HASH_LABEL,
+        &(definition_revision, trigger_id, idempotency_key),
+    )?))
 }
 
 pub fn make_proposal(
@@ -1452,7 +1462,7 @@ pub fn make_proposal(
     safe_summary: impl Into<String>,
 ) -> Result<RevisionProposal, OrchestrationDiagnostic> {
     let mut proposal = RevisionProposal {
-        id: String::new(),
+        id: super::identity::ProposalId::from_generated("0".repeat(blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE))),
         instance_id: instance.id.clone(),
         base_definition_revision: instance.definition_revision.clone(),
         base_epoch: instance.epoch,
@@ -1471,7 +1481,7 @@ pub fn make_approval(
     approved: bool,
 ) -> Result<ApprovalDecision, OrchestrationDiagnostic> {
     let mut approval = ApprovalDecision {
-        id: String::new(),
+        id: super::identity::ApprovalId::from_generated("0".repeat(blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE))),
         instance_id: instance.id.clone(),
         epoch: instance.epoch,
         base_workflow_revision: instance.workflow_revision.clone(),
@@ -1484,8 +1494,11 @@ pub fn make_approval(
     Ok(approval)
 }
 
-pub fn dispatch_identity(instance: &OrchestrationInstance, run_id: RunId) -> Result<String, OrchestrationDiagnostic> {
-    hash_serializable(
+pub fn dispatch_identity(
+    instance: &OrchestrationInstance,
+    run_id: RunId,
+) -> Result<super::identity::DispatchId, OrchestrationDiagnostic> {
+    Ok(super::identity::DispatchId::from_generated(hash_serializable(
         INSTANCE_HASH_LABEL,
         &(
             instance.id.as_str(),
@@ -1494,7 +1507,7 @@ pub fn dispatch_identity(instance: &OrchestrationInstance, run_id: RunId) -> Res
             instance.workflow_revision.content_hash.as_str(),
             run_id,
         ),
-    )
+    )?))
 }
 
 pub fn is_terminal_status(status: OrchestrationStatus) -> bool {
@@ -1508,13 +1521,13 @@ pub fn is_terminal_status(status: OrchestrationStatus) -> bool {
 }
 
 pub fn render_status_text(instance: &OrchestrationInstance) -> String {
-    debug_assert!(!instance.id.is_empty());
-    debug_assert!(!instance.workflow_revision.content_hash.is_empty());
+    debug_assert!(!instance.id.as_str().is_empty());
+    debug_assert!(!instance.workflow_revision.content_hash.as_str().is_empty());
     let active_run = instance.active_run_id.map_or_else(|| "-".to_string(), |run_id| run_id.to_string());
     let proposal = instance.pending_proposal.as_ref().map_or("-", |proposal| proposal.id.as_str());
     let event_sequence = instance.last_event_sequence.map_or_else(|| "-".to_string(), |sequence| sequence.to_string());
-    let event_head = instance.event_head.as_deref().unwrap_or("-");
-    let remaining = remaining_budget(&instance.budgets);
+    let event_head = instance.event_head.as_ref().map_or("-", super::identity::LedgerHeadId::as_str);
+    let remaining = budget_ledger_core::remaining_budget_for(&instance.budgets);
     format!(
         "{} | {:?} | revision {} | round {} | run {} | proposal {} | remaining {}/{}/{}/{}/{} | breached {} | event {}/{} | next {} | evidence {},{}",
         instance.id,
@@ -1567,11 +1580,8 @@ fn hash_serializable<T: Serialize + ?Sized>(label: &[u8], value: &T) -> Result<S
     Ok(hasher.finalize().to_hex().to_string())
 }
 
-fn is_blake3_hex(value: &str) -> bool {
-    let Some(expected_length) = blake3::OUT_LEN.checked_mul(HEX_CHARS_PER_BYTE) else {
-        return false;
-    };
-    value.len() == expected_length && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+fn identity_error(error: super::identity::AdmissionError) -> OrchestrationDiagnostic {
+    diagnostic(OrchestrationDiagnosticCode::InvalidIdentity, error.to_string())
 }
 
 fn invalid_transition(message: impl Into<String>) -> OrchestrationDiagnostic {

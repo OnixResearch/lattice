@@ -96,16 +96,16 @@ impl ReadOnlyStore {
 
     fn load_instance(
         &self,
-        instance_id: &str,
+        instance_id: &crate::orchestration::InstanceId,
     ) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
-        self.load_by_str(ORCHESTRATION_INSTANCES, instance_id)
+        self.load_by_str(ORCHESTRATION_INSTANCES, instance_id.as_str())
     }
 
     fn load_events(
         &self,
-        instance_id: &str,
+        instance_id: &crate::orchestration::InstanceId,
     ) -> Result<Vec<crate::orchestration::OrchestrationEvent>, crate::store::StoreError> {
-        Ok(self.load_by_str(ORCHESTRATION_EVENTS, instance_id)?.unwrap_or_default())
+        Ok(self.load_by_str(ORCHESTRATION_EVENTS, instance_id.as_str())?.unwrap_or_default())
     }
 
     fn load_by_u64<T: serde::de::DeserializeOwned>(

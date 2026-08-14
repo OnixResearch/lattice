@@ -41,7 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let workflow = load_workflow_nickel_file(Path::new(WORKFLOW_PATH))?;
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: lattice::orchestration::DefinitionId::try_from_text(DEFINITION_ID)
+            .expect("example definition identity must be valid"),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow)?,
         completion: CompletionPolicy::AwaitProposal,
@@ -76,11 +77,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         triggers: vec![
             OrchestrationTriggerBinding {
-                trigger_id: SCHEDULE_TRIGGER_ID.to_string(),
+                trigger_id: lattice::orchestration::TriggerId::try_from_text(SCHEDULE_TRIGGER_ID)
+                    .expect("example schedule trigger identity must be valid"),
                 kind: OrchestrationTriggerKind::Schedule,
             },
             OrchestrationTriggerBinding {
-                trigger_id: WEBHOOK_TRIGGER_ID.to_string(),
+                trigger_id: lattice::orchestration::TriggerId::try_from_text(WEBHOOK_TRIGGER_ID)
+                    .expect("example webhook trigger identity must be valid"),
                 kind: OrchestrationTriggerKind::Webhook,
             },
         ],

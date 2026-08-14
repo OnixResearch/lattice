@@ -34,8 +34,8 @@ impl Diagnostics {
 
 #[derive(Clone, Copy)]
 struct OwnerTuple<'a> {
-    instance_id: &'a str,
-    dispatch_id: &'a str,
+    instance_id: &'a crate::orchestration::InstanceId,
+    dispatch_id: &'a crate::orchestration::DispatchId,
 }
 
 // r[impl lattice.workflow_execution.safe_run_inspection]
@@ -217,7 +217,8 @@ fn inspect_orchestration_owner(
     orchestration: Option<super::model::OrchestrationInput<'_>>,
     diagnostics: &mut Diagnostics,
 ) -> (super::model::SafeOwner, Option<super::model::SafeOrchestrationEvidence>) {
-    let has_valid_owner_identities = is_blake3_identity(owner.instance_id) && is_blake3_identity(owner.dispatch_id);
+    let has_valid_owner_identities =
+        is_blake3_identity(owner.instance_id.as_str()) && is_blake3_identity(owner.dispatch_id.as_str());
     if !has_valid_owner_identities {
         diagnostics.push(super::model::DiagnosticCode::OwnerIdentityMalformed);
     }
@@ -225,7 +226,7 @@ fn inspect_orchestration_owner(
         diagnostics.push(super::model::DiagnosticCode::OrchestrationMissing);
         return (safe_owner(owner, super::model::OwnerBindingState::Invalid), None);
     };
-    if orchestration.instance.id != owner.instance_id {
+    if &orchestration.instance.id != owner.instance_id {
         diagnostics.push(super::model::DiagnosticCode::OrchestrationIdentityMismatch);
     }
     let event_chain = super::evidence::orchestration_event_chain(orchestration.instance, orchestration.events);
@@ -237,7 +238,7 @@ fn inspect_orchestration_owner(
         diagnostics.push(code);
     }
     let is_exact = has_valid_owner_identities
-        && orchestration.instance.id == owner.instance_id
+        && &orchestration.instance.id == owner.instance_id
         && event_chain == super::model::EvidenceState::Valid
         && facts.has_exact_binding();
     let binding = if is_exact {
@@ -258,8 +259,8 @@ fn workflow_identity(workflow_name: &str) -> String {
 
 fn safe_owner(owner: OwnerTuple<'_>, binding: super::model::OwnerBindingState) -> super::model::SafeOwner {
     super::model::SafeOwner::Orchestration {
-        instance_id: safe_identity(owner.instance_id),
-        dispatch_id: safe_identity(owner.dispatch_id),
+        instance_id: safe_identity(owner.instance_id.as_str()),
+        dispatch_id: safe_identity(owner.dispatch_id.as_str()),
         binding,
     }
 }

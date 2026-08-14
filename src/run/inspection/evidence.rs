@@ -5,7 +5,7 @@ const MAX_DISPATCH_DIAGNOSTICS: usize = 3;
 #[derive(Clone, Copy)]
 struct DispatchTarget<'a> {
     run_id: crate::engine::RunId,
-    dispatch_id: &'a str,
+    dispatch_id: &'a crate::orchestration::DispatchId,
 }
 
 #[derive(Clone, Copy)]
@@ -58,7 +58,7 @@ pub(super) fn orchestration_event_chain(
     ) else {
         return super::model::EvidenceState::Invalid;
     };
-    let replay = crate::orchestration::replay_events(&initial, events, instance.event_head.as_deref());
+    let replay = crate::orchestration::replay_events(&initial, events, instance.event_head.as_ref());
     if replay.valid && replay.instance == *instance {
         super::model::EvidenceState::Valid
     } else {
@@ -69,7 +69,7 @@ pub(super) fn orchestration_event_chain(
 // r[impl lattice.agent_orchestration.retry_round]
 pub(super) fn collect_dispatch_facts(
     run_id: crate::engine::RunId,
-    dispatch_id: &str,
+    dispatch_id: &crate::orchestration::DispatchId,
     events: &[crate::orchestration::OrchestrationEvent],
 ) -> DispatchFacts {
     let target = DispatchTarget { run_id, dispatch_id };
@@ -114,7 +114,7 @@ fn collect_start_fact(
     intent: &crate::orchestration::DispatchIntent,
     planned_charge: crate::orchestration::BudgetChargePlan,
 ) {
-    let has_dispatch = intent.id == target.dispatch_id;
+    let has_dispatch = &intent.id == target.dispatch_id;
     let has_run = intent.run_id == target.run_id;
     if has_dispatch && has_run {
         facts.exact_start_count = facts.exact_start_count.saturating_add(1);
@@ -128,7 +128,7 @@ fn collect_finish_fact(
     facts: &mut DispatchFacts,
     target: DispatchTarget<'_>,
     finished_run: &crate::engine::RunId,
-    finished_dispatch: &str,
+    finished_dispatch: &crate::orchestration::DispatchId,
     outcome: FinishOutcome,
 ) {
     let has_dispatch = finished_dispatch == target.dispatch_id;
@@ -146,7 +146,7 @@ fn collect_abandonment_fact(
     facts: &mut DispatchFacts,
     target: DispatchTarget<'_>,
     abandoned_run: &crate::engine::RunId,
-    abandoned_dispatch: &str,
+    abandoned_dispatch: &crate::orchestration::DispatchId,
 ) {
     let has_dispatch = abandoned_dispatch == target.dispatch_id;
     let has_run = *abandoned_run == target.run_id;

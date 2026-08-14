@@ -102,18 +102,29 @@ pub struct BudgetPolicy {
 
 /// One admitted reservation binding an identity to a materialized charge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct BudgetReservation {
-    pub reservation_id: String,
+pub struct BudgetReservation<Identity = String> {
+    pub reservation_id: Identity,
     pub charge: BudgetCharge,
 }
 
 /// The durable reserve-and-settle ledger state.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct BudgetLedger {
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BudgetLedger<Identity: Ord = String> {
     pub policy: BudgetPolicy,
     pub consumed: BudgetCharge,
-    pub reservations: BTreeMap<String, BudgetReservation>,
+    pub reservations: BTreeMap<Identity, BudgetReservation<Identity>>,
     pub breached: bool,
+}
+
+impl<Identity: Ord> Default for BudgetLedger<Identity> {
+    fn default() -> Self {
+        Self {
+            policy: BudgetPolicy::default(),
+            consumed: BudgetCharge::default(),
+            reservations: BTreeMap::new(),
+            breached: false,
+        }
+    }
 }
 
 /// Outcome of a settlement decision.
@@ -141,7 +152,16 @@ pub fn reserve_budget(
     reservation_id: &str,
     plan: BudgetChargePlan,
 ) -> Result<BudgetCharge, LedgerError> {
-    if ledger.reservations.contains_key(reservation_id) {
+    reserve_budget_for(ledger, reservation_id.to_owned(), plan)
+}
+
+/// Reserve a planned charge under a caller-owned nominal identity type.
+pub fn reserve_budget_for<Identity: Clone + Ord>(
+    ledger: &mut BudgetLedger<Identity>,
+    reservation_id: Identity,
+    plan: BudgetChargePlan,
+) -> Result<BudgetCharge, LedgerError> {
+    if ledger.reservations.contains_key(&reservation_id) {
         return Err(LedgerError::DuplicateReservation);
     }
     let charge = admitted_charge(&ledger.policy, plan)?;
@@ -149,10 +169,7 @@ pub fn reserve_budget(
     let committed = checked_add_charge(ledger.consumed, reserved)?;
     let requested = checked_add_charge(committed, charge)?;
     ensure_within_limits(&ledger.policy, requested)?;
-    ledger.reservations.insert(reservation_id.to_string(), BudgetReservation {
-        reservation_id: reservation_id.to_string(),
-        charge,
-    });
+    ledger.reservations.insert(reservation_id.clone(), BudgetReservation { reservation_id, charge });
     Ok(charge)
 }
 
@@ -162,6 +179,15 @@ pub fn reserve_budget(
 pub fn settle_budget(
     ledger: &mut BudgetLedger,
     reservation_id: &str,
+    observed: BudgetCharge,
+) -> Result<BudgetSettlement, LedgerError> {
+    settle_budget_for(ledger, &reservation_id.to_owned(), observed)
+}
+
+/// Settle a charge under a caller-owned nominal identity type.
+pub fn settle_budget_for<Identity: Ord>(
+    ledger: &mut BudgetLedger<Identity>,
+    reservation_id: &Identity,
     observed: BudgetCharge,
 ) -> Result<BudgetSettlement, LedgerError> {
     let reservation = ledger.reservations.remove(reservation_id).ok_or(LedgerError::MissingReservation)?;
@@ -179,6 +205,11 @@ pub fn settle_budget(
 /// Compute the remaining budget projected against consumed plus reserved totals.
 pub fn remaining_budget(ledger: &BudgetLedger) -> BudgetCharge {
     debug_assert!(ledger.reservations.values().all(|reservation| !reservation.reservation_id.is_empty()));
+    remaining_budget_for(ledger)
+}
+
+/// Compute remaining budget for a ledger with a caller-owned identity type.
+pub fn remaining_budget_for<Identity: Ord>(ledger: &BudgetLedger<Identity>) -> BudgetCharge {
     let reserved = ledger
         .reservations
         .values()
@@ -231,7 +262,9 @@ fn admitted_charge(policy: &BudgetPolicy, plan: BudgetChargePlan) -> Result<Budg
     Ok(charge)
 }
 
-fn total_reserved(reservations: &BTreeMap<String, BudgetReservation>) -> Result<BudgetCharge, LedgerError> {
+fn total_reserved<Identity>(
+    reservations: &BTreeMap<Identity, BudgetReservation<Identity>>,
+) -> Result<BudgetCharge, LedgerError> {
     reservations
         .values()
         .try_fold(BudgetCharge::default(), |total, reservation| checked_add_charge(total, reservation.charge))

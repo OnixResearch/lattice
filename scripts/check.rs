@@ -37,6 +37,12 @@ const ROLE_PROTOCOL_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "2024",
     "scripts/check-role-protocol-boundary.rs",
 ];
+const ORCHESTRATION_IDENTITY_SCRIPT_FORMAT_ARGS: &[&str] = &[
+    "--check",
+    "--edition",
+    "2024",
+    "scripts/check-orchestration-identity-boundary.rs",
+];
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
@@ -53,6 +59,14 @@ const WORKFLOW_BOUNDARY_SELF_TEST_ARGS: &[&str] = &[
 const WORKFLOW_BOUNDARY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-workflow-domain-boundaries.rs"];
 const EFFECT_AUTHORITY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-choregraph-effect-authority.rs"];
 const ROLE_PROTOCOL_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-role-protocol-boundary.rs"];
+const ORCHESTRATION_IDENTITY_SELF_TEST_ARGS: &[&str] = &[
+    "-q",
+    "-Zscript",
+    "scripts/check-orchestration-identity-boundary.rs",
+    "--self-test",
+];
+const ORCHESTRATION_IDENTITY_CHECK_ARGS: &[&str] =
+    &["-q", "-Zscript", "scripts/check-orchestration-identity-boundary.rs"];
 const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
@@ -115,6 +129,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "orchestration identity script format",
+        program: RUSTFMT_PROGRAM,
+        args: ORCHESTRATION_IDENTITY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "inventory script smoke",
         program: CARGO_PROGRAM,
         args: INVENTORY_SCRIPT_SMOKE_ARGS,
@@ -142,6 +162,18 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "role protocol boundary guard",
         program: CARGO_PROGRAM,
         args: ROLE_PROTOCOL_CHECK_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "orchestration identity boundary self-test",
+        program: CARGO_PROGRAM,
+        args: ORCHESTRATION_IDENTITY_SELF_TEST_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "orchestration identity boundary guard",
+        program: CARGO_PROGRAM,
+        args: ORCHESTRATION_IDENTITY_CHECK_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {

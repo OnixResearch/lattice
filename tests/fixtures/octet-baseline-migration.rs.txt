@@ -39,6 +39,11 @@ const ALLOWED_RESOLVED_FUNCTION: &str = "workflow_diagnostic_from_runner";
 const ALLOWED_RESOLVED_HEADLESS_FILE: &str = "src/headless.rs";
 const ALLOWED_RESOLVED_IMPORT_LINT: &str = "non_trait_imports";
 const ALLOWED_RESOLVED_HEADLESS_IMPORTS: &[&str] = &["`replay`", "`workflow_validation`"];
+const ALLOWED_TYPED_IDENTITY_RESOLUTIONS: &[(&str, &str)] = &[
+    ("src/orchestration/core.rs", "2 `&str` parameters are easy to swap by accident"),
+    ("src/orchestration/core.rs", "3 `&str` parameters are easy to swap by accident"),
+    ("src/store/mod.rs", "2 `&str` parameters are easy to swap by accident"),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Migration {
@@ -327,7 +332,11 @@ fn allowed_resolved_finding(diagnostic: &str) -> bool {
     let is_headless_import_resolution = diagnostic.contains(ALLOWED_RESOLVED_IMPORT_LINT)
         && diagnostic.contains(ALLOWED_RESOLVED_HEADLESS_FILE)
         && ALLOWED_RESOLVED_HEADLESS_IMPORTS.iter().any(|name| diagnostic.contains(name));
-    is_validation_resolution || is_headless_import_resolution
+    let is_typed_identity_resolution = diagnostic.contains("ambiguous_params")
+        && ALLOWED_TYPED_IDENTITY_RESOLUTIONS
+            .iter()
+            .any(|(file, message)| diagnostic.contains(file) && diagnostic.contains(message));
+    is_validation_resolution || is_headless_import_resolution || is_typed_identity_resolution
 }
 
 fn baseline_hash(stable_ids: &[String]) -> String {
@@ -488,6 +497,16 @@ fn self_test() -> Result<(), String> {
     )?;
     if migration_is_accepted(&unapproved_import_migration) {
         return Err("unapproved resolved import was accepted".to_string());
+    }
+
+    let typed_identity_resolution = "missing candidate key=computed ambiguous_params src/orchestration/core.rs 3 `&str` parameters are easy to swap by accident";
+    if !allowed_resolved_finding(typed_identity_resolution) {
+        return Err("typed identity resolution was not accepted".to_string());
+    }
+    let unrelated_typed_resolution =
+        "missing candidate key=computed ambiguous_params src/other.rs 3 `&str` parameters are easy to swap by accident";
+    if allowed_resolved_finding(unrelated_typed_resolution) {
+        return Err("unrelated typed identity resolution was accepted".to_string());
     }
 
     let unapproved_old = serde_json::json!({"findings": [finding("b3:unapproved", "lattice", "removed finding")]});

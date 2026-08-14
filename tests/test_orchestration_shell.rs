@@ -17,6 +17,7 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
 use lattice::orchestration::OrchestrationAction;
@@ -35,6 +36,8 @@ use lattice::orchestration::RecoveryOutcome;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::RetryRequest;
+use lattice::orchestration::TriggerId;
+use lattice::orchestration::TriggerIdempotencyKey;
 use lattice::orchestration::abandon_pending;
 use lattice::orchestration::approve_with_execution;
 use lattice::orchestration::current_schema_version;
@@ -156,7 +159,7 @@ fn fail_once_workflow(name: &str, marker: &Path) -> Workflow {
 fn definition(workflow: &Workflow, completion: CompletionPolicy) -> OrchestrationDefinition {
     OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid"),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(workflow).expect("workflow must hash"),
         completion,
@@ -181,7 +184,7 @@ fn definition(workflow: &Workflow, completion: CompletionPolicy) -> Orchestratio
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
         triggers: vec![OrchestrationTriggerBinding {
-            trigger_id: TRIGGER_ID.to_string(),
+            trigger_id: TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid"),
             kind: OrchestrationTriggerKind::Webhook,
         }],
         redaction: RedactionPolicy {
@@ -279,13 +282,13 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
         panic!("orchestration run must retain its owner identity");
     };
     assert_eq!(instance_id, &instance.id);
-    assert!(!dispatch_id.is_empty());
+    assert!(!dispatch_id.as_str().is_empty());
     let details = store
         .load_run_details(runs[0].run_id)
         .expect("run details must load")
         .expect("run details must persist");
     assert_eq!(details.nodes.len(), FIRST_SEQUENCE as usize);
-    let report = replay(&store, &instance.id).expect("side-effect-free replay must validate");
+    let report = replay(&store, instance.id.as_str()).expect("side-effect-free replay must validate");
     assert!(report.valid);
     assert_eq!(report.instance, instance);
 }
@@ -334,7 +337,7 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
     )
     .expect("proposal must hash");
     let advanced = approve_with_execution(&store, ProductApproval {
-        instance_id: waiting.id.clone(),
+        instance_id: waiting.id.to_string(),
         proposal,
         actor: ACTOR.to_owned(),
         execution: test_execution(&provider),
@@ -421,12 +424,21 @@ fn restart_duplicate_trigger_reuses_original_admission_across_processes() {
     assert_eq!(instances.len(), FIRST_SEQUENCE as usize);
     assert_eq!(runs.len(), FIRST_SEQUENCE as usize);
     let instance = &instances[0];
+    let trigger_id = TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid");
+    let idempotency_key =
+        TriggerIdempotencyKey::try_from_text(IDEMPOTENCY_KEY).expect("idempotency fixture must be valid");
     let expected_scoped_key =
-        lattice::orchestration::scoped_trigger_key(&instance.definition_revision, TRIGGER_ID, IDEMPOTENCY_KEY)
+        lattice::orchestration::scoped_trigger_key(&instance.definition_revision, &trigger_id, &idempotency_key)
             .expect("scoped trigger identity must hash");
-    assert_eq!(admissions.get(&expected_scoped_key).map(String::as_str), Some(first_result.instance_id.as_str()));
-    assert_eq!(instance.trigger_idempotency_key.as_deref(), Some(expected_scoped_key.as_str()));
-    assert_eq!(instance.id, first_result.instance_id);
+    assert_eq!(
+        admissions.get(&expected_scoped_key).map(lattice::orchestration::InstanceId::as_str),
+        Some(first_result.instance_id.as_str())
+    );
+    assert_eq!(
+        instance.trigger_idempotency_key.as_ref().map(lattice::orchestration::TriggerScopedKey::as_str),
+        Some(expected_scoped_key.as_str())
+    );
+    assert_eq!(instance.id.as_str(), first_result.instance_id);
     assert_eq!(instance.status, OrchestrationStatus::Completed);
     assert_eq!(instance.budgets.consumed, BudgetCharge {
         rounds: FIRST_SEQUENCE,
@@ -445,8 +457,8 @@ fn restart_duplicate_trigger_reuses_original_admission_across_processes() {
         panic!("restarted trigger run must retain orchestration ownership");
     };
     assert_eq!(instance_id, &instance.id);
-    assert!(!dispatch_id.is_empty());
-    let report = replay(&store, &instance.id).expect("restarted instance replay must validate");
+    assert!(!dispatch_id.as_str().is_empty());
+    let report = replay(&store, instance.id.as_str()).expect("restarted instance replay must validate");
     assert!(report.valid);
 }
 
@@ -507,7 +519,7 @@ fn run_restart_child(phase: RestartPhase, store_path: &Path, first_result_path: 
         .expect("restart child trigger must succeed");
     let result = RestartResult {
         process_id: std::process::id(),
-        instance_id: instance.id.clone(),
+        instance_id: instance.id.to_string(),
     };
     match phase {
         RestartPhase::First => {
@@ -578,7 +590,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     let unauthorized = retry(
         &store,
         RetryRequest {
-            instance_id: &failed.id,
+            instance_id: failed.id.as_str(),
             actor: UNAUTHORIZED_ACTOR,
         },
         AgentRuntimeConfig::default(),
@@ -593,7 +605,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     let completed = retry_with_execution(
         &store,
         RetryRequest {
-            instance_id: &failed.id,
+            instance_id: failed.id.as_str(),
             actor: ACTOR,
         },
         test_execution(&provider),
@@ -633,7 +645,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
         events.iter().filter(|event| event.kind == OrchestrationEventKind::RetryRoundStarted).count(),
         RETRY_LIMIT as usize
     );
-    let report = replay(&store, &completed.id).expect("retry replay must validate");
+    let report = replay(&store, completed.id.as_str()).expect("retry replay must validate");
     assert!(report.valid);
     assert_eq!(report.instance, completed);
 }
@@ -651,7 +663,7 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
     let pending_error = retry(
         &store,
         RetryRequest {
-            instance_id: &pending.id,
+            instance_id: pending.id.as_str(),
             actor: ACTOR,
         },
         AgentRuntimeConfig::default(),
@@ -663,14 +675,14 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
     assert!(store.list_runs(RETRY_RUN_LIST_LIMIT).expect("run list must load").is_empty());
 
     let abandoned = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &pending.id,
+        instance_id: pending.id.as_str(),
         actor: ACTOR,
     })
     .expect("authorized abandonment must close uncertainty");
     let abandoned_error = retry(
         &store,
         RetryRequest {
-            instance_id: &abandoned.id,
+            instance_id: abandoned.id.as_str(),
             actor: ACTOR,
         },
         AgentRuntimeConfig::default(),
@@ -704,7 +716,7 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
     let foreign_error = retry(
         &foreign_store,
         RetryRequest {
-            instance_id: &foreign_pending.id,
+            instance_id: foreign_pending.id.as_str(),
             actor: ACTOR,
         },
         AgentRuntimeConfig::default(),
@@ -778,7 +790,7 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
         })
         .expect("observed run must persist");
 
-    let outcome = recover_pending(&store, &started.instance.id).expect("recovery must run");
+    let outcome = recover_pending(&store, started.instance.id.as_str()).expect("recovery must run");
     let RecoveryOutcome::Reconciled(reconciled) = outcome else {
         panic!("existing run must reconcile");
     };
@@ -795,12 +807,12 @@ fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry(
     let (instance, events) = cancelled_acknowledged_instance(&workflow);
     store.create_orchestration(&instance, &events).expect("pending instance must persist");
 
-    let outcome = recover_pending(&store, &instance.id).expect("recovery must inspect pending run");
+    let outcome = recover_pending(&store, instance.id.as_str()).expect("recovery must inspect pending run");
     assert_eq!(outcome, RecoveryOutcome::PendingUnobserved {
         run_id: RunId(RECOVERY_RUN_ID),
     });
     let unauthorized = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &instance.id,
+        instance_id: instance.id.as_str(),
         actor: UNAUTHORIZED_ACTOR,
     })
     .expect_err("unauthorized abandonment must fail");
@@ -808,7 +820,7 @@ fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry(
     assert_eq!(store.load_orchestration(&instance.id).expect("instance must load"), Some(instance.clone()));
 
     let abandoned = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &instance.id,
+        instance_id: instance.id.as_str(),
         actor: ACTOR,
     })
     .expect("authorized abandonment must apply");
@@ -817,12 +829,12 @@ fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry(
     assert!(abandoned.active_run_id.is_none());
     assert!(abandoned.budgets.reservations.is_empty());
     assert_eq!(abandoned.budgets.consumed.rounds, FIRST_SEQUENCE);
-    let report = replay(&store, &instance.id).expect("abandonment replay must validate");
+    let report = replay(&store, instance.id.as_str()).expect("abandonment replay must validate");
     assert!(report.valid);
     assert_eq!(report.instance, abandoned);
 
     let repeated = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &instance.id,
+        instance_id: instance.id.as_str(),
         actor: ACTOR,
     })
     .expect_err("terminal abandonment cannot repeat");
@@ -856,14 +868,14 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
         .expect("observed run must persist");
 
     let rejected = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &instance.id,
+        instance_id: instance.id.as_str(),
         actor: ACTOR,
     })
     .expect_err("observed run cannot be abandoned");
     assert!(rejected.to_string().contains("use orchestration recover"));
     assert_eq!(store.load_orchestration(&instance.id).expect("instance must load"), Some(instance.clone()));
 
-    let outcome = recover_pending(&store, &instance.id).expect("ordinary recovery must reconcile");
+    let outcome = recover_pending(&store, instance.id.as_str()).expect("ordinary recovery must reconcile");
     let RecoveryOutcome::Reconciled(reconciled) = outcome else {
         panic!("observed run must reconcile");
     };
@@ -873,6 +885,9 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
 
 // r[verify lattice.agent_orchestration.run_identity]
 // r[verify lattice.agent_orchestration.run_identity.scenario.foreign]
+// r[verify lattice.agent_orchestration.nominal_identities.recovery]
+// r[verify lattice.agent_orchestration.nominal_identities.recovery.owner]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn foreign_run_record_cannot_satisfy_or_abandon_a_pending_dispatch() {
     let (_directory, store) = store();
@@ -893,9 +908,10 @@ fn foreign_run_record_cannot_satisfy_or_abandon_a_pending_dispatch() {
         })
         .expect("foreign run must persist");
 
-    let recovery_error = recover_pending(&store, &instance.id).expect_err("foreign run cannot satisfy recovery");
+    let recovery_error =
+        recover_pending(&store, instance.id.as_str()).expect_err("foreign run cannot satisfy recovery");
     let abandon_error = abandon_pending(&store, AbandonPendingRequest {
-        instance_id: &instance.id,
+        instance_id: instance.id.as_str(),
         actor: ACTOR,
     })
     .expect_err("foreign run blocks abandonment");

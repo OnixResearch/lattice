@@ -7,11 +7,13 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::TriggerId;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::load_definition_nickel_file;
@@ -29,6 +31,7 @@ const SUCCESSOR_NAME: &str = "format-successor";
 const OBJECTIVE: &str = "Preserve typed orchestration meaning";
 const ACTOR: &str = "operator:format";
 const TRIGGER_ID: &str = "format-schedule";
+const INVALID_IDENTITY: &str = " secret-identity";
 const FIRST_SEQUENCE: u64 = 1;
 const ROUND_LIMIT: u64 = 3;
 const RETRY_LIMIT: u64 = 1;
@@ -37,7 +40,7 @@ fn definition() -> OrchestrationDefinition {
     let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid"),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion: CompletionPolicy::AwaitProposal,
@@ -62,7 +65,7 @@ fn definition() -> OrchestrationDefinition {
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
         triggers: vec![OrchestrationTriggerBinding {
-            trigger_id: TRIGGER_ID.to_string(),
+            trigger_id: TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid"),
             kind: OrchestrationTriggerKind::Schedule,
         }],
         redaction: RedactionPolicy {
@@ -73,6 +76,8 @@ fn definition() -> OrchestrationDefinition {
 
 // r[verify lattice.agent_orchestration.format]
 // r[verify lattice.agent_orchestration.format.scenario.round-trip]
+// r[verify lattice.agent_orchestration.nominal_identities.wire_boundary]
+// r[verify lattice.agent_orchestration.nominal_identities.compatibility]
 #[test]
 fn typed_nickel_definition_round_trip_preserves_meaning() {
     let directory = tempdir().expect("temporary directory must exist");
@@ -104,6 +109,8 @@ fn default_disabled_retry_is_omitted_and_round_trips_through_nickel() {
 }
 
 // r[verify lattice.agent_orchestration.format]
+// r[verify lattice.agent_orchestration.nominal_identities.wire_boundary]
+// r[verify lattice.agent_orchestration.nominal_identities.compatibility]
 #[test]
 fn proposal_nickel_round_trip_preserves_hash_bound_identity() {
     let directory = tempdir().expect("temporary directory must exist");
@@ -151,4 +158,21 @@ fn malformed_nickel_definition_is_rejected() {
     std::fs::write(&path, "{ objective = }").expect("fixture must write");
 
     assert!(load_definition_nickel_file(&path).is_err());
+}
+
+// r[verify lattice.agent_orchestration.nominal_identities.validation]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix.no_effect]
+#[test]
+fn nickel_wire_adapter_rejects_invalid_identity_without_echoing_it() {
+    let directory = tempdir().expect("temporary directory must exist");
+    let path = directory.path().join("invalid-identity.ncl");
+    let rendered = definition_to_nickel(&definition())
+        .expect("definition must render")
+        .replace(&format!("id = \"{DEFINITION_ID}\""), &format!("id = \"{INVALID_IDENTITY}\""));
+    std::fs::write(&path, rendered).expect("fixture must write");
+
+    let error = load_definition_nickel_file(&path).expect_err("invalid identity must fail");
+
+    assert!(!error.to_string().contains(INVALID_IDENTITY));
+    assert!(error.to_string().contains("unsupported whitespace"));
 }

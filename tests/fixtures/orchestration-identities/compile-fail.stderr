@@ -1,0 +1,207 @@
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:40:21
+   |
+40 |     accept_instance(&dispatch);
+   |     --------------- ^^^^^^^^^ expected `&InstanceId`, found `&DispatchId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&InstanceId`
+              found reference `&DispatchId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:15:4
+   |
+15 | fn accept_instance(_: &InstanceId) {}
+   |    ^^^^^^^^^^^^^^^ --------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:41:21
+   |
+41 |     accept_dispatch(&instance);
+   |     --------------- ^^^^^^^^^ expected `&DispatchId`, found `&InstanceId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&DispatchId`
+              found reference `&InstanceId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:16:4
+   |
+16 | fn accept_dispatch(_: &DispatchId) {}
+   |    ^^^^^^^^^^^^^^^ --------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:42:21
+   |
+42 |     accept_proposal(&fact);
+   |     --------------- ^^^^^ expected `&ProposalId`, found `&FactId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&ProposalId`
+              found reference `&FactId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:17:4
+   |
+17 | fn accept_proposal(_: &ProposalId) {}
+   |    ^^^^^^^^^^^^^^^ --------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:43:17
+   |
+43 |     accept_fact(&proposal);
+   |     ----------- ^^^^^^^^^ expected `&FactId`, found `&ProposalId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&FactId`
+              found reference `&ProposalId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:18:4
+   |
+18 | fn accept_fact(_: &FactId) {}
+   |    ^^^^^^^^^^^ ----------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:44:24
+   |
+44 |     accept_reservation(&dispatch);
+   |     ------------------ ^^^^^^^^^ expected `&ReservationId`, found `&DispatchId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&ReservationId`
+              found reference `&DispatchId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:19:4
+   |
+19 | fn accept_reservation(_: &ReservationId) {}
+   |    ^^^^^^^^^^^^^^^^^^ -----------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:45:32
+   |
+45 |     accept_definition_revision(&workflow_revision);
+   |     -------------------------- ^^^^^^^^^^^^^^^^^^ expected `&DefinitionRevision`, found `&WorkflowRevision`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&DefinitionRevision`
+              found reference `&lattice::orchestration::WorkflowRevision`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:20:4
+   |
+20 | fn accept_definition_revision(_: &DefinitionRevision) {}
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ ----------------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:46:30
+   |
+46 |     accept_workflow_revision(&definition_revision);
+   |     ------------------------ ^^^^^^^^^^^^^^^^^^^^ expected `&WorkflowRevision`, found `&DefinitionRevision`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&lattice::orchestration::WorkflowRevision`
+              found reference `&DefinitionRevision`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:21:4
+   |
+21 | fn accept_workflow_revision(_: &WorkflowRevision) {}
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ --------------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:47:19
+   |
+47 |     accept_policy(&event);
+   |     ------------- ^^^^^^ expected `&AuthorityPolicyIdentity`, found `&EventId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&AuthorityPolicyIdentity`
+              found reference `&EventId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:22:4
+   |
+22 | fn accept_policy(_: &AuthorityPolicyIdentity) {}
+   |    ^^^^^^^^^^^^^ ---------------------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:48:18
+   |
+48 |     accept_event(&policy);
+   |     ------------ ^^^^^^^ expected `&EventId`, found `&AuthorityPolicyIdentity`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&EventId`
+              found reference `&AuthorityPolicyIdentity`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:23:4
+   |
+23 | fn accept_event(_: &EventId) {}
+   |    ^^^^^^^^^^^^ -----------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:49:17
+   |
+49 |     accept_head(&event);
+   |     ----------- ^^^^^^ expected `&LedgerHeadId`, found `&EventId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&LedgerHeadId`
+              found reference `&EventId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:24:4
+   |
+24 | fn accept_head(_: &LedgerHeadId) {}
+   |    ^^^^^^^^^^^ ----------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:50:18
+   |
+50 |     accept_event(&head);
+   |     ------------ ^^^^^ expected `&EventId`, found `&LedgerHeadId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&EventId`
+              found reference `&LedgerHeadId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:23:4
+   |
+23 | fn accept_event(_: &EventId) {}
+   |    ^^^^^^^^^^^^ -----------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:51:24
+   |
+51 |     accept_idempotency(&instance);
+   |     ------------------ ^^^^^^^^^ expected `&TriggerIdempotencyKey`, found `&InstanceId`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&TriggerIdempotencyKey`
+              found reference `&InstanceId`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:25:4
+   |
+25 | fn accept_idempotency(_: &TriggerIdempotencyKey) {}
+   |    ^^^^^^^^^^^^^^^^^^ -------------------------
+
+error[E0308]: mismatched types
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:52:21
+   |
+52 |     accept_instance(&idempotency);
+   |     --------------- ^^^^^^^^^^^^ expected `&InstanceId`, found `&TriggerIdempotencyKey`
+   |     |
+   |     arguments to this function are incorrect
+   |
+   = note: expected reference `&InstanceId`
+              found reference `&TriggerIdempotencyKey`
+note: function defined here
+  --> tests/fixtures/orchestration-identities/compile-fail.rs:15:4
+   |
+15 | fn accept_instance(_: &InstanceId) {}
+   |    ^^^^^^^^^^^^^^^ --------------

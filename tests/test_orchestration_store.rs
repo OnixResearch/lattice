@@ -9,13 +9,16 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::InstanceId;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::TriggerScopedKey;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::dispatch_identity;
 use lattice::orchestration::fact_identity;
@@ -39,11 +42,27 @@ const SECOND_RETRY_RUN_ID: u64 = 43;
 const RETRY_LIMIT: u64 = 2;
 const BUDGET_LIMIT: u64 = 10;
 
+fn digest(label: &str) -> String {
+    blake3::hash(label.as_bytes()).to_hex().to_string()
+}
+
+fn definition_id() -> DefinitionId {
+    DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid")
+}
+
+fn scoped_key() -> TriggerScopedKey {
+    TriggerScopedKey::try_from_hex(digest("scoped-key")).expect("scoped key fixture must be valid")
+}
+
+fn instance_id(label: &str) -> InstanceId {
+    InstanceId::try_from_hex(digest(label)).expect("instance identity fixture must be valid")
+}
+
 fn definition() -> OrchestrationDefinition {
     let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: definition_id(),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion: CompletionPolicy::RunSucceeded,
@@ -99,6 +118,8 @@ fn start(base: &lattice::orchestration::OrchestrationInstance) -> lattice::orche
 }
 
 // r[verify lattice.agent_orchestration.durability]
+// r[verify lattice.agent_orchestration.nominal_identities.wire_boundary]
+// r[verify lattice.agent_orchestration.nominal_identities.compatibility]
 #[test]
 fn store_persists_instance_and_event_atomically() {
     let (_directory, store) = store();
@@ -119,7 +140,7 @@ fn store_persists_instance_and_event_atomically() {
     );
     assert_eq!(store.load_orchestration_events(&started.instance.id).expect("event load must work"), vec![event]);
     assert_eq!(
-        store.load_orchestration_definition(DEFINITION_ID).expect("definition load must work"),
+        store.load_orchestration_definition(&definition_id()).expect("definition load must work"),
         Some(definition)
     );
 }
@@ -259,24 +280,27 @@ fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
 #[test]
 fn trigger_admission_insert_is_atomic_and_duplicate_safe() {
     let (_directory, store) = store();
+    let scoped_key = scoped_key();
+    let first_instance = instance_id("instance-one");
+    let second_instance = instance_id("instance-two");
     let first = store
-        .save_orchestration_trigger_admission("scoped-key", "instance-one")
+        .save_orchestration_trigger_admission(&scoped_key, &first_instance)
         .expect("first trigger write must work");
     let duplicate = store
-        .save_orchestration_trigger_admission("scoped-key", "instance-two")
+        .save_orchestration_trigger_admission(&scoped_key, &second_instance)
         .expect("duplicate trigger write must return prior result");
 
     assert_eq!(first, TriggerAdmissionWrite::Inserted);
     assert_eq!(duplicate, TriggerAdmissionWrite::Duplicate {
-        instance_id: "instance-one".to_string()
+        instance_id: first_instance.clone()
     });
     assert_eq!(
         store
             .list_orchestration_trigger_admissions()
             .expect("admissions must list")
-            .get("scoped-key")
-            .map(String::as_str),
-        Some("instance-one")
+            .get(&scoped_key)
+            .map(InstanceId::as_str),
+        Some(first_instance.as_str())
     );
 }
 
@@ -295,7 +319,7 @@ fn mismatched_creation_event_batch_is_rejected_without_partial_state() {
     let base = new_instance(definition(), FIRST_SEQUENCE, None).expect("instance must hash");
     let started = start(&base);
     let mut event = started.event.expect("event must exist");
-    event.instance_id = "different-instance".to_string();
+    event.instance_id = instance_id("different-instance");
 
     let error = store
         .create_orchestration(&started.instance, &[event])

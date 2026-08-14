@@ -15,6 +15,7 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
 use lattice::orchestration::OrchestrationAction;
@@ -71,6 +72,10 @@ const RECOVERY_CONTENDER_POLL_ATTEMPTS: usize = 500;
 const RECOVERY_CONTENDER_POLL_DELAY_MS: u64 = 10;
 const RECOVERY_CONTENDER_COUNT: usize = 2;
 const RECOVERY_SETTLED_EVENT_COUNT: usize = 3;
+
+fn definition_id() -> DefinitionId {
+    DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid")
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct RecoveryContenderResult {
@@ -129,7 +134,7 @@ fn fixture_with_workflow(
     store.save_workflow(&workflow).expect("workflow must persist");
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: definition_id(),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow must hash"),
         completion,
@@ -211,7 +216,7 @@ fn recovery_contender_outcome(result: &RecoveryContenderResult) -> RecoveryConte
 fn persist_observed_failure(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: definition_id(),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(workflow).expect("workflow must hash"),
         completion: CompletionPolicy::RunSucceeded,
@@ -316,7 +321,7 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
 fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: definition_id(),
         objective: OBJECTIVE.to_string(),
         workflow: workflow_revision(workflow).expect("workflow must hash"),
         completion: CompletionPolicy::RunSucceeded,
@@ -433,7 +438,7 @@ fn cli_validates_starts_and_reports_json_status() {
 
     let status = command(&config_path)
         .arg("status")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -457,7 +462,7 @@ fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
 
     let retry = command(&config_path)
         .arg("retry")
-        .arg(&failed.id)
+        .arg(failed.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .arg("--output")
@@ -473,7 +478,7 @@ fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&completed.id)
+        .arg(completed.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -505,7 +510,7 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
 
     let pause = command(&config_path)
         .arg("pause")
-        .arg(&waiting.id)
+        .arg(waiting.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .arg("--output")
@@ -518,7 +523,7 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
 
     let resume = command(&config_path)
         .arg("resume")
-        .arg(&paused.id)
+        .arg(paused.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .arg("--output")
@@ -531,7 +536,7 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&resumed.id)
+        .arg(resumed.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -557,7 +562,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let recovery = command(&config_path)
         .arg("recover")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -567,7 +572,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let retry_pending = command(&config_path)
         .arg("retry")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .output()
@@ -577,7 +582,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let cancel = command(&config_path)
         .arg("cancel")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .arg("--output")
@@ -591,7 +596,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let abandon = command(&config_path)
         .arg("abandon")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .arg("--output")
@@ -609,7 +614,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -622,7 +627,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let retry_abandoned = command(&config_path)
         .arg("retry")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .output()
@@ -632,7 +637,7 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
 
     let repeated = command(&config_path)
         .arg("abandon")
-        .arg(&instance.id)
+        .arg(instance.id.as_str())
         .arg("--actor")
         .arg(ACTOR)
         .output()
@@ -693,14 +698,24 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
     let second_ready_path = directory.path().join("recovery-contender-second-ready");
     let first_result_path = directory.path().join("recovery-contender-first-result.json");
     let second_result_path = directory.path().join("recovery-contender-second-result.json");
-    let first =
-        recovery_contender_command(&config_path, &pending.id, &first_ready_path, &release_path, &first_result_path)
-            .spawn()
-            .expect("first recovery contender starts");
-    let second =
-        recovery_contender_command(&config_path, &pending.id, &second_ready_path, &release_path, &second_result_path)
-            .spawn()
-            .expect("second recovery contender starts");
+    let first = recovery_contender_command(
+        &config_path,
+        pending.id.as_str(),
+        &first_ready_path,
+        &release_path,
+        &first_result_path,
+    )
+    .spawn()
+    .expect("first recovery contender starts");
+    let second = recovery_contender_command(
+        &config_path,
+        pending.id.as_str(),
+        &second_ready_path,
+        &release_path,
+        &second_result_path,
+    )
+    .spawn()
+    .expect("second recovery contender starts");
     let first = common::ChildGuard::new(first);
     let second = common::ChildGuard::new(second);
     for ready_path in [&first_ready_path, &second_ready_path] {
@@ -758,7 +773,7 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
 
     let repeated = command(&config_path)
         .arg("recover")
-        .arg(&pending.id)
+        .arg(pending.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -768,7 +783,7 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&pending.id)
+        .arg(pending.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -810,7 +825,7 @@ fn operator_e2e_orchestration_denies_forced_death_effect_without_current_authori
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&failed.id)
+        .arg(failed.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -839,7 +854,7 @@ fn operator_e2e_orchestration_recovery_reconciles_exact_observed_run_without_red
 
     let recovery = command(&config_path)
         .arg("recover")
-        .arg(&pending.id)
+        .arg(pending.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -863,7 +878,7 @@ fn operator_e2e_orchestration_recovery_reconciles_exact_observed_run_without_red
 
     let replay = command(&config_path)
         .arg("replay")
-        .arg(&pending.id)
+        .arg(pending.id.as_str())
         .arg("--output")
         .arg("json")
         .output()
@@ -888,7 +903,7 @@ fn operator_e2e_orchestration_recovery_rejects_unscoped_run_without_mutating_pen
 
     let recovery = command(&config_path)
         .arg("recover")
-        .arg(&pending.id)
+        .arg(pending.id.as_str())
         .arg("--output")
         .arg("json")
         .output()

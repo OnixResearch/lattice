@@ -13,8 +13,11 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
+use lattice::orchestration::DispatchId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::InstanceId;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationEvent;
@@ -76,6 +79,18 @@ const SAFE_ACTOR: &str = "operator:safe";
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_PARALLELISM: usize = 1;
 const SCHEDULE_OCCURRENCE_IDENTITY: &str = "b3:0000000000000000000000000000000000000000000000000000000000000000";
+
+fn test_digest(label: &str) -> String {
+    blake3::hash(label.as_bytes()).to_hex().to_string()
+}
+
+fn definition_id() -> DefinitionId {
+    DefinitionId::try_from_text(ORCHESTRATION_ID).expect("definition identity fixture must be valid")
+}
+
+fn forged_dispatch_id(label: &str) -> DispatchId {
+    DispatchId::try_from_hex(test_digest(label)).expect("dispatch identity fixture must be valid")
+}
 
 fn record(owner: RunOwner) -> RunRecord {
     RunRecord {
@@ -140,11 +155,11 @@ fn assert_private_content_absent(rendered: &str) {
     assert!(!rendered.contains("<think>"));
 }
 
-fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
+fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
     let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: ORCHESTRATION_ID.to_string(),
+        id: definition_id(),
         objective: PRIVATE_PROMPT.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow revision"),
         completion: CompletionPolicy::RunSucceeded,
@@ -193,7 +208,7 @@ fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     (start.0, vec![start.1], dispatch_id)
 }
 
-fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
+fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
     let (started, mut events, dispatch_id) = started_orchestration_fixture();
     let acknowledged = apply(&started, OrchestrationAction::DispatchAcknowledged {
         dispatch_id: dispatch_id.clone(),
@@ -214,11 +229,11 @@ fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, S
     (finished.0, events, dispatch_id)
 }
 
-fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
+fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
     let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
     let definition = OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: ORCHESTRATION_ID.to_string(),
+        id: definition_id(),
         objective: PRIVATE_PROMPT.to_string(),
         workflow: workflow_revision(&workflow).expect("workflow revision"),
         completion: CompletionPolicy::RunSucceeded,
@@ -316,7 +331,7 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     (completed.0, events, retry_dispatch_id)
 }
 
-fn abandoned_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, String) {
+fn abandoned_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
     let (started, mut events, dispatch_id) = started_orchestration_fixture();
     let acknowledged = apply(&started, OrchestrationAction::DispatchAcknowledged {
         dispatch_id: dispatch_id.clone(),
@@ -420,23 +435,17 @@ fn present_foreign_detail_and_replay_identity_fail_closed() {
 // r[verify lattice.workflow_execution.safe_run_inspection]
 #[test]
 fn malformed_missing_owner_identities_are_not_echoed() {
-    let record = record(RunOwner::Orchestration {
-        instance_id: PRIVATE_PROMPT.to_string(),
-        dispatch_id: PRIVATE_CREDENTIAL.to_string(),
+    let encoded = serde_json::json!({
+        "kind": "orchestration",
+        "instance_id": PRIVATE_PROMPT,
+        "dispatch_id": PRIVATE_CREDENTIAL,
     });
-    let report = inspect(Input {
-        record: &record,
-        details: None,
-        replay_events: None,
-        orchestration: None,
-    });
-    let rendered = render_json(&report).expect("JSON rendering");
 
-    assert!(!report.valid);
-    assert!(report.diagnostic_codes.contains(&DiagnosticCode::OwnerIdentityMalformed));
-    assert!(report.diagnostic_codes.contains(&DiagnosticCode::OrchestrationMissing));
-    assert_private_content_absent(&rendered);
-    assert!(rendered.contains("[invalid]"));
+    let rejected =
+        serde_json::from_value::<RunOwner>(encoded).expect_err("malformed owner identities must fail admission");
+
+    assert!(!rejected.to_string().contains(PRIVATE_PROMPT));
+    assert!(!rejected.to_string().contains(PRIVATE_CREDENTIAL));
 }
 
 // r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.recovery]
@@ -484,6 +493,7 @@ fn malformed_schedule_occurrence_owner_is_rejected_without_echo() {
 
 // r[verify lattice.workflow_execution.safe_run_inspection]
 // r[verify lattice.workflow_execution.safe_run_inspection.scenario.owner_binding]
+// r[verify lattice.agent_orchestration.nominal_identities.compatibility]
 #[test]
 fn exact_orchestration_owner_reports_finished_dispatch_and_settled_budget() {
     let (instance, events, dispatch_id) = orchestration_fixture();
@@ -583,7 +593,7 @@ fn foreign_dispatch_owner_and_duplicate_admission_are_invalid() {
     let (instance, events, dispatch_id) = orchestration_fixture();
     let foreign_record = record(RunOwner::Orchestration {
         instance_id: instance.id.clone(),
-        dispatch_id: "foreign-dispatch".to_string(),
+        dispatch_id: forged_dispatch_id("foreign-dispatch"),
     });
     let foreign_report = inspect(Input {
         record: &foreign_record,
@@ -594,8 +604,10 @@ fn foreign_dispatch_owner_and_duplicate_admission_are_invalid() {
             events: &events,
         }),
     });
+    let forged_instance_id =
+        InstanceId::try_from_hex(dispatch_id.as_str()).expect("forged instance fixture uses valid digest spelling");
     let foreign_instance_record = record(RunOwner::Orchestration {
-        instance_id: dispatch_id.clone(),
+        instance_id: forged_instance_id,
         dispatch_id: dispatch_id.clone(),
     });
     let foreign_instance_report = inspect(Input {

@@ -168,7 +168,7 @@ fn load_workflow_revision(store: &crate::store::Store, workflow_name: &str) -> R
         .load_workflow(workflow_name)?
         .ok_or_else(|| Error::MissingWorkflow(workflow_name.to_string()))?;
     crate::orchestration::workflow_revision(&workflow)
-        .map(|revision| revision.content_hash)
+        .map(|revision| revision.content_hash.to_string())
         .map_err(|error| Error::InvalidWorkflowRevision(error.to_string()))
 }
 

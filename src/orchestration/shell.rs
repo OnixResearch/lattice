@@ -180,7 +180,7 @@ fn validation_report(definition: &OrchestrationDefinition, workflow: Option<&Wor
     let orchestration_diagnostics = core::validate_definition(definition, workflow_revision.as_ref());
     let workflow_diagnostics = workflow.map_or_else(Vec::new, crate::workflow_validation::validate_workflow);
     DefinitionValidationReport {
-        definition_revision: core::definition_revision(definition).ok(),
+        definition_revision: core::definition_revision(definition).ok().map(|revision| revision.to_string()),
         workflow_revision,
         orchestration_diagnostics,
         workflow_diagnostics,
@@ -255,10 +255,13 @@ pub async fn start_from_trigger_with_execution(
         idempotency_key,
         execution,
     } = request;
-    let trigger_id = trigger_id.as_str();
+    let definition_id = crate::orchestration::DefinitionId::try_from_text(definition_id).map_err(identity_error)?;
+    let trigger_id = crate::orchestration::TriggerId::try_from_text(trigger_id).map_err(identity_error)?;
+    let idempotency_key =
+        crate::orchestration::TriggerIdempotencyKey::try_from_text(idempotency_key).map_err(identity_error)?;
     let definition = store
         .load_orchestration_definition(&definition_id)?
-        .ok_or(OrchestrationShellError::WorkflowNotFound(definition_id))?;
+        .ok_or_else(|| OrchestrationShellError::WorkflowNotFound(definition_id.to_string()))?;
     let report = validate_definition_in_store(store, &definition)?;
     if !report.valid() {
         return Err(OrchestrationShellError::DefinitionInvalid(Box::new(report)));
@@ -270,20 +273,20 @@ pub async fn start_from_trigger_with_execution(
     let admission = core::admit_trigger_start(core::TriggerStartRequest {
         definition: &definition,
         definition_revision: &definition_revision,
-        trigger_id,
+        trigger_id: &trigger_id,
         trigger_kind,
         idempotency_key: &idempotency_key,
         next_sequence: sequence,
         context: &context,
     })?;
     match admission {
-        OrchestrationTriggerAdmission::Duplicate { instance_id } => load_instance(store, &instance_id),
+        OrchestrationTriggerAdmission::Duplicate { instance_id } => load_instance_by_id(store, &instance_id),
         OrchestrationTriggerAdmission::Accepted(plan) => {
             let instance = core::new_instance(definition, sequence, Some(plan.scoped_key.clone()))?;
             debug_assert_eq!(instance.id, plan.instance_id);
             match store.create_triggered_orchestration(&plan.scoped_key, &instance)? {
                 TriggerAdmissionWrite::Inserted => execute_ready_round(store, instance, execution).await,
-                TriggerAdmissionWrite::Duplicate { instance_id } => load_instance(store, &instance_id),
+                TriggerAdmissionWrite::Duplicate { instance_id } => load_instance_by_id(store, &instance_id),
             }
         }
     }
@@ -360,7 +363,7 @@ async fn execute_started_round(
         execution.authority_provider,
     )
     .await;
-    let current = load_instance(store, &acknowledged.id)?;
+    let current = load_instance_by_id(store, &acknowledged.id)?;
     let (is_succeeded, is_retryable_observed_failure, summary) = match result {
         Ok(summary) => {
             let is_succeeded = summary.status == HeadlessRunStatus::Succeeded;
@@ -454,8 +457,12 @@ fn planned_charge(
     })
 }
 
-fn observed_usage(instance: &OrchestrationInstance, dispatch_id: &str) -> Option<BudgetCharge> {
-    instance.budgets.reservations.get(dispatch_id).map(|reservation| reservation.charge)
+fn observed_usage(
+    instance: &OrchestrationInstance,
+    dispatch_id: &crate::orchestration::DispatchId,
+) -> Option<BudgetCharge> {
+    let reservation_id = crate::orchestration::ReservationId::from_dispatch(dispatch_id);
+    instance.budgets.reservations.get(&reservation_id).map(|reservation| reservation.charge)
 }
 
 fn safe_run_summary(summary: &headless::HeadlessRunSummary) -> String {
@@ -549,7 +556,8 @@ pub async fn approve_with_execution(
         actor,
         execution,
     } = request;
-    let mut instance = load_instance(store, &instance_id)?;
+    let instance_id = crate::orchestration::InstanceId::try_from_hex(instance_id).map_err(identity_error)?;
+    let mut instance = load_instance_by_id(store, &instance_id)?;
     debug_assert_eq!(instance.id, instance_id);
     debug_assert_eq!(proposal.instance_id, instance_id);
     match &instance.pending_proposal {
@@ -598,9 +606,10 @@ pub fn reject(
     actor: &str,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
+    let proposal_id = crate::orchestration::ProposalId::try_from_hex(proposal_id).map_err(identity_error)?;
     apply_and_commit(store, &instance, OrchestrationAction::RejectProposal {
         actor: actor.to_string(),
-        proposal_id: proposal_id.to_string(),
+        proposal_id,
     })
 }
 
@@ -661,8 +670,8 @@ pub fn replay(store: &Store, instance_id: &str) -> Result<ReplayReport, Orchestr
     let current = load_instance(store, instance_id)?;
     let initial =
         core::new_instance(current.definition.clone(), current.sequence, current.trigger_idempotency_key.clone())?;
-    let events = store.load_orchestration_events(instance_id)?;
-    let report = core::replay_events(&initial, &events, current.event_head.as_deref());
+    let events = store.load_orchestration_events(&current.id)?;
+    let report = core::replay_events(&initial, &events, current.event_head.as_ref());
     if !report.valid || report.instance != current {
         return Err(OrchestrationShellError::ReplayInvalid(Box::new(report)));
     }
@@ -670,6 +679,7 @@ pub fn replay(store: &Store, instance_id: &str) -> Result<ReplayReport, Orchestr
 }
 
 // r[impl lattice.agent_orchestration.durability]
+// r[impl lattice.agent_orchestration.nominal_identities.recovery]
 pub fn recover_pending(store: &Store, instance_id: &str) -> Result<RecoveryOutcome, OrchestrationShellError> {
     let instance = load_instance(store, instance_id)?;
     let Some(intent) = instance.pending_dispatch.clone() else {
@@ -755,7 +765,22 @@ fn reconcile_run_record(
 }
 
 pub fn load_instance(store: &Store, instance_id: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
+    let instance_id = crate::orchestration::InstanceId::try_from_hex(instance_id).map_err(identity_error)?;
+    load_instance_by_id(store, &instance_id)
+}
+
+fn load_instance_by_id(
+    store: &Store,
+    instance_id: &crate::orchestration::InstanceId,
+) -> Result<OrchestrationInstance, OrchestrationShellError> {
     store
         .load_orchestration(instance_id)?
         .ok_or_else(|| OrchestrationShellError::MissingInstance(instance_id.to_string()))
+}
+
+fn identity_error(error: crate::orchestration::AdmissionError) -> OrchestrationShellError {
+    OrchestrationShellError::Core(OrchestrationDiagnostic {
+        code: OrchestrationDiagnosticCode::InvalidIdentity,
+        message: error.to_string(),
+    })
 }

@@ -23,6 +23,7 @@ nix develop          # enter devshell
 pre-commit install   # install the Octet pre-commit hook
 scripts/check.rs                              # run operator E2E, guards, fmt, tests, and clippy
 scripts/check-workflow-domain-boundaries.rs   # reject core clock reads and non-TUI Subwayrat leakage
+scripts/check-orchestration-identity-boundary.rs # reject raw orchestration identities in the typed core
 scripts/operator-e2e.rs                       # exercise TUI PTY, webhook TCP, scheduler process, and orchestration recovery boundaries
 octet-precommit-check  # run the fail-closed Octet stable-ID gate
 cargo octet check    # inspect raw warning-level Octet output
@@ -253,6 +254,10 @@ lattice --config ./demo/config.ncl orchestration replay <instance-id> --output j
 ```
 
 Lattice reserves run IDs before effects. Foreign and legacy records fail closed.
+
+[Orchestration identities](docs/orchestration-identities.md) use distinct checked Rust roles. Nickel, CLI, webhook, scheduler, JSON, and redb adapters preserve their existing text shapes.
+
+Typed identities prove local role separation and checked syntax. They do not prove provider truth, remote cancellation, external exactly-once effects, independent history, or production readiness.
 
 Abandonment requires prior authorized cancellation. It does not prove provider cancellation, provider failure, billing truth, remote deduplication, or production readiness.
 

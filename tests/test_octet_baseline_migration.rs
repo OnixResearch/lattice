@@ -7,9 +7,12 @@ const REQUIRED_FRAGMENTS: &[&str] = &[
     "const ALLOWED_RESOLVED_FILE: &str = \"src/workflow_validation.rs\"",
     "const ALLOWED_RESOLVED_FUNCTION: &str = \"workflow_diagnostic_from_runner\"",
     "const ALLOWED_RESOLVED_HEADLESS_IMPORTS: &[&str] = &[\"`replay`\", \"`workflow_validation`\"]",
+    "const ALLOWED_TYPED_IDENTITY_RESOLUTIONS: &[(&str, &str)]",
     "if !migration.unmatched_candidate.is_empty()",
     "migration.unmatched_old.iter().all(|diagnostic| allowed_resolved_finding(diagnostic))",
     "unapproved resolved import was accepted",
+    "typed identity resolution was not accepted",
+    "unrelated typed identity resolution was accepted",
     "unapproved resolved finding was accepted",
     "unique.entry(stable_id).or_insert(finding)",
     "duplicate stable finding IDs were not deduplicated",
@@ -28,6 +31,7 @@ fn migration_source_issues(source: &str) -> BTreeSet<&'static str> {
     }
     if !source.contains("unapproved resolved finding was accepted")
         || !source.contains("unapproved resolved import was accepted")
+        || !source.contains("unrelated typed identity resolution was accepted")
     {
         issues.insert("migration.negative-test");
     }

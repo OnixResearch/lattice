@@ -72,8 +72,8 @@ pub enum RunOwner {
     #[default]
     Unscoped,
     Orchestration {
-        instance_id: String,
-        dispatch_id: String,
+        instance_id: crate::orchestration::InstanceId,
+        dispatch_id: crate::orchestration::DispatchId,
     },
     ScheduleOccurrence {
         identity: String,
@@ -197,12 +197,17 @@ pub trait TriggerStore {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TriggerAdmissionWrite {
     Inserted,
-    Duplicate { instance_id: String },
+    Duplicate {
+        instance_id: crate::orchestration::InstanceId,
+    },
 }
 
 pub trait OrchestrationStore {
     fn save_orchestration_definition(&self, definition: &OrchestrationDefinition) -> Result<(), StoreError>;
-    fn load_orchestration_definition(&self, id: &str) -> Result<Option<OrchestrationDefinition>, StoreError>;
+    fn load_orchestration_definition(
+        &self,
+        id: &crate::orchestration::DefinitionId,
+    ) -> Result<Option<OrchestrationDefinition>, StoreError>;
     fn next_orchestration_sequence(&self) -> Result<u64, StoreError>;
     fn create_orchestration(
         &self,
@@ -211,7 +216,7 @@ pub trait OrchestrationStore {
     ) -> Result<(), StoreError>;
     fn create_triggered_orchestration(
         &self,
-        scoped_key: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
         instance: &OrchestrationInstance,
     ) -> Result<TriggerAdmissionWrite, StoreError>;
     fn commit_orchestration_transition(
@@ -220,15 +225,23 @@ pub trait OrchestrationStore {
         instance: &OrchestrationInstance,
         event: &OrchestrationEvent,
     ) -> Result<(), StoreError>;
-    fn load_orchestration(&self, id: &str) -> Result<Option<OrchestrationInstance>, StoreError>;
-    fn load_orchestration_events(&self, id: &str) -> Result<Vec<OrchestrationEvent>, StoreError>;
+    fn load_orchestration(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Option<OrchestrationInstance>, StoreError>;
+    fn load_orchestration_events(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Vec<OrchestrationEvent>, StoreError>;
     fn list_orchestrations(&self) -> Result<Vec<OrchestrationInstance>, StoreError>;
     fn save_orchestration_trigger_admission(
         &self,
-        scoped_key: &str,
-        instance_id: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
+        instance_id: &crate::orchestration::InstanceId,
     ) -> Result<TriggerAdmissionWrite, StoreError>;
-    fn list_orchestration_trigger_admissions(&self) -> Result<HashMap<String, String>, StoreError>;
+    fn list_orchestration_trigger_admissions(
+        &self,
+    ) -> Result<HashMap<crate::orchestration::TriggerScopedKey, crate::orchestration::InstanceId>, StoreError>;
 }
 
 /// Persistent store backed by redb.
@@ -704,6 +717,8 @@ impl Store {
     }
 
     // r[impl lattice.agent_orchestration.durability]
+    // r[impl lattice.agent_orchestration.nominal_identities.wire_boundary]
+    // r[impl lattice.agent_orchestration.nominal_identities.compatibility]
     pub fn save_orchestration_definition(&self, definition: &OrchestrationDefinition) -> Result<(), StoreError> {
         let data = serialize(definition)?;
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
@@ -718,10 +733,13 @@ impl Store {
         Ok(())
     }
 
-    pub fn load_orchestration_definition(&self, id: &str) -> Result<Option<OrchestrationDefinition>, StoreError> {
+    pub fn load_orchestration_definition(
+        &self,
+        id: &crate::orchestration::DefinitionId,
+    ) -> Result<Option<OrchestrationDefinition>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|error| StoreError::Table(error.to_string()))?;
-        deserialize_optional(table.get(id).map_err(|error| StoreError::Db(error.to_string()))?)
+        deserialize_optional(table.get(id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?)
     }
 
     pub fn next_orchestration_sequence(&self) -> Result<u64, StoreError> {
@@ -777,7 +795,7 @@ impl Store {
     // r[impl lattice.agent_orchestration.triggers]
     pub fn create_triggered_orchestration(
         &self,
-        scoped_key: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
         instance: &OrchestrationInstance,
     ) -> Result<TriggerAdmissionWrite, StoreError> {
         validate_event_batch(instance, &[])?;
@@ -789,9 +807,12 @@ impl Store {
                 .open_table(ORCHESTRATION_TRIGGER_ADMISSIONS)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
             let existing_instance_id = admissions
-                .get(scoped_key)
+                .get(scoped_key.as_str())
                 .map_err(|error| StoreError::Db(error.to_string()))?
-                .map(|existing| existing.value().to_string());
+                .map(|existing| {
+                    crate::orchestration::InstanceId::try_from_hex(existing.value()).map_err(identity_admission_error)
+                })
+                .transpose()?;
             match existing_instance_id {
                 Some(existing_instance_id) => TriggerAdmissionWrite::Duplicate {
                     instance_id: existing_instance_id,
@@ -816,7 +837,7 @@ impl Store {
                         .insert(instance.id.as_str(), empty_events.as_slice())
                         .map_err(|error| StoreError::Db(error.to_string()))?;
                     admissions
-                        .insert(scoped_key, instance.id.as_str())
+                        .insert(scoped_key.as_str(), instance.id.as_str())
                         .map_err(|error| StoreError::Db(error.to_string()))?;
                     TriggerAdmissionWrite::Inserted
                 }
@@ -833,7 +854,9 @@ impl Store {
         instance: &OrchestrationInstance,
         event: &OrchestrationEvent,
     ) -> Result<(), StoreError> {
-        if event.instance_id != instance.id || instance.event_head.as_deref() != Some(event.event_hash.as_str()) {
+        let has_matching_head =
+            instance.event_head.as_ref().is_some_and(|head| head.as_str() == event.event_hash.as_str());
+        if event.instance_id != instance.id || !has_matching_head {
             return Err(StoreError::Conflict(
                 "orchestration transition event does not match the resulting instance head".to_string(),
             ));
@@ -878,16 +901,22 @@ impl Store {
         Ok(())
     }
 
-    pub fn load_orchestration(&self, id: &str) -> Result<Option<OrchestrationInstance>, StoreError> {
+    pub fn load_orchestration(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Option<OrchestrationInstance>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(ORCHESTRATION_INSTANCES).map_err(|error| StoreError::Table(error.to_string()))?;
-        deserialize_optional(table.get(id).map_err(|error| StoreError::Db(error.to_string()))?)
+        deserialize_optional(table.get(id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?)
     }
 
-    pub fn load_orchestration_events(&self, id: &str) -> Result<Vec<OrchestrationEvent>, StoreError> {
+    pub fn load_orchestration_events(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Vec<OrchestrationEvent>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(ORCHESTRATION_EVENTS).map_err(|error| StoreError::Table(error.to_string()))?;
-        match table.get(id).map_err(|error| StoreError::Db(error.to_string()))? {
+        match table.get(id.as_str()).map_err(|error| StoreError::Db(error.to_string()))? {
             Some(data) => deserialize(data.value()),
             None => Ok(Vec::new()),
         }
@@ -909,8 +938,8 @@ impl Store {
     // r[impl lattice.agent_orchestration.triggers]
     pub fn save_orchestration_trigger_admission(
         &self,
-        scoped_key: &str,
-        instance_id: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
+        instance_id: &crate::orchestration::InstanceId,
     ) -> Result<TriggerAdmissionWrite, StoreError> {
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         let outcome = {
@@ -918,15 +947,20 @@ impl Store {
                 .open_table(ORCHESTRATION_TRIGGER_ADMISSIONS)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
             let existing_instance_id = table
-                .get(scoped_key)
+                .get(scoped_key.as_str())
                 .map_err(|error| StoreError::Db(error.to_string()))?
-                .map(|existing| existing.value().to_string());
+                .map(|existing| {
+                    crate::orchestration::InstanceId::try_from_hex(existing.value()).map_err(identity_admission_error)
+                })
+                .transpose()?;
             match existing_instance_id {
                 Some(existing_instance_id) => TriggerAdmissionWrite::Duplicate {
                     instance_id: existing_instance_id,
                 },
                 None => {
-                    table.insert(scoped_key, instance_id).map_err(|error| StoreError::Db(error.to_string()))?;
+                    table
+                        .insert(scoped_key.as_str(), instance_id.as_str())
+                        .map_err(|error| StoreError::Db(error.to_string()))?;
                     TriggerAdmissionWrite::Inserted
                 }
             }
@@ -935,7 +969,9 @@ impl Store {
         Ok(outcome)
     }
 
-    pub fn list_orchestration_trigger_admissions(&self) -> Result<HashMap<String, String>, StoreError> {
+    pub fn list_orchestration_trigger_admissions(
+        &self,
+    ) -> Result<HashMap<crate::orchestration::TriggerScopedKey, crate::orchestration::InstanceId>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn
             .open_table(ORCHESTRATION_TRIGGER_ADMISSIONS)
@@ -944,10 +980,18 @@ impl Store {
         let iter = table.iter().map_err(|error| StoreError::Db(error.to_string()))?;
         for entry in iter {
             let (key, value) = entry.map_err(|error| StoreError::Db(error.to_string()))?;
-            admissions.insert(key.value().to_string(), value.value().to_string());
+            let scoped_key =
+                crate::orchestration::TriggerScopedKey::try_from_hex(key.value()).map_err(identity_admission_error)?;
+            let instance_id =
+                crate::orchestration::InstanceId::try_from_hex(value.value()).map_err(identity_admission_error)?;
+            admissions.insert(scoped_key, instance_id);
         }
         Ok(admissions)
     }
+}
+
+fn identity_admission_error(error: crate::orchestration::AdmissionError) -> StoreError {
+    StoreError::Deserialize(error.to_string())
 }
 
 fn serialize<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, StoreError> {
@@ -968,7 +1012,8 @@ fn validate_event_batch(instance: &OrchestrationInstance, events: &[Orchestratio
     let mut prior_hash: Option<&str> = None;
     let mut prior_sequence: Option<u64> = None;
     for event in events {
-        if event.instance_id != instance.id || event.prior_hash.as_deref() != prior_hash {
+        if event.instance_id != instance.id || event.prior_hash.as_ref().map(|identity| identity.as_str()) != prior_hash
+        {
             return Err(StoreError::Conflict(
                 "orchestration creation event chain does not match the instance".to_string(),
             ));
@@ -981,7 +1026,9 @@ fn validate_event_batch(instance: &OrchestrationInstance, events: &[Orchestratio
         prior_hash = Some(event.event_hash.as_str());
         prior_sequence = Some(event.sequence);
     }
-    if instance.event_head.as_deref() != prior_hash || instance.last_event_sequence != prior_sequence {
+    if instance.event_head.as_ref().map(|identity| identity.as_str()) != prior_hash
+        || instance.last_event_sequence != prior_sequence
+    {
         return Err(StoreError::Conflict(
             "orchestration creation events do not match the persisted instance head".to_string(),
         ));
@@ -994,7 +1041,9 @@ fn validate_next_event(
     events: &[OrchestrationEvent],
     event: &OrchestrationEvent,
 ) -> Result<(), StoreError> {
-    if event.instance_id != current.id || event.prior_hash != current.event_head {
+    let event_prior = event.prior_hash.as_ref().map(|identity| identity.as_str());
+    let current_head = current.event_head.as_ref().map(|identity| identity.as_str());
+    if event.instance_id != current.id || event_prior != current_head {
         return Err(StoreError::Conflict("orchestration event does not extend the current event head".to_string()));
     }
     let expected_sequence = current
@@ -1394,7 +1443,10 @@ impl OrchestrationStore for Store {
         Store::save_orchestration_definition(self, definition)
     }
 
-    fn load_orchestration_definition(&self, id: &str) -> Result<Option<OrchestrationDefinition>, StoreError> {
+    fn load_orchestration_definition(
+        &self,
+        id: &crate::orchestration::DefinitionId,
+    ) -> Result<Option<OrchestrationDefinition>, StoreError> {
         Store::load_orchestration_definition(self, id)
     }
 
@@ -1412,7 +1464,7 @@ impl OrchestrationStore for Store {
 
     fn create_triggered_orchestration(
         &self,
-        scoped_key: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
         instance: &OrchestrationInstance,
     ) -> Result<TriggerAdmissionWrite, StoreError> {
         Store::create_triggered_orchestration(self, scoped_key, instance)
@@ -1427,11 +1479,17 @@ impl OrchestrationStore for Store {
         Store::commit_orchestration_transition(self, expected_version, instance, event)
     }
 
-    fn load_orchestration(&self, id: &str) -> Result<Option<OrchestrationInstance>, StoreError> {
+    fn load_orchestration(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Option<OrchestrationInstance>, StoreError> {
         Store::load_orchestration(self, id)
     }
 
-    fn load_orchestration_events(&self, id: &str) -> Result<Vec<OrchestrationEvent>, StoreError> {
+    fn load_orchestration_events(
+        &self,
+        id: &crate::orchestration::InstanceId,
+    ) -> Result<Vec<OrchestrationEvent>, StoreError> {
         Store::load_orchestration_events(self, id)
     }
 
@@ -1441,13 +1499,15 @@ impl OrchestrationStore for Store {
 
     fn save_orchestration_trigger_admission(
         &self,
-        scoped_key: &str,
-        instance_id: &str,
+        scoped_key: &crate::orchestration::TriggerScopedKey,
+        instance_id: &crate::orchestration::InstanceId,
     ) -> Result<TriggerAdmissionWrite, StoreError> {
         Store::save_orchestration_trigger_admission(self, scoped_key, instance_id)
     }
 
-    fn list_orchestration_trigger_admissions(&self) -> Result<HashMap<String, String>, StoreError> {
+    fn list_orchestration_trigger_admissions(
+        &self,
+    ) -> Result<HashMap<crate::orchestration::TriggerScopedKey, crate::orchestration::InstanceId>, StoreError> {
         Store::list_orchestration_trigger_admissions(self)
     }
 }

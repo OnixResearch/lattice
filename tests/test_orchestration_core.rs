@@ -14,8 +14,12 @@ use lattice::orchestration::BudgetLedger;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::DefinitionId;
+use lattice::orchestration::DispatchId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::FactId;
+use lattice::orchestration::LedgerHeadId;
 use lattice::orchestration::OrchestrationAction;
 use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::OrchestrationDiagnosticCode;
@@ -27,8 +31,12 @@ use lattice::orchestration::OrchestrationTriggerBinding;
 use lattice::orchestration::OrchestrationTriggerContext;
 use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
+use lattice::orchestration::ReservationId;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::RevisionProposal;
+use lattice::orchestration::StateDigest;
+use lattice::orchestration::TriggerId;
+use lattice::orchestration::TriggerIdempotencyKey;
 use lattice::orchestration::TriggerStartRequest;
 use lattice::orchestration::admit_trigger_start;
 use lattice::orchestration::authority_policy_hash;
@@ -76,6 +84,34 @@ const LOCAL_CHAIN_SCOPE: &str = "local-sequence-consistency-only";
 const REMOTE_EFFECT_SCOPE: &str = "remote-effects-may-be-at-least-once";
 const HEX_CHARS_PER_BYTE: usize = 2;
 
+fn test_digest(label: &str) -> String {
+    blake3::hash(label.as_bytes()).to_hex().to_string()
+}
+
+fn definition_id() -> DefinitionId {
+    DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid")
+}
+
+fn trigger_id() -> TriggerId {
+    TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid")
+}
+
+fn idempotency_key() -> TriggerIdempotencyKey {
+    TriggerIdempotencyKey::try_from_text(IDEMPOTENCY_KEY).expect("idempotency fixture must be valid")
+}
+
+fn reservation_id(label: &str) -> ReservationId {
+    ReservationId::try_from_text(label).expect("reservation identity fixture must be valid")
+}
+
+fn dispatch_id(label: &str) -> DispatchId {
+    DispatchId::try_from_hex(test_digest(label)).expect("dispatch identity fixture must be valid")
+}
+
+fn fact_id(label: &str) -> FactId {
+    FactId::try_from_hex(test_digest(label)).expect("fact identity fixture must be valid")
+}
+
 fn workflow(name: &str) -> Workflow {
     Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch())
 }
@@ -85,7 +121,7 @@ fn definition(completion: CompletionPolicy) -> OrchestrationDefinition {
     let revision = workflow_revision(&workflow).expect("fixture workflow must serialize");
     OrchestrationDefinition {
         schema_version: current_schema_version(),
-        id: DEFINITION_ID.to_string(),
+        id: definition_id(),
         objective: OBJECTIVE.to_string(),
         workflow: revision,
         completion,
@@ -113,7 +149,7 @@ fn definition(completion: CompletionPolicy) -> OrchestrationDefinition {
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
         triggers: vec![OrchestrationTriggerBinding {
-            trigger_id: TRIGGER_ID.to_string(),
+            trigger_id: trigger_id(),
             kind: OrchestrationTriggerKind::Webhook,
         }],
         redaction: RedactionPolicy {
@@ -219,12 +255,13 @@ fn valid_definition_binds_exact_workflow_revision() {
 
     assert!(validate_definition(&definition, Some(&actual)).is_empty());
     assert_eq!(
-        definition_revision(&definition).expect("definition must hash").len(),
+        definition_revision(&definition).expect("definition must hash").as_str().len(),
         blake3::OUT_LEN * HEX_CHARS_PER_BYTE
     );
 }
 
 // r[verify lattice.agent_orchestration.model]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn workflow_revision_drift_is_rejected() {
     let definition = definition(CompletionPolicy::RunSucceeded);
@@ -300,7 +337,7 @@ fn observed_failure_retry_starts_fresh_budgeted_round_and_replays() {
         retry.event.expect("retry event"),
         completed.event.expect("completion event"),
     ];
-    let report = replay_events(&base, &events, completed.instance.event_head.as_deref());
+    let report = replay_events(&base, &events, completed.instance.event_head.as_ref());
     assert!(report.valid, "diagnostics: {:?}", report.diagnostics);
     assert_eq!(report.instance, completed.instance);
 }
@@ -398,7 +435,7 @@ fn retry_policy_rejects_zero_and_disabled_defaults_remain_canonical() {
             started.event.expect("start event"),
             finished.event.expect("finish event"),
         ],
-        finished.instance.event_head.as_deref(),
+        finished.instance.event_head.as_ref(),
     );
     assert!(report.valid);
 }
@@ -460,6 +497,9 @@ fn proposal_requires_current_authority_and_successor_validation() {
 
 // r[verify lattice.agent_orchestration.authority]
 // r[verify lattice.agent_orchestration.authority.scenario.stale]
+// r[verify lattice.agent_orchestration.nominal_identities.transitions]
+// r[verify lattice.agent_orchestration.nominal_identities.transitions.stale]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn stale_approval_is_rejected() {
     let mut instance = base_instance(CompletionPolicy::AwaitProposal);
@@ -495,16 +535,17 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
     };
     let mut missing = charge_plan();
     missing.tokens = None;
-    let missing_error = reserve_budget(&mut missing_bound_ledger, "missing", missing).expect_err("bound is required");
+    let missing_error =
+        reserve_budget(&mut missing_bound_ledger, reservation_id("missing"), missing).expect_err("bound is required");
     assert_eq!(missing_error.code, OrchestrationDiagnosticCode::MissingBudgetBound);
 
     let mut ledger = BudgetLedger {
         policy,
         ..BudgetLedger::default()
     };
-    reserve_budget(&mut ledger, "first", charge_plan()).expect("first reservation fits");
-    let oversubscribed =
-        reserve_budget(&mut ledger, "second", charge_plan()).expect_err("second reservation exceeds limit");
+    reserve_budget(&mut ledger, reservation_id("first"), charge_plan()).expect("first reservation fits");
+    let oversubscribed = reserve_budget(&mut ledger, reservation_id("second"), charge_plan())
+        .expect_err("second reservation exceeds limit");
     assert_eq!(oversubscribed.code, OrchestrationDiagnosticCode::BudgetExceeded);
     assert_eq!(ledger.reservations.len(), FIRST_INSTANCE_SEQUENCE as usize);
 }
@@ -516,7 +557,7 @@ fn duplicate_fact_is_idempotent() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
     let action = OrchestrationAction::StartRound {
         intent: DispatchIntent {
-            id: DISPATCH_ID.to_string(),
+            id: dispatch_identity(&base, RunId(FIRST_RUN_ID)).expect("dispatch must hash"),
             run_id: RunId(FIRST_RUN_ID),
             workflow_revision: base.workflow_revision.clone(),
             status: DispatchStatus::Pending,
@@ -524,7 +565,7 @@ fn duplicate_fact_is_idempotent() {
         planned_charge: charge_plan(),
     };
     let start = OrchestrationFact {
-        id: FACT_ID_START.to_string(),
+        id: fact_id(FACT_ID_START),
         action,
     };
     let applied = transition(&base, start.clone()).expect("first fact applies");
@@ -538,6 +579,9 @@ fn duplicate_fact_is_idempotent() {
 // r[verify lattice.agent_orchestration.events]
 // r[verify lattice.agent_orchestration.events.scenario.replay]
 // r[verify lattice.agent_orchestration.events.scenario.tampered]
+// r[verify lattice.agent_orchestration.nominal_identities.events]
+// r[verify lattice.agent_orchestration.nominal_identities.events.distinct]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn replay_reconstructs_state_and_rejects_tampering() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -549,13 +593,14 @@ fn replay_reconstructs_state_and_rejects_tampering() {
     ];
     let head = finished.instance.event_head.clone();
 
-    let replay = replay_events(&base, &events, head.as_deref());
+    let replay = replay_events(&base, &events, head.as_ref());
     assert!(replay.valid);
     assert_eq!(replay.instance, finished.instance);
 
     let mut tampered = events;
-    tampered[0].state_hash.push('0');
-    let rejected = replay_events(&base, &tampered, head.as_deref());
+    tampered[0].state_hash =
+        StateDigest::try_from_hex(test_digest("tampered-state")).expect("tampered digest must be valid");
+    let rejected = replay_events(&base, &tampered, head.as_ref());
     assert!(!rejected.valid);
     assert_eq!(rejected.diagnostics[0].code, OrchestrationDiagnosticCode::ReplayMismatch);
 }
@@ -567,13 +612,16 @@ fn replay_rejects_wrong_local_head_without_claiming_external_anchor() {
     let started = start_transition(&base);
     let events = vec![started.event.expect("event exists")];
 
-    let report = replay_events(&base, &events, Some("not-the-local-head"));
+    let wrong_head =
+        LedgerHeadId::try_from_hex(test_digest("not-the-local-head")).expect("wrong ledger head fixture must be valid");
+    let report = replay_events(&base, &events, Some(&wrong_head));
 
     assert!(!report.valid);
     assert_eq!(report.diagnostics[0].code, OrchestrationDiagnosticCode::ReplayHeadMismatch);
 }
 
 // r[verify lattice.agent_orchestration.triggers]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn trigger_admission_is_scoped_and_duplicate_safe() {
     let definition = definition(CompletionPolicy::RunSucceeded);
@@ -581,12 +629,14 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
     let empty = OrchestrationTriggerContext {
         accepted: BTreeMap::new(),
     };
+    let trigger_id = trigger_id();
+    let idempotency_key = idempotency_key();
     let admitted = admit_trigger_start(TriggerStartRequest {
         definition: &definition,
         definition_revision: &revision,
-        trigger_id: TRIGGER_ID,
+        trigger_id: &trigger_id,
         trigger_kind: OrchestrationTriggerKind::Webhook,
-        idempotency_key: IDEMPOTENCY_KEY,
+        idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &empty,
     })
@@ -600,9 +650,9 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
     let duplicate = admit_trigger_start(TriggerStartRequest {
         definition: &definition,
         definition_revision: &revision,
-        trigger_id: TRIGGER_ID,
+        trigger_id: &trigger_id,
         trigger_kind: OrchestrationTriggerKind::Webhook,
-        idempotency_key: IDEMPOTENCY_KEY,
+        idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &duplicate_context,
     })
@@ -611,12 +661,13 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
         instance_id: plan.instance_id
     });
 
+    let missing_trigger = TriggerId::try_from_text("missing-trigger").expect("missing trigger fixture must be valid");
     let error = admit_trigger_start(TriggerStartRequest {
         definition: &definition,
         definition_revision: &revision,
-        trigger_id: "missing-trigger",
+        trigger_id: &missing_trigger,
         trigger_kind: OrchestrationTriggerKind::Webhook,
-        idempotency_key: IDEMPOTENCY_KEY,
+        idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &empty,
     })
@@ -705,7 +756,7 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
         cancelled.event.expect("cancellation event exists"),
         abandoned.event.clone().expect("abandonment event exists"),
     ];
-    let replay = replay_events(&base, &events, abandoned.instance.event_head.as_deref());
+    let replay = replay_events(&base, &events, abandoned.instance.event_head.as_ref());
     assert!(replay.valid);
     assert_eq!(replay.instance, abandoned.instance);
 
@@ -749,6 +800,8 @@ fn planned_abandonment_releases_reservation_without_consumption() {
 // r[verify lattice.agent_orchestration.unobserved_abandon]
 // r[verify lattice.agent_orchestration.unobserved_abandon.scenario.authority]
 // r[verify lattice.agent_orchestration.unobserved_abandon.scenario.identity]
+// r[verify lattice.agent_orchestration.nominal_identities.recovery]
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
@@ -781,7 +834,7 @@ fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
 
     let mismatched_action = OrchestrationAction::AbandonPendingDispatch {
         actor: ACTOR.to_string(),
-        dispatch_id: DISPATCH_ID.to_string(),
+        dispatch_id: dispatch_id(DISPATCH_ID),
         run_id: dispatch.run_id,
     };
     let mismatched =
@@ -883,7 +936,7 @@ fn status_text_is_actionable_safe_and_explicitly_local_and_at_least_once() {
     let rendered = render_status_text(&started);
 
     assert!(rendered.contains(&format!("{:?}", OrchestrationStatus::Running)));
-    assert!(rendered.contains(&started.workflow_revision.content_hash));
+    assert!(rendered.contains(started.workflow_revision.content_hash.as_str()));
     assert!(rendered.contains(&format!("round {FIRST_INSTANCE_SEQUENCE}")));
     assert!(rendered.contains("remaining "));
     assert!(rendered.contains("proposal -"));
@@ -937,6 +990,7 @@ fn feedback_cannot_continue_a_running_round_or_bypass_successor_validation() {
     assert_eq!(submitted.workflow_revision, waiting.workflow_revision);
 }
 
+// r[verify lattice.agent_orchestration.nominal_identities.failure_matrix]
 #[test]
 fn explicitly_supplied_fact_ids_remain_distinct() {
     assert_ne!(FACT_ID_START, FACT_ID_FINISH);
