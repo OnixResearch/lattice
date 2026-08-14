@@ -12,6 +12,7 @@ pub mod engine;
 pub mod error;
 pub mod expressions;
 pub mod file_node;
+pub mod guarded;
 pub mod headless;
 pub mod http;
 pub mod image_node;

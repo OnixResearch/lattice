@@ -1,4 +1,7 @@
-const SUPPORTED_FEATURE_IDS: &[&str] = &["lattice.workflow-template-bundle.v1"];
+const SUPPORTED_FEATURE_IDS: &[&str] = &[
+    "lattice.workflow-template-bundle.v1",
+    crate::guarded::authority::GUARDED_FEATURE_ID,
+];
 const BUNDLE_IDENTITY_DOMAIN: &str = "lattice.workflow-template-bundle.v1";
 const MANIFEST_FILE_NAME: &str = "manifest.ncl";
 
@@ -31,6 +34,23 @@ pub fn validate_bundle(
         &workflow_revision,
         &bundle,
     )?;
+    if input
+        .manifest
+        .compatibility
+        .feature_ids
+        .iter()
+        .any(|feature| feature == crate::guarded::authority::GUARDED_FEATURE_ID)
+    {
+        crate::guarded::authority::validate_bundle(&input.manifest.id, &workflow, orchestration.as_ref()).map_err(
+            |_| {
+                diagnostic(
+                    &bundle,
+                    super::model::DiagnosticCode::IncompatibleContent,
+                    "guarded workflow authority validation failed",
+                )
+            },
+        )?;
+    }
     let manifest_identity = super::model::ContentIdentity::from_bytes(&input.manifest_bytes);
     let identity = bundle_identity(&manifest_identity, &file_identities);
     debug_assert!(total_bytes <= super::model::MAX_BUNDLE_BYTES);

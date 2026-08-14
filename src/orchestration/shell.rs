@@ -364,13 +364,15 @@ async fn execute_started_round(
     )
     .await;
     let current = load_instance_by_id(store, &acknowledged.id)?;
+    // Guarded summaries contain typed redacted facts only.
+    let guarded_summary = crate::guarded::status::optional(store, run_id, &current.definition.id)?;
     let (is_succeeded, is_retryable_observed_failure, summary) = match result {
         Ok(summary) => {
             let is_succeeded = summary.status == HeadlessRunStatus::Succeeded;
             let is_retryable = !is_succeeded && exact_owned_failed_run(store, &current, &intent)?;
-            (is_succeeded, is_retryable, safe_run_summary(&summary))
+            (is_succeeded, is_retryable, guarded_summary.unwrap_or_else(|| safe_run_summary(&summary)))
         }
-        Err(_) => (false, false, UNOBSERVED_ROUND_FAILURE_SUMMARY.to_string()),
+        Err(_) => (false, false, guarded_summary.unwrap_or_else(|| UNOBSERVED_ROUND_FAILURE_SUMMARY.to_string())),
     };
     let observed_usage = observed_usage(&current, &intent.id).unwrap_or_default();
     apply_and_commit(store, &current, OrchestrationAction::RunFinished {
@@ -751,16 +753,14 @@ fn reconcile_run_record(
     let is_succeeded = record.failures == 0;
     let is_retryable_observed_failure =
         !is_succeeded && record.finished_epoch_ms.is_some() && instance.definition.retry.is_some();
+    let guarded_summary = crate::guarded::status::optional(store, intent.run_id, &instance.definition.id)?;
     apply_and_commit(store, instance, OrchestrationAction::RunFinished {
         dispatch_id: intent.id.clone(),
         run_id: intent.run_id,
         succeeded: is_succeeded,
         retryable_observed_failure: is_retryable_observed_failure,
         observed_usage,
-        safe_summary: format!(
-            "recovered workflow {} run {} with {} failures",
-            record.workflow_name, record.run_id, record.failures
-        ),
+        safe_summary: guarded_summary.unwrap_or_else(|| crate::guarded::status::recovered_fallback(record)),
     })
 }
 

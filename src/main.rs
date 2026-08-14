@@ -94,6 +94,8 @@ enum CliCommand {
     Approvals(lattice::workflow::gate::cli::CommandArgs),
     /// Resume a durably suspended workflow
     Workflow(lattice::workflow::gate::cli::ResumeGroupArgs),
+    /// Run fixed guarded-round discovery, probe, and progress adapters
+    Guarded(lattice::guarded::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -398,6 +400,11 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Some(CliCommand::Doctor(doctor_args)) = &args.command {
         return Ok(run_doctor_command(&config_path, doctor_args));
     }
+    if let Some(CliCommand::Guarded(guarded_args)) = &args.command {
+        return lattice::guarded::run_command(guarded_args).map_err(|error| lattice::error::Error::Config {
+            message: error.to_string(),
+        });
+    }
 
     let app_config = config::load_app_config(&config_path);
 
@@ -439,6 +446,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         Some(CliCommand::Workflow(workflow_args)) => {
             Ok(lattice::workflow::gate::cli::run_resume(&app_config, &workflow_args).await)
         }
+        Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         None => {
             let config_root = config_path.parent().unwrap_or_else(|| std::path::Path::new("."));
             let templates_dir = config_root.join("templates");
