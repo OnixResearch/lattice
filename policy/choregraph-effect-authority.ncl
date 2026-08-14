@@ -29,5 +29,11 @@ let Policy = {
       resource_prefixes = ["lattice://network/"],
       abilities = ["network/request"],
     },
+    "lattice-role-protocol" = {
+      id = "lattice-role-protocol",
+      description = "Admit one exact projected role-protocol dispatch.",
+      resource_prefixes = ["lattice://role-protocol/"],
+      abilities = ["protocol/transport", "protocol/external-role"],
+    },
   },
 } | Policy

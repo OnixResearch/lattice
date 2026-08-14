@@ -31,6 +31,17 @@
       "resource_prefixes": [
         "lattice://process/"
       ]
+    },
+    "lattice-role-protocol": {
+      "abilities": [
+        "protocol/transport",
+        "protocol/external-role"
+      ],
+      "description": "Admit one exact projected role-protocol dispatch.",
+      "id": "lattice-role-protocol",
+      "resource_prefixes": [
+        "lattice://role-protocol/"
+      ]
     }
   },
   "schema_version": "ucan-nickel-contracts.policy.v1"

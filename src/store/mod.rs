@@ -52,6 +52,8 @@ const ORCHESTRATION_TRIGGER_ADMISSIONS: TableDefinition<&str, &str> =
 const ORCHESTRATION_COUNTERS: TableDefinition<&str, u64> = TableDefinition::new("orchestration_counters");
 const EFFECT_ATTEMPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("effect_attempts_v1");
 const EFFECT_OUTCOMES: TableDefinition<&str, &[u8]> = TableDefinition::new("effect_outcomes_v1");
+const PROTOCOL_SESSIONS: TableDefinition<&str, &[u8]> = TableDefinition::new("protocol_sessions_v1");
+const PROTOCOL_EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("protocol_events_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -264,6 +266,8 @@ impl Store {
             let _ = txn.open_table(ORCHESTRATION_COUNTERS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(EFFECT_ATTEMPTS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(EFFECT_OUTCOMES).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(PROTOCOL_SESSIONS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn.open_table(PROTOCOL_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -1140,6 +1144,102 @@ impl crate::engine::effect::dispatch::EffectAttemptStore for Store {
         self.save_effect_outcome(event)
             .map_err(|_| crate::engine::effect::dispatch::Error::OutcomePersistence)
     }
+}
+
+// r[impl lattice.role_protocol.persistence]
+impl crate::engine::protocol::shell::SessionRepository for Store {
+    fn create(
+        &self,
+        session: &crate::engine::protocol::SessionRecord,
+    ) -> Result<(), crate::engine::protocol::shell::StoreError> {
+        let session_data = serialize(session).map_err(map_session_error)?;
+        let txn = self.db.begin_write().map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        {
+            let mut sessions = txn
+                .open_table(PROTOCOL_SESSIONS)
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+            if sessions
+                .get(session.plan.session.as_str())
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?
+                .is_some()
+            {
+                return Err(crate::engine::protocol::shell::StoreError::Conflict);
+            }
+            sessions
+                .insert(session.plan.session.as_str(), session_data.as_slice())
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        }
+        txn.commit().map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)
+    }
+
+    fn load(
+        &self,
+        identity: &crate::engine::protocol::Identity,
+    ) -> Result<Option<crate::engine::protocol::SessionRecord>, crate::engine::protocol::shell::StoreError> {
+        let txn = self.db.begin_read().map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        let sessions = txn
+            .open_table(PROTOCOL_SESSIONS)
+            .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        sessions
+            .get(identity.as_str())
+            .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?
+            .map(|data| deserialize(data.value()).map_err(map_session_error))
+            .transpose()
+    }
+
+    fn commit(
+        &self,
+        expected_version: u64,
+        session: &crate::engine::protocol::SessionRecord,
+        event: &crate::engine::protocol::SessionEvent,
+    ) -> Result<(), crate::engine::protocol::shell::StoreError> {
+        let session_data = serialize(session).map_err(map_session_error)?;
+        let event_data = serialize(event).map_err(map_session_error)?;
+        let event_key = protocol_event_key(session);
+        let txn = self.db.begin_write().map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        {
+            let mut sessions = txn
+                .open_table(PROTOCOL_SESSIONS)
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+            let persisted: crate::engine::protocol::SessionRecord = {
+                let existing = sessions
+                    .get(session.plan.session.as_str())
+                    .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?
+                    .ok_or(crate::engine::protocol::shell::StoreError::Conflict)?;
+                deserialize(existing.value()).map_err(map_session_error)?
+            };
+            if persisted.version != expected_version || session.version != expected_version.saturating_add(1) {
+                return Err(crate::engine::protocol::shell::StoreError::Conflict);
+            }
+            sessions
+                .insert(session.plan.session.as_str(), session_data.as_slice())
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        }
+        {
+            let mut events = txn
+                .open_table(PROTOCOL_EVENTS)
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+            if events
+                .get(event_key.as_str())
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?
+                .is_some()
+            {
+                return Err(crate::engine::protocol::shell::StoreError::Conflict);
+            }
+            events
+                .insert(event_key.as_str(), event_data.as_slice())
+                .map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)?;
+        }
+        txn.commit().map_err(|_| crate::engine::protocol::shell::StoreError::Unavailable)
+    }
+}
+
+fn protocol_event_key(session: &crate::engine::protocol::SessionRecord) -> String {
+    format!("{}:{:020}", session.plan.session.as_str(), session.version)
+}
+
+fn map_session_error(_error: StoreError) -> crate::engine::protocol::shell::StoreError {
+    crate::engine::protocol::shell::StoreError::InvalidRecord
 }
 
 /// Store errors.

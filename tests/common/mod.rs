@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod authority;
+pub mod protocol;
 
 use std::collections::HashMap;
 

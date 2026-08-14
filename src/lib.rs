@@ -21,6 +21,9 @@ pub mod node_kind_provider;
 pub mod openai;
 pub mod orchestration;
 pub mod process;
+pub mod protocol_cli {
+    pub use crate::engine::protocol::cli::*;
+}
 pub mod replay;
 pub mod run;
 pub mod scheduler;

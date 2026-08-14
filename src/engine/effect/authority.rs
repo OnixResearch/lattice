@@ -16,9 +16,9 @@ pub use receipt::reserve_attempt;
 pub const CHOREGRAPH_EFFECT_AUTHORITY_POLICY_JSON: &str =
     include_str!("../../../policy/generated/choregraph-effect-authority.json");
 pub const CHOREGRAPH_EFFECT_AUTHORITY_POLICY_BLAKE3: &str =
-    "9ee8c70aabacbe478d3deb37001652ba62662313408bcd66e6386339c3cce204";
+    "56800b3cb2f0819e31cbd32fc3ee41e1a74e7dbf6495540ad8d50db5341f0a79";
 pub const CHOREGRAPH_EFFECT_AUTHORITY_POLICY_REF: &str =
-    "blake3:9ee8c70aabacbe478d3deb37001652ba62662313408bcd66e6386339c3cce204";
+    "blake3:56800b3cb2f0819e31cbd32fc3ee41e1a74e7dbf6495540ad8d50db5341f0a79";
 pub const CHOREGRAPH_EFFECT_AUTHORITY_POLICY_SCHEMA: &str = basalt::SUPPORTED_SCHEMA_VERSION;
 pub const CHOREGRAPH_EFFECT_AUTHORITY_BINDING_SCHEMA: &str = "lattice.choregraph-effect-binding.v1";
 pub const CHOREGRAPH_EFFECT_SCOPE_SCHEMA: &str = "molten.collaboration-scope.snapshot.v1";

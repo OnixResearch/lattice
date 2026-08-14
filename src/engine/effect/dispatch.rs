@@ -121,6 +121,15 @@ impl Shell {
         Err(error)
     }
 
+    pub fn record_authorization(
+        &self,
+        authorized: &AuthorizedAttempt,
+    ) -> Result<super::authority::AuthorizationOutcomeEvent, Error> {
+        let outcome = super::authority::outcome_event(&authorized.attempt, &authorized.authorization);
+        self.attempts.record_outcome(&outcome).map_err(|_| Error::OutcomePersistence)?;
+        Ok(outcome)
+    }
+
     // r[impl lattice.choregraph_effect_authority.files]
     pub fn admit_file_path(
         &self,

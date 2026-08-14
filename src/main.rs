@@ -90,6 +90,8 @@ enum CliCommand {
     Doctor(DoctorCommandArgs),
     /// Manage durable multi-run agent orchestrations
     Orchestration(OrchestrationCommandArgs),
+    /// Manage durable projected role-protocol sessions
+    Protocol(lattice::protocol_cli::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -428,6 +430,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         Some(CliCommand::Orchestration(orchestration_args)) => {
             Ok(run_orchestration_command(&app_config, &orchestration_args).await)
         }
+        Some(CliCommand::Protocol(protocol_args)) => Ok(run_protocol_command(&app_config, &protocol_args)),
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);
@@ -1705,6 +1708,25 @@ fn write_output_file(path: &PathBuf, contents: String) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
     std::fs::write(path, contents).map_err(|error| error.to_string())
+}
+
+fn run_protocol_command(app_config: &config::AppConfig, args: &lattice::protocol_cli::CommandArgs) -> ExitCode {
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("Protocol command failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let result = lattice::protocol_cli::run(&store, args);
+    if write_stdout_and_flush(&result.output).is_err() {
+        return ExitCode::FAILURE;
+    }
+    if result.success {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 fn open_store(app_config: &config::AppConfig) -> Result<Store, String> {

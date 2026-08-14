@@ -1,10 +1,10 @@
 //! Static adoption checks for exact Choregraph source and authority boundaries.
 
-const CHOREGRAPH_REVISION: &str = "85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+const CHOREGRAPH_REVISION: &str = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
 const CHOREGRAPH_ROLLBACK_REVISION: &str = "81b260da2256147ec82cb5dd44c0a0c1dcb7500d";
-const CHOREGRAPH_URL: &str = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
+const CHOREGRAPH_URL: &str = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
 const VCS_REVISION_HEX_LENGTH: usize = 40;
-const CARGO_PIN_COUNT: usize = 4;
+const CARGO_PIN_COUNT: usize = 5;
 const CARGO_MANIFEST: &str = include_str!("../Cargo.toml");
 const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const SOURCE_ADMISSION: &str = include_str!("fixtures/radicle/choregraph-source-admission-v1.ncl");
@@ -39,6 +39,7 @@ const FORBIDDEN_LOWERING_MARKERS: &[&str] = &[
 #[test]
 fn exact_source_and_prerequisites_are_aligned() {
     assert_eq!(CARGO_MANIFEST.matches(CHOREGRAPH_REVISION).count(), CARGO_PIN_COUNT);
+    assert!(CARGO_MANIFEST.contains("choregraph-choreography"));
     assert!(CARGO_MANIFEST.contains("choregraph-core"));
     assert!(CARGO_MANIFEST.contains("choregraph-nickel"));
     assert!(CARGO_MANIFEST.contains("choregraph-seaglass"));

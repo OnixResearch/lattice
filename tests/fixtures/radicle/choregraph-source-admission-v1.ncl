@@ -10,7 +10,7 @@ let Hex64 =
 in
 let ExactUrl =
   std.contract.from_predicate (fun value =>
-    value == "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
+    value == "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
   )
 in
 let Admission = {
@@ -50,16 +50,16 @@ in
     schema = "lattice.choregraph-source-admission.v1",
     status = 'accepted,
     rid = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF",
-    revision = "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
-    source_url = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git",
-    source_archive_blake3 = "b9bbe165260d6b30290ac90b02440b498a35d07dd94969b9fc56c69149ffcc04",
+    revision = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07",
+    source_url = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git",
+    source_archive_blake3 = "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e",
     release_bundle_blake3 = "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9",
     candidate_blake3 = "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a",
     publication_receipt_revision = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c",
     publication_receipt_matches_revision = false,
     license = "AGPL-3.0-or-later",
-    cargo_revision = "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
-    nix_revision = "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
+    cargo_revision = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07",
+    nix_revision = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07",
     prerequisites = {
       execution_graph_baseline = true,
       nickel_evaluator_baseline = true,

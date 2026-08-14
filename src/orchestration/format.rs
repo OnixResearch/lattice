@@ -76,7 +76,10 @@ fn render_with_contract<T: Serialize>(
     Ok(format!("{header}{contract}({body}) | {contract_name}\n"))
 }
 
-fn render_nickel_value(value: &serde_json::Value, indent: usize) -> Result<String, OrchestrationFormatError> {
+pub(crate) fn render_nickel_value(
+    value: &serde_json::Value,
+    indent: usize,
+) -> Result<String, OrchestrationFormatError> {
     match value {
         serde_json::Value::Null => Ok("null".to_string()),
         serde_json::Value::Bool(value) => Ok(value.to_string()),

@@ -224,18 +224,18 @@
     "choregraph": {
       "flake": false,
       "locked": {
-        "lastModified": 1786046474,
-        "narHash": "sha256-LwDI9579RslL/+QlUlpKAKnnElhoi0o1pSSEhvvT078=",
+        "lastModified": 1786600812,
+        "narHash": "sha256-0aF9Hhhp/9yrm6tO977JSss0FcqmqPNYKZocqF4PbBA=",
         "ref": "refs/heads/main",
-        "rev": "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
-        "revCount": 58,
+        "rev": "0b2000edaf86d5a7a8601246afbc0d526f4a2a07",
+        "revCount": 65,
         "type": "git",
-        "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
+        "url": "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       },
       "original": {
-        "rev": "85ea5e35caaab23260fcb27bc7c5d995dec546c4",
+        "rev": "0b2000edaf86d5a7a8601246afbc0d526f4a2a07",
         "type": "git",
-        "url": "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
+        "url": "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"
       }
     },
     "content-identity-core": {

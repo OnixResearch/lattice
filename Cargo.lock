@@ -761,9 +761,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "choregraph-choreography"
+version = "0.1.0"
+source = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
+dependencies = [
+ "blake3",
+ "choregraph-kamacite",
+ "serde",
+ "serde_json",
+ "verified-logic 0.2.0 (git+ssh://git@github.com/OnixResearch/trellis.git?rev=d65974b14978e1a44b0f5067beb9ef6d83317dc8)",
+]
+
+[[package]]
 name = "choregraph-core"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+source = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
 dependencies = [
  "vstd",
 ]
@@ -771,7 +783,7 @@ dependencies = [
 [[package]]
 name = "choregraph-kamacite"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+source = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
 dependencies = [
  "blake3",
  "choregraph-core",
@@ -782,7 +794,7 @@ dependencies = [
 [[package]]
 name = "choregraph-nickel"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+source = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
 dependencies = [
  "blake3",
  "choregraph-core",
@@ -793,7 +805,7 @@ dependencies = [
 [[package]]
 name = "choregraph-seaglass"
 version = "0.1.0"
-source = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+source = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
 dependencies = [
  "choregraph-core",
 ]
@@ -2803,6 +2815,7 @@ dependencies = [
  "bytes",
  "cap-root-core",
  "cap-std",
+ "choregraph-choreography",
  "choregraph-core",
  "choregraph-kamacite",
  "choregraph-nickel",
@@ -6199,7 +6212,7 @@ dependencies = [
  "snafu 0.8.9",
  "tempfile",
  "ucan-core",
- "verified-logic",
+ "verified-logic 0.2.0",
  "zeroize",
 ]
 
@@ -6368,6 +6381,22 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "vstd",
+]
+
+[[package]]
+name = "verified-logic"
+version = "0.2.0"
+source = "git+ssh://git@github.com/OnixResearch/trellis.git?rev=d65974b14978e1a44b0f5067beb9ef6d83317dc8#d65974b14978e1a44b0f5067beb9ef6d83317dc8"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "bs58",
+ "ed25519-dalek",
+ "redb 2.6.3",
+ "regex",
+ "serde",
+ "serde_json",
  "vstd",
 ]
 

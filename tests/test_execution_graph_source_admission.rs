@@ -9,15 +9,15 @@ const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
 const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
-const REVISION: &str = "85ea5e35caaab23260fcb27bc7c5d995dec546c4";
-const ARCHIVE_BLAKE3: &str = "b9bbe165260d6b30290ac90b02440b498a35d07dd94969b9fc56c69149ffcc04";
+const REVISION: &str = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
+const ARCHIVE_BLAKE3: &str = "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e";
 const LICENSE: &str = "AGPL-3.0-or-later";
-const HTTPS_URL: &str = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
-const NAR_HASH: &str = "sha256-LwDI9579RslL/+QlUlpKAKnnElhoi0o1pSSEhvvT078=";
-const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"85ea5e35caaab23260fcb27bc7c5d995dec546c4\" }";
-const LOCK_SOURCE: &str = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4";
-const FLAKE_PIN: &str = "url = \"git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4\";";
-const CARGO_LOCK_PACKAGE_COUNT: usize = 4;
+const HTTPS_URL: &str = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
+const NAR_HASH: &str = "sha256-0aF9Hhhp/9yrm6tO977JSss0FcqmqPNYKZocqF4PbBA=";
+const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"0b2000edaf86d5a7a8601246afbc0d526f4a2a07\" }";
+const LOCK_SOURCE: &str = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
+const FLAKE_PIN: &str = "url = \"git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07\";";
+const CARGO_LOCK_PACKAGE_COUNT: usize = 5;
 const HISTORICAL_PUBLICATION_REVISION: &str = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
 
 const ISSUE_RECEIPT: &str = "source.receipt";

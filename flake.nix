@@ -15,7 +15,7 @@
       flake = false;
     };
     choregraph = {
-      url = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+      url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
       flake = false;
     };
     cap-root = {
@@ -111,7 +111,7 @@
         };
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
-        choregraphCargoSource = "git+https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=85ea5e35caaab23260fcb27bc7c5d995dec546c4#85ea5e35caaab23260fcb27bc7c5d995dec546c4";
+        choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
@@ -143,11 +143,18 @@
           substituteInPlace "$out/config.toml" \
             --replace-fail "${baseCargoVendorDir}" "$out"
 
-          # Choregraph keeps its reviewed Kamacite codec above the package root.
-          # Restore that exact pinned file where rustc resolves the module path.
+          choregraphVendorRoot=$(find "$out" -type d -name choregraph-choreography-0.1.0 -print -quit)
+          test -n "$choregraphVendorRoot"
+          choregraphCheckoutRoot=$(dirname "$(dirname "$choregraphVendorRoot")")
+
+          # Choregraph keeps reviewed compile-time inputs above package roots.
+          # Restore those exact pinned files where rustc resolves each relative path.
           install -D -m 0444 \
             ${choregraph}/vendor/kamacite-core-selected/preserves/codec.rs \
             "$out/vendor/kamacite-core-selected/preserves/codec.rs"
+          mkdir -p "$choregraphCheckoutRoot/schemas"
+          cp -RL ${choregraph}/schemas/preserves \
+            "$choregraphCheckoutRoot/schemas/preserves"
         '';
 
         # Common build inputs
@@ -301,8 +308,18 @@
               cd source
 
               export CARGO_HOME="$PWD/.cargo-home"
-              mkdir -p "$CARGO_HOME"
-              cp "${octetVendorDir}/config.toml" "$CARGO_HOME/config.toml"
+              octet_vendor_root="$PWD/../octet-cargo-vendor"
+              mkdir -p "$CARGO_HOME" "$octet_vendor_root"
+              cp -RL "${octetVendorDir}/." "$octet_vendor_root"
+              chmod -R u+w "$octet_vendor_root"
+              choregraph_vendor_root=$(find "$octet_vendor_root" -type d -name choregraph-choreography-0.1.0 -print -quit)
+              test -n "$choregraph_vendor_root"
+              mkdir -p "$(dirname "$(dirname "$choregraph_vendor_root")")/schemas"
+              cp -RL ${choregraph}/schemas/preserves \
+                "$(dirname "$(dirname "$choregraph_vendor_root")")/schemas/preserves"
+              substituteInPlace "$octet_vendor_root/config.toml" \
+                --replace-fail "${octetVendorDir}" "$octet_vendor_root"
+              cp "$octet_vendor_root/config.toml" "$CARGO_HOME/config.toml"
 
               # r[verify lattice.repository_validation.baselined_octet_gate.scenario.accepted]
               OCTET_ARTIFACT_DIR="$PWD/target/octet-check" octet-precommit-check
@@ -416,10 +433,10 @@
                 .admission.schema == "lattice.choregraph-source-admission.v1"
                 and .admission.status == "accepted"
                 and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
-                and .admission.revision == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+                and .admission.revision == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
                 and .admission.cargo_revision == .admission.revision
                 and .admission.nix_revision == .admission.revision
-                and .admission.source_archive_blake3 == "b9bbe165260d6b30290ac90b02440b498a35d07dd94969b9fc56c69149ffcc04"
+                and .admission.source_archive_blake3 == "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e"
                 and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
                 and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
                 and ([.admission.prerequisites[]] | all(. == true))
@@ -435,17 +452,19 @@
               fi
 
               grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'git = "https://git.onix.computer/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'rev = "85ea5e35caaab23260fcb27bc7c5d995dec546c4"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"' ${self}/Cargo.toml > /dev/null
+              test "$(grep --count '^name = "choregraph-choreography"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-nickel"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
               grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq --exit-status '
-                .nodes.choregraph.locked.rev == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
-                and .nodes.choregraph.original.rev == "85ea5e35caaab23260fcb27bc7c5d995dec546c4"
+                .nodes.choregraph.locked.rev == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
+                and .nodes.choregraph.original.rev == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
               ' ${self}/flake.lock > /dev/null
 
+              test -f ${choregraph}/crates/choregraph-choreography/Cargo.toml
               test -f ${choregraph}/crates/choregraph-core/Cargo.toml
               test -f ${choregraph}/crates/choregraph-nickel/Cargo.toml
               test -f ${choregraph}/crates/choregraph-seaglass/Cargo.toml
