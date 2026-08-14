@@ -56,6 +56,8 @@ const PROTOCOL_SESSIONS: TableDefinition<&str, &[u8]> = TableDefinition::new("pr
 const PROTOCOL_EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("protocol_events_v1");
 const WORKFLOW_APPROVAL_REQUESTS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflow_approval_requests_v1");
 const WORKFLOW_APPROVAL_RUN_INDEX: TableDefinition<u64, &str> = TableDefinition::new("workflow_approval_run_index_v1");
+const WORKFLOW_TEMPLATE_ACTIVATIONS: TableDefinition<&str, &[u8]> =
+    TableDefinition::new("workflow_template_activations_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -296,6 +298,9 @@ impl Store {
             let _ = txn.open_table(EFFECT_OUTCOMES).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(PROTOCOL_SESSIONS).map_err(|e| StoreError::Table(e.to_string()))?;
             let _ = txn.open_table(PROTOCOL_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
+            let _ = txn
+                .open_table(WORKFLOW_TEMPLATE_ACTIVATIONS)
+                .map_err(|error| StoreError::Table(error.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -671,6 +676,46 @@ impl Store {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(ORCHESTRATION_DEFINITIONS).map_err(|error| StoreError::Table(error.to_string()))?;
         deserialize_optional(table.get(id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?)
+    }
+
+    // r[impl lattice.workflow_templates.activation]
+    pub fn save_workflow_template_activation(
+        &self,
+        receipt: &crate::workflow_template::ActivationReceipt,
+    ) -> Result<(), StoreError> {
+        let data = serialize(receipt)?;
+        let transaction = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table = transaction
+                .open_table(WORKFLOW_TEMPLATE_ACTIVATIONS)
+                .map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) =
+                table.get(receipt.identity.as_str()).map_err(|error| StoreError::Db(error.to_string()))?
+            {
+                let stored: crate::workflow_template::ActivationReceipt = deserialize(existing.value())?;
+                if stored != *receipt {
+                    return Err(StoreError::Conflict(
+                        "workflow-template activation receipt identity collision".to_string(),
+                    ));
+                }
+            } else {
+                table
+                    .insert(receipt.identity.as_str(), data.as_slice())
+                    .map_err(|error| StoreError::Db(error.to_string()))?;
+            }
+        }
+        transaction.commit().map_err(|error| StoreError::Db(error.to_string()))
+    }
+
+    pub fn load_workflow_template_activation(
+        &self,
+        identity: &crate::workflow_template::ContentIdentity,
+    ) -> Result<Option<crate::workflow_template::ActivationReceipt>, StoreError> {
+        let transaction = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = transaction
+            .open_table(WORKFLOW_TEMPLATE_ACTIVATIONS)
+            .map_err(|error| StoreError::Table(error.to_string()))?;
+        deserialize_optional(table.get(identity.as_str()).map_err(|error| StoreError::Db(error.to_string()))?)
     }
 
     pub fn next_orchestration_sequence(&self) -> Result<u64, StoreError> {

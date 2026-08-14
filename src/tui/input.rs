@@ -44,6 +44,8 @@ pub fn handle_event(app: &mut App, event: &Event) -> Option<AppAction> {
 }
 
 fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    debug_assert!(app.workflow_template_browser.selected <= app.workflow_templates.len());
+    debug_assert!(!app.workflow_templates.is_empty() || app.workflow_template_browser.selected == 0);
     if app.is_confirming_quit() {
         return handle_quit_confirmation_key(key);
     }
@@ -70,6 +72,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
 
     if app.is_diagnostics_open() {
         return handle_diagnostics_key(app, key);
+    }
+
+    if app.is_workflow_template_browser_open() {
+        return handle_workflow_template_browser_key(app, key);
     }
 
     if app.is_workflow_browser_open() {
@@ -270,6 +276,17 @@ fn add_node_key_action(key: &KeyEvent, step: AddNodeStep) -> AddNodeKeyAction {
         }
         _ => AddNodeKeyAction::Ignore,
     }
+}
+
+fn handle_workflow_template_browser_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match key.code {
+        KeyCode::Esc => app.close_workflow_template_browser(),
+        KeyCode::Down => app.select_next_workflow_template(),
+        KeyCode::Up => app.select_previous_workflow_template(),
+        KeyCode::Enter => app.confirm_workflow_template_browser(),
+        _ => {}
+    }
+    None
 }
 
 fn handle_workflow_browser_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {

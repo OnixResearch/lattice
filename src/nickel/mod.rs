@@ -42,6 +42,11 @@ pub fn evaluate_file(path: &std::path::Path) -> Result<serde_json::Value, SafeFa
     nickel_eval::evaluate_to_json(path).map_err(|error| classify_failure(&error))
 }
 
+/// Evaluate an already captured UTF-8 Nickel source without reopening a path.
+pub fn evaluate_source(source: &str) -> Result<serde_json::Value, SafeFailure> {
+    nickel_eval::evaluate_to_json_str(source).map_err(|error| classify_failure(&error))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,6 +60,20 @@ mod tests {
         let value = evaluate_file(&path).expect("valid Nickel evaluates");
 
         assert_eq!(value["enabled"], true);
+    }
+
+    #[test]
+    fn adapter_evaluates_captured_source() {
+        let value = evaluate_source("{ enabled = true }").expect("captured Nickel evaluates");
+
+        assert_eq!(value["enabled"], true);
+    }
+
+    #[test]
+    fn adapter_rejects_invalid_captured_source() {
+        let error = evaluate_source("let x = in").expect_err("invalid captured Nickel fails");
+
+        assert_eq!(error, SafeFailure::Evaluation);
     }
 
     #[test]

@@ -165,7 +165,13 @@ lattice --config ./demo/config.ncl import examples/workflows/daily-digest.ncl
 lattice --config ./demo/config.ncl run daily-digest --output json
 ```
 
-`--init` is create-only. It fails if the selected config path exists.
+`--init` is create-only. It fails if the selected config path or another initialization target exists.
+
+It also creates the local `workflow-templates/` catalog. Press `Ctrl-P` and select **Browse Workflow Templates** to open it.
+
+Template selection and preview stay in memory. They do not save, start orchestration, call an agent, or run a node.
+
+See [Local workflow-template bundles](docs/workflow-template-bundles.md) for the bundle contract, preview steps, activation boundary, and non-claims.
 
 Edit an existing Nickel file directly, or select a new path.
 

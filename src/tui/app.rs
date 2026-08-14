@@ -108,6 +108,7 @@ pub enum AppAction {
     SaveWorkflow,
     AddNode,
     OpenWorkflow,
+    OpenWorkflowTemplates,
     AutoLayout,
     EditNodeLabel,
     EditNodeCommand,
@@ -715,6 +716,42 @@ pub struct WorkflowBrowserState {
     pub message: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkflowTemplateBrowseStep {
+    Browse,
+    Preview,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowTemplateBrowserState {
+    pub open: bool,
+    pub selected: usize,
+    pub step: WorkflowTemplateBrowseStep,
+    pub message: Option<String>,
+    prior_workflow: Option<Workflow>,
+    prior_dirty: bool,
+}
+
+impl WorkflowTemplateBrowserState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            selected: 0,
+            step: WorkflowTemplateBrowseStep::Browse,
+            message: None,
+            prior_workflow: None,
+            prior_dirty: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowTemplateDraft {
+    pub bundle: crate::workflow_template::ContentIdentity,
+    pub workflow: crate::orchestration::WorkflowRevisionRef,
+    pub orchestration: Option<crate::orchestration::DefinitionRevision>,
+}
+
 impl WorkflowBrowserState {
     fn closed() -> Self {
         Self {
@@ -894,6 +931,12 @@ impl PaletteData {
                 icon: Some('📂'),
             },
             FuzzyCandidate {
+                id: "workflow_templates".into(),
+                text: "Browse Workflow Templates".into(),
+                context: None,
+                icon: Some('▦'),
+            },
+            FuzzyCandidate {
                 id: "layout".into(),
                 text: "Auto-Layout (Ctrl-L)".into(),
                 context: None,
@@ -927,6 +970,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "diagnostics" => Some(AppAction::OpenDiagnostics),
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
+        "workflow_templates" => Some(AppAction::OpenWorkflowTemplates),
         "layout" => Some(AppAction::AutoLayout),
         "edit_label" => Some(AppAction::EditNodeLabel),
         "edit_command" => Some(AppAction::EditNodeCommand),
@@ -947,9 +991,12 @@ pub struct App {
     pub output: StreamingOutput,
     pub run_output_lines: Vec<RunOutputLine>,
     pub workflow_browser: WorkflowBrowserState,
+    pub workflow_template_browser: WorkflowTemplateBrowserState,
+    pub workflow_template_draft: Option<WorkflowTemplateDraft>,
     pub property_edit: Option<PropertyEditState>,
     pub add_node_flow: AddNodeFlowState,
     pub node_templates: Vec<NodeTemplate>,
+    pub workflow_templates: Vec<crate::workflow_template::ValidatedBundle>,
     pub run_state: AppRunState,
     pub run_history: RunHistoryState,
     pub approvals: ApprovalState,
@@ -1000,9 +1047,12 @@ impl App {
             output: StreamingOutput::new(),
             run_output_lines: Vec::new(),
             workflow_browser: WorkflowBrowserState::closed(),
+            workflow_template_browser: WorkflowTemplateBrowserState::closed(),
+            workflow_template_draft: None,
             property_edit: None,
             add_node_flow: AddNodeFlowState::closed(),
             node_templates: Vec::new(),
+            workflow_templates: Vec::new(),
             run_state: AppRunState::idle(),
             run_history: RunHistoryState::closed(),
             approvals: ApprovalState::closed(),
@@ -1084,6 +1134,7 @@ impl App {
 
     /// Open workflow diagnostics for the current workflow snapshot.
     pub fn open_diagnostics(&mut self) {
+        self.close_workflow_template_browser();
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
         self.add_node_flow = AddNodeFlowState::closed();
@@ -1102,8 +1153,122 @@ impl App {
         self.node_templates = templates;
     }
 
+    /// Replace the validated local workflow-template catalog.
+    pub fn set_workflow_templates(&mut self, templates: Vec<crate::workflow_template::ValidatedBundle>) {
+        self.workflow_templates = templates;
+    }
+
+    pub fn is_workflow_template_browser_open(&self) -> bool {
+        self.workflow_template_browser.open
+    }
+
+    // r[impl lattice.workflow_templates.preview]
+    pub fn open_workflow_template_browser(&mut self) {
+        if self.is_workflow_template_browser_open() {
+            self.close_workflow_template_browser();
+        }
+        self.show_palette = false;
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.add_node_flow = AddNodeFlowState::closed();
+        self.run_history = RunHistoryState::closed();
+        self.approvals = ApprovalState::closed();
+        self.diagnostics = DiagnosticsState::closed();
+        self.workflow_template_browser = WorkflowTemplateBrowserState {
+            open: true,
+            selected: 0,
+            step: WorkflowTemplateBrowseStep::Browse,
+            message: if self.workflow_templates.is_empty() {
+                Some("No valid workflow templates are available".to_string())
+            } else {
+                None
+            },
+            prior_workflow: None,
+            prior_dirty: self.dirty,
+        };
+    }
+
+    // r[impl lattice.workflow_templates.preview]
+    pub fn close_workflow_template_browser(&mut self) {
+        if self.workflow_template_browser.step == WorkflowTemplateBrowseStep::Preview {
+            if let Some(previous) = self.workflow_template_browser.prior_workflow.take() {
+                self.workflow = previous;
+                self.dirty = self.workflow_template_browser.prior_dirty;
+                self.sync_graph_state();
+            }
+            self.workflow_template_draft = None;
+        }
+        self.workflow_template_browser = WorkflowTemplateBrowserState::closed();
+    }
+
+    pub fn select_next_workflow_template(&mut self) {
+        if self.workflow_templates.is_empty()
+            || self.workflow_template_browser.step != WorkflowTemplateBrowseStep::Browse
+        {
+            return;
+        }
+        let last_index = self.workflow_templates.len().saturating_sub(1);
+        self.workflow_template_browser.selected =
+            self.workflow_template_browser.selected.saturating_add(1).min(last_index);
+    }
+
+    pub fn select_previous_workflow_template(&mut self) {
+        if self.workflow_template_browser.step == WorkflowTemplateBrowseStep::Browse {
+            self.workflow_template_browser.selected = self.workflow_template_browser.selected.saturating_sub(1);
+        }
+    }
+
+    pub fn selected_workflow_template(&self) -> Option<&crate::workflow_template::ValidatedBundle> {
+        self.workflow_templates.get(self.workflow_template_browser.selected)
+    }
+
+    // r[impl lattice.workflow_templates.preview]
+    pub fn confirm_workflow_template_browser(&mut self) {
+        match self.workflow_template_browser.step {
+            WorkflowTemplateBrowseStep::Browse => self.preview_selected_workflow_template(),
+            WorkflowTemplateBrowseStep::Preview => {
+                self.workflow_template_browser = WorkflowTemplateBrowserState::closed();
+                self.output.push_line("Workflow template retained as an unsaved draft");
+            }
+        }
+    }
+
+    fn preview_selected_workflow_template(&mut self) {
+        if self.dirty {
+            self.workflow_template_browser.message =
+                Some("Save or discard current workflow changes before template preview".to_string());
+            return;
+        }
+        let Some(bundle) = self.selected_workflow_template().cloned() else {
+            self.workflow_template_browser.message = Some("Selected workflow template is unavailable".to_string());
+            return;
+        };
+        self.workflow_template_browser.prior_workflow = Some(self.workflow.clone());
+        self.workflow_template_browser.prior_dirty = self.dirty;
+        self.workflow = bundle.workflow.clone();
+        self.dirty = true;
+        self.workflow_template_draft = Some(WorkflowTemplateDraft {
+            bundle: bundle.identity.clone(),
+            workflow: bundle.workflow_revision.clone(),
+            orchestration: bundle.orchestration_revision.clone(),
+        });
+        self.workflow_template_browser.step = WorkflowTemplateBrowseStep::Preview;
+        self.workflow_template_browser.message = Some(format!(
+            "Preview only: {} │ orchestration={} │ no effects",
+            bundle.manifest.display_name,
+            if bundle.orchestration.is_some() {
+                "present"
+            } else {
+                "none"
+            },
+        ));
+        self.sync_graph_state();
+        debug_assert!(self.dirty);
+        debug_assert!(self.workflow_template_draft.is_some());
+    }
+
     /// Start the guided add-node flow.
     pub fn open_add_node_flow(&mut self) {
+        self.close_workflow_template_browser();
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
         self.diagnostics.open = false;
@@ -1436,6 +1601,7 @@ impl App {
     }
 
     pub fn open_approvals(&mut self) {
+        self.close_workflow_template_browser();
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
         self.add_node_flow = AddNodeFlowState::closed();
@@ -1552,6 +1718,7 @@ impl App {
 
     /// Open recent run history.
     pub fn open_run_history(&mut self) {
+        self.close_workflow_template_browser();
         self.show_palette = false;
         self.workflow_browser = WorkflowBrowserState::closed();
         self.diagnostics.open = false;
@@ -1714,6 +1881,7 @@ impl App {
 
     /// Open the saved-workflow browser.
     pub fn open_workflow_browser(&mut self) {
+        self.close_workflow_template_browser();
         self.show_palette = false;
         self.diagnostics.open = false;
         let Some(store) = &self.store else {
@@ -2580,20 +2748,41 @@ impl App {
     }
 
     /// Save the current workflow to the store.
+    // r[impl lattice.workflow_templates.activation]
     pub fn save_workflow(&mut self) {
-        if let Some(ref store) = self.store {
-            match store.save_workflow(&self.workflow) {
-                Ok(()) => {
-                    self.clear_workflow_dirty();
-                    self.output.push_line(&format!("Saved '{}'", self.workflow.meta.name));
-                }
-                Err(e) => {
-                    self.output.push_line(&format!("Save failed: {e}"));
-                }
-            }
-        } else {
+        let Some(store) = self.store.clone() else {
             self.output.push_line("No database available");
+            return;
+        };
+        match self.save_current_workflow(&store) {
+            Ok(()) => {
+                self.clear_workflow_dirty();
+                self.workflow_template_draft = None;
+                self.output.push_line(&format!("Saved '{}'", self.workflow.meta.name));
+            }
+            Err(error) => self.output.push_line(&format!("Save failed: {error}")),
         }
+    }
+
+    fn save_current_workflow(&self, store: &Store) -> Result<(), String> {
+        let Some(draft) = &self.workflow_template_draft else {
+            return store.save_workflow(&self.workflow).map_err(|error| error.to_string());
+        };
+        let current_revision = crate::orchestration::workflow_revision(&self.workflow)
+            .map_err(|_| "workflow-template draft identity is invalid".to_string())?;
+        if current_revision != draft.workflow {
+            return Err("workflow-template draft differs from the previewed revision".to_string());
+        }
+        let bundle = self
+            .workflow_templates
+            .iter()
+            .find(|bundle| {
+                bundle.identity == draft.bundle
+                    && bundle.workflow_revision == draft.workflow
+                    && bundle.orchestration_revision == draft.orchestration
+            })
+            .ok_or_else(|| "workflow-template draft source is unavailable".to_string())?;
+        crate::workflow_template::save_draft(store, bundle).map(|_| ()).map_err(|error| error.to_string())
     }
 
     /// Rebuild the Subwayrat state from the Lattice-owned workflow graph.
@@ -2673,6 +2862,9 @@ impl App {
                         }
                         AppAction::OpenWorkflow => {
                             self.open_workflow_browser();
+                        }
+                        AppAction::OpenWorkflowTemplates => {
+                            self.open_workflow_template_browser();
                         }
                         AppAction::AutoLayout => {
                             self.auto_layout();

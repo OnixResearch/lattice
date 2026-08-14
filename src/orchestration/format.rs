@@ -40,8 +40,15 @@ impl std::error::Error for OrchestrationFormatError {}
 pub fn load_definition_nickel_file(path: &Path) -> Result<OrchestrationDefinition, OrchestrationFormatError> {
     let json = config::load_nickel_as_json(path)
         .map_err(|_| OrchestrationFormatError::Nickel("definition evaluation failed".to_string()))?;
+    definition_from_nickel_value(json)
+}
+
+/// Decode an already evaluated orchestration definition without filesystem access.
+pub fn definition_from_nickel_value(
+    value: serde_json::Value,
+) -> Result<OrchestrationDefinition, OrchestrationFormatError> {
     let wire: wire::DefinitionRecord =
-        serde_json::from_value(json).map_err(|error| OrchestrationFormatError::Json(error.to_string()))?;
+        serde_json::from_value(value).map_err(|error| OrchestrationFormatError::Json(error.to_string()))?;
     wire.try_into()
 }
 

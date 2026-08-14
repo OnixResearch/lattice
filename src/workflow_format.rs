@@ -2276,6 +2276,54 @@ pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormat
     portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
 }
 
+/// Decode an already evaluated workflow and resolve prompt files from captured bundle assets.
+pub fn from_nickel_value(
+    value: serde_json::Value,
+    assets: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Result<Workflow, WorkflowFormatError> {
+    let portable: PortableWorkflow =
+        serde_json::from_value(value).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
+    validate_portable_identity(&portable)?;
+    choregraph::lower_portable(&portable)?;
+    let resolved_agent_prompts = captured_markdown_agent_prompts(&portable, assets)?;
+    portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
+}
+
+fn captured_markdown_agent_prompts(
+    portable: &PortableWorkflow,
+    assets: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Result<HashMap<u64, String>, WorkflowFormatError> {
+    let mut prompts = HashMap::with_capacity(portable.configs.len());
+    for config in &portable.configs {
+        if config.kind != "agent" {
+            continue;
+        }
+        let Some(prompt_file) = prompt_file_for_loading(config)? else {
+            continue;
+        };
+        let relative_path = validate_markdown_prompt_path(config.node_id, prompt_file)?;
+        let asset_key = relative_path.to_string_lossy();
+        let bytes = assets.get(asset_key.as_ref()).ok_or_else(|| {
+            agent_prompt_file_error(config.node_id, prompt_file, "declared prompt asset is missing".to_string())
+        })?;
+        if bytes.len() > MAX_MARKDOWN_AGENT_PROMPT_BYTES {
+            return Err(agent_prompt_file_error(
+                config.node_id,
+                prompt_file,
+                format!("file exceeds the {MAX_MARKDOWN_AGENT_PROMPT_BYTES}-byte limit"),
+            ));
+        }
+        let prompt = std::str::from_utf8(bytes)
+            .map_err(|_| agent_prompt_file_error(config.node_id, prompt_file, "file is not valid UTF-8".to_string()))?;
+        if prompt.trim().is_empty() {
+            return Err(agent_prompt_file_error(config.node_id, prompt_file, "file is empty".to_string()));
+        }
+        prompts.insert(config.node_id, prompt.to_string());
+    }
+    debug_assert!(prompts.len() <= portable.configs.len());
+    Ok(prompts)
+}
+
 fn empty_prompt_files() -> Vec<String> {
     Vec::new()
 }

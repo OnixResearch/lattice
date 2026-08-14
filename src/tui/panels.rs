@@ -52,6 +52,10 @@ const QUIT_CONFIRM_TOP_OFFSET: u16 = 3;
 const WORKFLOW_BROWSER_WIDTH: u16 = 64;
 const WORKFLOW_BROWSER_HEIGHT: u16 = 16;
 const WORKFLOW_BROWSER_TOP_OFFSET: u16 = 2;
+const WORKFLOW_TEMPLATE_BROWSER_WIDTH: u16 = 78;
+const WORKFLOW_TEMPLATE_BROWSER_HEIGHT: u16 = 20;
+const WORKFLOW_TEMPLATE_BROWSER_TOP_OFFSET: u16 = 2;
+const WORKFLOW_TEMPLATE_METADATA_ROWS: usize = 6;
 const ADD_NODE_WIDTH: u16 = 66;
 const ADD_NODE_HEIGHT: u16 = 14;
 const ADD_NODE_TOP_OFFSET: u16 = 2;
@@ -64,6 +68,8 @@ const APPROVAL_TOP_OFFSET: u16 = 2;
 const DIAGNOSTICS_WIDTH: u16 = 78;
 const DIAGNOSTICS_HEIGHT: u16 = 16;
 const DIAGNOSTICS_TOP_OFFSET: u16 = 2;
+const VERTICAL_SECTION_COUNT: usize = 3;
+const HORIZONTAL_SECTION_COUNT: usize = 2;
 
 /// Render the full application layout.
 pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
@@ -76,6 +82,7 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
             Constraint::Length(1),  // status bar
         ])
         .split(area);
+    debug_assert_eq!(vert.len(), VERTICAL_SECTION_COUNT);
 
     // Horizontal split for canvas and properties panel.
     let horiz = Layout::default()
@@ -85,6 +92,7 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
             Constraint::Percentage(30), // properties
         ])
         .split(vert[0]);
+    debug_assert_eq!(horiz.len(), HORIZONTAL_SECTION_COUNT);
 
     render_canvas(app, horiz[0], buf);
     render_properties(app, horiz[1], buf);
@@ -106,6 +114,10 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
 
     if app.is_approval_list_open() {
         render_approvals(app, area, buf);
+    }
+
+    if app.is_workflow_template_browser_open() {
+        render_workflow_template_browser(app, area, buf);
     }
 
     if app.is_workflow_browser_open() {
@@ -957,6 +969,70 @@ fn render_add_node_parameter_lines(app: &App) -> Vec<Line<'static>> {
         Line::from(value),
         Line::styled("Enter: next/create │ Esc: cancel", Style::default().fg(Color::DarkGray)),
     ]
+}
+
+fn render_workflow_template_browser(app: &App, area: Rect, buf: &mut Buffer) {
+    debug_assert!(app.workflow_template_browser.selected <= app.workflow_templates.len());
+    let width = area.width.min(WORKFLOW_TEMPLATE_BROWSER_WIDTH);
+    let height = area.height.min(WORKFLOW_TEMPLATE_BROWSER_HEIGHT);
+    debug_assert!(width <= area.width);
+    debug_assert!(height <= area.height);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = WORKFLOW_TEMPLATE_BROWSER_TOP_OFFSET.min(area.height.saturating_sub(height));
+    let browser_area = Rect::new(x, y, width, height);
+
+    Clear.render(browser_area, buf);
+    let block = Block::new()
+        .borders(Borders::ALL)
+        .title(" Workflow Templates ")
+        .border_style(Style::new().fg(Color::Green));
+    let inner = block.inner(browser_area);
+    block.render(browser_area, buf);
+
+    let mut lines = Vec::with_capacity(app.workflow_templates.len().saturating_add(WORKFLOW_TEMPLATE_METADATA_ROWS));
+    if let Some(message) = &app.workflow_template_browser.message {
+        lines.push(Line::styled(message.clone(), Style::new().fg(Color::Yellow)));
+    }
+    lines.push(Line::styled(
+        match app.workflow_template_browser.step {
+            crate::tui::app::WorkflowTemplateBrowseStep::Browse => "↑/↓: select │ Enter: preview │ Esc: cancel",
+            crate::tui::app::WorkflowTemplateBrowseStep::Preview => {
+                "Enter: keep unsaved draft │ Esc: restore prior workflow"
+            }
+        },
+        Style::new().fg(Color::DarkGray),
+    ));
+    for (index, template) in app.workflow_templates.iter().enumerate() {
+        let is_selected = index == app.workflow_template_browser.selected;
+        let style = if is_selected {
+            Style::new().fg(Color::Black).bg(Color::Green)
+        } else {
+            Style::new().fg(Color::White)
+        };
+        let prefix = if is_selected { "› " } else { "  " };
+        let orchestration = if template.orchestration.is_some() {
+            "orchestration draft"
+        } else {
+            "workflow only"
+        };
+        lines.push(Line::styled(
+            format!("{prefix}{} [{}] — {orchestration}", template.manifest.display_name, template.manifest.category),
+            style,
+        ));
+        if is_selected {
+            lines.push(Line::styled(template.manifest.description.clone(), Style::new().fg(Color::Gray)));
+            lines
+                .push(Line::styled(format!("bundle {}", template.identity.as_str()), Style::new().fg(Color::DarkGray)));
+            for claim in &template.manifest.non_claims {
+                lines.push(Line::styled(format!("non-claim: {claim}"), Style::new().fg(Color::DarkGray)));
+            }
+        }
+    }
+    if app.workflow_templates.is_empty() && app.workflow_template_browser.message.is_none() {
+        lines.push(Line::styled("No valid workflow templates are available", Style::new().fg(Color::DarkGray)));
+    }
+    lines.truncate(usize::from(inner.height));
+    Paragraph::new(lines).render(inner, buf);
 }
 
 fn render_workflow_browser(app: &App, area: Rect, buf: &mut Buffer) {

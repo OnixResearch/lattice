@@ -87,6 +87,8 @@
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/contracts/generated/policy.json"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";
+        isWorkflowTemplateAssetPath =
+          path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/workflow-templates/" (toString path);
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
@@ -106,6 +108,7 @@
             || isAnimusCompileTimeAssetPath path
             || isRatsCompileTimeAssetPath path
             || isPolicyAssetPath path
+            || isWorkflowTemplateAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };
