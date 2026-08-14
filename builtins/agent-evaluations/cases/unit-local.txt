@@ -1,0 +1,6 @@
+schema=lattice.agent-evaluation.case-asset.v1
+case=unit-local
+fixture=deterministic-parser-unit
+hidden_material=none
+network=none
+expected=objective-gates-only

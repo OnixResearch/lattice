@@ -175,6 +175,8 @@ See [Local workflow-template bundles](docs/workflow-template-bundles.md) for the
 
 The built-in catalog also contains `cairn-agent-drain` and `octet-agent-burndown`. Each bundle runs one visible acyclic round with at most one Pi agent. Strict progress, positive budgets, and separate operator approval control later rounds. The bundles never push changes. See [Guarded agent workflow templates](docs/guarded-agent-templates.md) for commands, recovery steps, and authority limits.
 
+Lattice also provides an identity-bound [agent-evaluation lane](docs/agent-evaluation.md). The lane loads typed Nickel catalog and planning inputs, runs bounded command drivers, keeps objective gates authoritative, and stores metadata-only receipts. Live runs use preview-first commands and require exact operator, target, credential-reference, retention, and cleanup authority.
+
 Edit an existing Nickel file directly, or select a new path.
 
 ## Native OpenAI-compatible agents
@@ -352,6 +354,7 @@ verus verus/example_spec.rs
 - [bounded-exec](https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git) — bounded child-process mechanics at revision `29dac88ecded94457572db3fdfaaaab95fa91525`.
 - [nickel-eval](https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git) — product-neutral Nickel evaluation at revision `bf16cf223ed3dfe75a28f02ac21ed7891a60bac1`.
 - [content-identity-core](https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git) — product-neutral identity framing at revision `7f55597b5dc879b7601856e8d7fd0dbacaa2a498`; see [source and role policy](docs/content-identity-source.md).
+- [qaml-ai/camelAI](https://github.com/qaml-ai/camelAI) — reviewed manifest and evaluation-lane reference at revision `70dd57a6219d9a19b25840aebbf1105c63c3a5f2`. Lattice does not adopt its Cloudflare coupling, raw transcript defaults, or judge-authoritative rollout decisions.
 - [Aspen](https://github.com/OnixResearch/aspen) — `scripts/octet-burndown.scm` is a reviewed design reference at BLAKE3 `791fba3ab3c78ededa9406b57a3d90163984541d453f183f632d8326e3aa5322`.
 - [mc](https://github.com/OnixResearch/mc) — `scripts/ralph-drain-cairns.scm` is a reviewed design reference from commit `7f36751aa4aadcbb048442c06dfbcf2addec4aaa`, at BLAKE3 `94ff7d3c3c527d272782c1bbd84b79da557fc6392af9dfbbaf7a21cb03f703b9`.
 - [Pi coding agent](https://pi.dev) — generic agent SDK and RPC reference.

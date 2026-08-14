@@ -1,4 +1,5 @@
 // r[impl lattice.architecture.core_crate.compatibility]
+pub mod agent_evaluation;
 pub mod agent_node;
 pub mod animus_agent;
 mod capability;

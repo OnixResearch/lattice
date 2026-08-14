@@ -96,6 +96,8 @@ enum CliCommand {
     Workflow(lattice::workflow::gate::cli::ResumeGroupArgs),
     /// Run fixed guarded-round discovery, probe, and progress adapters
     Guarded(lattice::guarded::CommandArgs),
+    /// Inspect identity-bound agent evaluations and durable trial state
+    Evaluation(lattice::agent_evaluation::cli::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -445,6 +447,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         }
         Some(CliCommand::Workflow(workflow_args)) => {
             Ok(lattice::workflow::gate::cli::run_resume(&app_config, &workflow_args).await)
+        }
+        Some(CliCommand::Evaluation(evaluation_args)) => {
+            Ok(lattice::agent_evaluation::cli::run(&app_config, &evaluation_args))
         }
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         None => {

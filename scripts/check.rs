@@ -70,6 +70,14 @@ const ORCHESTRATION_IDENTITY_CHECK_ARGS: &[&str] =
 const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
 const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
+// r[impl lattice.agent_evaluation.verification]
+const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[
+    "test",
+    "--test",
+    "test_agent_evaluation_core",
+    "--test",
+    "test_agent_evaluation_shell",
+];
 const TEST_ARGS: &[&str] = &["test"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
@@ -192,6 +200,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "Rats focused consumer compile",
         program: CARGO_PROGRAM,
         args: FOCUSED_CONSUMER_CHECK_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "agent evaluation",
+        program: CARGO_PROGRAM,
+        args: AGENT_EVALUATION_TEST_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {

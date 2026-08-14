@@ -1,0 +1,6 @@
+schema=lattice.agent-evaluation.case-asset.v1
+case=skill-local
+fixture=bounded-workflow-skill
+hidden_material=none
+network=none
+expected=objective-gates-with-advisory-rubric

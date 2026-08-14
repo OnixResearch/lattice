@@ -1,6 +1,7 @@
 const SUPPORTED_FEATURE_IDS: &[&str] = &[
     "lattice.workflow-template-bundle.v1",
     crate::guarded::authority::GUARDED_FEATURE_ID,
+    crate::agent_evaluation::model::FEATURE_ID,
 ];
 const BUNDLE_IDENTITY_DOMAIN: &str = "lattice.workflow-template-bundle.v1";
 const MANIFEST_FILE_NAME: &str = "manifest.ncl";

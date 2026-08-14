@@ -89,6 +89,8 @@
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";
         isWorkflowTemplateAssetPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/workflow-templates/" (toString path);
+        isAgentEvaluationAssetPath =
+          path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/agent-evaluations/" (toString path);
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
@@ -109,6 +111,7 @@
             || isRatsCompileTimeAssetPath path
             || isPolicyAssetPath path
             || isWorkflowTemplateAssetPath path
+            || isAgentEvaluationAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };
@@ -555,6 +558,19 @@
               touch "$out"
             '';
 
+        agentEvaluationCatalogCheck =
+          pkgs.runCommand "lattice-agent-evaluation-catalog"
+            {
+              nativeBuildInputs = [ pkgs.nickel ];
+            }
+            ''
+              nickel typecheck ${src}/policy/agent-evaluation-catalog.ncl
+              nickel export --format json ${src}/builtins/agent-evaluations/catalog.ncl > catalog.json
+              nickel typecheck ${src}/builtins/workflow-templates/agent-evaluation-catalog-review/manifest.ncl
+              nickel typecheck ${src}/builtins/workflow-templates/agent-evaluation-catalog-review/workflow.ncl
+              touch "$out"
+            '';
+
         # Build the actual package
         lattice = craneLib.buildPackage {
           inherit
@@ -587,6 +603,19 @@
             partitions = 1;
             partitionType = "count";
           };
+
+          agent-evaluation = craneLib.cargoTest {
+            inherit
+              src
+              cargoArtifacts
+              cargoVendorDir
+              nativeBuildInputs
+              buildInputs
+              ;
+            cargoTestExtraArgs = "--test test_agent_evaluation_core --test test_agent_evaluation_shell";
+          };
+
+          agent-evaluation-catalog = agentEvaluationCatalogCheck;
 
           # Clippy lints
           clippy = craneLib.cargoClippy {

@@ -14,6 +14,23 @@ pub fn run_bounded(
     config: &super::core::RuntimeConfig,
     cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
+    run_bounded_with_environment(request, config, cancellation, bounded_exec::EnvironmentMode::Inherit)
+}
+
+pub fn run_bounded_clear_environment(
+    request: &crate::agent_node::ProcessRequest,
+    config: &super::core::RuntimeConfig,
+) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
+    debug_assert!(request.env.is_empty());
+    run_bounded_with_environment(request, config, None, bounded_exec::EnvironmentMode::Clear)
+}
+
+fn run_bounded_with_environment(
+    request: &crate::agent_node::ProcessRequest,
+    config: &super::core::RuntimeConfig,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+    environment_mode: bounded_exec::EnvironmentMode,
+) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
     let ambient_current_dir = std::path::Path::new(CURRENT_DIRECTORY)
         .canonicalize()
         .map_err(|_| crate::agent_node::ProcessError::Spawn(super::core::EXECUTION_FAILURE_DIAGNOSTIC.to_owned()))?;
@@ -29,7 +46,7 @@ pub fn run_bounded(
         program,
         args: request.args.clone(),
         current_dir,
-        environment_mode: bounded_exec::EnvironmentMode::Inherit,
+        environment_mode,
         environment: request.env.iter().map(|(key, value)| (key.clone(), value.clone())).collect(),
         stdin: request.stdin.clone(),
         timeout: std::time::Duration::from_secs(request.timeout_secs),

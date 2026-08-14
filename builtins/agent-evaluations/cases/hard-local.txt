@@ -1,0 +1,6 @@
+schema=lattice.agent-evaluation.case-asset.v1
+case=hard-local
+fixture=frozen-private-regression
+hidden_material=frozen
+network=isolated
+expected=objective-gates-with-immutable-reference

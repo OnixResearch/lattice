@@ -58,6 +58,8 @@ const WORKFLOW_APPROVAL_REQUESTS: TableDefinition<&str, &[u8]> = TableDefinition
 const WORKFLOW_APPROVAL_RUN_INDEX: TableDefinition<u64, &str> = TableDefinition::new("workflow_approval_run_index_v1");
 const WORKFLOW_TEMPLATE_ACTIVATIONS: TableDefinition<&str, &[u8]> =
     TableDefinition::new("workflow_template_activations_v1");
+const EVALUATION_TRIALS: TableDefinition<&str, &[u8]> = TableDefinition::new("agent_evaluation_trials_v1");
+const EVALUATION_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("agent_evaluation_receipts_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -301,6 +303,8 @@ impl Store {
             let _ = txn
                 .open_table(WORKFLOW_TEMPLATE_ACTIVATIONS)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(EVALUATION_TRIALS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(EVALUATION_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
 
@@ -651,6 +655,7 @@ impl Store {
 include!("gate/state.rs");
 include!("gate/transition.rs");
 include!("run/records.rs");
+include!("agent/evaluation.rs");
 
 impl Store {
     // r[impl lattice.agent_orchestration.nominal_identities.wire_boundary]
