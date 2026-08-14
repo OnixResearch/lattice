@@ -19,6 +19,7 @@ pub enum Error {
     WorkflowRevision,
     TransitionDenied,
     UnexpectedBindings,
+    InvalidCheckpoint,
 }
 
 impl std::fmt::Display for Error {
@@ -30,6 +31,7 @@ impl std::fmt::Display for Error {
             Self::WorkflowRevision => write!(formatter, "workflow revision identity failed"),
             Self::TransitionDenied => write!(formatter, "Choregraph denied the product execution transition"),
             Self::UnexpectedBindings => write!(formatter, "Choregraph returned an unexpected concrete intent set"),
+            Self::InvalidCheckpoint => write!(formatter, "persisted workflow checkpoint is not admissible"),
         }
     }
 }
@@ -101,6 +103,46 @@ impl Session {
             ready_nodes: std::collections::BTreeSet::new(),
             started_nodes: std::collections::BTreeSet::new(),
         })
+    }
+
+    pub fn new_with_checkpoint(
+        workflow: &crate::engine::workflow::Workflow,
+        run: &RunContext,
+        checkpoint: &[crate::engine::executor::StepResult],
+    ) -> Result<Self, Error> {
+        let mut session = Self::new(workflow, run)?;
+        let mut states = session
+            .machine
+            .node_ids()
+            .iter()
+            .cloned()
+            .map(|node_id| (node_id, choregraph_core::LocalState::Pending))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        let mut observed = std::collections::BTreeSet::new();
+        for step in checkpoint {
+            if !observed.insert(step.node_id) {
+                return Err(Error::InvalidCheckpoint);
+            }
+            let expected = node_reference(step.node_id);
+            let machine_node = session
+                .machine
+                .node_ids()
+                .iter()
+                .find(|node_id| node_id.as_str() == expected)
+                .cloned()
+                .ok_or(Error::InvalidCheckpoint)?;
+            let state = match step.status {
+                crate::engine::executor::NodeStatus::Completed { .. } => choregraph_core::LocalState::Completed,
+                crate::engine::executor::NodeStatus::Failed { .. } => choregraph_core::LocalState::Failed,
+                crate::engine::executor::NodeStatus::Skipped => choregraph_core::LocalState::Cancelled,
+                crate::engine::executor::NodeStatus::Pending | crate::engine::executor::NodeStatus::Running => {
+                    return Err(Error::InvalidCheckpoint);
+                }
+            };
+            states.insert(machine_node, state);
+        }
+        session.state = choregraph_core::MachineState::new(states);
+        Ok(session)
     }
 
     pub fn mark_ready(&mut self, node_id: crate::engine::workflow::NodeId) -> Result<(), Error> {

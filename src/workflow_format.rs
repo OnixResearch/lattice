@@ -194,8 +194,14 @@ pub struct PortableNodeConfig {
     pub subworkflow_input_mappings: Vec<PortableSubworkflowInputMapping>,
     #[serde(default)]
     pub subworkflow_output_mappings: Vec<PortableSubworkflowOutputMapping>,
+    #[serde(default = "empty_approval_configs", skip_serializing_if = "Vec::is_empty")]
+    pub approval: Vec<crate::workflow::gate::ApprovalNodeConfig>,
     pub timeout_secs: u64,
     pub pipe_stdin: bool,
+}
+
+fn empty_approval_configs() -> Vec<crate::workflow::gate::ApprovalNodeConfig> {
+    Vec::new()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,6 +326,10 @@ pub enum WorkflowFormatError {
         node_id: u64,
         operation: String,
     },
+    InvalidApprovalConfig {
+        node_id: u64,
+        message: String,
+    },
     InvalidAgentTarget {
         node_id: u64,
         target: String,
@@ -400,6 +410,9 @@ impl std::fmt::Display for WorkflowFormatError {
             }
             Self::InvalidFileOperation { node_id, operation } => {
                 write!(f, "node {node_id} has invalid file operation: {operation}")
+            }
+            Self::InvalidApprovalConfig { node_id, message } => {
+                write!(f, "node {node_id} has invalid approval config: {message}")
             }
             Self::InvalidAgentTarget { node_id, target } => {
                 write!(f, "node {node_id} has invalid agent target: {target}")
@@ -534,9 +547,62 @@ fn workflow_for_config(config: NodeConfig) -> Workflow {
         NodeConfig::Condition(config) => workflow.add_condition_node("node", config.clone()),
         NodeConfig::Merge(config) => workflow.add_merge_node("node", config.clone()),
         NodeConfig::Subworkflow(config) => workflow.add_subworkflow_node("node", config.clone()),
+        NodeConfig::Approval(config) => workflow.add_approval_node("node", config.clone()),
     };
     workflow.set_node_config(node_id, config);
     workflow
+}
+
+fn empty_portable_node_config(
+    node_id: u64,
+    kind: String,
+    runner: PortableRunnerFields,
+    secret_env: Vec<PortableSecretEnvVar>,
+) -> PortableNodeConfig {
+    PortableNodeConfig {
+        node_id,
+        kind,
+        runtime_kind: runner.runtime_kind,
+        runtime_key: runner.runtime_key,
+        effect_policy: runner.effect_policy,
+        cache_policy: runner.cache_policy,
+        retry_policy: runner.retry_policy,
+        artifact_policy: runner.artifact_policy,
+        command: String::new(),
+        cwd: Vec::new(),
+        env: Vec::new(),
+        secret_env,
+        http_method: String::new(),
+        url: String::new(),
+        headers: Vec::new(),
+        body: Vec::new(),
+        file_operation: String::new(),
+        file_path: String::new(),
+        file_content: Vec::new(),
+        overwrite: false,
+        allowed_roots: Vec::new(),
+        image_path: String::new(),
+        image_allowed_roots: Vec::new(),
+        image_max_bytes: 0,
+        agent_target: String::new(),
+        agent_prompt: String::new(),
+        agent_prompt_file: Vec::new(),
+        agent_output_mode: String::new(),
+        agent_model_hint: Vec::new(),
+        agent_tool_policy: String::new(),
+        agent_context_refs: Vec::new(),
+        agent_cwd: Vec::new(),
+        agent_session: Vec::new(),
+        condition_branches: Vec::new(),
+        merge_policy: String::new(),
+        merge_required_inputs: Vec::new(),
+        subworkflow_name: String::new(),
+        subworkflow_input_mappings: Vec::new(),
+        subworkflow_output_mappings: Vec::new(),
+        approval: Vec::new(),
+        timeout_secs: 0,
+        pipe_stdin: false,
+    }
 }
 
 // r[impl n8nclone.workflow_format.node_kind_provider.export]
@@ -605,6 +671,7 @@ fn node_config_to_portable(
                 subworkflow_name: String::new(),
                 subworkflow_input_mappings: Vec::new(),
                 subworkflow_output_mappings: Vec::new(),
+                approval: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: *pipe_stdin,
             }
@@ -665,6 +732,7 @@ fn node_config_to_portable(
                 subworkflow_name: String::new(),
                 subworkflow_input_mappings: Vec::new(),
                 subworkflow_output_mappings: Vec::new(),
+                approval: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: false,
             }
@@ -715,6 +783,7 @@ fn node_config_to_portable(
             subworkflow_name: String::new(),
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -762,6 +831,7 @@ fn node_config_to_portable(
             subworkflow_name: String::new(),
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -805,6 +875,7 @@ fn node_config_to_portable(
             subworkflow_name: String::new(),
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -848,6 +919,7 @@ fn node_config_to_portable(
             subworkflow_name: String::new(),
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -891,6 +963,7 @@ fn node_config_to_portable(
             subworkflow_name: String::new(),
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -942,9 +1015,20 @@ fn node_config_to_portable(
                 .iter()
                 .map(portable_subworkflow_output_mapping)
                 .collect(),
+            approval: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
+        NodeConfig::Approval(approval) => {
+            let mut portable = empty_portable_node_config(
+                node_id,
+                node_kind_provider::portable_kind_for_config(config).to_string(),
+                portable_runner,
+                secret_env,
+            );
+            portable.approval.push(approval.clone());
+            portable
+        }
     };
     debug_assert_eq!(result.node_id, node_id);
     debug_assert_eq!(result.kind, node_kind_provider::portable_kind_for_config(config));
@@ -1378,6 +1462,14 @@ fn portable_config_to_node_config(
     let Some(provider) = node_kind_provider::provider_for_portable_kind(&config.kind) else {
         return Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone()));
     };
+    if provider.portable_kind() != "approval" && !config.approval.is_empty() {
+        return Err(WorkflowFormatError::InvalidApprovalConfig {
+            node_id: config.node_id,
+            message: "approval configuration is present on another node kind".to_string(),
+        });
+    }
+    debug_assert_eq!(provider.portable_kind(), config.kind);
+    debug_assert!(!provider.display_label().is_empty());
     match provider.portable_kind() {
         "shell" => portable_shell_config_to_node_config(config),
         "http" => portable_http_config_to_node_config(config),
@@ -1387,6 +1479,7 @@ fn portable_config_to_node_config(
         "condition" => portable_condition_config_to_node_config(config),
         "merge" => portable_merge_config_to_node_config(config),
         "subworkflow" => portable_subworkflow_config_to_node_config(config),
+        "approval" => portable_approval_config_to_node_config(config),
         _ => Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone())),
     }
 }
@@ -1624,6 +1717,50 @@ fn portable_subworkflow_config_to_node_config(config: &PortableNodeConfig) -> Re
     Ok(NodeConfig::Subworkflow(subworkflow))
 }
 
+fn portable_approval_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    const EXPECTED_APPROVAL_CONFIG_COUNT: usize = 1;
+    let [approval] = config.approval.as_slice() else {
+        return Err(WorkflowFormatError::InvalidApprovalConfig {
+            node_id: config.node_id,
+            message: format!(
+                "approval node has {} configurations; expected {EXPECTED_APPROVAL_CONFIG_COUNT}",
+                config.approval.len()
+            ),
+        });
+    };
+    let has_foreign_fields = [
+        !config.command.is_empty(),
+        !config.cwd.is_empty(),
+        !config.env.is_empty(),
+        !config.secret_env.is_empty(),
+        !config.url.is_empty(),
+        !config.file_path.is_empty(),
+        !config.image_path.is_empty(),
+        !config.agent_prompt.is_empty(),
+        !config.condition_branches.is_empty(),
+        !config.merge_policy.is_empty(),
+        !config.subworkflow_name.is_empty(),
+    ]
+    .into_iter()
+    .any(std::convert::identity);
+    if has_foreign_fields {
+        return Err(WorkflowFormatError::InvalidApprovalConfig {
+            node_id: config.node_id,
+            message: "approval node contains fields owned by another node kind".to_string(),
+        });
+    }
+    let issues = crate::workflow::gate::core::validate_node_config(approval);
+    if let Some(issue) = issues.first() {
+        return Err(WorkflowFormatError::InvalidApprovalConfig {
+            node_id: config.node_id,
+            message: issue.message.clone(),
+        });
+    }
+    debug_assert_eq!(config.approval.len(), EXPECTED_APPROVAL_CONFIG_COUNT);
+    debug_assert!(issues.is_empty());
+    Ok(NodeConfig::Approval(approval.clone()))
+}
+
 fn parse_merge_policy(node_id: u64, policy: &str) -> Result<MergePolicy, WorkflowFormatError> {
     match policy {
         "all" => Ok(MergePolicy::All),
@@ -1752,7 +1889,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch | default = [], merge_policy | String | default = \"\", merge_required_inputs | Array String | default = [], subworkflow_name | String | default = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping | default = [], subworkflow_output_mappings | Array SubworkflowOutputMapping | default = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet ApprovalAuthority = { profile | String, local_actors | Array String, accepted_abilities | Array String, prohibit_self_approval | Bool, delegated_policy_reference | Dyn } in\nlet ApprovalExpiry = { decision_ttl_millis | Number, resume_ttl_millis | Number, approval_must_be_fresh_at_resume | Bool, clock_source | String } in\nlet ApprovalReason = { required | Bool, identity_bound | Bool, max_bytes | Number } in\nlet ApprovalResumeValue = { name | String, type_tag | String } in\nlet ApprovalResume = { values | Array ApprovalResumeValue, credential_bindings | Array String } in\nlet ApprovalTerminal = { on_rejection | String, on_expiry | String } in\nlet ApprovalNodeConfig = { gate_id | String, safe_summary | String, selected_input_ports | Array String, required_artifacts | Array String, authority | ApprovalAuthority, expiry | ApprovalExpiry, reason | ApprovalReason, resume | ApprovalResume, terminal | ApprovalTerminal, required_non_claims | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch | default = [], merge_policy | String | default = \"\", merge_required_inputs | Array String | default = [], subworkflow_name | String | default = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping | default = [], subworkflow_output_mappings | Array SubworkflowOutputMapping | default = [], approval | Array ApprovalNodeConfig | default = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
@@ -1944,9 +2081,140 @@ fn render_config(output: &mut String, config: &PortableNodeConfig) {
         ));
     }
     output.push_str("      ],\n");
+    output.push_str("      approval = [\n");
+    for approval in &config.approval {
+        ApprovalRenderer {
+            output: &mut *output,
+            approval,
+        }
+        .render();
+    }
+    output.push_str("      ],\n");
     output.push_str(&format!("      timeout_secs = {},\n", config.timeout_secs));
     output.push_str(&format!("      pipe_stdin = {},\n", config.pipe_stdin));
     output.push_str("    },\n");
+}
+
+const APPROVAL_FIELD_INDENT: usize = 10;
+const APPROVAL_NESTED_FIELD_INDENT: usize = 12;
+
+struct ApprovalRenderer<'a> {
+    output: &'a mut String,
+    approval: &'a crate::workflow::gate::ApprovalNodeConfig,
+}
+
+impl ApprovalRenderer<'_> {
+    fn render(&mut self) {
+        let initial_bytes = self.output.len();
+        self.output.push_str("        {\n");
+        self.output.push_str(&format!("          gate_id = {},\n", quoted(self.approval.gate_id.as_str())));
+        self.output
+            .push_str(&format!("          safe_summary = {},\n", quoted(&self.approval.safe_summary)));
+        self.render_string_array("selected_input_ports", &self.approval.selected_input_ports, APPROVAL_FIELD_INDENT);
+        let artifacts = self.approval.required_artifacts.iter().map(ToString::to_string).collect::<Vec<_>>();
+        self.render_string_array("required_artifacts", &artifacts, APPROVAL_FIELD_INDENT);
+        self.render_authority();
+        self.render_expiry_and_reason();
+        self.render_resume();
+        self.output.push_str(&format!(
+            "          terminal = {{ on_rejection = {}, on_expiry = {} }},\n",
+            quoted(terminal_outcome_label(self.approval.terminal.on_rejection)),
+            quoted(terminal_outcome_label(self.approval.terminal.on_expiry)),
+        ));
+        self.render_string_array("required_non_claims", &self.approval.required_non_claims, APPROVAL_FIELD_INDENT);
+        self.output.push_str("        },\n");
+        debug_assert!(self.output.len() > initial_bytes);
+        debug_assert!(self.output.ends_with("        },\n"));
+    }
+
+    fn render_authority(&mut self) {
+        let initial_bytes = self.output.len();
+        self.output.push_str("          authority = {\n");
+        self.output.push_str(&format!(
+            "            profile = {},\n",
+            quoted(match self.approval.authority.profile {
+                crate::workflow::gate::AuthorityProfile::LocalOperator => "local_operator",
+                crate::workflow::gate::AuthorityProfile::BasaltUcanVerified => "basalt_ucan_verified",
+            })
+        ));
+        let actors = self.approval.authority.local_actors.iter().map(ToString::to_string).collect::<Vec<_>>();
+        self.render_string_array("local_actors", &actors, APPROVAL_NESTED_FIELD_INDENT);
+        let abilities = self
+            .approval
+            .authority
+            .accepted_abilities
+            .iter()
+            .map(|ability| match ability {
+                crate::workflow::gate::DecisionAbility::Approve => "approve".to_string(),
+                crate::workflow::gate::DecisionAbility::Reject => "reject".to_string(),
+            })
+            .collect::<Vec<_>>();
+        self.render_string_array("accepted_abilities", &abilities, APPROVAL_NESTED_FIELD_INDENT);
+        self.output.push_str(&format!(
+            "            prohibit_self_approval = {},\n",
+            self.approval.authority.prohibit_self_approval
+        ));
+        self.output.push_str("            delegated_policy_reference = ");
+        match &self.approval.authority.delegated_policy_reference {
+            Some(reference) => self.output.push_str(&quoted(reference)),
+            None => self.output.push_str("null"),
+        }
+        self.output.push_str(",\n          },\n");
+        debug_assert!(self.output.len() > initial_bytes);
+        debug_assert!(self.output.ends_with(",\n          },\n"));
+    }
+
+    fn render_expiry_and_reason(&mut self) {
+        self.output.push_str("          expiry = {\n");
+        self.output.push_str(&format!(
+            "            decision_ttl_millis = {},\n            resume_ttl_millis = {},\n            approval_must_be_fresh_at_resume = {},\n            clock_source = {},\n",
+            self.approval.expiry.decision_ttl_millis,
+            self.approval.expiry.resume_ttl_millis,
+            self.approval.expiry.approval_must_be_fresh_at_resume,
+            quoted(match self.approval.expiry.clock_source {
+                crate::workflow::gate::ClockSourceClass::UtcWallClock => "utc_wall_clock",
+            }),
+        ));
+        self.output.push_str("          },\n");
+        self.output.push_str(&format!(
+            "          reason = {{ required = {}, identity_bound = {}, max_bytes = {} }},\n",
+            self.approval.reason.required, self.approval.reason.identity_bound, self.approval.reason.max_bytes,
+        ));
+    }
+
+    fn render_resume(&mut self) {
+        let initial_bytes = self.output.len();
+        self.output.push_str("          resume = {\n            values = [\n");
+        for value in &self.approval.resume.values {
+            self.output.push_str(&format!(
+                "              {{ name = {}, type_tag = {} }},\n",
+                quoted(value.name.as_str()),
+                quoted(&value.type_tag),
+            ));
+        }
+        self.output.push_str("            ],\n");
+        let credentials = self.approval.resume.credential_bindings.iter().map(ToString::to_string).collect::<Vec<_>>();
+        self.render_string_array("credential_bindings", &credentials, APPROVAL_NESTED_FIELD_INDENT);
+        self.output.push_str("          },\n");
+        debug_assert!(self.output.len() > initial_bytes);
+        debug_assert!(self.output.ends_with("          },\n"));
+    }
+
+    fn render_string_array(&mut self, field: &str, values: &[String], indent: usize) {
+        let padding = " ".repeat(indent);
+        self.output.push_str(&format!("{padding}{field} = ["));
+        for value in values {
+            self.output.push_str(&format!("{}, ", quoted(value)));
+        }
+        self.output.push_str("],\n");
+    }
+}
+
+const fn terminal_outcome_label(outcome: crate::workflow::gate::TerminalOutcome) -> &'static str {
+    match outcome {
+        crate::workflow::gate::TerminalOutcome::FailWorkflow => "fail_workflow",
+        crate::workflow::gate::TerminalOutcome::CancelWorkflow => "cancel_workflow",
+    }
 }
 
 fn render_trigger(output: &mut String, trigger: &PortableTrigger) {

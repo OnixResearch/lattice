@@ -112,6 +112,7 @@ pub enum NodeConfig {
     Condition(ConditionNodeConfig),
     Merge(MergeNodeConfig),
     Subworkflow(SubworkflowNodeConfig),
+    Approval(crate::workflow::gate::ApprovalNodeConfig),
 }
 
 impl NodeConfig {
@@ -169,6 +170,10 @@ impl NodeConfig {
         Self::Subworkflow(config)
     }
 
+    pub fn approval(config: crate::workflow::gate::ApprovalNodeConfig) -> Self {
+        Self::Approval(config)
+    }
+
     pub fn kind_label(&self) -> &'static str {
         match self {
             Self::Shell { .. } => "Shell",
@@ -179,6 +184,7 @@ impl NodeConfig {
             Self::Condition(_) => "Condition",
             Self::Merge(_) => "Merge",
             Self::Subworkflow(_) => "Subworkflow",
+            Self::Approval(_) => "Approval",
         }
     }
 }
@@ -399,6 +405,36 @@ impl Workflow {
         };
         let id = self.graph.add_node(label, &input_specs, &output_specs);
         self.configs.insert(id.0, NodeConfig::subworkflow(config));
+        id
+    }
+
+    /// Add a durable approval gate with declared selected inputs and resume outputs.
+    pub fn add_approval_node(
+        &mut self,
+        label: impl Into<String>,
+        config: crate::workflow::gate::ApprovalNodeConfig,
+    ) -> NodeId {
+        const CREDENTIAL_OUTPUT_PREFIX: &str = "credential:";
+        let input_specs = config
+            .selected_input_ports
+            .iter()
+            .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
+            .collect::<Vec<_>>();
+        let mut output_specs = config
+            .resume
+            .values
+            .iter()
+            .map(|field| PortSpec::new(field.name.as_str(), field.type_tag.clone()))
+            .collect::<Vec<_>>();
+        output_specs.extend(
+            config
+                .resume
+                .credential_bindings
+                .iter()
+                .map(|name| PortSpec::new(format!("{CREDENTIAL_OUTPUT_PREFIX}{name}"), TypeTag::String.as_str())),
+        );
+        let id = self.graph.add_node(label, &input_specs, &output_specs);
+        self.configs.insert(id.0, NodeConfig::approval(config));
         id
     }
 

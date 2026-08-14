@@ -20,6 +20,7 @@ mod shell;
 #[serde(rename_all = "snake_case")]
 pub enum HeadlessRunStatus {
     Succeeded,
+    Suspended,
     Failed,
 }
 
@@ -27,6 +28,7 @@ impl HeadlessRunStatus {
     fn as_str(self) -> &'static str {
         match self {
             Self::Succeeded => "succeeded",
+            Self::Suspended => "suspended",
             Self::Failed => "failed",
         }
     }
@@ -123,7 +125,7 @@ pub fn render_run_summary_text(summary: &HeadlessRunSummary) -> String {
 // r[impl n8nclone.workflow_execution.headless.exit_status]
 pub fn process_result_for_summary(summary: &HeadlessRunSummary) -> HeadlessProcessResult {
     match summary.status {
-        HeadlessRunStatus::Succeeded => HeadlessProcessResult::Success,
+        HeadlessRunStatus::Succeeded | HeadlessRunStatus::Suspended => HeadlessProcessResult::Success,
         HeadlessRunStatus::Failed => HeadlessProcessResult::Failure,
     }
 }
@@ -156,7 +158,7 @@ fn run_finished_epoch_ms() -> i64 {
     finished.timestamp_millis()
 }
 
-fn persist_completed_outputs_to_cache(store: &impl crate::store::ExecutionCache, results: &[StepResult]) {
+pub(crate) fn persist_completed_outputs_to_cache(store: &impl crate::store::ExecutionCache, results: &[StepResult]) {
     for step in results {
         if let NodeStatus::Completed { outputs, .. } = &step.status {
             let _ = store.put_cache(&step.input_hash, outputs);

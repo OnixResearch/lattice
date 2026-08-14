@@ -67,6 +67,9 @@ fn owner_text(owner: &super::model::SafeOwner) -> String {
         super::model::SafeOwner::ScheduleOccurrence { identity } => {
             format!("owner schedule_occurrence identity={identity}\n")
         }
+        super::model::SafeOwner::WorkflowApproval { request_id } => {
+            format!("owner workflow_approval request={request_id}\n")
+        }
     }
 }
 

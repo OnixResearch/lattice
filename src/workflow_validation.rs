@@ -47,6 +47,8 @@ pub enum WorkflowDiagnosticCode {
     InvalidConditionConfig,
     InvalidMergeConfig,
     InvalidSubworkflowConfig,
+    InvalidApprovalConfig,
+    DuplicateApprovalGate,
     InvalidTriggerConfig,
     InvalidExpressionSyntax,
     RunnerCycleDetected,
@@ -98,6 +100,7 @@ fn base_workflow_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     }
 
     validate_node_configs(workflow, &mut diagnostics);
+    diagnostics.extend(validate_approval_topology(workflow));
     validate_edges(workflow, &mut diagnostics);
     validate_control_flow_topology(workflow, &mut diagnostics);
     validate_runner_admission(workflow, &mut diagnostics);
@@ -204,6 +207,7 @@ fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDia
         NodeKindValidationCode::InvalidCondition => WorkflowDiagnosticCode::InvalidConditionConfig,
         NodeKindValidationCode::InvalidMerge => WorkflowDiagnosticCode::InvalidMergeConfig,
         NodeKindValidationCode::InvalidSubworkflow => WorkflowDiagnosticCode::InvalidSubworkflowConfig,
+        NodeKindValidationCode::InvalidApproval => WorkflowDiagnosticCode::InvalidApprovalConfig,
     }
 }
 
@@ -276,7 +280,7 @@ fn validate_config_expressions(
                 validate_expression_field(node_id, "session", session, diagnostics);
             }
         }
-        NodeConfig::Condition(_) | NodeConfig::Merge(_) | NodeConfig::Subworkflow(_) => {}
+        NodeConfig::Condition(_) | NodeConfig::Merge(_) | NodeConfig::Subworkflow(_) | NodeConfig::Approval(_) => {}
     }
 }
 
@@ -294,6 +298,37 @@ fn validate_expression_field(
             format!("invalid expression in {field_name}: {error}"),
         ));
     }
+}
+
+fn validate_approval_topology(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
+    let mut diagnostics = Vec::with_capacity(workflow.graph.node_count());
+    let mut gate_ids = std::collections::BTreeSet::new();
+    for node in workflow.graph.nodes() {
+        let Some(NodeConfig::Approval(config)) = workflow.node_config(node.id) else {
+            continue;
+        };
+        if !gate_ids.insert(config.gate_id.as_str()) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::DuplicateApprovalGate,
+                Some(node.id),
+                None,
+                "approval gate identity must be unique within the workflow".to_string(),
+            ));
+        }
+        let input_labels =
+            node.input_ports.iter().map(|port| port.label.as_str()).collect::<std::collections::BTreeSet<_>>();
+        if config.selected_input_ports.iter().any(|label| !input_labels.contains(label.as_str())) {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::InvalidApprovalConfig,
+                Some(node.id),
+                None,
+                "approval selected inputs must name declared node input ports".to_string(),
+            ));
+        }
+    }
+    debug_assert!(gate_ids.len() <= workflow.graph.node_count());
+    debug_assert!(diagnostics.iter().all(|diagnostic| !diagnostic.message.is_empty()));
+    diagnostics
 }
 
 fn validate_credentials(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
@@ -372,7 +407,8 @@ fn validate_control_flow_topology(workflow: &Workflow, diagnostics: &mut Vec<Wor
                 | NodeConfig::Http { .. }
                 | NodeConfig::File { .. }
                 | NodeConfig::ImageInput { .. }
-                | NodeConfig::Agent(_),
+                | NodeConfig::Agent(_)
+                | NodeConfig::Approval(_),
             )
             | None => {}
         }

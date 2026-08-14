@@ -64,6 +64,10 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         return handle_run_history_key(app, key);
     }
 
+    if app.is_approval_list_open() {
+        return handle_approval_key(app, key);
+    }
+
     if app.is_diagnostics_open() {
         return handle_diagnostics_key(app, key);
     }
@@ -92,6 +96,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Some(AppAction::RunWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('x')) => return Some(AppAction::CancelRun),
         (KeyModifiers::CONTROL, KeyCode::Char('h')) => return Some(AppAction::OpenRunHistory),
+        (KeyModifiers::CONTROL, KeyCode::Char('a')) => return Some(AppAction::OpenApprovals),
         (KeyModifiers::CONTROL, KeyCode::Char('d')) => return Some(AppAction::OpenDiagnostics),
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Some(AppAction::SaveWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('n')) => return Some(AppAction::AddNode),
@@ -125,6 +130,17 @@ fn handle_run_history_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
             app.rerun_selected_run_history();
         }
         RunHistoryKeyAction::Ignore => {}
+    }
+    None
+}
+
+fn handle_approval_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
+    match key.code {
+        KeyCode::Esc => app.close_approvals(),
+        KeyCode::Down => app.select_next_approval(),
+        KeyCode::Up => app.select_previous_approval(),
+        KeyCode::Enter => app.inspect_selected_approval(),
+        _ => {}
     }
     None
 }

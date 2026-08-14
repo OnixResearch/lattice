@@ -218,6 +218,18 @@ Refresh the reviewed Animus snapshot with:
 scripts/sync_animus.rs ../animus vendor-cargo-deps/animus
 ```
 
+## Durable workflow approvals
+
+A typed approval node stops a run at a persisted Choregraph suspension point. The initiating process does not wait for an operator.
+
+Approval decisions and workflow resume are separate actions. Resume reloads the exact checkpoint and runs only the remaining ready nodes.
+
+Use `lattice approvals list`, `lattice approvals show`, and `lattice approvals receipt` for safe metadata. Use `lattice approvals decide` to record an approval or rejection.
+
+Use `lattice workflow resume` with the exact request, revision, event head, owner, typed values, and opaque credential references.
+
+See [Durable workflow approvals](docs/workflow-approvals.md) for the node contract, command syntax, authority checks, expiry behavior, recovery limits, and non-claims.
+
 ## Durable agent orchestration
 
 Lattice coordinates immutable workflow revisions across explicit rounds. Each round remains an acyclic workflow that Choregraph admits.

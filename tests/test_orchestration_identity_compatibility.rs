@@ -56,6 +56,8 @@ fn write_pre_migration_records(path: &std::path::Path, fixture: &PreMigrationFix
 // r[verify lattice.agent_orchestration.nominal_identities.compatibility]
 // r[verify lattice.agent_orchestration.nominal_identities.wire_boundary]
 // r[verify lattice.agent_orchestration.nominal_identities.events]
+// r[verify lattice.workflow_approval.compatibility]
+// r[verify lattice.workflow_approval.compatibility.valid]
 #[test]
 fn pre_migration_redb_json_loads_with_exact_wire_projection_and_replays_without_effects() {
     let fixture = fixture();
@@ -91,6 +93,7 @@ fn pre_migration_redb_json_loads_with_exact_wire_projection_and_replays_without_
 
 // r[verify lattice.agent_orchestration.nominal_identities.validation]
 // r[verify lattice.agent_orchestration.nominal_identities.failure_matrix.no_effect]
+// r[verify lattice.workflow_approval.compatibility.denied]
 #[test]
 fn malformed_pre_migration_redb_key_fails_before_core_loading() {
     let fixture = fixture();

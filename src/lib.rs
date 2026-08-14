@@ -31,5 +31,6 @@ pub mod store;
 pub mod triggers;
 pub mod tui;
 pub mod webhooks;
+pub mod workflow;
 pub mod workflow_format;
 pub mod workflow_validation;

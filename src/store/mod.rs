@@ -54,6 +54,8 @@ const EFFECT_ATTEMPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("effe
 const EFFECT_OUTCOMES: TableDefinition<&str, &[u8]> = TableDefinition::new("effect_outcomes_v1");
 const PROTOCOL_SESSIONS: TableDefinition<&str, &[u8]> = TableDefinition::new("protocol_sessions_v1");
 const PROTOCOL_EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("protocol_events_v1");
+const WORKFLOW_APPROVAL_REQUESTS: TableDefinition<&str, &[u8]> = TableDefinition::new("workflow_approval_requests_v1");
+const WORKFLOW_APPROVAL_RUN_INDEX: TableDefinition<u64, &str> = TableDefinition::new("workflow_approval_run_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -63,6 +65,7 @@ const INITIAL_ORCHESTRATION_SEQUENCE: u64 = 0;
 const NEXT_ORCHESTRATION_SEQUENCE_INCREMENT: u64 = 1;
 const ORCHESTRATION_VERSION_INCREMENT: u64 = 1;
 const ORCHESTRATION_EVENT_SEQUENCE_INCREMENT: u64 = 1;
+const WORKFLOW_APPROVAL_VERSION_INCREMENT: u64 = 1;
 
 /// Durable owner identity used to prevent one execution from satisfying another dispatch.
 // r[impl lattice.agent_orchestration.run_identity]
@@ -77,6 +80,9 @@ pub enum RunOwner {
     },
     ScheduleOccurrence {
         identity: String,
+    },
+    WorkflowApproval {
+        request_id: crate::workflow::gate::ApprovalRequestId,
     },
 }
 
@@ -124,6 +130,15 @@ pub struct RunNodeDetail {
 pub struct RunDetailRecord {
     pub run_id: RunId,
     pub nodes: Vec<RunNodeDetail>,
+}
+
+pub struct WorkflowApprovalAdvance<'a> {
+    pub expected_version: u64,
+    pub completed_request: &'a crate::workflow::gate::ApprovalRequest,
+    pub next_request: &'a crate::workflow::gate::ApprovalRequest,
+    pub run: &'a RunRecord,
+    pub details: &'a RunDetailRecord,
+    pub replay_events: &'a [ReplayEventRecord],
 }
 
 // r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
@@ -626,97 +641,13 @@ impl Store {
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
     }
+}
 
-    /// Load one run record by identity.
-    pub fn load_run(&self, run_id: RunId) -> Result<Option<RunRecord>, StoreError> {
-        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
-        let table = txn.open_table(RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
-        match table.get(run_id.0).map_err(|error| StoreError::Db(error.to_string()))? {
-            Some(data) => deserialize(data.value()).map(Some),
-            None => Ok(None),
-        }
-    }
+include!("gate/state.rs");
+include!("gate/transition.rs");
+include!("run/records.rs");
 
-    /// Store detailed per-node records for a run.
-    pub fn save_run_details(&self, record: &RunDetailRecord) -> Result<(), StoreError> {
-        let data = serde_json::to_vec(record).map_err(|e| StoreError::Serialize(e.to_string()))?;
-        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
-        {
-            let mut table = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
-            table.insert(record.run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
-        }
-        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
-        Ok(())
-    }
-
-    /// Load detailed per-node records for a run.
-    pub fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError> {
-        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
-        let table = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
-        match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
-            Some(data) => {
-                let bytes: &[u8] = data.value();
-                let record: RunDetailRecord =
-                    serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
-                Ok(Some(record))
-            }
-            None => Ok(None),
-        }
-    }
-
-    // r[impl n8nclone.workflow_execution.replay.event_store]
-    pub fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError> {
-        let data = serde_json::to_vec(events).map_err(|e| StoreError::Serialize(e.to_string()))?;
-        let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
-        {
-            let mut table = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
-            table.insert(run_id.0, data.as_slice()).map_err(|e| StoreError::Db(e.to_string()))?;
-        }
-        txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
-        Ok(())
-    }
-
-    // r[impl n8nclone.workflow_execution.replay.event_store]
-    pub fn load_run_replay_events(&self, run_id: RunId) -> Result<Option<Vec<ReplayEventRecord>>, StoreError> {
-        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
-        let table = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
-        match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
-            Some(data) => {
-                let bytes: &[u8] = data.value();
-                let events = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
-                Ok(Some(events))
-            }
-            None => Ok(None),
-        }
-    }
-
-    /// List recent runs (newest first).
-    pub fn list_runs(&self, limit: usize) -> Result<Vec<RunRecord>, StoreError> {
-        let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
-        let table = txn.open_table(RUNS).map_err(|e| StoreError::Table(e.to_string()))?;
-        let mut records = Vec::new();
-        let iter = table.iter().map_err(|e| StoreError::Db(e.to_string()))?;
-        for entry in iter {
-            let (_key, data) = entry.map_err(|e| StoreError::Db(e.to_string()))?;
-            let bytes: &[u8] = data.value();
-            let rec: RunRecord = serde_json::from_slice(bytes).map_err(|e| StoreError::Deserialize(e.to_string()))?;
-            records.push(rec);
-        }
-        records.reverse();
-        records.truncate(limit);
-        Ok(records)
-    }
-
-    /// Atomically reserve and return one globally unique run id.
-    // r[impl lattice.agent_orchestration.run_identity]
-    pub fn next_run_id(&self) -> Result<RunId, StoreError> {
-        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
-        let run_id = reserve_run_id(&txn)?;
-        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
-        Ok(run_id)
-    }
-
-    // r[impl lattice.agent_orchestration.durability]
+impl Store {
     // r[impl lattice.agent_orchestration.nominal_identities.wire_boundary]
     // r[impl lattice.agent_orchestration.nominal_identities.compatibility]
     pub fn save_orchestration_definition(&self, definition: &OrchestrationDefinition) -> Result<(), StoreError> {

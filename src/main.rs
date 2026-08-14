@@ -92,6 +92,10 @@ enum CliCommand {
     Orchestration(OrchestrationCommandArgs),
     /// Manage durable projected role-protocol sessions
     Protocol(lattice::protocol_cli::CommandArgs),
+    /// Inspect and decide durable workflow approvals
+    Approvals(lattice::workflow::gate::cli::CommandArgs),
+    /// Resume a durably suspended workflow
+    Workflow(lattice::workflow::gate::cli::ResumeGroupArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -431,6 +435,12 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
             Ok(run_orchestration_command(&app_config, &orchestration_args).await)
         }
         Some(CliCommand::Protocol(protocol_args)) => Ok(run_protocol_command(&app_config, &protocol_args)),
+        Some(CliCommand::Approvals(approval_args)) => {
+            Ok(lattice::workflow::gate::cli::run_approvals(&app_config, &approval_args))
+        }
+        Some(CliCommand::Workflow(workflow_args)) => {
+            Ok(lattice::workflow::gate::cli::run_resume(&app_config, &workflow_args).await)
+        }
         None => {
             let templates_dir = config_path.parent().unwrap_or_else(|| std::path::Path::new(".")).join("templates");
             let template_load = config::load_node_templates_with_diagnostics(&templates_dir);

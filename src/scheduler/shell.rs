@@ -184,8 +184,8 @@ fn owner_observation(identity: &str, owner: &crate::store::RunOwner) -> super::S
             identity: owner_identity,
         } if owner_identity == identity => super::ScheduleOccurrenceRunOwnerObservation::Exact,
         crate::store::RunOwner::Unscoped => super::ScheduleOccurrenceRunOwnerObservation::Unscoped,
-        crate::store::RunOwner::Orchestration { .. } | crate::store::RunOwner::ScheduleOccurrence { .. } => {
-            super::ScheduleOccurrenceRunOwnerObservation::Foreign
-        }
+        crate::store::RunOwner::Orchestration { .. }
+        | crate::store::RunOwner::ScheduleOccurrence { .. }
+        | crate::store::RunOwner::WorkflowApproval { .. } => super::ScheduleOccurrenceRunOwnerObservation::Foreign,
     }
 }

@@ -123,6 +123,9 @@ pub enum SafeOwner {
     ScheduleOccurrence {
         identity: String,
     },
+    WorkflowApproval {
+        request_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

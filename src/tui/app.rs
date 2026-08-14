@@ -63,6 +63,7 @@ const INITIAL_VIEWPORT_WIDTH: u16 = 80;
 const INITIAL_VIEWPORT_HEIGHT: u16 = 24;
 const NEW_NODE_HORIZONTAL_GAP: i32 = 4;
 const RUN_HISTORY_LIMIT: usize = 20;
+const APPROVAL_LIST_LIMIT: u32 = 20;
 const TRIGGER_STATUS_HISTORY_LIMIT: usize = 100;
 const INITIAL_TUI_RUN_ID: u64 = 0;
 const ACTIVE_REPLAY_TIMESTAMP_EPOCH_MS: i64 = 0;
@@ -102,6 +103,7 @@ pub enum AppAction {
     RunWorkflow,
     CancelRun,
     OpenRunHistory,
+    OpenApprovals,
     OpenDiagnostics,
     SaveWorkflow,
     AddNode,
@@ -746,6 +748,37 @@ pub struct RunHistoryState {
     pub message: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ApprovalState {
+    pub open: bool,
+    pub records: Vec<crate::workflow::gate::shell::SafeApprovalView>,
+    pub selected: usize,
+    pub detail: Option<String>,
+    pub message: Option<String>,
+}
+
+impl ApprovalState {
+    fn closed() -> Self {
+        Self {
+            open: false,
+            records: Vec::new(),
+            selected: 0,
+            detail: None,
+            message: None,
+        }
+    }
+
+    fn open(records: Vec<crate::workflow::gate::shell::SafeApprovalView>, message: Option<String>) -> Self {
+        Self {
+            open: true,
+            records,
+            selected: 0,
+            detail: None,
+            message,
+        }
+    }
+}
+
 impl RunHistoryState {
     fn closed() -> Self {
         Self {
@@ -837,6 +870,12 @@ impl PaletteData {
                 icon: Some('◷'),
             },
             FuzzyCandidate {
+                id: "approvals".into(),
+                text: "Workflow Approvals".into(),
+                context: None,
+                icon: Some('✓'),
+            },
+            FuzzyCandidate {
                 id: "diagnostics".into(),
                 text: "Workflow Diagnostics (Ctrl-D)".into(),
                 context: None,
@@ -884,6 +923,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "run" => Some(AppAction::RunWorkflow),
         "cancel_run" => Some(AppAction::CancelRun),
         "history" => Some(AppAction::OpenRunHistory),
+        "approvals" => Some(AppAction::OpenApprovals),
         "diagnostics" => Some(AppAction::OpenDiagnostics),
         "save" => Some(AppAction::SaveWorkflow),
         "open" => Some(AppAction::OpenWorkflow),
@@ -912,6 +952,7 @@ pub struct App {
     pub node_templates: Vec<NodeTemplate>,
     pub run_state: AppRunState,
     pub run_history: RunHistoryState,
+    pub approvals: ApprovalState,
     pub diagnostics: DiagnosticsState,
     pub store: Option<Store>,
     active_run: Option<ActiveRun>,
@@ -964,6 +1005,7 @@ impl App {
             node_templates: Vec::new(),
             run_state: AppRunState::idle(),
             run_history: RunHistoryState::closed(),
+            approvals: ApprovalState::closed(),
             diagnostics: DiagnosticsState::closed(),
             store,
             active_run: None,
@@ -1046,6 +1088,7 @@ impl App {
         self.workflow_browser = WorkflowBrowserState::closed();
         self.add_node_flow = AddNodeFlowState::closed();
         self.run_history = RunHistoryState::closed();
+        self.approvals = ApprovalState::closed();
         self.diagnostics = DiagnosticsState::open(crate::workflow_validation::validate_workflow(&self.workflow));
     }
 
@@ -1388,6 +1431,120 @@ impl App {
         format!("Subworkflow {}", self.workflow.graph.node_count().saturating_add(1))
     }
 
+    pub fn is_approval_list_open(&self) -> bool {
+        self.approvals.open
+    }
+
+    pub fn open_approvals(&mut self) {
+        self.show_palette = false;
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.add_node_flow = AddNodeFlowState::closed();
+        self.run_history = RunHistoryState::closed();
+        self.diagnostics = DiagnosticsState::closed();
+        let Some(store) = &self.store else {
+            self.approvals = ApprovalState::open(Vec::new(), Some("No database available".to_string()));
+            return;
+        };
+        match crate::workflow::gate::shell::list_safe(store, APPROVAL_LIST_LIMIT) {
+            Ok(records) => {
+                let message = records.is_empty().then(|| "No workflow approvals available".to_string());
+                self.approvals = ApprovalState::open(records, message);
+            }
+            Err(_) => {
+                self.approvals =
+                    ApprovalState::open(Vec::new(), Some("Workflow approval inspection failed".to_string()));
+            }
+        }
+    }
+
+    pub fn close_approvals(&mut self) {
+        self.approvals = ApprovalState::closed();
+    }
+
+    pub fn select_next_approval(&mut self) {
+        if !self.approvals.records.is_empty() {
+            self.approvals.selected =
+                self.approvals.selected.saturating_add(1).min(self.approvals.records.len().saturating_sub(1));
+            self.approvals.detail = None;
+        }
+    }
+
+    pub fn select_previous_approval(&mut self) {
+        self.approvals.selected = self.approvals.selected.saturating_sub(1);
+        self.approvals.detail = None;
+    }
+
+    pub fn inspect_selected_approval(&mut self) {
+        self.approvals.detail = self
+            .approvals
+            .records
+            .get(self.approvals.selected)
+            .map(crate::workflow::gate::shell::render_safe_text);
+    }
+
+    pub fn decide_selected_approval(&mut self, command: &crate::workflow::gate::DecisionCommand) -> bool {
+        let Some(selected) = self.approvals.records.get(self.approvals.selected) else {
+            self.approvals.message = Some("No workflow approval is selected".to_string());
+            return false;
+        };
+        if selected.request_id != command.request_id.as_str() {
+            self.approvals.message = Some("Workflow approval selection changed".to_string());
+            return false;
+        }
+        let Some(store) = self.store.clone() else {
+            self.approvals.message = Some("No database available".to_string());
+            return false;
+        };
+        match crate::workflow::gate::shell::decide(&store, command) {
+            Ok(_) => {
+                self.output.push_line("Workflow approval decision recorded; execution remains suspended");
+                self.open_approvals();
+                true
+            }
+            Err(_) => {
+                self.approvals.message = Some("Workflow approval decision failed or became stale".to_string());
+                false
+            }
+        }
+    }
+
+    pub async fn resume_selected_approval(&mut self, command: &crate::workflow::gate::ResumeCommand) -> bool {
+        let Some(selected) = self.approvals.records.get(self.approvals.selected) else {
+            self.approvals.message = Some("No workflow approval is selected".to_string());
+            return false;
+        };
+        if selected.request_id != command.request_id.as_str() {
+            self.approvals.message = Some("Workflow approval selection changed".to_string());
+            return false;
+        }
+        let Some(store) = self.store.clone() else {
+            self.approvals.message = Some("No database available".to_string());
+            return false;
+        };
+        let authority_provider = Arc::clone(&self.authority_provider);
+        let result = crate::workflow::gate::shell::resume_with_authority_provider(
+            &store,
+            command,
+            self.config.effective_agent_runtime(),
+            authority_provider.as_ref(),
+        )
+        .await;
+        match result {
+            Ok(execution) => {
+                self.output.push_line(&format!(
+                    "Workflow resume completed with {:?}; downstream work ran only after the separate resume action",
+                    execution.summary.status
+                ));
+                self.open_approvals();
+                true
+            }
+            Err(_) => {
+                self.approvals.message = Some("Workflow approval resume failed or became uncertain".to_string());
+                false
+            }
+        }
+    }
+
     /// Return whether the run-history modal is open.
     pub fn is_run_history_open(&self) -> bool {
         self.run_history.open
@@ -1399,6 +1556,7 @@ impl App {
         self.workflow_browser = WorkflowBrowserState::closed();
         self.diagnostics.open = false;
         self.add_node_flow = AddNodeFlowState::closed();
+        self.approvals = ApprovalState::closed();
         let Some(store) = &self.store else {
             let message = "No database available".to_string();
             self.output.push_line(&message);
@@ -1771,7 +1929,8 @@ impl App {
                 | NodeConfig::Agent(_)
                 | NodeConfig::Condition(_)
                 | NodeConfig::Merge(_)
-                | NodeConfig::Subworkflow(_) => None,
+                | NodeConfig::Subworkflow(_)
+                | NodeConfig::Approval(_) => None,
             },
             PropertyEditField::TimeoutSecs => match self.workflow.node_config(node_id)? {
                 NodeConfig::Shell { timeout_secs, .. } | NodeConfig::Http { timeout_secs, .. } => {
@@ -1782,7 +1941,8 @@ impl App {
                 | NodeConfig::Agent(_)
                 | NodeConfig::Condition(_)
                 | NodeConfig::Merge(_)
-                | NodeConfig::Subworkflow(_) => None,
+                | NodeConfig::Subworkflow(_)
+                | NodeConfig::Approval(_) => None,
             },
             PropertyEditField::ImagePath => match self.workflow.node_config(node_id)? {
                 NodeConfig::ImageInput { path, .. } => Some(path.clone()),
@@ -1870,7 +2030,8 @@ impl App {
                     | NodeConfig::Agent(_)
                     | NodeConfig::Condition(_)
                     | NodeConfig::Merge(_)
-                    | NodeConfig::Subworkflow(_) => Err(PropertyEditError::MissingConfig),
+                    | NodeConfig::Subworkflow(_)
+                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::TimeoutSecs => {
@@ -1916,7 +2077,8 @@ impl App {
                     | NodeConfig::Agent(_)
                     | NodeConfig::Condition(_)
                     | NodeConfig::Merge(_)
-                    | NodeConfig::Subworkflow(_) => Err(PropertyEditError::MissingConfig),
+                    | NodeConfig::Subworkflow(_)
+                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::ImagePath => {
@@ -2496,6 +2658,9 @@ impl App {
                         }
                         AppAction::OpenRunHistory => {
                             self.open_run_history();
+                        }
+                        AppAction::OpenApprovals => {
+                            self.open_approvals();
                         }
                         AppAction::OpenDiagnostics => {
                             self.open_diagnostics();

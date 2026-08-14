@@ -517,7 +517,8 @@ fn export_node_to_n8n_json(
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
-        | NodeConfig::Subworkflow(_) => {
+        | NodeConfig::Subworkflow(_)
+        | NodeConfig::Approval(_) => {
             return Err(export_unsupported_node_diagnostic(node_id, label, "unsupported node kind"));
         }
     };

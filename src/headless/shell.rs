@@ -73,9 +73,24 @@ pub(super) async fn run_saved_workflow_with_executor_factory(
         .load(run_id, Some(store.clone()))
         .map_err(|error| super::HeadlessRunError::Validation(vec![authority_context_diagnostic(error.to_string())]))?;
     let cache = std::collections::HashMap::new();
-    let (_executor_run_id, results) = executor.run_authorized(&workflow, &cache, &authority).await;
-    super::persist_completed_outputs_to_cache(store, &results);
-
+    let outcome = executor.run_authorized_until_approval(&workflow, &cache, &authority).await;
+    super::persist_completed_outputs_to_cache(store, &outcome.results);
+    if let Some(suspension) = outcome.suspension {
+        let (summary, _request) =
+            crate::workflow::gate::shell::persist_suspension(crate::workflow::gate::shell::SuspensionCommitInput {
+                store,
+                workflow: &workflow,
+                run_id,
+                owner,
+                started_epoch_millis: started_epoch_ms,
+                observed_epoch_millis: super::run_finished_epoch_ms(),
+                results: &outcome.results,
+                suspension,
+            })
+            .map_err(|error| super::HeadlessRunError::Store(error.to_string()))?;
+        return Ok(summary);
+    }
+    let results = outcome.results;
     let summary = super::summarize_run(run_id, &workflow, &results);
     let finished_epoch_ms = super::run_finished_epoch_ms();
     let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);

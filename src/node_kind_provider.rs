@@ -18,6 +18,7 @@ const KIND_AGENT: &str = "agent";
 const KIND_CONDITION: &str = "condition";
 const KIND_MERGE: &str = "merge";
 const KIND_SUBWORKFLOW: &str = "subworkflow";
+const KIND_APPROVAL: &str = "approval";
 const DISPLAY_SHELL: &str = "Shell";
 const DISPLAY_HTTP: &str = "HTTP";
 const DISPLAY_FILE: &str = "File";
@@ -26,6 +27,7 @@ const DISPLAY_AGENT: &str = "Agent";
 const DISPLAY_CONDITION: &str = "Condition";
 const DISPLAY_MERGE: &str = "Merge";
 const DISPLAY_SUBWORKFLOW: &str = "Subworkflow";
+const DISPLAY_APPROVAL: &str = "Approval";
 const MIN_IMAGE_BYTE_BUDGET: usize = 1;
 const PRODUCT_FILE_ROOT_COUNT: usize = 1;
 
@@ -39,6 +41,7 @@ pub enum NodeKind {
     Condition,
     Merge,
     Subworkflow,
+    Approval,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +57,7 @@ pub enum NodeKindValidationCode {
     InvalidCondition,
     InvalidMerge,
     InvalidSubworkflow,
+    InvalidApproval,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +98,9 @@ static CONDITION_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
 static MERGE_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider { kind: NodeKind::Merge };
 static SUBWORKFLOW_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
     kind: NodeKind::Subworkflow,
+};
+static APPROVAL_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
+    kind: NodeKind::Approval,
 };
 
 impl NodeKindProvider for BuiltinNodeKindProvider {
@@ -136,6 +143,7 @@ pub fn node_kind_for_config(config: &NodeConfig) -> NodeKind {
         NodeConfig::Condition(_) => NodeKind::Condition,
         NodeConfig::Merge(_) => NodeKind::Merge,
         NodeConfig::Subworkflow(_) => NodeKind::Subworkflow,
+        NodeConfig::Approval(_) => NodeKind::Approval,
     }
 }
 
@@ -205,6 +213,11 @@ pub fn property_lines_for_config(config: &NodeConfig) -> Vec<NodePropertyLine> {
         NodeConfig::Subworkflow(config) => vec![
             property_line("Type", DISPLAY_SUBWORKFLOW),
             property_line("Workflow", &config.workflow_name),
+        ],
+        NodeConfig::Approval(config) => vec![
+            property_line("Type", DISPLAY_APPROVAL),
+            property_line("Gate", config.gate_id.as_str()),
+            property_line("Summary", &config.safe_summary),
         ],
     }
 }
@@ -319,6 +332,13 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
                 issues.push(issue(NodeKindValidationCode::InvalidSubworkflow, error.to_string()));
             }
         }
+        NodeConfig::Approval(config) => {
+            issues.extend(
+                crate::workflow::gate::core::validate_node_config(config)
+                    .into_iter()
+                    .map(|validation| issue(NodeKindValidationCode::InvalidApproval, validation.message)),
+            );
+        }
     }
     issues
 }
@@ -337,6 +357,7 @@ fn node_kind_for_portable_kind(kind: &str) -> Option<NodeKind> {
         KIND_CONDITION => Some(NodeKind::Condition),
         KIND_MERGE => Some(NodeKind::Merge),
         KIND_SUBWORKFLOW => Some(NodeKind::Subworkflow),
+        KIND_APPROVAL => Some(NodeKind::Approval),
         _ => None,
     }
 }
@@ -351,6 +372,7 @@ fn provider_for_kind(kind: NodeKind) -> &'static dyn NodeKindProvider {
         NodeKind::Condition => &CONDITION_PROVIDER,
         NodeKind::Merge => &MERGE_PROVIDER,
         NodeKind::Subworkflow => &SUBWORKFLOW_PROVIDER,
+        NodeKind::Approval => &APPROVAL_PROVIDER,
     }
 }
 
@@ -364,6 +386,7 @@ fn portable_kind_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::Condition => KIND_CONDITION,
         NodeKind::Merge => KIND_MERGE,
         NodeKind::Subworkflow => KIND_SUBWORKFLOW,
+        NodeKind::Approval => KIND_APPROVAL,
     }
 }
 
@@ -377,5 +400,6 @@ fn display_label_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::Condition => DISPLAY_CONDITION,
         NodeKind::Merge => DISPLAY_MERGE,
         NodeKind::Subworkflow => DISPLAY_SUBWORKFLOW,
+        NodeKind::Approval => DISPLAY_APPROVAL,
     }
 }

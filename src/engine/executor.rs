@@ -83,6 +83,7 @@ const AUTHORIZED_EFFECTFUL_NODE_REQUIRED: &str = "authorized execution requires 
 const AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED: &str =
     "product effect execution requires a current Choregraph authority context";
 const CHOREGRAPH_EXECUTION_FAILURE: &str = "Choregraph product execution failed";
+const APPROVAL_REQUIRES_DURABLE_SHELL: &str = "approval nodes require the durable workflow approval shell";
 
 type LocalProcessConfig = crate::process::core::RuntimeConfig;
 const HTTP_BODY_INPUT_LABEL: &str = "body";
@@ -110,6 +111,7 @@ const HASH_TAG_AGENT_CONFIG: &[u8] = b"agent-config";
 const HASH_TAG_CONDITION_CONFIG: &[u8] = b"condition-config";
 const HASH_TAG_MERGE_CONFIG: &[u8] = b"merge-config";
 const HASH_TAG_SUBWORKFLOW_CONFIG: &[u8] = b"subworkflow-config";
+const HASH_TAG_APPROVAL_CONFIG: &[u8] = b"approval-config";
 const HASH_TAG_COMMAND: &[u8] = b"command";
 const HASH_TAG_HTTP_METHOD: &[u8] = b"http-method";
 const HASH_TAG_HTTP_URL: &[u8] = b"http-url";
@@ -305,6 +307,19 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
         NodeConfig::Subworkflow(config) => {
             hasher.update(HASH_TAG_SUBWORKFLOW_CONFIG);
             update_str(hasher, HASH_TAG_SUBWORKFLOW_NAME, &config.workflow_name);
+        }
+        NodeConfig::Approval(config) => {
+            hasher.update(HASH_TAG_APPROVAL_CONFIG);
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, config.gate_id.as_str());
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, &config.safe_summary);
+            update_ordered_string_list_hash(hasher, HASH_TAG_INPUTS, &config.selected_input_ports);
+            for artifact in &config.required_artifacts {
+                update_str(hasher, HASH_TAG_APPROVAL_CONFIG, artifact.as_str());
+            }
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, &format!("{:?}", config.authority));
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, &format!("{:?}", config.expiry));
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, &format!("{:?}", config.resume));
+            update_str(hasher, HASH_TAG_APPROVAL_CONFIG, &format!("{:?}", config.terminal));
         }
     }
 }
@@ -605,7 +620,8 @@ fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
-        | NodeConfig::Subworkflow(_) => None,
+        | NodeConfig::Subworkflow(_)
+        | NodeConfig::Approval(_) => None,
     }
 }
 
@@ -622,7 +638,8 @@ fn effect_ability(config: &NodeConfig) -> Option<&'static str> {
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
-        | NodeConfig::Subworkflow(_) => None,
+        | NodeConfig::Subworkflow(_)
+        | NodeConfig::Approval(_) => None,
     }
 }
 
@@ -635,7 +652,8 @@ fn effect_resource(config: &NodeConfig, node_id: crate::engine::workflow::NodeId
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
-        | NodeConfig::Subworkflow(_) => return None,
+        | NodeConfig::Subworkflow(_)
+        | NodeConfig::Approval(_) => return None,
     };
     Some(format!("{prefix}{}", node_id.0))
 }
@@ -1082,11 +1100,52 @@ pub enum NodeStatus {
 }
 
 /// Result of executing a single step (one node).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepResult {
     pub node_id: crate::engine::workflow::NodeId,
     pub status: NodeStatus,
     pub input_hash: ContentHash,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApprovalSuspensionPoint {
+    pub node_id: crate::engine::workflow::NodeId,
+    pub inputs: HashMap<PortId, Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApprovalRunOutcome {
+    pub run_id: RunId,
+    pub results: Vec<StepResult>,
+    pub suspension: Option<ApprovalSuspensionPoint>,
+}
+
+pub struct ApprovalResumeInput<'a> {
+    pub workflow: &'a Workflow,
+    pub cache: &'a HashMap<ContentHash, HashMap<PortId, Value>>,
+    pub context: &'a crate::engine::effect::execution::RunContext,
+    pub checkpoint: &'a [StepResult],
+    pub resumed_gate: crate::engine::workflow::NodeId,
+    pub resumed_gate_outputs: &'a HashMap<PortId, Value>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExecutionControl<'a> {
+    checkpoint: &'a [StepResult],
+    stop_at_approval: bool,
+    resumed_gate: Option<crate::engine::workflow::NodeId>,
+    resumed_gate_outputs: Option<&'a HashMap<PortId, Value>>,
+}
+
+impl ExecutionControl<'_> {
+    const fn ordinary() -> Self {
+        Self {
+            checkpoint: &[],
+            stop_at_approval: false,
+            resumed_gate: None,
+            resumed_gate_outputs: None,
+        }
+    }
 }
 
 struct RuntimeParts {
@@ -2048,6 +2107,13 @@ impl Executor {
                     },
                 }
             }
+            NodeConfig::Approval(_) => StepResult {
+                node_id,
+                status: NodeStatus::Failed {
+                    error: APPROVAL_REQUIRES_DURABLE_SHELL.to_owned(),
+                },
+                input_hash,
+            },
         }
     }
 
@@ -2072,6 +2138,37 @@ impl Executor {
         context: &crate::engine::effect::execution::RunContext,
     ) -> (RunId, Vec<StepResult>) {
         self.run_with_bound_inputs(workflow, cache, &HashMap::new(), Some(context)).await
+    }
+
+    pub async fn run_authorized_until_approval(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        context: &crate::engine::effect::execution::RunContext,
+    ) -> ApprovalRunOutcome {
+        self.run_with_bound_inputs_control(workflow, cache, &HashMap::new(), Some(context), ExecutionControl {
+            checkpoint: &[],
+            stop_at_approval: true,
+            resumed_gate: None,
+            resumed_gate_outputs: None,
+        })
+        .await
+    }
+
+    pub async fn resume_authorized_after_approval(&mut self, input: ApprovalResumeInput<'_>) -> ApprovalRunOutcome {
+        self.run_with_bound_inputs_control(
+            input.workflow,
+            input.cache,
+            &HashMap::new(),
+            Some(input.context),
+            ExecutionControl {
+                checkpoint: input.checkpoint,
+                stop_at_approval: true,
+                resumed_gate: Some(input.resumed_gate),
+                resumed_gate_outputs: Some(input.resumed_gate_outputs),
+            },
+        )
+        .await
     }
 
     pub async fn run_with_named_inputs(
@@ -2102,16 +2199,45 @@ impl Executor {
         bound_inputs: &HashMap<PortId, Value>,
         product_context: Option<&crate::engine::effect::execution::RunContext>,
     ) -> (RunId, Vec<StepResult>) {
+        let outcome = self
+            .run_with_bound_inputs_control(workflow, cache, bound_inputs, product_context, ExecutionControl::ordinary())
+            .await;
+        (outcome.run_id, outcome.results)
+    }
+
+    async fn run_with_bound_inputs_control(
+        &mut self,
+        workflow: &Workflow,
+        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        bound_inputs: &HashMap<PortId, Value>,
+        product_context: Option<&crate::engine::effect::execution::RunContext>,
+        control: ExecutionControl<'_>,
+    ) -> ApprovalRunOutcome {
         let run_id = RunId(self.next_run_id);
         self.next_run_id = self.next_run_id.saturating_add(1);
         let mut product_session = match product_context {
-            Some(context) => match crate::engine::effect::execution::Session::new(workflow, context) {
-                Ok(session) => Some(session),
-                Err(error) => {
-                    let diagnostic = choregraph_execution_error(error);
-                    return (run_id, failed_product_run(workflow, &diagnostic));
+            Some(context) => {
+                let session = if control.checkpoint.is_empty() {
+                    crate::engine::effect::execution::Session::new(workflow, context)
+                } else {
+                    crate::engine::effect::execution::Session::new_with_checkpoint(
+                        workflow,
+                        context,
+                        control.checkpoint,
+                    )
+                };
+                match session {
+                    Ok(session) => Some(session),
+                    Err(error) => {
+                        let diagnostic = choregraph_execution_error(error);
+                        return ApprovalRunOutcome {
+                            run_id,
+                            results: failed_product_run(workflow, &diagnostic),
+                            suspension: None,
+                        };
+                    }
                 }
-            },
+            }
             None => None,
         };
 
@@ -2119,7 +2245,11 @@ impl Executor {
             Some(admitted) => admitted,
             None => {
                 error!("workflow failed shared graph admission, cannot execute");
-                return (run_id, Vec::new());
+                return ApprovalRunOutcome {
+                    run_id,
+                    results: Vec::new(),
+                    suspension: None,
+                };
             }
         };
 
@@ -2128,9 +2258,30 @@ impl Executor {
         let maximum_step_count = topo.len();
         let mut results = Vec::with_capacity(maximum_step_count);
         let mut port_values: HashMap<PortId, Value> = HashMap::new();
-        let mut runner_states = BTreeMap::new();
+        assert!(
+            control.checkpoint.len() <= maximum_step_count,
+            "approval checkpoint cannot contain more nodes than the admitted workflow"
+        );
+        let mut runner_states = control
+            .checkpoint
+            .iter()
+            .map(|step| (step.node_id.0, runner_step_state(&step.status)))
+            .collect::<BTreeMap<_, _>>();
+        let mut checkpoint_nodes = std::collections::HashSet::with_capacity(control.checkpoint.len());
+        for step in control.checkpoint {
+            checkpoint_nodes.insert(step.node_id);
+            if let NodeStatus::Completed { outputs, .. } = &step.status {
+                for (port_id, value) in outputs {
+                    port_values.insert(*port_id, value.clone());
+                }
+            }
+            results.push(step.clone());
+        }
 
         for node_id in topo {
+            if checkpoint_nodes.contains(&node_id) {
+                continue;
+            }
             assert!(
                 runner_states.len() < maximum_step_count,
                 "runner state count must remain bounded by admitted nodes"
@@ -2173,6 +2324,60 @@ impl Executor {
                     input_hash,
                 });
                 continue;
+            }
+
+            if matches!(workflow.node_config(node_id), Some(NodeConfig::Approval(_))) && control.stop_at_approval {
+                if control.resumed_gate == Some(node_id) {
+                    let Some(node) = workflow.graph.node(node_id) else {
+                        results.push(failed_product_step(
+                            node_id,
+                            input_hash,
+                            "approval node is missing from workflow graph",
+                        ));
+                        continue;
+                    };
+                    let Some(outputs) = control.resumed_gate_outputs else {
+                        results.push(failed_product_step(node_id, input_hash, "approved resume inputs are missing"));
+                        continue;
+                    };
+                    if !approval_gate_outputs_valid(node, outputs) {
+                        results.push(failed_product_step(
+                            node_id,
+                            input_hash,
+                            "approved resume outputs do not match the gate schema",
+                        ));
+                        continue;
+                    }
+                    if let Some(session) = product_session.as_mut()
+                        && (session.mark_ready(node_id).is_err() || session.start_pure(node_id).is_err())
+                    {
+                        let step = failed_product_step(node_id, input_hash, CHOREGRAPH_EXECUTION_FAILURE);
+                        runner_states.insert(node_id.0, runner_step_state(&step.status));
+                        results.push(step);
+                        continue;
+                    }
+                    let step = completed_step_result(node_id, input_hash, node, outputs.clone(), false);
+                    let step = match product_session.as_mut() {
+                        Some(session) => match session.finish(node_id, &step.status) {
+                            Ok(()) => step,
+                            Err(error) => failed_product_step(node_id, input_hash, &choregraph_execution_error(error)),
+                        },
+                        None => step,
+                    };
+                    if let NodeStatus::Completed { outputs, .. } = &step.status {
+                        for (port_id, value) in outputs {
+                            port_values.insert(*port_id, value.clone());
+                        }
+                    }
+                    runner_states.insert(node_id.0, runner_step_state(&step.status));
+                    results.push(step);
+                    continue;
+                }
+                return ApprovalRunOutcome {
+                    run_id,
+                    results,
+                    suspension: Some(ApprovalSuspensionPoint { node_id, inputs }),
+                };
             }
 
             if let Some(session) = product_session.as_mut()
@@ -2261,7 +2466,11 @@ impl Executor {
         }
 
         info!(run = %run_id, steps = results.len(), "workflow execution complete");
-        (run_id, results)
+        ApprovalRunOutcome {
+            run_id,
+            results,
+            suspension: None,
+        }
     }
 }
 
@@ -2395,6 +2604,17 @@ fn gather_inputs(
     }
 
     inputs
+}
+
+fn approval_gate_outputs_valid(node: &Node, outputs: &HashMap<PortId, Value>) -> bool {
+    if outputs.len() != node.output_ports.len() {
+        return false;
+    }
+    node.output_ports.iter().all(|port| {
+        outputs.get(&port.id).is_some_and(|value| {
+            port.type_tag == crate::engine::value::TypeTag::Any.as_str() || port.type_tag == value.type_tag().as_str()
+        })
+    })
 }
 
 fn runner_step_state(status: &NodeStatus) -> runner::RunnerStepState {

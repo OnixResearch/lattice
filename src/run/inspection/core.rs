@@ -208,6 +208,12 @@ fn inspect_owner(
                 None,
             )
         }
+        crate::store::RunOwner::WorkflowApproval { request_id } => (
+            super::model::SafeOwner::WorkflowApproval {
+                request_id: request_id.to_string(),
+            },
+            None,
+        ),
     }
 }
 

@@ -171,6 +171,9 @@ pub struct RevisionProposal {
     pub safe_summary: String,
 }
 
+// r[impl lattice.workflow_approval.compatibility]
+// r[impl lattice.workflow_approval.compatibility.valid]
+// r[impl lattice.workflow_approval.compatibility.denied]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalDecision {
     pub id: super::identity::ApprovalId,
