@@ -196,11 +196,17 @@ pub struct PortableNodeConfig {
     pub subworkflow_output_mappings: Vec<PortableSubworkflowOutputMapping>,
     #[serde(default = "empty_approval_configs", skip_serializing_if = "Vec::is_empty")]
     pub approval: Vec<crate::workflow::gate::ApprovalNodeConfig>,
+    #[serde(default = "empty_operation_plans", skip_serializing_if = "Vec::is_empty")]
+    pub operation_plan: Vec<crate::operation::InvocationPlan>,
     pub timeout_secs: u64,
     pub pipe_stdin: bool,
 }
 
 fn empty_approval_configs() -> Vec<crate::workflow::gate::ApprovalNodeConfig> {
+    Vec::new()
+}
+
+fn empty_operation_plans() -> Vec<crate::operation::InvocationPlan> {
     Vec::new()
 }
 
@@ -330,6 +336,10 @@ pub enum WorkflowFormatError {
         node_id: u64,
         message: String,
     },
+    InvalidOperationConfig {
+        node_id: u64,
+        message: String,
+    },
     InvalidAgentTarget {
         node_id: u64,
         target: String,
@@ -413,6 +423,9 @@ impl std::fmt::Display for WorkflowFormatError {
             }
             Self::InvalidApprovalConfig { node_id, message } => {
                 write!(f, "node {node_id} has invalid approval config: {message}")
+            }
+            Self::InvalidOperationConfig { node_id, message } => {
+                write!(f, "node {node_id} has invalid operation config: {message}")
             }
             Self::InvalidAgentTarget { node_id, target } => {
                 write!(f, "node {node_id} has invalid agent target: {target}")
@@ -544,6 +557,7 @@ fn workflow_for_config(config: NodeConfig) -> Workflow {
         NodeConfig::Agent(settings) => {
             workflow.add_agent_node("node", settings.target, &settings.prompt, settings.output_mode)
         }
+        NodeConfig::Operation(plan) => workflow.add_operation_node("node", (**plan).clone()),
         NodeConfig::Condition(config) => workflow.add_condition_node("node", config.clone()),
         NodeConfig::Merge(config) => workflow.add_merge_node("node", config.clone()),
         NodeConfig::Subworkflow(config) => workflow.add_subworkflow_node("node", config.clone()),
@@ -600,6 +614,7 @@ fn empty_portable_node_config(
         subworkflow_input_mappings: Vec::new(),
         subworkflow_output_mappings: Vec::new(),
         approval: Vec::new(),
+        operation_plan: Vec::new(),
         timeout_secs: 0,
         pipe_stdin: false,
     }
@@ -672,6 +687,7 @@ fn node_config_to_portable(
                 subworkflow_input_mappings: Vec::new(),
                 subworkflow_output_mappings: Vec::new(),
                 approval: Vec::new(),
+                operation_plan: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: *pipe_stdin,
             }
@@ -733,6 +749,7 @@ fn node_config_to_portable(
                 subworkflow_input_mappings: Vec::new(),
                 subworkflow_output_mappings: Vec::new(),
                 approval: Vec::new(),
+                operation_plan: Vec::new(),
                 timeout_secs: *timeout_secs,
                 pipe_stdin: false,
             }
@@ -784,6 +801,7 @@ fn node_config_to_portable(
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -832,6 +850,7 @@ fn node_config_to_portable(
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -876,9 +895,20 @@ fn node_config_to_portable(
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
+        NodeConfig::Operation(plan) => {
+            let mut portable = empty_portable_node_config(
+                node_id,
+                node_kind_provider::portable_kind_for_config(config).to_string(),
+                portable_runner,
+                secret_env,
+            );
+            portable.operation_plan.push((**plan).clone());
+            portable
+        }
         NodeConfig::Condition(condition) => PortableNodeConfig {
             node_id,
             kind: node_kind_provider::portable_kind_for_config(config).to_string(),
@@ -920,6 +950,7 @@ fn node_config_to_portable(
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -964,6 +995,7 @@ fn node_config_to_portable(
             subworkflow_input_mappings: Vec::new(),
             subworkflow_output_mappings: Vec::new(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -1016,6 +1048,7 @@ fn node_config_to_portable(
                 .map(portable_subworkflow_output_mapping)
                 .collect(),
             approval: Vec::new(),
+            operation_plan: Vec::new(),
             timeout_secs: 0,
             pipe_stdin: false,
         },
@@ -1468,6 +1501,12 @@ fn portable_config_to_node_config(
             message: "approval configuration is present on another node kind".to_string(),
         });
     }
+    if provider.portable_kind() != "operation" && !config.operation_plan.is_empty() {
+        return Err(WorkflowFormatError::InvalidOperationConfig {
+            node_id: config.node_id,
+            message: "operation plan is present on another node kind".to_string(),
+        });
+    }
     debug_assert_eq!(provider.portable_kind(), config.kind);
     debug_assert!(!provider.display_label().is_empty());
     match provider.portable_kind() {
@@ -1476,12 +1515,29 @@ fn portable_config_to_node_config(
         "file" => portable_file_config_to_node_config(config),
         "image_input" => Ok(portable_image_input_config_to_node_config(config)),
         "agent" => portable_agent_config_to_node_config(config, resolved_agent_prompt),
+        "operation" => portable_operation_config_to_node_config(config),
         "condition" => portable_condition_config_to_node_config(config),
         "merge" => portable_merge_config_to_node_config(config),
         "subworkflow" => portable_subworkflow_config_to_node_config(config),
         "approval" => portable_approval_config_to_node_config(config),
         _ => Err(WorkflowFormatError::UnsupportedNodeKind(config.kind.clone())),
     }
+}
+
+fn portable_operation_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
+    let [plan] = config.operation_plan.as_slice() else {
+        return Err(WorkflowFormatError::InvalidOperationConfig {
+            node_id: config.node_id,
+            message: "operation node requires exactly one invocation plan".to_string(),
+        });
+    };
+    crate::operation::planning::validate_plan_identity(plan).map_err(|error| {
+        WorkflowFormatError::InvalidOperationConfig {
+            node_id: config.node_id,
+            message: error.to_string(),
+        }
+    })?;
+    Ok(NodeConfig::operation(plan.clone()))
 }
 
 fn portable_shell_config_to_node_config(config: &PortableNodeConfig) -> Result<NodeConfig, WorkflowFormatError> {
@@ -1889,7 +1945,7 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
 }
 
 fn nickel_contract_prelude() -> &'static str {
-    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet ApprovalAuthority = { profile | String, local_actors | Array String, accepted_abilities | Array String, prohibit_self_approval | Bool, delegated_policy_reference | Dyn } in\nlet ApprovalExpiry = { decision_ttl_millis | Number, resume_ttl_millis | Number, approval_must_be_fresh_at_resume | Bool, clock_source | String } in\nlet ApprovalReason = { required | Bool, identity_bound | Bool, max_bytes | Number } in\nlet ApprovalResumeValue = { name | String, type_tag | String } in\nlet ApprovalResume = { values | Array ApprovalResumeValue, credential_bindings | Array String } in\nlet ApprovalTerminal = { on_rejection | String, on_expiry | String } in\nlet ApprovalNodeConfig = { gate_id | String, safe_summary | String, selected_input_ports | Array String, required_artifacts | Array String, authority | ApprovalAuthority, expiry | ApprovalExpiry, reason | ApprovalReason, resume | ApprovalResume, terminal | ApprovalTerminal, required_non_claims | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch | default = [], merge_policy | String | default = \"\", merge_required_inputs | Array String | default = [], subworkflow_name | String | default = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping | default = [], subworkflow_output_mappings | Array SubworkflowOutputMapping | default = [], approval | Array ApprovalNodeConfig | default = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
+    "let Port = { id | Number, label | String, type_tag | String } in\nlet Node = { id | Number, label | String, x | Number, y | Number, input_ports | Array Port, output_ports | Array Port } in\nlet Edge = { source | Number, target | Number } in\nlet EnvVar = { key | String, value | String } in\nlet SecretEnvVar = { name | String, provider | String, key | String, field | Array String, value | optional | Dyn } in\nlet ConditionBranch = { label | String, predicate | String } in\nlet SubworkflowInputMapping = { parent_input | String, child_input | String } in\nlet SubworkflowOutputMapping = { child_output | String, parent_output | String } in\nlet ApprovalAuthority = { profile | String, local_actors | Array String, accepted_abilities | Array String, prohibit_self_approval | Bool, delegated_policy_reference | Dyn } in\nlet ApprovalExpiry = { decision_ttl_millis | Number, resume_ttl_millis | Number, approval_must_be_fresh_at_resume | Bool, clock_source | String } in\nlet ApprovalReason = { required | Bool, identity_bound | Bool, max_bytes | Number } in\nlet ApprovalResumeValue = { name | String, type_tag | String } in\nlet ApprovalResume = { values | Array ApprovalResumeValue, credential_bindings | Array String } in\nlet ApprovalTerminal = { on_rejection | String, on_expiry | String } in\nlet ApprovalNodeConfig = { gate_id | String, safe_summary | String, selected_input_ports | Array String, required_artifacts | Array String, authority | ApprovalAuthority, expiry | ApprovalExpiry, reason | ApprovalReason, resume | ApprovalResume, terminal | ApprovalTerminal, required_non_claims | Array String } in\nlet OperationBounds = { timeout_seconds | Number, input_bytes | Number, output_bytes | Number, artifact_bytes | Number } in\nlet OperationField = { name | String, value_type | String, required | Bool, max_bytes | Number } in\nlet OperationRecord = { fields | Array OperationField, deny_unknown_fields | Bool } in\nlet OperationRuntime = { kind | String, key | String, executor_identity | String, executable_path | String, available | Bool, maximum_bounds | OperationBounds } in\nlet OperationSecretRef = { provider | String, key | String, field | optional | String } in\nlet OperationPlan = { schema | String, identity | String, catalog_identity | String, type_id | String, type_revision | String, instance_id | String, instance_identity | String, method | String, method_identity | String, arguments | { _ | Dyn }, arguments_identity | String, output_contract | OperationRecord, output_contract_identity | String, runtime | OperationRuntime, capabilities | Array String, target | { _ | Dyn }, credentials | { _ | OperationSecretRef }, bounds | OperationBounds, required_non_claims | Array String } in\nlet NodeConfig = { node_id | Number, kind | String, runtime_kind | String, runtime_key | String, effect_policy | String, cache_policy | String, retry_policy | String, artifact_policy | String, command | String, cwd | Array String, env | Array EnvVar, secret_env | Array SecretEnvVar, http_method | String, url | String, headers | Array EnvVar, body | Array String, file_operation | String, file_path | String, file_content | Array String, overwrite | Bool, allowed_roots | Array String, image_path | String, image_allowed_roots | Array String, image_max_bytes | Number, agent_target | String, agent_prompt | String, agent_prompt_file | Array String, agent_output_mode | String, agent_model_hint | Array String, agent_tool_policy | String, agent_context_refs | Array String, agent_cwd | Array String, agent_session | Array String, condition_branches | Array ConditionBranch | default = [], merge_policy | String | default = \"\", merge_required_inputs | Array String | default = [], subworkflow_name | String | default = \"\", subworkflow_input_mappings | Array SubworkflowInputMapping | default = [], subworkflow_output_mappings | Array SubworkflowOutputMapping | default = [], approval | Array ApprovalNodeConfig | default = [], operation_plan | Array OperationPlan | default = [], timeout_secs | Number, pipe_stdin | Bool } in\nlet TriggerInputBinding = { input_label | String, source_kind | String, source_name | String, type_tag | String, required | Bool } in\nlet Trigger = { id | String, workflow_name | String, enabled | Bool, kind | String, webhook_method | String, webhook_path | String, webhook_content_types | Array String, auth_kind | String, auth_provider | String, auth_key | String, auth_field | Array String, auth_header | String, schedule_interval_secs | Number, schedule_next_run_epoch_ms | Number, schedule_missed_run_policy | String, input_bindings | Array TriggerInputBinding, overlap_policy | String, idempotency_policy | String, idempotency_json_pointer | String } in\nlet Meta = { name | String, description | String, created | String, modified | String } in\nlet Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | Array NodeConfig, triggers | Array Trigger } in\n"
 }
 
 fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
@@ -2088,6 +2144,17 @@ fn render_config(output: &mut String, config: &PortableNodeConfig) {
             approval,
         }
         .render();
+    }
+    output.push_str("      ],\n");
+    output.push_str("      operation_plan = [\n");
+    for plan in &config.operation_plan {
+        let rendered = serde_json::to_value(plan)
+            .ok()
+            .and_then(|value| crate::orchestration::format::render_nickel_value(&value, 0).ok())
+            .unwrap_or_else(|| "{ invalid_operation_plan = true }".to_string());
+        output.push_str("        ");
+        output.push_str(&rendered);
+        output.push_str(",\n");
     }
     output.push_str("      ],\n");
     output.push_str(&format!("      timeout_secs = {},\n", config.timeout_secs));

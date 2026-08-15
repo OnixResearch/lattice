@@ -11,7 +11,7 @@ const CAIRN_SPECS_DIR: &str = ".cairn/specs";
 const SPEC_FILE_NAME: &str = "spec.md";
 const LINE_NUMBER_BASE: usize = 1;
 const NORMATIVE_WORDS: &[&str] = &["MUST", "SHOULD", "SHALL", "MAY"];
-const VALID_SPEC: &str = "# Example\n\n## Requirements\n\n### Requirement: Example\nr[example.requirement] The system MUST do the thing.\n\n#### Scenario: Happy path\nr[example.requirement.happy]\n- GIVEN valid input\n- WHEN the action runs\n- THEN the result is visible\n";
+const VALID_SPEC: &str = "# Example\n\n## Requirements\n\n### Requirement: Example\n\nr[example.requirement] The system MUST do the thing.\n\n#### Scenario: Happy path\n\nr[example.requirement.happy]\n- GIVEN valid input\n- WHEN the action runs\n- THEN the result is visible\n";
 const INVALID_SPEC: &str = "# Example\n\n## Requirements\n\n### Requirement: Example\nr[example.requirement] The system does the thing.\n\n#### Scenario: Broken path\nr[example.requirement.broken]\n- GIVEN valid input\n- THEN the result is visible\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,8 +88,7 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
 }
 
 fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
-    let marker_index = heading_index + LINE_NUMBER_BASE;
-    let Some(marker_line) = lines.get(marker_index).map(|line| line.trim()) else {
+    let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(
             path,
             heading_index,
@@ -97,6 +96,7 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
         ));
         return;
     };
+    let marker_line = lines[marker_index].trim();
 
     if !marker_line.starts_with("r[") {
         diagnostics.push(diagnostic(path, marker_index, "requirement must start with an r[...] marker"));
@@ -111,11 +111,11 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
 }
 
 fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
-    let marker_index = heading_index + LINE_NUMBER_BASE;
-    let Some(marker_line) = lines.get(marker_index).map(|line| line.trim()) else {
+    let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(path, heading_index, "scenario heading must be followed by an r[...] marker line"));
         return;
     };
+    let marker_line = lines[marker_index].trim();
 
     if !marker_line.starts_with("r[") {
         diagnostics.push(diagnostic(path, marker_index, "scenario must start with an r[...] marker"));
@@ -136,6 +136,15 @@ fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnosti
             ));
         }
     }
+}
+
+fn next_nonempty_line_index(lines: &[&str], heading_index: usize) -> Option<usize> {
+    lines
+        .iter()
+        .enumerate()
+        .skip(heading_index + LINE_NUMBER_BASE)
+        .take_while(|(_, line)| !line.trim_start().starts_with("###"))
+        .find_map(|(index, line)| (!line.trim().is_empty()).then_some(index))
 }
 
 fn diagnostic(path: &str, zero_based_line_index: usize, message: &str) -> SpecDiagnostic {

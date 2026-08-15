@@ -2095,6 +2095,7 @@ impl App {
                 | NodeConfig::File { .. }
                 | NodeConfig::ImageInput { .. }
                 | NodeConfig::Agent(_)
+                | NodeConfig::Operation(_)
                 | NodeConfig::Condition(_)
                 | NodeConfig::Merge(_)
                 | NodeConfig::Subworkflow(_)
@@ -2107,6 +2108,7 @@ impl App {
                 NodeConfig::File { .. }
                 | NodeConfig::ImageInput { .. }
                 | NodeConfig::Agent(_)
+                | NodeConfig::Operation(_)
                 | NodeConfig::Condition(_)
                 | NodeConfig::Merge(_)
                 | NodeConfig::Subworkflow(_)
@@ -2196,6 +2198,7 @@ impl App {
                     | NodeConfig::File { .. }
                     | NodeConfig::ImageInput { .. }
                     | NodeConfig::Agent(_)
+                    | NodeConfig::Operation(_)
                     | NodeConfig::Condition(_)
                     | NodeConfig::Merge(_)
                     | NodeConfig::Subworkflow(_)
@@ -2243,6 +2246,7 @@ impl App {
                     NodeConfig::File { .. }
                     | NodeConfig::ImageInput { .. }
                     | NodeConfig::Agent(_)
+                    | NodeConfig::Operation(_)
                     | NodeConfig::Condition(_)
                     | NodeConfig::Merge(_)
                     | NodeConfig::Subworkflow(_)
@@ -2266,7 +2270,15 @@ impl App {
                         });
                         Ok(())
                     }
-                    _ => Err(PropertyEditError::MissingConfig),
+                    NodeConfig::Shell { .. }
+                    | NodeConfig::Http { .. }
+                    | NodeConfig::File { .. }
+                    | NodeConfig::Agent(_)
+                    | NodeConfig::Operation(_)
+                    | NodeConfig::Condition(_)
+                    | NodeConfig::Merge(_)
+                    | NodeConfig::Subworkflow(_)
+                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
                 }
             }
             PropertyEditField::AgentPrompt

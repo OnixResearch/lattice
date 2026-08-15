@@ -98,6 +98,8 @@ enum CliCommand {
     Guarded(lattice::guarded::CommandArgs),
     /// Inspect identity-bound agent evaluations and durable trial state
     Evaluation(lattice::agent_evaluation::cli::CommandArgs),
+    /// Inspect, plan, run, and promote typed operation contracts
+    Operation(lattice::operation::cli::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -344,6 +346,15 @@ struct DoctorCommandArgs {
     /// Output format for the doctor report
     #[arg(long, value_enum, default_value_t = DoctorOutputFormat::Text)]
     output: DoctorOutputFormat,
+    /// Optional typed operation catalog to check
+    #[arg(long)]
+    operation_catalog: Option<PathBuf>,
+    /// Optional data-only operation instances to check
+    #[arg(long)]
+    operation_instances: Option<PathBuf>,
+    /// Optional exact Cairn pilot executor to check
+    #[arg(long)]
+    operation_executable: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -413,6 +424,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Some(CliCommand::Runs(runs_args)) = &args.command {
         return Ok(run_runs_command(&app_config, runs_args));
     }
+    if let Some(CliCommand::Operation(operation_args)) = &args.command {
+        return Ok(lattice::operation::cli::run(&app_config, operation_args));
+    }
 
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
         tracing::warn!(error = %e, "failed to create data dir");
@@ -450,6 +464,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         }
         Some(CliCommand::Evaluation(evaluation_args)) => {
             Ok(lattice::agent_evaluation::cli::run(&app_config, &evaluation_args))
+        }
+        Some(CliCommand::Operation(_)) => {
+            unreachable!("operation command returns before generic data-directory side effects")
         }
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         None => {
@@ -503,7 +520,7 @@ fn setup_logging(verbose: bool) {
 
 // r[impl n8nclone.operator_diagnostics.doctor_command]
 fn run_doctor_command(config_path: &Path, args: &DoctorCommandArgs) -> ExitCode {
-    let facts = collect_doctor_facts(config_path);
+    let facts = collect_doctor_facts(config_path, args);
     let report = doctor::evaluate(&facts);
     let rendered = match args.output {
         DoctorOutputFormat::Text => doctor::render_text(&report),
@@ -530,7 +547,7 @@ fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppC
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks]
-fn collect_doctor_facts(config_path: &Path) -> doctor::Facts {
+fn collect_doctor_facts(config_path: &Path, args: &DoctorCommandArgs) -> doctor::Facts {
     let mut checks = Vec::new();
     let app_config = match load_app_config_checked_for_doctor(config_path) {
         Ok(app_config) => {
@@ -549,6 +566,7 @@ fn collect_doctor_facts(config_path: &Path) -> doctor::Facts {
         }
     };
 
+    collect_operation_doctor_facts(args, &mut checks);
     let store_path = config::store_path(&app_config.data_dir);
     if !store_path.exists() {
         checks.push(
@@ -578,6 +596,40 @@ fn collect_doctor_facts(config_path: &Path) -> doctor::Facts {
     collect_credential_doctor_facts(&triggers, &mut checks);
     collect_webhook_listener_doctor_facts(&triggers, &mut checks);
     doctor::Facts::new(checks)
+}
+
+fn collect_operation_doctor_facts(args: &DoctorCommandArgs, checks: &mut Vec<doctor::Fact>) {
+    let (catalog, instances, executable) = match (
+        args.operation_catalog.as_deref(),
+        args.operation_instances.as_deref(),
+        args.operation_executable.as_deref(),
+    ) {
+        (None, None, None) => return,
+        (Some(catalog), Some(instances), Some(executable)) => (catalog, instances, executable),
+        _ => {
+            checks.push(
+                doctor::Fact::fatal(
+                    doctor::CHECK_OPERATION_CONTRACTS,
+                    "operation readiness needs a catalog, instances, and executable",
+                )
+                .with_remediation("supply all three operation readiness paths"),
+            );
+            return;
+        }
+    };
+    match lattice::operation::readiness::inspect(catalog, instances, executable) {
+        Ok(report) => checks.push(doctor::Fact::healthy(
+            doctor::CHECK_OPERATION_CONTRACTS,
+            format!(
+                "operation catalog and Cairn pilot are ready: {} types, {} instances, {} credential references",
+                report.type_count, report.instance_count, report.credential_reference_count
+            ),
+        )),
+        Err(error) => checks.push(
+            doctor::Fact::fatal(doctor::CHECK_OPERATION_CONTRACTS, format!("operation readiness failed: {error}"))
+                .with_remediation("fix operation catalog, instance, root, executor, or credential-reference facts"),
+        ),
+    }
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.config_store]

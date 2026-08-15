@@ -15,6 +15,7 @@ const KIND_HTTP: &str = "http";
 const KIND_FILE: &str = "file";
 const KIND_IMAGE_INPUT: &str = "image_input";
 const KIND_AGENT: &str = "agent";
+const KIND_OPERATION: &str = "operation";
 const KIND_CONDITION: &str = "condition";
 const KIND_MERGE: &str = "merge";
 const KIND_SUBWORKFLOW: &str = "subworkflow";
@@ -24,6 +25,7 @@ const DISPLAY_HTTP: &str = "HTTP";
 const DISPLAY_FILE: &str = "File";
 const DISPLAY_IMAGE_INPUT: &str = "Image Input";
 const DISPLAY_AGENT: &str = "Agent";
+const DISPLAY_OPERATION: &str = "Operation";
 const DISPLAY_CONDITION: &str = "Condition";
 const DISPLAY_MERGE: &str = "Merge";
 const DISPLAY_SUBWORKFLOW: &str = "Subworkflow";
@@ -38,6 +40,7 @@ pub enum NodeKind {
     File,
     ImageInput,
     Agent,
+    Operation,
     Condition,
     Merge,
     Subworkflow,
@@ -54,6 +57,7 @@ pub enum NodeKindValidationCode {
     UnsupportedImageFormat,
     InvalidImageByteBudget,
     EmptyAgentPrompt,
+    InvalidOperation,
     InvalidCondition,
     InvalidMerge,
     InvalidSubworkflow,
@@ -92,6 +96,9 @@ static IMAGE_INPUT_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
     kind: NodeKind::ImageInput,
 };
 static AGENT_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider { kind: NodeKind::Agent };
+static OPERATION_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
+    kind: NodeKind::Operation,
+};
 static CONDITION_PROVIDER: BuiltinNodeKindProvider = BuiltinNodeKindProvider {
     kind: NodeKind::Condition,
 };
@@ -140,6 +147,7 @@ pub fn node_kind_for_config(config: &NodeConfig) -> NodeKind {
         NodeConfig::File { .. } => NodeKind::File,
         NodeConfig::ImageInput { .. } => NodeKind::ImageInput,
         NodeConfig::Agent(_) => NodeKind::Agent,
+        NodeConfig::Operation(_) => NodeKind::Operation,
         NodeConfig::Condition(_) => NodeKind::Condition,
         NodeConfig::Merge(_) => NodeKind::Merge,
         NodeConfig::Subworkflow(_) => NodeKind::Subworkflow,
@@ -198,6 +206,7 @@ pub fn property_lines_for_config(config: &NodeConfig) -> Vec<NodePropertyLine> {
             }
             lines
         }
+        NodeConfig::Operation(plan) => operation_property_lines(plan),
         NodeConfig::Condition(config) => vec![
             property_line("Type", DISPLAY_CONDITION),
             property_line(
@@ -220,6 +229,16 @@ pub fn property_lines_for_config(config: &NodeConfig) -> Vec<NodePropertyLine> {
             property_line("Summary", &config.safe_summary),
         ],
     }
+}
+
+fn operation_property_lines(plan: &crate::operation::InvocationPlan) -> Vec<NodePropertyLine> {
+    vec![
+        property_line("Type", DISPLAY_OPERATION),
+        property_line("Operation type", &plan.type_id),
+        property_line("Instance", &plan.instance_id),
+        property_line("Method", &plan.method),
+        property_line("Plan", &plan.identity),
+    ]
 }
 
 fn shell_property_lines(
@@ -317,6 +336,14 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
                 ));
             }
         }
+        NodeConfig::Operation(plan) => {
+            if crate::operation::planning::validate_plan_identity(plan).is_err() {
+                issues.push(issue(
+                    NodeKindValidationCode::InvalidOperation,
+                    format!("operation node '{node_label}' has an invalid invocation plan"),
+                ));
+            }
+        }
         NodeConfig::Condition(config) => {
             if let Err(error) = control_flow::validate_condition_config(config) {
                 issues.push(issue(NodeKindValidationCode::InvalidCondition, error.to_string()));
@@ -354,6 +381,7 @@ fn node_kind_for_portable_kind(kind: &str) -> Option<NodeKind> {
         KIND_FILE => Some(NodeKind::File),
         KIND_IMAGE_INPUT => Some(NodeKind::ImageInput),
         KIND_AGENT => Some(NodeKind::Agent),
+        KIND_OPERATION => Some(NodeKind::Operation),
         KIND_CONDITION => Some(NodeKind::Condition),
         KIND_MERGE => Some(NodeKind::Merge),
         KIND_SUBWORKFLOW => Some(NodeKind::Subworkflow),
@@ -369,6 +397,7 @@ fn provider_for_kind(kind: NodeKind) -> &'static dyn NodeKindProvider {
         NodeKind::File => &FILE_PROVIDER,
         NodeKind::ImageInput => &IMAGE_INPUT_PROVIDER,
         NodeKind::Agent => &AGENT_PROVIDER,
+        NodeKind::Operation => &OPERATION_PROVIDER,
         NodeKind::Condition => &CONDITION_PROVIDER,
         NodeKind::Merge => &MERGE_PROVIDER,
         NodeKind::Subworkflow => &SUBWORKFLOW_PROVIDER,
@@ -383,6 +412,7 @@ fn portable_kind_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::File => KIND_FILE,
         NodeKind::ImageInput => KIND_IMAGE_INPUT,
         NodeKind::Agent => KIND_AGENT,
+        NodeKind::Operation => KIND_OPERATION,
         NodeKind::Condition => KIND_CONDITION,
         NodeKind::Merge => KIND_MERGE,
         NodeKind::Subworkflow => KIND_SUBWORKFLOW,
@@ -397,6 +427,7 @@ fn display_label_for_node_kind(kind: NodeKind) -> &'static str {
         NodeKind::File => DISPLAY_FILE,
         NodeKind::ImageInput => DISPLAY_IMAGE_INPUT,
         NodeKind::Agent => DISPLAY_AGENT,
+        NodeKind::Operation => DISPLAY_OPERATION,
         NodeKind::Condition => DISPLAY_CONDITION,
         NodeKind::Merge => DISPLAY_MERGE,
         NodeKind::Subworkflow => DISPLAY_SUBWORKFLOW,

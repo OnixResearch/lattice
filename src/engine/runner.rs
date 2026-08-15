@@ -105,6 +105,7 @@ const RUNTIME_KIND_FILE: &str = "file";
 const RUNTIME_KIND_HTTP: &str = "http";
 const RUNTIME_KIND_IMAGE_INPUT: &str = "image_input";
 const RUNTIME_KIND_MERGE: &str = "merge";
+const RUNTIME_KIND_PROCESS: &str = "process";
 const RUNTIME_KIND_SHELL: &str = "shell";
 const RUNTIME_KIND_SUBWORKFLOW: &str = "subworkflow";
 const RUNTIME_KIND_APPROVAL: &str = "approval";
@@ -422,6 +423,7 @@ fn runtime_binding_for_config(config: &NodeConfig) -> RuntimeBinding {
         NodeConfig::Agent(settings) => {
             runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(settings.target))
         }
+        NodeConfig::Operation(plan) => runtime_binding(&plan.runtime.kind, &plan.runtime.key),
         NodeConfig::Condition(_) => runtime_binding(RUNTIME_KIND_CONDITION, RUNTIME_KEY_DEFAULT),
         NodeConfig::Merge(_) => runtime_binding(RUNTIME_KIND_MERGE, RUNTIME_KEY_DEFAULT),
         NodeConfig::Subworkflow(_) => runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
@@ -806,6 +808,7 @@ pub fn builtin_runtime_registry() -> RuntimeRegistry {
         runtime_binding(RUNTIME_KIND_MERGE, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_APPROVAL, RUNTIME_KEY_DEFAULT),
+        runtime_binding(RUNTIME_KIND_PROCESS, crate::operation::runtime::CAIRN_RUNTIME_KEY),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Pi)),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Clankers)),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Animus)),
@@ -872,7 +875,7 @@ fn runtime_effect_policy(binding: &RuntimeBinding) -> Option<&'static str> {
         RUNTIME_KIND_AGENT => Some(EFFECT_POLICY_AGENT),
         RUNTIME_KIND_FILE | RUNTIME_KIND_IMAGE_INPUT => Some(EFFECT_POLICY_FILE),
         RUNTIME_KIND_HTTP => Some(EFFECT_POLICY_HTTP),
-        RUNTIME_KIND_SHELL => Some(EFFECT_POLICY_PROCESS),
+        RUNTIME_KIND_SHELL | RUNTIME_KIND_PROCESS => Some(EFFECT_POLICY_PROCESS),
         RUNTIME_KIND_CONDITION | RUNTIME_KIND_MERGE | RUNTIME_KIND_SUBWORKFLOW | RUNTIME_KIND_APPROVAL => {
             Some(EFFECT_POLICY_PURE)
         }

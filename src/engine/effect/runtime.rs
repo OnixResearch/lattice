@@ -1,14 +1,16 @@
 //! Bounded product adapters selected after exact authorization.
 
+mod operation;
+
 use std::io::Write as _;
 
 const FILE_READ_ABILITY: &str = "file/read";
 const FILE_WRITE_ABILITY: &str = "file/write";
 const FILE_APPEND_ABILITY: &str = "file/append";
-const PROCESS_ABILITY: &str = "process/execute";
+pub(super) const PROCESS_ABILITY: &str = "process/execute";
 const NETWORK_ABILITY: &str = "network/request";
 const FILE_PLAN_DOMAIN: &[u8] = b"lattice.effect.file-plan.v1";
-const PROCESS_PLAN_DOMAIN: &[u8] = b"lattice.effect.process-plan.v1";
+pub(super) const PROCESS_PLAN_DOMAIN: &[u8] = b"lattice.effect.process-plan.v1";
 const NETWORK_PLAN_DOMAIN: &[u8] = b"lattice.effect.network-plan.v1";
 const DISPATCH_REQUEST_DOMAIN: &[u8] = b"lattice.effect.dispatch-request.v1";
 const PLAN_FIELD_SEPARATOR: &[u8] = &[0];
@@ -231,7 +233,7 @@ fn file_plan_fields(request: &FileAdapterRequest) -> Vec<String> {
     ]
 }
 
-fn process_plan_fields(request: &crate::agent_node::ProcessRequest) -> Vec<String> {
+pub(super) fn process_plan_fields(request: &crate::agent_node::ProcessRequest) -> Vec<String> {
     let mut fields = vec![
         request.program.clone(),
         request.cwd.clone().unwrap_or_default(),
@@ -257,7 +259,7 @@ fn network_plan_fields(request: &crate::http::HttpRequestPlan) -> Vec<String> {
     fields
 }
 
-fn plan_identity(domain: &[u8], fields: &[String]) -> String {
+pub(super) fn plan_identity(domain: &[u8], fields: &[String]) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(domain);
     for field in fields {

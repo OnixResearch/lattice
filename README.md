@@ -177,6 +177,8 @@ The built-in catalog also contains `cairn-agent-drain` and `octet-agent-burndown
 
 Lattice also provides an identity-bound [agent-evaluation lane](docs/agent-evaluation.md). The lane loads typed Nickel catalog and planning inputs, runs bounded command drivers, keeps objective gates authoritative, and stores metadata-only receipts. Live runs use preview-first commands and require exact operator, target, credential-reference, retention, and cleanup authority.
 
+[Typed operation contracts](docs/operation-contracts.md) define reusable methods separately from data-only instances. Direct runs and promoted workflow nodes share one identity-bound plan. Execution is bounded, preview-first, authority-checked, and metadata-only in durable evidence.
+
 Edit an existing Nickel file directly, or select a new path.
 
 ## Native OpenAI-compatible agents
@@ -369,7 +371,7 @@ verus verus/example_spec.rs
 - [FarmTable](https://github.com/scion-frontiers/farmtable) — ready-task and critical-path architecture reference.
 - [cap-std](https://github.com/bytecodealliance/cap-std) — capability-directory implementation.
 - [Animus](https://github.com/OnixResearch/animus) — adapter contracts and bounded agent loop.
-- [Swamp](https://github.com/swamp-club/swamp) — durable operation and manual-gate reference.
+- [Swamp](https://github.com/swamp-club/swamp) — AGPL-3.0 durable-operation and manual-gate design reference at revision `a648c1307fd5cffa029cb8348b2ec20cb727bd66`. It is not a dependency.
 - [Aspen Octet burn-down guard](../aspen/scripts/octet-burndown.scm) — guarded-round burn-down reference; not a Lattice runtime dependency.
 - [mc Ralph Cairn drain loop](../../mc/scripts/ralph-drain-cairns.scm) — bounded drain-loop reference; not a Lattice runtime dependency.
 - [universal-weave](https://github.com/transkatgirl/universal-weave) — Loom-style branching tree/DAG primitives. Design reference only for future branching-run exploration in the TUI. Not a dependency: the run DAG stays with Choregraph, and records stay in redb with BLAKE3 identity.

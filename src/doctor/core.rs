@@ -8,6 +8,7 @@ pub const CHECK_STORE: &str = "store";
 pub const CHECK_WORKFLOWS: &str = "workflows";
 pub const CHECK_CREDENTIALS: &str = "credentials";
 pub const CHECK_WEBHOOK_LISTENER: &str = "webhook_listener";
+pub const CHECK_OPERATION_CONTRACTS: &str = "operation_contracts";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]

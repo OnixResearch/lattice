@@ -623,7 +623,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.pure-core-deterministic"
@@ -635,7 +635,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.enumerated-failures-complete"
@@ -647,7 +647,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.healthy-findings-complete"
@@ -659,7 +659,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.deterministic-dual-renderers"
@@ -671,7 +671,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.mixed-json-output-complete"
@@ -683,7 +683,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.mixed-text-output-complete"
@@ -695,7 +695,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         },
         {
           "path": "tests/test_doctor.rs",
@@ -711,7 +711,7 @@
       "evidence": [
         {
           "path": "src/doctor/core.rs",
-          "blake3": "1adcbf27ee2fc97ee0b4ec4dabb58b9b04c90bb3dcc7eae41646c0edfb11554d"
+          "blake3": "9514463f2e7eb5bdcdd570841eec1559bee444a53a8c527ededeb0adafb8aa92"
         }
       ],
       "rationale_code": "assertions.json-sensitive-values-redacted"

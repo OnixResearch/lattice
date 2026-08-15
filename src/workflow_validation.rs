@@ -44,6 +44,7 @@ pub enum WorkflowDiagnosticCode {
     UnsupportedImageFormat,
     InvalidImageByteBudget,
     EmptyAgentPrompt,
+    InvalidOperationConfig,
     InvalidConditionConfig,
     InvalidMergeConfig,
     InvalidSubworkflowConfig,
@@ -204,6 +205,7 @@ fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDia
         NodeKindValidationCode::UnsupportedImageFormat => WorkflowDiagnosticCode::UnsupportedImageFormat,
         NodeKindValidationCode::InvalidImageByteBudget => WorkflowDiagnosticCode::InvalidImageByteBudget,
         NodeKindValidationCode::EmptyAgentPrompt => WorkflowDiagnosticCode::EmptyAgentPrompt,
+        NodeKindValidationCode::InvalidOperation => WorkflowDiagnosticCode::InvalidOperationConfig,
         NodeKindValidationCode::InvalidCondition => WorkflowDiagnosticCode::InvalidConditionConfig,
         NodeKindValidationCode::InvalidMerge => WorkflowDiagnosticCode::InvalidMergeConfig,
         NodeKindValidationCode::InvalidSubworkflow => WorkflowDiagnosticCode::InvalidSubworkflowConfig,
@@ -264,23 +266,38 @@ fn validate_config_expressions(
                 validate_expression_field(node_id, "allowed_root", root, diagnostics);
             }
         }
-        NodeConfig::Agent(settings) => {
-            validate_expression_field(node_id, "prompt", &settings.prompt, diagnostics);
-            if let Some(model_hint) = &settings.model_hint {
-                validate_expression_field(node_id, "model_hint", model_hint, diagnostics);
-            }
-            validate_expression_field(node_id, "tool_policy", &settings.tool_policy, diagnostics);
-            for context_ref in &settings.context_refs {
-                validate_expression_field(node_id, "context_ref", context_ref, diagnostics);
-            }
-            if let Some(cwd) = &settings.cwd {
-                validate_expression_field(node_id, "cwd", cwd, diagnostics);
-            }
-            if let Some(session) = &settings.session {
-                validate_expression_field(node_id, "session", session, diagnostics);
-            }
-        }
-        NodeConfig::Condition(_) | NodeConfig::Merge(_) | NodeConfig::Subworkflow(_) | NodeConfig::Approval(_) => {}
+        NodeConfig::Agent(settings) => validate_agent_expressions(node_id, settings, diagnostics),
+        NodeConfig::Operation(_)
+        | NodeConfig::Condition(_)
+        | NodeConfig::Merge(_)
+        | NodeConfig::Subworkflow(_)
+        | NodeConfig::Approval(_) => {}
+    }
+}
+
+#[allow(
+    unknown_lints,
+    borrowed_argument_types,
+    reason = "agent expression validation appends findings to the caller-owned diagnostic accumulator"
+)]
+fn validate_agent_expressions(
+    node_id: crate::engine::workflow::NodeId,
+    settings: &crate::agent_node::AgentNodeSettings,
+    diagnostics: &mut Vec<WorkflowDiagnostic>,
+) {
+    validate_expression_field(node_id, "prompt", &settings.prompt, diagnostics);
+    if let Some(model_hint) = &settings.model_hint {
+        validate_expression_field(node_id, "model_hint", model_hint, diagnostics);
+    }
+    validate_expression_field(node_id, "tool_policy", &settings.tool_policy, diagnostics);
+    for context_ref in &settings.context_refs {
+        validate_expression_field(node_id, "context_ref", context_ref, diagnostics);
+    }
+    if let Some(cwd) = &settings.cwd {
+        validate_expression_field(node_id, "cwd", cwd, diagnostics);
+    }
+    if let Some(session) = &settings.session {
+        validate_expression_field(node_id, "session", session, diagnostics);
     }
 }
 
@@ -408,6 +425,7 @@ fn validate_control_flow_topology(workflow: &Workflow, diagnostics: &mut Vec<Wor
                 | NodeConfig::File { .. }
                 | NodeConfig::ImageInput { .. }
                 | NodeConfig::Agent(_)
+                | NodeConfig::Operation(_)
                 | NodeConfig::Approval(_),
             )
             | None => {}

@@ -63,6 +63,7 @@ const EFFECT_RESOURCE_NETWORK_PREFIX: &str = "lattice://network/";
 const EFFECT_OPERATION_SHELL: &str = "lattice/shell";
 const EFFECT_OPERATION_HTTP: &str = "lattice/http";
 const EFFECT_OPERATION_FILE: &str = "lattice/file";
+const EFFECT_OPERATION_TYPED: &str = "lattice/operation";
 const EFFECT_ABILITY_PROCESS: &str = "process/execute";
 const EFFECT_ABILITY_NETWORK: &str = "network/request";
 const EFFECT_ABILITY_FILE_READ: &str = "file/read";
@@ -108,6 +109,7 @@ const HASH_TAG_HTTP_CONFIG: &[u8] = b"http-config";
 const HASH_TAG_FILE_CONFIG: &[u8] = b"file-config";
 const HASH_TAG_IMAGE_INPUT_CONFIG: &[u8] = b"image-input-config";
 const HASH_TAG_AGENT_CONFIG: &[u8] = b"agent-config";
+const HASH_TAG_OPERATION_CONFIG: &[u8] = b"operation-config";
 const HASH_TAG_CONDITION_CONFIG: &[u8] = b"condition-config";
 const HASH_TAG_MERGE_CONFIG: &[u8] = b"merge-config";
 const HASH_TAG_SUBWORKFLOW_CONFIG: &[u8] = b"subworkflow-config";
@@ -291,6 +293,10 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
         NodeConfig::Agent(settings) => {
             hasher.update(HASH_TAG_AGENT_CONFIG);
             update_agent_settings_hash(hasher, settings);
+        }
+        NodeConfig::Operation(plan) => {
+            hasher.update(HASH_TAG_OPERATION_CONFIG);
+            update_str(hasher, HASH_TAG_OPERATION_CONFIG, &plan.identity);
         }
         NodeConfig::Condition(config) => {
             hasher.update(HASH_TAG_CONDITION_CONFIG);
@@ -616,6 +622,7 @@ fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
         NodeConfig::Shell { .. } => Some(EFFECT_OPERATION_SHELL),
         NodeConfig::Http { .. } => Some(EFFECT_OPERATION_HTTP),
         NodeConfig::File { .. } => Some(EFFECT_OPERATION_FILE),
+        NodeConfig::Operation(_) => Some(EFFECT_OPERATION_TYPED),
         NodeConfig::ImageInput { .. }
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
@@ -634,6 +641,7 @@ fn effect_ability(config: &NodeConfig) -> Option<&'static str> {
             FileOperationKind::Write => EFFECT_ABILITY_FILE_WRITE,
             FileOperationKind::Append => EFFECT_ABILITY_FILE_APPEND,
         }),
+        NodeConfig::Operation(_) => Some(EFFECT_ABILITY_PROCESS),
         NodeConfig::ImageInput { .. }
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
@@ -648,6 +656,7 @@ fn effect_resource(config: &NodeConfig, node_id: crate::engine::workflow::NodeId
         NodeConfig::Shell { .. } => EFFECT_RESOURCE_PROCESS_PREFIX,
         NodeConfig::Http { .. } => EFFECT_RESOURCE_NETWORK_PREFIX,
         NodeConfig::File { .. } => EFFECT_RESOURCE_FILE_PREFIX,
+        NodeConfig::Operation(_) => EFFECT_RESOURCE_PROCESS_PREFIX,
         NodeConfig::ImageInput { .. }
         | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
@@ -2001,6 +2010,84 @@ impl Executor {
                         node_id,
                         status: NodeStatus::Failed {
                             error: error.to_string(),
+                        },
+                        input_hash,
+                    },
+                }
+            }
+            NodeConfig::Operation(plan) => {
+                let Some(output_port) = node.output_ports.first().map(|port| port.id) else {
+                    return StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: "operation node output port is missing".to_string(),
+                        },
+                        input_hash,
+                    };
+                };
+                let request =
+                    match crate::operation::runtime::prepare_process_request(plan, self.credential_provider.as_ref()) {
+                        Ok(request) => request,
+                        Err(observation) => {
+                            return StepResult {
+                                node_id,
+                                status: NodeStatus::Failed {
+                                    error: observation.diagnostic,
+                                },
+                                input_hash,
+                            };
+                        }
+                    };
+                let payload = crate::engine::effect::runtime::process_plan_identity(&request.process);
+                let dispatched = match effect {
+                    EffectExecution::Exact { binding, dispatch } => {
+                        if !authorized_request_matches_payload(binding, &payload) {
+                            Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_string())
+                        } else {
+                            let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                dispatch,
+                                self.http_client.as_ref(),
+                                &self.local_process,
+                                self.cancellation.as_ref(),
+                            );
+                            dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error)
+                        }
+                    }
+                    EffectExecution::Product(session) => {
+                        let binding = session.bind_effect(node_id, &payload).map_err(choregraph_execution_error);
+                        binding.and_then(|binding| {
+                            let dispatch = session.dispatch();
+                            let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                dispatch,
+                                self.http_client.as_ref(),
+                                &self.local_process,
+                                self.cancellation.as_ref(),
+                            );
+                            dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error)
+                        })
+                    }
+                    EffectExecution::Compatibility => Err("operation execution requires product authority".to_string()),
+                };
+                let observation = match dispatched {
+                    Ok(Ok(output)) => {
+                        crate::operation::runtime::classify_process_output(plan, output, &request.secret_values)
+                            .unwrap_or_else(std::convert::identity)
+                    }
+                    Ok(Err(error)) => crate::operation::runtime::process_failure(error),
+                    Err(_) => {
+                        crate::operation::runtime::unknown("operation authority or process outcome is unavailable")
+                    }
+                };
+                match (observation.class, observation.output) {
+                    (crate::operation::runtime::ObservationClass::Completed, Some(output)) => {
+                        let mut outputs = HashMap::new();
+                        outputs.insert(output_port, Value::from_json(output));
+                        completed_step_result(node_id, input_hash, node, outputs, false)
+                    }
+                    _ => StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: observation.diagnostic,
                         },
                         input_hash,
                     },

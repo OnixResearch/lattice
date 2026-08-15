@@ -156,6 +156,7 @@ fn inspect_node<'a>(
         crate::engine::workflow::NodeConfig::Http { .. }
         | crate::engine::workflow::NodeConfig::File { .. }
         | crate::engine::workflow::NodeConfig::ImageInput { .. }
+        | crate::engine::workflow::NodeConfig::Operation(_)
         | crate::engine::workflow::NodeConfig::Subworkflow(_)
         | crate::engine::workflow::NodeConfig::Approval(_) => return Err(Error::InvalidNodeShape),
     }

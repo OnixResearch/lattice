@@ -91,6 +91,8 @@
           path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/workflow-templates/" (toString path);
         isAgentEvaluationAssetPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/agent-evaluations/" (toString path);
+        isOperationAssetPath =
+          path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/operations/" (toString path);
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
         isIdentityAuditAssetPath =
           path:
@@ -112,6 +114,7 @@
             || isPolicyAssetPath path
             || isWorkflowTemplateAssetPath path
             || isAgentEvaluationAssetPath path
+            || isOperationAssetPath path
             || isRepositoryValidationAssetPath path
             || isIdentityAuditAssetPath path;
         };
@@ -571,6 +574,23 @@
               touch "$out"
             '';
 
+        operationContractCheck =
+          pkgs.runCommand "lattice-operation-contracts"
+            {
+              nativeBuildInputs = [ pkgs.nickel ];
+            }
+            ''
+              nickel typecheck ${src}/policy/operation-contracts.ncl
+              unexpected_success=1
+              nickel export --format json ${src}/builtins/operations/catalog.ncl > catalog.json
+              nickel export --format json ${src}/builtins/operations/instances.example.ncl > instances.json
+              if nickel export --format json ${src}/tests/fixtures/operations/catalog-unknown-field.ncl > /dev/null 2>&1; then
+                echo "invalid operation catalog unexpectedly exported" >&2
+                exit "$unexpected_success"
+              fi
+              touch "$out"
+            '';
+
         # Build the actual package
         lattice = craneLib.buildPackage {
           inherit
@@ -615,7 +635,19 @@
             cargoTestExtraArgs = "--test test_agent_evaluation_core --test test_agent_evaluation_shell";
           };
 
+          operation-contracts = craneLib.cargoTest {
+            inherit
+              src
+              cargoArtifacts
+              cargoVendorDir
+              nativeBuildInputs
+              buildInputs
+              ;
+            cargoTestExtraArgs = "--test test_operation_contracts --test test_operation_cli";
+          };
+
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
+          operation-contract-catalog = operationContractCheck;
 
           # Clippy lints
           clippy = craneLib.cargoClippy {

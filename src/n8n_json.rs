@@ -515,6 +515,7 @@ fn export_node_to_n8n_json(
         NodeConfig::File { .. }
         | NodeConfig::ImageInput { .. }
         | NodeConfig::Agent(_)
+        | NodeConfig::Operation(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
         | NodeConfig::Subworkflow(_)

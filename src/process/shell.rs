@@ -21,8 +21,16 @@ pub fn run_bounded_clear_environment(
     request: &crate::agent_node::ProcessRequest,
     config: &super::core::RuntimeConfig,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
+    run_bounded_clear_environment_with_cancellation(request, config, None)
+}
+
+pub fn run_bounded_clear_environment_with_cancellation(
+    request: &crate::agent_node::ProcessRequest,
+    config: &super::core::RuntimeConfig,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
     debug_assert!(request.env.is_empty());
-    run_bounded_with_environment(request, config, None, bounded_exec::EnvironmentMode::Clear)
+    run_bounded_with_environment(request, config, cancellation, bounded_exec::EnvironmentMode::Clear)
 }
 
 fn run_bounded_with_environment(

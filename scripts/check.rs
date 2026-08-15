@@ -78,6 +78,13 @@ const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[
     "--test",
     "test_agent_evaluation_shell",
 ];
+const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
+    "test",
+    "--test",
+    "test_operation_contracts",
+    "--test",
+    "test_operation_cli",
+];
 const TEST_ARGS: &[&str] = &["test"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
@@ -206,6 +213,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "agent evaluation",
         program: CARGO_PROGRAM,
         args: AGENT_EVALUATION_TEST_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "operation contracts",
+        program: CARGO_PROGRAM,
+        args: OPERATION_CONTRACT_TEST_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
@@ -366,8 +379,7 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
 }
 
 fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
-    let marker_index = heading_index + LINE_NUMBER_BASE;
-    let Some(marker_line) = lines.get(marker_index).map(|line| line.trim()) else {
+    let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(
             path,
             heading_index,
@@ -375,6 +387,7 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
         ));
         return;
     };
+    let marker_line = lines[marker_index].trim();
 
     if !marker_line.starts_with("r[") {
         diagnostics.push(diagnostic(path, marker_index, "requirement must start with an r[...] marker"));
@@ -389,11 +402,11 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
 }
 
 fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
-    let marker_index = heading_index + LINE_NUMBER_BASE;
-    let Some(marker_line) = lines.get(marker_index).map(|line| line.trim()) else {
+    let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(path, heading_index, "scenario heading must be followed by an r[...] marker line"));
         return;
     };
+    let marker_line = lines[marker_index].trim();
 
     if !marker_line.starts_with("r[") {
         diagnostics.push(diagnostic(path, marker_index, "scenario must start with an r[...] marker"));
@@ -414,6 +427,15 @@ fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnosti
             ));
         }
     }
+}
+
+fn next_nonempty_line_index(lines: &[&str], heading_index: usize) -> Option<usize> {
+    lines
+        .iter()
+        .enumerate()
+        .skip(heading_index + LINE_NUMBER_BASE)
+        .take_while(|(_, line)| !line.trim_start().starts_with("###"))
+        .find_map(|(index, line)| (!line.trim().is_empty()).then_some(index))
 }
 
 fn diagnostic(path: &str, zero_based_line_index: usize, message: &str) -> SpecDiagnostic {

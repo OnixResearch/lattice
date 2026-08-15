@@ -109,6 +109,7 @@ pub enum NodeConfig {
         max_bytes: usize,
     },
     Agent(AgentNodeSettings),
+    Operation(Box<crate::operation::InvocationPlan>),
     Condition(ConditionNodeConfig),
     Merge(MergeNodeConfig),
     Subworkflow(SubworkflowNodeConfig),
@@ -158,6 +159,10 @@ impl NodeConfig {
         Self::Agent(AgentNodeSettings::new(target, prompt, output_mode))
     }
 
+    pub fn operation(plan: crate::operation::InvocationPlan) -> Self {
+        Self::Operation(Box::new(plan))
+    }
+
     pub fn condition(config: ConditionNodeConfig) -> Self {
         Self::Condition(config)
     }
@@ -181,6 +186,7 @@ impl NodeConfig {
             Self::File { .. } => "File",
             Self::ImageInput { .. } => "Image Input",
             Self::Agent(_) => "Agent",
+            Self::Operation(_) => "Operation",
             Self::Condition(_) => "Condition",
             Self::Merge(_) => "Merge",
             Self::Subworkflow(_) => "Subworkflow",
@@ -354,6 +360,13 @@ impl Workflow {
             ],
         );
         self.configs.insert(id.0, NodeConfig::agent(target, prompt, output_mode));
+        id
+    }
+
+    /// Add a typed operation node with one validated JSON result.
+    pub fn add_operation_node(&mut self, label: impl Into<String>, plan: crate::operation::InvocationPlan) -> NodeId {
+        let id = self.graph.add_node(label, &[], &[PortSpec::new("result", TypeTag::Json.as_str())]);
+        self.configs.insert(id.0, NodeConfig::operation(plan));
         id
     }
 
