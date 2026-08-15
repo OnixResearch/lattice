@@ -100,6 +100,8 @@ enum CliCommand {
     Evaluation(lattice::agent_evaluation::cli::CommandArgs),
     /// Inspect, plan, run, and promote typed operation contracts
     Operation(lattice::operation::cli::CommandArgs),
+    /// Inspect and manage immutable versioned operation data
+    OperationData(lattice::operation_data::cli::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -427,6 +429,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Some(CliCommand::Operation(operation_args)) = &args.command {
         return Ok(lattice::operation::cli::run(&app_config, operation_args));
     }
+    if let Some(CliCommand::OperationData(operation_data_args)) = &args.command {
+        return Ok(lattice::operation_data::cli::run(&app_config, operation_data_args));
+    }
 
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
         tracing::warn!(error = %e, "failed to create data dir");
@@ -467,6 +472,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         }
         Some(CliCommand::Operation(_)) => {
             unreachable!("operation command returns before generic data-directory side effects")
+        }
+        Some(CliCommand::OperationData(_)) => {
+            unreachable!("operation data command returns before generic data-directory side effects")
         }
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         None => {

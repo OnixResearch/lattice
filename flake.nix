@@ -591,6 +591,22 @@
               touch "$out"
             '';
 
+        operationDataPolicyCheck =
+          pkgs.runCommand "lattice-operation-data-policy"
+            {
+              nativeBuildInputs = [ pkgs.nickel ];
+            }
+            ''
+              unexpected_success=1
+              nickel typecheck ${src}/policy/operation-data.ncl
+              nickel export --format json ${src}/tests/fixtures/operation-data/query-valid.ncl > query.json
+              if nickel export --format json ${src}/tests/fixtures/operation-data/query-invalid-identity.ncl > /dev/null 2>&1; then
+                echo "invalid operation-data query unexpectedly exported" >&2
+                exit "$unexpected_success"
+              fi
+              touch "$out"
+            '';
+
         # Build the actual package
         lattice = craneLib.buildPackage {
           inherit
@@ -646,8 +662,20 @@
             cargoTestExtraArgs = "--test test_operation_contracts --test test_operation_cli";
           };
 
+          operation-data = craneLib.cargoTest {
+            inherit
+              src
+              cargoArtifacts
+              cargoVendorDir
+              nativeBuildInputs
+              buildInputs
+              ;
+            cargoTestExtraArgs = "--test test_operation_data";
+          };
+
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
           operation-contract-catalog = operationContractCheck;
+          operation-data-policy = operationDataPolicyCheck;
 
           # Clippy lints
           clippy = craneLib.cargoClippy {

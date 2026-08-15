@@ -179,6 +179,8 @@ Lattice also provides an identity-bound [agent-evaluation lane](docs/agent-evalu
 
 [Typed operation contracts](docs/operation-contracts.md) define reusable methods separately from data-only instances. Direct runs and promoted workflow nodes share one identity-bound plan. Execution is bounded, preview-first, authority-checked, and metadata-only in durable evidence.
 
+[Immutable operation data](docs/operation-data.md) preserves selected outputs as exact resource or file versions. A closed query IR resolves dynamic selectors before dispatch. Retention and orphan pruning remain separate.
+
 Edit an existing Nickel file directly, or select a new path.
 
 ## Native OpenAI-compatible agents

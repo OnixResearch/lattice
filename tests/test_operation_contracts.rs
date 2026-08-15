@@ -879,6 +879,26 @@ fn operation_metadata_discovery_does_not_require_an_executor_or_credential_provi
 }
 
 #[test]
+fn operation_data_inputs_bind_exact_versions_into_the_invocation_identity() {
+    let fixture = fixture(r#"{"valid":true}"#);
+    let input = lattice::operation_data::ResolvedInput {
+        version_identity: operation::identity::hash_bytes("test.operation-data-version.v1", b"version"),
+        content_identity: operation::identity::hash_bytes("test.operation-data-content.v1", b"content"),
+    };
+    let bound =
+        lattice::operation_data::bind_resolved_inputs(&fixture.plan, vec![input.clone()]).expect("bound invocation");
+    lattice::operation_data::validate_bound_invocation_plan(&bound).expect("valid bound invocation");
+    assert_eq!(bound.base_invocation_identity, fixture.plan.identity);
+    assert_eq!(bound.resolved_data_inputs, vec![input.clone()]);
+
+    let mut tampered = bound;
+    tampered.resolved_data_inputs[0].content_identity =
+        operation::identity::hash_bytes("test.operation-data-content.v1", b"changed");
+    assert!(lattice::operation_data::validate_bound_invocation_plan(&tampered).is_err());
+    assert!(lattice::operation_data::bind_resolved_inputs(&fixture.plan, vec![input.clone(), input]).is_err());
+}
+
+#[test]
 fn test_clock_is_monotonic() {
     let clock = TestClock::new();
     assert!(clock.observe_epoch_millis() < clock.observe_epoch_millis());

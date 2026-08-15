@@ -307,9 +307,9 @@ impl Store {
             let _ = txn.open_table(EVALUATION_TRIALS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(EVALUATION_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(OPERATION_RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
+            ensure_operation_data_tables(&txn)?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
-
         Ok(())
     }
 
@@ -659,6 +659,7 @@ include!("gate/transition.rs");
 include!("run/records.rs");
 include!("agent/evaluation.rs");
 include!("operation.rs");
+include!("operation/data.rs");
 
 impl Store {
     // r[impl lattice.agent_orchestration.nominal_identities.wire_boundary]

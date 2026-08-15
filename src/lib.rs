@@ -22,6 +22,7 @@ pub mod nickel;
 pub mod node_kind_provider;
 pub mod openai;
 pub mod operation;
+pub mod operation_data;
 pub mod orchestration;
 pub mod process;
 pub mod protocol_cli {
