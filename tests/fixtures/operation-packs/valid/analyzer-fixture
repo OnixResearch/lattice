@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+analyze_command="analyze"
+if [ "${1:-}" != "$analyze_command" ]; then
+  unsupported_request_exit=2
+  exit "$unsupported_request_exit"
+fi
+while IFS= read -r input_line; do
+  :
+done
+printf '%s\n' '{"schema":"lattice.operation-pack-analyzer-output.v1","structured":{"summary":"bounded fixture analysis"},"markdown":"# Analysis\\n\\nBounded fixture analysis.","non_claims":["analyzer output does not strengthen the original operation observation"]}'

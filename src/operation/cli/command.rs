@@ -41,7 +41,7 @@ fn render_methods(args: &MethodsArgs) -> Result<(), super::Error> {
 }
 
 fn plan_from_args(args: &PlanArgs) -> Result<AdmittedPlan, super::Error> {
-    admit(PlanInput {
+    admit_for_pack(PlanInput {
         catalog_path: &args.source.catalog,
         instances_path: &args.source.instances,
         instance_id: &args.instance,

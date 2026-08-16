@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  change)
+    printf '%s\n' '{"root":"fixture","layout":"cairn","changes":[]}'
+    ;;
+  validate)
+    printf '%s\n' '{"valid":true,"findings":[],"issues":[]}'
+    ;;
+  *)
+    printf '%s\n' '{"valid":false,"findings":[],"issues":["unsupported fixture request"]}'
+    unsupported_request_exit=2
+    exit "$unsupported_request_exit"
+    ;;
+esac

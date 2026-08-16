@@ -106,10 +106,10 @@ pub struct PlanInput<'a> {
     pub executable_path: &'a std::path::Path,
 }
 
-struct AdmittedPlan {
-    catalog: super::model::ValidatedCatalog,
-    instance: super::model::ValidatedInstance,
-    plan: super::model::InvocationPlan,
+pub(crate) struct AdmittedPlan {
+    pub(crate) catalog: super::model::ValidatedCatalog,
+    pub(crate) instance: super::model::ValidatedInstance,
+    pub(crate) plan: super::model::InvocationPlan,
 }
 
 pub fn catalog_report(
@@ -126,7 +126,11 @@ pub fn catalog_report(
 }
 
 pub fn admit_plan(input: PlanInput<'_>) -> Result<super::model::InvocationPlan, super::Error> {
-    Ok(admit(input)?.plan)
+    Ok(admit_for_pack(input)?.plan)
+}
+
+pub(crate) fn admit_for_pack(input: PlanInput<'_>) -> Result<AdmittedPlan, super::Error> {
+    admit_for_pack_with_runtime(input, &crate::process::core::RuntimeConfig::default())
 }
 
 #[allow(
@@ -134,7 +138,10 @@ pub fn admit_plan(input: PlanInput<'_>) -> Result<super::model::InvocationPlan, 
     function_length,
     reason = "one admission function keeps the exact catalog, instance, executable, policy, and preflight sequence visible"
 )]
-fn admit(input: PlanInput<'_>) -> Result<AdmittedPlan, super::Error> {
+pub(crate) fn admit_for_pack_with_runtime(
+    input: PlanInput<'_>,
+    process_runtime: &crate::process::core::RuntimeConfig,
+) -> Result<AdmittedPlan, super::Error> {
     let catalog = super::format::load_catalog(input.catalog_path)?;
     let mut instances = super::format::load_instances(input.instances_path, &catalog)?;
     let instance = instances.remove(input.instance_id).ok_or_else(|| {
@@ -168,7 +175,6 @@ fn admit(input: PlanInput<'_>) -> Result<AdmittedPlan, super::Error> {
         .credentials
         .values()
         .all(|reference| crate::credentials::validate_secret_ref(reference).is_ok());
-    let process_runtime = crate::process::core::RuntimeConfig::default();
     let runtime = super::model::RuntimeFact {
         kind: operation_type.definition.runtime.kind.clone(),
         key: operation_type.definition.runtime.key.clone(),

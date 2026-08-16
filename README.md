@@ -181,6 +181,8 @@ Lattice also provides an identity-bound [agent-evaluation lane](docs/agent-evalu
 
 [Immutable operation data](docs/operation-data.md) preserves selected outputs as exact resource or file versions. A closed query IR resolves dynamic selectors before dispatch. Retention and orphan pruning remain separate.
 
+[Content-addressed operation packs](docs/operation-packs.md) distribute exact catalogs, external runtimes, analyzers, and passive skills. Pure admission binds trust, platform, license, capability, dependency, evidence, and lock facts before any effect.
+
 Edit an existing Nickel file directly, or select a new path.
 
 ## Native OpenAI-compatible agents

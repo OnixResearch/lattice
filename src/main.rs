@@ -102,6 +102,8 @@ enum CliCommand {
     Operation(lattice::operation::cli::CommandArgs),
     /// Inspect and manage immutable versioned operation data
     OperationData(lattice::operation_data::cli::CommandArgs),
+    /// Inspect, lock, install, run, and diagnose content-addressed operation packs
+    Pack(lattice::operation_pack::cli::CommandArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -432,6 +434,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Some(CliCommand::OperationData(operation_data_args)) = &args.command {
         return Ok(lattice::operation_data::cli::run(&app_config, operation_data_args));
     }
+    if let Some(CliCommand::Pack(pack_args)) = &args.command {
+        return Ok(lattice::operation_pack::cli::run(&app_config, pack_args));
+    }
 
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
         tracing::warn!(error = %e, "failed to create data dir");
@@ -475,6 +480,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         }
         Some(CliCommand::OperationData(_)) => {
             unreachable!("operation data command returns before generic data-directory side effects")
+        }
+        Some(CliCommand::Pack(_)) => {
+            unreachable!("operation pack command returns before generic data-directory side effects")
         }
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         None => {
