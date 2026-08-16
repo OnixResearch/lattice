@@ -607,6 +607,23 @@
               touch "$out"
             '';
 
+        operationPackPolicyCheck =
+          pkgs.runCommand "lattice-operation-pack-policy"
+            {
+              nativeBuildInputs = [ pkgs.nickel ];
+            }
+            ''
+              unexpected_success=1
+              nickel typecheck ${src}/policy/operation-packs.ncl
+              nickel export --format json ${src}/tests/fixtures/operation-packs/manifest-policy-valid.ncl > manifest.json
+              nickel export --format json ${src}/tests/fixtures/operation-packs/registry-valid.ncl > registry.json
+              if nickel export --format json ${src}/tests/fixtures/operation-packs/manifest-policy-invalid.ncl > /dev/null 2>&1; then
+                echo "invalid operation-pack manifest unexpectedly exported" >&2
+                exit "$unexpected_success"
+              fi
+              touch "$out"
+            '';
+
         # Build the actual package
         lattice = craneLib.buildPackage {
           inherit
@@ -673,9 +690,21 @@
             cargoTestExtraArgs = "--test test_operation_data";
           };
 
+          operation-packs = craneLib.cargoTest {
+            inherit
+              src
+              cargoArtifacts
+              cargoVendorDir
+              nativeBuildInputs
+              buildInputs
+              ;
+            cargoTestExtraArgs = "--test test_operation_pack_core --test test_operation_pack_analyzers --test test_operation_pack_shell --test test_operation_pack_cli";
+          };
+
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
           operation-contract-catalog = operationContractCheck;
           operation-data-policy = operationDataPolicyCheck;
+          operation-pack-policy = operationPackPolicyCheck;
 
           # Clippy lints
           clippy = craneLib.cargoClippy {
