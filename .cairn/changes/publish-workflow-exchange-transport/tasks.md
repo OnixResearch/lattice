@@ -21,4 +21,4 @@
 - [x] [parallel] Add negative malformed, oversized, stale, peer, timeout, disconnect, and handler tests. r[lattice.workflow_interchange.transport_evidence]
 - [x] [parallel] Add producer fixtures, documentation, and consumer integration guidance. r[lattice.workflow_interchange.transport_evidence]
 - [x] [serial] Add strict Octet deny-all, Clippy, format, and Nix verification rails. r[lattice.workflow_interchange.transport_evidence]
-- [ ] [serial] Run repository checks, record evidence, sync the accepted specification, and archive the change. r[lattice.workflow_interchange.transport_evidence]
+- [x] [serial] Run repository checks, record evidence, sync the accepted specification, and archive the change. r[lattice.workflow_interchange.transport_evidence]

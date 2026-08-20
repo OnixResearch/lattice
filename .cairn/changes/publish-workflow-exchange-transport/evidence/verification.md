@@ -45,8 +45,12 @@ The final Tracey report contains no `lattice.workflow_interchange` item in its m
 
 ## Repository gates
 
-- `scripts/check.rs`: pending final run
-- `nix flake check -L --option secret-key-files ''`: pending final run
+- `scripts/check.rs`: pass
+- `nix flake check -L --option secret-key-files ''`: pass
+
+One concurrent full run exposed an unrelated analyzer timing failure. The isolated Nextest derivation then passed all 1,024 tests.
+
+A later full run exposed an unrelated process-spawn failure. The isolated Lattice derivation passed, and the final full flake check passed.
 
 ## Claim boundary
 
