@@ -8,7 +8,7 @@ description = "Versioned no-std workflow request and observation contract for La
 publish = false
 
 [workspace]
-members = ["."]
+members = [".", "transport"]
 resolver = "3"
 
 [workspace.metadata.octet]

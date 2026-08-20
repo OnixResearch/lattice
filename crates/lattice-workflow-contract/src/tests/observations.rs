@@ -1,6 +1,7 @@
 use super::*;
 
 // r[verify lattice.workflow_interchange.observation]
+// r[verify lattice.workflow_interchange.observation.scenario.completed]
 #[test]
 fn linked_terminal_observation_is_admitted() {
     let profile = profile();
@@ -11,6 +12,7 @@ fn linked_terminal_observation_is_admitted() {
     assert_eq!(validate_observation(&profile, &request, &accepted, &observation), Ok(()));
 }
 
+// r[verify lattice.workflow_interchange.observation.scenario.paused]
 #[test]
 fn paused_observation_cannot_claim_terminal_success() {
     let profile = profile();
@@ -25,6 +27,7 @@ fn paused_observation_cannot_claim_terminal_success() {
     assert_eq!(error.code, ErrorCode::ObservationStateMismatch);
 }
 
+// r[verify lattice.workflow_interchange.observation.scenario.stale]
 #[test]
 fn stale_execution_observation_is_rejected() {
     let profile = profile();
@@ -65,6 +68,7 @@ fn oversized_log_observation_is_rejected() {
     assert_eq!(error.code, ErrorCode::ObservationLimit);
 }
 
+// r[verify lattice.workflow_interchange.controls_logs.scenario.gap]
 #[test]
 fn log_retention_gap_remains_explicit_and_admitted() {
     let profile = profile();
@@ -89,6 +93,7 @@ fn malformed_wire_identity_is_rejected_during_decode() {
 }
 
 // r[verify lattice.workflow_interchange.controls_logs]
+// r[verify lattice.workflow_interchange.controls_logs.scenario.cancel]
 #[test]
 fn controls_require_exact_execution_and_sequence() {
     let profile = profile();
@@ -110,6 +115,7 @@ fn controls_require_exact_execution_and_sequence() {
     assert_eq!(error.code, ErrorCode::ControlLinkageMismatch);
 }
 
+// r[verify lattice.workflow_interchange.controls_logs.scenario.log-bound]
 #[test]
 fn log_reads_are_bounded_and_linked() {
     let profile = profile();

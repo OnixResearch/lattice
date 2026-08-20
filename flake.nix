@@ -99,7 +99,7 @@
               exit 1
             fi
             cd crates/lattice-workflow-contract
-            exec cargo-octet check "$@"
+            exec cargo-octet check -p lattice-workflow-contract "$@"
           '';
         };
         workflowContractOctetCheck =
@@ -107,9 +107,57 @@
             inherit system;
             src = workflowContractRoot;
             cargoLock = workflowContractRoot + "/Cargo.lock";
+            packages = [ "lattice-workflow-contract" ];
           }).overrideAttrs
             (_old: {
               DYLINT_RUSTFLAGS = workflowContractOctetFlags;
+            });
+
+        workflowTransportRoot = workflowContractRoot + "/transport";
+        workflowTransportSource = workflowContractSource;
+        workflowTransportVendorDir = workflowContractVendorDir;
+        workflowTransportCargoExtraArgs = "--package lattice-workflow-transport --all-features";
+        workflowTransportCommonArgs = {
+          pname = "lattice-workflow-transport";
+          version = "0.1.0";
+          src = workflowTransportSource;
+          cargoLock = workflowContractRoot + "/Cargo.lock";
+          cargoVendorDir = workflowTransportVendorDir;
+          strictDeps = true;
+        };
+        workflowTransportCargoArtifacts = workflowContractCraneLib.buildDepsOnly (
+          workflowTransportCommonArgs
+          // {
+            cargoExtraArgs = workflowTransportCargoExtraArgs;
+          }
+        );
+        workflowTransportOctetConfig =
+          (builtins.fromJSON (builtins.readFile (workflowTransportRoot + "/config/octet-deny-all.json")))
+          .config;
+        workflowTransportOctetFlags = builtins.concatStringsSep " " (
+          map (lint: "-D ${lint}") workflowTransportOctetConfig.lints
+        );
+        workflowTransportOctetRunner = pkgs.writeShellApplication {
+          name = "lattice-workflow-transport-octet-deny-all";
+          runtimeInputs = [ octet.packages.${system}.cargo-octet ];
+          text = ''
+            export DYLINT_RUSTFLAGS=${pkgs.lib.escapeShellArg workflowTransportOctetFlags}
+            if [ ! -f crates/lattice-workflow-contract/transport/Cargo.toml ]; then
+              echo "run the workflow transport Octet hook from the Lattice repository root" >&2
+              exit 1
+            fi
+            cd crates/lattice-workflow-contract
+            exec cargo-octet check "$@"
+          '';
+        };
+        workflowTransportOctetCheck =
+          (octet.lib.mkConsumerCheck {
+            inherit system;
+            src = workflowTransportSource;
+            cargoLock = workflowContractRoot + "/Cargo.lock";
+          }).overrideAttrs
+            (_old: {
+              DYLINT_RUSTFLAGS = workflowTransportOctetFlags;
             });
 
         # Common source filtering
@@ -694,6 +742,7 @@
           default = lattice;
           lattice = lattice;
           workflow-contract-octet-deny-all = workflowContractOctetRunner;
+          workflow-transport-octet-deny-all = workflowTransportOctetRunner;
         };
 
         checks = {
@@ -760,7 +809,15 @@
             workflowContractCommonArgs
             // {
               cargoArtifacts = workflowContractCargoArtifacts;
-              cargoTestExtraArgs = "--workspace --all-targets --all-features";
+              cargoTestExtraArgs = "--package lattice-workflow-contract --all-targets --all-features";
+            }
+          );
+
+          workflow-transport = workflowContractCraneLib.cargoTest (
+            workflowTransportCommonArgs
+            // {
+              cargoArtifacts = workflowTransportCargoArtifacts;
+              cargoTestExtraArgs = "${workflowTransportCargoExtraArgs} --all-targets";
             }
           );
 
@@ -768,7 +825,7 @@
             workflowContractCommonArgs
             // {
               cargoArtifacts = workflowContractCargoArtifacts;
-              cargoExtraArgs = "--workspace --target wasm32-unknown-unknown";
+              cargoExtraArgs = "--package lattice-workflow-contract --target wasm32-unknown-unknown";
             }
           );
 
@@ -792,6 +849,28 @@
                   ${self}/tests/fixtures/kiln-workflow-contract/negative/profile-zero-limit.ncl \
                   > /dev/null; then
                   echo "zero workflow limit fixture passed" >&2
+                  exit 1
+                fi
+                nickel typecheck ${self}/contracts/workflow-transport-profile.ncl
+                nickel export --format json \
+                  ${self}/tests/fixtures/workflow-transport/profile-valid.ncl \
+                  > /dev/null
+                if nickel export --format json \
+                  ${self}/tests/fixtures/workflow-transport/negative/profile-zero-frame.ncl \
+                  > /dev/null; then
+                  echo "zero transport frame fixture passed" >&2
+                  exit 1
+                fi
+                if nickel export --format json \
+                  ${self}/tests/fixtures/workflow-transport/negative/profile-empty-peers.ncl \
+                  > /dev/null; then
+                  echo "empty transport peer fixture passed" >&2
+                  exit 1
+                fi
+                if nickel export --format json \
+                  ${self}/tests/fixtures/workflow-transport/negative/profile-unsorted-peers.ncl \
+                  > /dev/null; then
+                  echo "unsorted transport peer fixture passed" >&2
                   exit 1
                 fi
                 touch "$out"
@@ -818,7 +897,15 @@
             workflowContractCommonArgs
             // {
               cargoArtifacts = workflowContractCargoArtifacts;
-              cargoClippyExtraArgs = "--workspace --all-targets --all-features --no-deps -- -D warnings";
+              cargoClippyExtraArgs = "--package lattice-workflow-contract --all-targets --all-features --no-deps -- -D warnings";
+            }
+          );
+
+          workflow-transport-clippy = workflowContractCraneLib.cargoClippy (
+            workflowTransportCommonArgs
+            // {
+              cargoArtifacts = workflowTransportCargoArtifacts;
+              cargoClippyExtraArgs = "${workflowTransportCargoExtraArgs} --all-targets --no-deps -- -D warnings";
             }
           );
 
@@ -833,9 +920,17 @@
             src = workflowContractSource;
           };
 
+          workflow-transport-fmt = workflowContractCraneLib.cargoFmt {
+            pname = "lattice-workflow-transport-format";
+            version = "0.1.0";
+            src = workflowTransportSource;
+            cargoExtraArgs = "--package lattice-workflow-transport";
+          };
+
           # Octet Tiger Style lints
           octet = octetCheck;
           workflow-contract-octet = workflowContractOctetCheck;
+          workflow-transport-octet = workflowTransportOctetCheck;
 
           # Exact published process-runner source identity
           bounded-exec-source = boundedExecSourceIdentityCheck;
@@ -863,6 +958,8 @@
             ++ [
               octet.packages.${system}.cargo-octet
               octetPreCommitCheck
+              workflowContractOctetRunner
+              workflowTransportOctetRunner
             ];
 
           # Use the exact toolchain required by the admitted Choregraph source

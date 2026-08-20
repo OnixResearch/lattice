@@ -170,6 +170,8 @@ fn completed_observation(request: &WorkflowRequest, accepted: &WorkflowAccepted)
 }
 
 // r[verify lattice.workflow_interchange.request]
+// r[verify lattice.workflow_interchange.request.scenario.equal]
+// r[verify lattice.workflow_interchange.graph.scenario.accepted]
 #[test]
 fn profile_and_request_are_admitted_deterministically() {
     let profile = profile();
@@ -190,6 +192,7 @@ fn oversized_capability_profile_is_rejected() {
     assert_eq!(error.code, ErrorCode::LimitInvalid);
 }
 
+// r[verify lattice.workflow_interchange.graph.scenario.adapter]
 #[test]
 fn unsupported_adapter_is_rejected_before_dispatch() {
     let profile = profile();
@@ -203,6 +206,7 @@ fn unsupported_adapter_is_rejected_before_dispatch() {
 }
 
 // r[verify lattice.workflow_interchange.graph]
+// r[verify lattice.workflow_interchange.graph.scenario.cycle]
 #[test]
 fn cyclic_graph_is_rejected() {
     let profile = profile();
@@ -218,6 +222,7 @@ fn cyclic_graph_is_rejected() {
     assert_eq!(error.code, ErrorCode::GraphCycle);
 }
 
+// r[verify lattice.workflow_interchange.request.scenario.graph-change]
 #[test]
 fn changed_graph_identity_is_rejected() {
     let profile = profile();

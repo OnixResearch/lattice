@@ -42,6 +42,7 @@ fn fixtures() -> ProducerFixtures {
 }
 
 // r[verify lattice.workflow_interchange.evidence]
+// r[verify lattice.workflow_interchange.evidence.scenario.nonclaims]
 #[test]
 fn accepted_producer_fixtures_pass_independent_admission() {
     let fixtures = fixtures();
@@ -55,6 +56,7 @@ fn accepted_producer_fixtures_pass_independent_admission() {
     );
 }
 
+// r[verify lattice.workflow_interchange.evidence.scenario.negative]
 #[test]
 fn rejected_producer_fixtures_keep_stable_failure_classes() {
     let fixtures = fixtures();
