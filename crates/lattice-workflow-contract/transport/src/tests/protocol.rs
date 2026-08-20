@@ -1,5 +1,130 @@
 use super::*;
 
+// r[verify lattice.workflow_interchange.transport_dispatch_recovery.scenario.lost]
+// r[verify lattice.workflow_interchange.transport_dispatch_recovery_result.scenario.accepted]
+#[test]
+fn dispatch_recovery_returns_the_exact_linked_acceptance() {
+    let profile = contract_profile();
+    let request = workflow_request(&profile);
+    let exchange =
+        new_request(ExchangeCommand::RecoverDispatch { profile, request }).expect("recovery request is encodable");
+    let mut service = WorkflowExchangeService::new(FixtureHandler { calls: 0 });
+    let response = service.exchange(&exchange).expect("recovery response is encodable");
+
+    assert_eq!(validate_exchange_response(&exchange, &response), Ok(()));
+    assert!(matches!(
+        response.result,
+        ExchangeResult::Success(success) if matches!(success.as_ref(), ExchangeSuccess::Accepted(_))
+    ));
+}
+
+// r[verify lattice.workflow_interchange.transport_dispatch_recovery_result.scenario.observed]
+#[test]
+fn dispatch_recovery_rejects_an_observation_without_the_exact_acceptance() {
+    struct AlternateHandler;
+
+    impl WorkflowExchangeHandler for AlternateHandler {
+        fn handle(&mut self, command: &ExchangeCommand) -> Result<ExchangeSuccess, HandlerError> {
+            let ExchangeCommand::RecoverDispatch { request, .. } = command else {
+                return Err(HandlerError::Rejected);
+            };
+            let accepted = accepted(request);
+            Ok(ExchangeSuccess::Observation(observation(request, &accepted)))
+        }
+    }
+
+    let profile = contract_profile();
+    let request = workflow_request(&profile);
+    let exchange =
+        new_request(ExchangeCommand::RecoverDispatch { profile, request }).expect("recovery request is encodable");
+    let mut service = WorkflowExchangeService::new(AlternateHandler);
+    let response = service.exchange(&exchange).expect("observation rejection is encodable");
+
+    assert!(matches!(
+        response.result,
+        ExchangeResult::Rejected(Rejection {
+            code: RejectionCode::InvalidOperationResult,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn stale_recovery_observation_is_replaced_with_a_safe_rejection() {
+    struct ForeignHandler;
+
+    impl WorkflowExchangeHandler for ForeignHandler {
+        fn handle(&mut self, command: &ExchangeCommand) -> Result<ExchangeSuccess, HandlerError> {
+            let ExchangeCommand::RecoverDispatch { request, .. } = command else {
+                return Err(HandlerError::Rejected);
+            };
+            let accepted = accepted(request);
+            let mut stale = observation(request, &accepted);
+            stale.execution_identity = identity('e');
+            stale.identity = observation_identity(&stale);
+            Ok(ExchangeSuccess::Observation(stale))
+        }
+    }
+
+    let profile = contract_profile();
+    let request = workflow_request(&profile);
+    let exchange =
+        new_request(ExchangeCommand::RecoverDispatch { profile, request }).expect("recovery request is encodable");
+    let mut service = WorkflowExchangeService::new(ForeignHandler);
+    let response = service.exchange(&exchange).expect("safe rejection is encodable");
+    assert!(matches!(
+        response.result,
+        ExchangeResult::Rejected(Rejection {
+            code: RejectionCode::InvalidOperationResult,
+            ..
+        })
+    ));
+}
+
+// r[verify lattice.workflow_interchange.transport_dispatch_recovery.scenario.changed]
+#[test]
+fn changed_recovery_request_fails_before_handler_invocation() {
+    let profile = contract_profile();
+    let request = workflow_request(&profile);
+    let mut exchange =
+        new_request(ExchangeCommand::RecoverDispatch { profile, request }).expect("recovery request is encodable");
+    if let ExchangeCommand::RecoverDispatch { request, .. } = &mut exchange.command {
+        request.idempotency_key = identity('e');
+    }
+    let mut service = WorkflowExchangeService::new(FixtureHandler { calls: 0 });
+    let response = service.exchange(&exchange).expect("rejection response is encodable");
+
+    assert!(matches!(response.result, ExchangeResult::Rejected(_)));
+    assert_eq!(service.handler().calls, 0);
+}
+
+// r[verify lattice.workflow_interchange.transport_dispatch_recovery_result.scenario.not-found]
+#[test]
+fn missing_recovery_request_returns_a_closed_not_found_rejection() {
+    struct AbsentHandler;
+
+    impl WorkflowExchangeHandler for AbsentHandler {
+        fn handle(&mut self, _command: &ExchangeCommand) -> Result<ExchangeSuccess, HandlerError> {
+            Err(HandlerError::NotFound)
+        }
+    }
+
+    let profile = contract_profile();
+    let request = workflow_request(&profile);
+    let exchange =
+        new_request(ExchangeCommand::RecoverDispatch { profile, request }).expect("recovery request is encodable");
+    let mut service = WorkflowExchangeService::new(AbsentHandler);
+    let response = service.exchange(&exchange).expect("not-found response is encodable");
+
+    assert!(matches!(
+        response.result,
+        ExchangeResult::Rejected(Rejection {
+            code: RejectionCode::NotFound,
+            ..
+        })
+    ));
+}
+
 // r[verify lattice.workflow_interchange.transport_response.scenario.log]
 #[test]
 fn linked_log_bytes_are_returned_with_the_admitted_observation() {

@@ -68,6 +68,11 @@ pub enum ExchangeCommand {
         profile: CapabilityProfile,
         request: WorkflowRequest,
     },
+    // r[impl lattice.workflow_interchange.transport_dispatch_recovery]
+    RecoverDispatch {
+        profile: CapabilityProfile,
+        request: WorkflowRequest,
+    },
     Observe {
         profile: CapabilityProfile,
         request: WorkflowRequest,
@@ -124,6 +129,7 @@ pub enum RejectionCode {
     LogTooLarge,
     PeerDenied,
     HandlerUnavailable,
+    NotFound,
     EncodingFailure,
 }
 
@@ -170,6 +176,7 @@ pub enum AdmissionError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HandlerError {
     Unavailable,
+    NotFound,
     Rejected,
 }
 

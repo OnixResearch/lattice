@@ -121,7 +121,7 @@ pub fn validate_exchange_request(request: &ExchangeRequest) -> Result<(), Admiss
 
 fn validate_command(command: &ExchangeCommand) -> Result<(), AdmissionError> {
     match command {
-        ExchangeCommand::Dispatch { profile, request } => {
+        ExchangeCommand::Dispatch { profile, request } | ExchangeCommand::RecoverDispatch { profile, request } => {
             validate_profile(profile).map_err(|_| AdmissionError::Contract)?;
             validate_request(profile, request).map_err(|_| AdmissionError::Contract)
         }
@@ -200,9 +200,10 @@ pub fn validate_response_limits(profile: &TransportProfile, response: &ExchangeR
 )]
 fn validate_success(command: &ExchangeCommand, success: &ExchangeSuccess) -> Result<(), AdmissionError> {
     match (command, success) {
-        (ExchangeCommand::Dispatch { request, .. }, ExchangeSuccess::Accepted(accepted)) => {
-            validate_accepted(request, accepted).map_err(|_| AdmissionError::Contract)
-        }
+        (
+            ExchangeCommand::Dispatch { request, .. } | ExchangeCommand::RecoverDispatch { request, .. },
+            ExchangeSuccess::Accepted(accepted),
+        ) => validate_accepted(request, accepted).map_err(|_| AdmissionError::Contract),
         (
             ExchangeCommand::Observe {
                 profile,
