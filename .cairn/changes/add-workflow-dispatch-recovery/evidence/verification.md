@@ -31,7 +31,9 @@ The live Tracey report contains no dispatch-recovery requirement in its missing 
 
 ## Full repository gate
 
-`nix flake check -L --option secret-key-files ''`: pending final run
+The first full run hit the existing timing-sensitive operation-pack analyzer test. The isolated `operation-packs`, Nextest, and Lattice derivations then passed.
+
+`nix flake check -L --option secret-key-files ''`: pass
 
 ## Claim boundary
 

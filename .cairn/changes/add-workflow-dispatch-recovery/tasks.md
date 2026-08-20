@@ -7,4 +7,4 @@
 - [x] [parallel] Add changed-request, observation-only, stale-observation, not-found, and disconnect tests. r[lattice.workflow_interchange.transport_dispatch_recovery_result]
 - [x] [parallel] Update producer fixtures and integration documentation. r[lattice.workflow_interchange.transport_dispatch_recovery_result]
 - [x] [serial] Run focused Rust, Clippy, Octet, Nickel, Cairn, and Nix checks. r[lattice.workflow_interchange.transport_dispatch_recovery_result]
-- [ ] [serial] Record evidence, sync the accepted spec, archive the change, and publish it. r[lattice.workflow_interchange.transport_dispatch_recovery_result]
+- [x] [serial] Record evidence, sync the accepted spec, archive the change, and publish it. r[lattice.workflow_interchange.transport_dispatch_recovery_result]
