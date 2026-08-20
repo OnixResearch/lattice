@@ -27,6 +27,7 @@ const TEST_DEADLINE_MILLISECONDS: u64 = 5_000;
 const TEST_SEQUENCE: u64 = 7;
 const TEST_LOG_BYTES: &[u8] = b"log\n";
 const TEST_IDENTITY_DIGIT_COUNT: usize = 64;
+const TEST_PROFILE_USER_ID: u32 = 1_000;
 
 fn identity(digit: char) -> Identity {
     let hex = digit.to_string().repeat(TEST_IDENTITY_DIGIT_COUNT);

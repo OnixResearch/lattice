@@ -179,6 +179,19 @@ pub fn validate_exchange_response(
     }
 }
 
+pub fn validate_response_limits(profile: &TransportProfile, response: &ExchangeResponse) -> Result<(), AdmissionError> {
+    validate_transport_profile(profile)?;
+    if let ExchangeResult::Success(success) = &response.result
+        && let ExchangeSuccess::Log { bytes, .. } = success.as_ref()
+    {
+        let byte_count_bytes = u32::try_from(bytes.len()).map_err(|_| AdmissionError::LogBound)?;
+        if byte_count_bytes > profile.limits.maximum_log_bytes {
+            return Err(AdmissionError::LogBound);
+        }
+    }
+    Ok(())
+}
+
 // Contract validators are not const, so this pure dispatcher cannot become const.
 #[allow(
     unknown_lints,

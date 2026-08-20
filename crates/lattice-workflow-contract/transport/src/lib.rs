@@ -22,6 +22,7 @@ pub use core::request_identity;
 pub use core::response_identity;
 pub use core::validate_exchange_request;
 pub use core::validate_exchange_response;
+pub use core::validate_response_limits;
 pub use core::validate_transport_profile;
 
 pub use handler::WorkflowExchangeHandler;

@@ -26,6 +26,11 @@ fn linked_log_bytes_are_returned_with_the_admitted_observation() {
     .expect("log request is encodable");
     let mut service = WorkflowExchangeService::new(FixtureHandler { calls: 0 });
     let response = service.exchange(&exchange).expect("log response is encodable");
+    let endpoint_profile = transport_profile(TEST_PROFILE_USER_ID);
+    assert_eq!(validate_response_limits(&endpoint_profile, &response), Ok(()));
+    let mut narrow_profile = endpoint_profile;
+    narrow_profile.limits.maximum_log_bytes = 1;
+    assert_eq!(validate_response_limits(&narrow_profile, &response), Err(AdmissionError::LogBound));
 
     assert!(matches!(
         response.result,

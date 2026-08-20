@@ -64,6 +64,8 @@ impl<'a> UnixClient<'a> {
         let body = read_frame(&mut stream, limits.maximum_frame_bytes).map_err(|_| ClientFailure::UnknownAfterWrite)?;
         let response: ExchangeResponse = serde_json::from_slice(&body).map_err(|_| ClientFailure::UnknownAfterWrite)?;
         validate_exchange_response(request, &response).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+        crate::validate_response_limits(self.endpoint.profile, &response)
+            .map_err(|_| ClientFailure::UnknownAfterWrite)?;
         Ok(response)
     }
 }
@@ -127,9 +129,23 @@ fn exchange_one<H: WorkflowExchangeHandler>(
     profile: &TransportProfile,
     service: &mut WorkflowExchangeService<H>,
 ) -> Result<(), ServerFailure> {
+    debug_assert!(profile.limits.maximum_frame_bytes > 0);
+    debug_assert!(profile.limits.maximum_log_bytes > 0);
     let body = read_frame(stream, profile.limits.maximum_frame_bytes).map_err(map_read_failure)?;
     let request: ExchangeRequest = serde_json::from_slice(&body).map_err(|_| ServerFailure::ReadFailed)?;
-    let response = service.exchange(&request).map_err(|_| ServerFailure::WriteFailed)?;
+    let candidate = service.exchange(&request).map_err(|_| ServerFailure::WriteFailed)?;
+    let response = if crate::validate_response_limits(profile, &candidate).is_ok() {
+        candidate
+    } else {
+        crate::new_response(
+            request.identity.clone(),
+            crate::ExchangeResult::Rejected(crate::Rejection {
+                code: crate::RejectionCode::LogTooLarge,
+                field: "exchange.log".to_string(),
+            }),
+        )
+        .map_err(|_| ServerFailure::WriteFailed)?
+    };
     let frame = encode_frame(&response, profile.limits.maximum_frame_bytes).map_err(map_write_failure)?;
     write_frame(stream, &frame).map_err(map_write_failure)?;
     stream.flush().map_err(|_| ServerFailure::WriteFailed)
