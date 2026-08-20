@@ -419,7 +419,7 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
@@ -443,7 +443,7 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/lib.rs",
@@ -463,11 +463,11 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "aa99fce4ef12caea007b20f029ad8b035dc7b662d326b25ed6cf886bec6bce0e"
+          "blake3": "cc941c2571f024516fafcf7be1e4441194642883055ebd0bb0f56df3ae78af61"
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/test_repository_validation.rs",
@@ -483,11 +483,11 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "aa99fce4ef12caea007b20f029ad8b035dc7b662d326b25ed6cf886bec6bce0e"
+          "blake3": "cc941c2571f024516fafcf7be1e4441194642883055ebd0bb0f56df3ae78af61"
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/test_repository_validation.rs",
@@ -503,11 +503,11 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "aa99fce4ef12caea007b20f029ad8b035dc7b662d326b25ed6cf886bec6bce0e"
+          "blake3": "cc941c2571f024516fafcf7be1e4441194642883055ebd0bb0f56df3ae78af61"
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/test_repository_validation.rs",
@@ -523,7 +523,7 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
@@ -543,7 +543,7 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs",
@@ -563,7 +563,7 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/n8n/shell.json",
@@ -583,7 +583,7 @@
       "evidence": [
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/n8n/shell.json",
@@ -607,7 +607,7 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/Cargo.toml",
@@ -635,7 +635,7 @@
         },
         {
           "path": "flake.nix",
-          "blake3": "32da0c5185ad83df2c388220098c95ed6ea441ca520af737cb84ddeaf7467839"
+          "blake3": "7fa66cb20b5c52ddd3fcd5bad9efd0b321a86826116a73f79905e1627b574a60"
         },
         {
           "path": "tests/fixtures/repository-validation/vendor-dependency/Cargo.toml",

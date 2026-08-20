@@ -58,6 +58,60 @@
 
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
+        workflowContractRoot = ./crates/lattice-workflow-contract;
+        workflowContractToolchain = rustToolchain.override {
+          targets = [ "wasm32-unknown-unknown" ];
+        };
+        workflowContractCraneLib = (crane.mkLib pkgs).overrideToolchain workflowContractToolchain;
+        workflowContractSource = pkgs.lib.cleanSourceWith {
+          src = workflowContractRoot;
+          filter =
+            path: type:
+            workflowContractCraneLib.filterCargoSources path type
+            || pkgs.lib.hasInfix "/fixtures/" (toString path)
+            || builtins.baseNameOf path == "LICENSE"
+            || builtins.baseNameOf path == "rustfmt.toml";
+        };
+        workflowContractVendorDir = workflowContractCraneLib.vendorCargoDeps {
+          cargoLock = workflowContractRoot + "/Cargo.lock";
+        };
+        workflowContractCommonArgs = {
+          pname = "lattice-workflow-contract";
+          version = "0.1.0";
+          src = workflowContractSource;
+          cargoVendorDir = workflowContractVendorDir;
+          strictDeps = true;
+        };
+        workflowContractCargoArtifacts = workflowContractCraneLib.buildDepsOnly workflowContractCommonArgs;
+        workflowContractOctetConfig =
+          (builtins.fromJSON (builtins.readFile (workflowContractRoot + "/config/octet-deny-all.json")))
+          .config;
+        workflowContractOctetFlags = builtins.concatStringsSep " " (
+          map (lint: "-D ${lint}") workflowContractOctetConfig.lints
+        );
+        workflowContractOctetRunner = pkgs.writeShellApplication {
+          name = "lattice-workflow-contract-octet-deny-all";
+          runtimeInputs = [ octet.packages.${system}.cargo-octet ];
+          text = ''
+            export DYLINT_RUSTFLAGS=${pkgs.lib.escapeShellArg workflowContractOctetFlags}
+            if [ ! -f crates/lattice-workflow-contract/Cargo.toml ]; then
+              echo "run the workflow contract Octet hook from the Lattice repository root" >&2
+              exit 1
+            fi
+            cd crates/lattice-workflow-contract
+            exec cargo-octet check "$@"
+          '';
+        };
+        workflowContractOctetCheck =
+          (octet.lib.mkConsumerCheck {
+            inherit system;
+            src = workflowContractRoot;
+            cargoLock = workflowContractRoot + "/Cargo.lock";
+          }).overrideAttrs
+            (_old: {
+              DYLINT_RUSTFLAGS = workflowContractOctetFlags;
+            });
+
         # Common source filtering
         sourceRoot = toString ./.;
         isSourceFixturePath =
@@ -639,6 +693,7 @@
         packages = {
           default = lattice;
           lattice = lattice;
+          workflow-contract-octet-deny-all = workflowContractOctetRunner;
         };
 
         checks = {
@@ -701,6 +756,47 @@
             cargoTestExtraArgs = "--test test_operation_pack_core --test test_operation_pack_analyzers --test test_operation_pack_shell --test test_operation_pack_cli";
           };
 
+          workflow-contract = workflowContractCraneLib.cargoTest (
+            workflowContractCommonArgs
+            // {
+              cargoArtifacts = workflowContractCargoArtifacts;
+              cargoTestExtraArgs = "--workspace --all-targets --all-features";
+            }
+          );
+
+          workflow-contract-wasm = workflowContractCraneLib.cargoBuild (
+            workflowContractCommonArgs
+            // {
+              cargoArtifacts = workflowContractCargoArtifacts;
+              cargoExtraArgs = "--workspace --target wasm32-unknown-unknown";
+            }
+          );
+
+          workflow-contract-nickel =
+            pkgs.runCommand "lattice-workflow-contract-nickel"
+              {
+                nativeBuildInputs = [ pkgs.nickel ];
+              }
+              ''
+                nickel typecheck ${self}/contracts/kiln-workflow-contract.ncl
+                nickel export --format json \
+                  ${self}/tests/fixtures/kiln-workflow-contract/request-valid.ncl \
+                  > /dev/null
+                if nickel export --format json \
+                  ${self}/tests/fixtures/kiln-workflow-contract/negative/request-invalid-identity.ncl \
+                  > /dev/null; then
+                  echo "invalid workflow identity fixture passed" >&2
+                  exit 1
+                fi
+                if nickel export --format json \
+                  ${self}/tests/fixtures/kiln-workflow-contract/negative/profile-zero-limit.ncl \
+                  > /dev/null; then
+                  echo "zero workflow limit fixture passed" >&2
+                  exit 1
+                fi
+                touch "$out"
+              '';
+
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
           operation-contract-catalog = operationContractCheck;
           operation-data-policy = operationDataPolicyCheck;
@@ -718,14 +814,28 @@
             cargoClippyExtraArgs = "--package lattice --all-targets --no-deps -- -D warnings";
           };
 
+          workflow-contract-clippy = workflowContractCraneLib.cargoClippy (
+            workflowContractCommonArgs
+            // {
+              cargoArtifacts = workflowContractCargoArtifacts;
+              cargoClippyExtraArgs = "--workspace --all-targets --all-features --no-deps -- -D warnings";
+            }
+          );
+
           # Format check
           fmt = craneLib.cargoFmt {
             inherit src;
             cargoExtraArgs = "--package lattice";
           };
 
+          workflow-contract-fmt = craneLib.cargoFmt {
+            pname = "lattice-workflow-contract-format";
+            src = workflowContractSource;
+          };
+
           # Octet Tiger Style lints
           octet = octetCheck;
+          workflow-contract-octet = workflowContractOctetCheck;
 
           # Exact published process-runner source identity
           bounded-exec-source = boundedExecSourceIdentityCheck;

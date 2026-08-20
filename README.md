@@ -349,6 +349,16 @@ The dependency source is:
 
 Cargo, Nix, and Crane must use that source. Acquisition fails instead of using GitHub as a fallback.
 
+## Workflow consumer contract
+
+`crates/lattice-workflow-contract` publishes the versioned request and observation boundary for consumers such as Kiln.
+
+The `no_std + alloc` crate owns bounded wire values, deterministic BLAKE3 identities, and pure admission. It imports no Lattice runtime implementation.
+
+The contract preserves consumer effect, attempt, candidate, pipeline, policy, graph, and idempotency identities. Lattice workflow and execution identities remain native observations.
+
+See [`crates/lattice-workflow-contract/README.md`](crates/lattice-workflow-contract/README.md) for the integration flow and explicit non-claims.
+
 ## Verification
 
 ```bash
