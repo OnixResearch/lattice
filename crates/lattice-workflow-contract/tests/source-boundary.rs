@@ -39,6 +39,8 @@ const FORBIDDEN_MANIFEST_MARKERS: &[&str] = &[
 ];
 
 // r[verify lattice.workflow_interchange.contract]
+// r[verify lattice.workflow_interchange.contract.scenario.independent]
+// r[verify lattice.workflow_interchange.contract.scenario.runtime]
 #[test]
 fn contract_source_contains_no_runtime_or_shell_dependency() {
     let manifest_root = Path::new(env!("CARGO_MANIFEST_DIR"));
