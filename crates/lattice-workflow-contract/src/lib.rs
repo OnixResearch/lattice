@@ -8,6 +8,10 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+#![allow(
+    unknown_lints,
+    reason = "the transport deny-all runner compiles this dependency without loading its Dylint driver"
+)]
 
 extern crate alloc;
 

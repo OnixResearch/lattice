@@ -68,6 +68,8 @@ enum CliCommand {
     Run(RunCommandArgs),
     /// Inspect persisted run evidence without emitting arbitrary content
     Runs(RunsCommandArgs),
+    /// Serve the bounded durable workflow exchange
+    WorkflowExchange(WorkflowExchangeCommandArgs),
     /// Export a saved workflow to a typed Nickel file
     Export(ExportWorkflowArgs),
     /// Import a typed Nickel workflow file into the store
@@ -132,6 +134,22 @@ enum RunsCliCommand {
     },
     /// Explicitly repair an existing redb store after an unclean writer exit
     Repair,
+}
+
+#[derive(clap::Args, Debug)]
+struct WorkflowExchangeCommandArgs {
+    #[command(subcommand)]
+    command: WorkflowExchangeCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum WorkflowExchangeCliCommand {
+    /// Serve one typed handler profile over its configured Unix socket
+    Serve {
+        /// Typed Nickel workflow exchange handler profile
+        #[arg(long)]
+        profile: PathBuf,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -447,6 +465,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     match args.command {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
         Some(CliCommand::Runs(_)) => unreachable!("runs command returns before data-directory side effects"),
+        Some(CliCommand::WorkflowExchange(exchange_args)) => {
+            Ok(run_workflow_exchange_command(&app_config, &exchange_args))
+        }
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),
         Some(CliCommand::ImportN8n(import_args)) => Ok(import_n8n_workflow_command(&app_config, &import_args)),
@@ -1832,6 +1853,38 @@ fn run_protocol_command(app_config: &config::AppConfig, args: &lattice::protocol
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+// r[impl lattice.workflow_interchange.application_command]
+fn run_workflow_exchange_command(app_config: &config::AppConfig, args: &WorkflowExchangeCommandArgs) -> ExitCode {
+    let WorkflowExchangeCliCommand::Serve { profile } = &args.command;
+    let profile = match lattice::workflow_exchange::load_profile(profile) {
+        Ok(profile) => profile,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let store = match open_store(app_config) {
+        Ok(store) => store,
+        Err(_) => {
+            eprintln!("workflow exchange durable store is unavailable");
+            return ExitCode::FAILURE;
+        }
+    };
+    match lattice::workflow_exchange::serve(store, profile, app_config.effective_agent_runtime()) {
+        Ok(report) => {
+            println!(
+                "workflow exchange stopped after {} accepted connections, {} completed exchanges, {} denied peers, and {} failed exchanges",
+                report.accepted_connections, report.completed_exchanges, report.rejected_peers, report.failed_exchanges,
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

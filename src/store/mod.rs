@@ -8,6 +8,7 @@
 //!  - cache: input_hash → output values (skip re-execution)
 
 mod admission;
+mod exchange;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -61,6 +62,12 @@ const WORKFLOW_TEMPLATE_ACTIVATIONS: TableDefinition<&str, &[u8]> =
 const EVALUATION_TRIALS: TableDefinition<&str, &[u8]> = TableDefinition::new("agent_evaluation_trials_v1");
 const EVALUATION_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("agent_evaluation_receipts_v1");
 const OPERATION_RUNS: TableDefinition<&str, &[u8]> = TableDefinition::new("operation_runs_v1");
+const WORKFLOW_EXCHANGE_EXECUTIONS: TableDefinition<&str, &[u8]> =
+    TableDefinition::new("workflow_exchange_executions_v1");
+const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
+    TableDefinition::new("workflow_exchange_request_index_v1");
+const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
+    TableDefinition::new("workflow_exchange_idempotency_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
 const RUN_ID_COUNTER_KEY: &str = "next_run_id";
 const RUN_ID_EXHAUSTED_MESSAGE: &str = "run id space is exhausted";
@@ -307,6 +314,14 @@ impl Store {
             let _ = txn.open_table(EVALUATION_TRIALS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(EVALUATION_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(OPERATION_RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ =
+                txn.open_table(WORKFLOW_EXCHANGE_EXECUTIONS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn
+                .open_table(WORKFLOW_EXCHANGE_REQUEST_INDEX)
+                .map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn
+                .open_table(WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
+                .map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;

@@ -53,6 +53,14 @@ The client never converts unknown into failure or success. Reconciliation must n
 
 If dispatch acceptance is missing, `RecoverDispatch` carries the original admitted request. It returns only the exact linked acceptance or a closed rejection.
 
+## Lattice application handler
+
+The `lattice workflow-exchange serve` command composes this transport with the normal Lattice store and headless runtime.
+
+Its typed handler profile maps exact consumer graphs to exact saved workflow revisions. Durable admission stores acceptance before execution. Acceptance recovery never redispatches.
+
+See [Durable workflow exchange application](workflow-exchange-application.md) for route authority, lifecycle, logs, setup, and non-claims.
+
 ## Kiln integration
 
 Kiln can implement `WorkflowExchangePort` by mapping each closed Kiln operation to one producer-owned transport command.

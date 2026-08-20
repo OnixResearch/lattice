@@ -7,14 +7,6 @@ rust-version = "1.88"
 description = "Versioned no-std workflow request and observation contract for Lattice consumers"
 publish = false
 
-[workspace]
-members = [".", "transport"]
-resolver = "3"
-
-[workspace.metadata.octet]
-default_scope = ["--workspace"]
-cargo_check_args = ["--all-targets", "--all-features"]
-
 [dependencies]
 blake3 = { version = "1.8.3", default-features = false, features = ["pure"] }
 serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }

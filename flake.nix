@@ -63,26 +63,26 @@
           targets = [ "wasm32-unknown-unknown" ];
         };
         workflowContractCraneLib = (crane.mkLib pkgs).overrideToolchain workflowContractToolchain;
-        workflowContractSource = pkgs.lib.cleanSourceWith {
-          src = workflowContractRoot;
-          filter =
-            path: type:
-            workflowContractCraneLib.filterCargoSources path type
-            || pkgs.lib.hasInfix "/fixtures/" (toString path)
-            || builtins.baseNameOf path == "LICENSE"
-            || builtins.baseNameOf path == "rustfmt.toml";
-        };
-        workflowContractVendorDir = workflowContractCraneLib.vendorCargoDeps {
-          cargoLock = workflowContractRoot + "/Cargo.lock";
-        };
+        workflowContractSource = src;
+        workflowContractVendorDir = cargoVendorDir;
         workflowContractCommonArgs = {
           pname = "lattice-workflow-contract";
           version = "0.1.0";
           src = workflowContractSource;
+          cargoLock = ./Cargo.lock;
           cargoVendorDir = workflowContractVendorDir;
+          nativeBuildInputs = with pkgs; [
+            clang
+            mold
+          ];
           strictDeps = true;
         };
-        workflowContractCargoArtifacts = workflowContractCraneLib.buildDepsOnly workflowContractCommonArgs;
+        workflowContractCargoArtifacts = workflowContractCraneLib.buildDepsOnly (
+          workflowContractCommonArgs
+          // {
+            cargoExtraArgs = "--package lattice-workflow-contract --all-features";
+          }
+        );
         workflowContractOctetConfig =
           (builtins.fromJSON (builtins.readFile (workflowContractRoot + "/config/octet-deny-all.json")))
           .config;
@@ -91,38 +91,47 @@
         );
         workflowContractOctetRunner = pkgs.writeShellApplication {
           name = "lattice-workflow-contract-octet-deny-all";
-          runtimeInputs = [ octet.packages.${system}.cargo-octet ];
+          runtimeInputs = [
+            octet.packages.${system}.cargo-octet
+            pkgs.jq
+          ];
           text = ''
-            export DYLINT_RUSTFLAGS=${pkgs.lib.escapeShellArg workflowContractOctetFlags}
             if [ ! -f crates/lattice-workflow-contract/Cargo.toml ]; then
               echo "run the workflow contract Octet hook from the Lattice repository root" >&2
               exit 1
             fi
-            cd crates/lattice-workflow-contract
-            exec cargo-octet check -p lattice-workflow-contract "$@"
+            artifact_dir="$(mktemp -d)"
+            trap 'rm -rf "$artifact_dir"' EXIT
+            cargo-octet check -p lattice-workflow-contract --output-format json --artifact-dir "$artifact_dir" "$@"
+            jq --exit-status '
+              .status == "clean"
+              and (.total_findings | tonumber) == 0
+              and .cargo_process_exit.classification == "success"
+              and (.cargo_process_exit.code | tonumber) == 0
+            ' "$artifact_dir/status.json" > /dev/null
           '';
         };
-        workflowContractOctetCheck =
-          (octet.lib.mkConsumerCheck {
-            inherit system;
-            src = workflowContractRoot;
-            cargoLock = workflowContractRoot + "/Cargo.lock";
-            packages = [ "lattice-workflow-contract" ];
-          }).overrideAttrs
-            (_old: {
-              DYLINT_RUSTFLAGS = workflowContractOctetFlags;
-            });
+        workflowContractOctetCheck = octet.lib.mkConsumerCheck {
+          inherit system;
+          src = workflowContractSource;
+          cargoLock = ./Cargo.lock;
+          packages = [ "lattice-workflow-contract" ];
+        };
 
         workflowTransportRoot = workflowContractRoot + "/transport";
-        workflowTransportSource = workflowContractSource;
-        workflowTransportVendorDir = workflowContractVendorDir;
+        workflowTransportSource = src;
+        workflowTransportVendorDir = cargoVendorDir;
         workflowTransportCargoExtraArgs = "--package lattice-workflow-transport --all-features";
         workflowTransportCommonArgs = {
           pname = "lattice-workflow-transport";
           version = "0.1.0";
           src = workflowTransportSource;
-          cargoLock = workflowContractRoot + "/Cargo.lock";
+          cargoLock = ./Cargo.lock;
           cargoVendorDir = workflowTransportVendorDir;
+          nativeBuildInputs = with pkgs; [
+            clang
+            mold
+          ];
           strictDeps = true;
         };
         workflowTransportCargoArtifacts = workflowContractCraneLib.buildDepsOnly (
@@ -139,26 +148,32 @@
         );
         workflowTransportOctetRunner = pkgs.writeShellApplication {
           name = "lattice-workflow-transport-octet-deny-all";
-          runtimeInputs = [ octet.packages.${system}.cargo-octet ];
+          runtimeInputs = [
+            octet.packages.${system}.cargo-octet
+            pkgs.jq
+          ];
           text = ''
-            export DYLINT_RUSTFLAGS=${pkgs.lib.escapeShellArg workflowTransportOctetFlags}
             if [ ! -f crates/lattice-workflow-contract/transport/Cargo.toml ]; then
               echo "run the workflow transport Octet hook from the Lattice repository root" >&2
               exit 1
             fi
-            cd crates/lattice-workflow-contract
-            exec cargo-octet check "$@"
+            artifact_dir="$(mktemp -d)"
+            trap 'rm -rf "$artifact_dir"' EXIT
+            cargo-octet check -p lattice-workflow-transport --output-format json --artifact-dir "$artifact_dir" "$@"
+            jq --exit-status '
+              .status == "clean"
+              and (.total_findings | tonumber) == 0
+              and .cargo_process_exit.classification == "success"
+              and (.cargo_process_exit.code | tonumber) == 0
+            ' "$artifact_dir/status.json" > /dev/null
           '';
         };
-        workflowTransportOctetCheck =
-          (octet.lib.mkConsumerCheck {
-            inherit system;
-            src = workflowTransportSource;
-            cargoLock = workflowContractRoot + "/Cargo.lock";
-          }).overrideAttrs
-            (_old: {
-              DYLINT_RUSTFLAGS = workflowTransportOctetFlags;
-            });
+        workflowTransportOctetCheck = octet.lib.mkConsumerCheck {
+          inherit system;
+          src = workflowTransportSource;
+          cargoLock = ./Cargo.lock;
+          packages = [ "lattice-workflow-transport" ];
+        };
 
         # Common source filtering
         sourceRoot = toString ./.;
@@ -196,6 +211,14 @@
         isOperationAssetPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/operations/" (toString path);
         isRepositoryValidationAssetPath = path: toString path == "${sourceRoot}/.gitignore";
+        isWorkflowContractAssetPath =
+          path:
+          pkgs.lib.hasInfix "/crates/lattice-workflow-contract/" (toString path)
+          && (
+            pkgs.lib.hasInfix "/fixtures/" (toString path)
+            || builtins.baseNameOf path == "LICENSE"
+            || builtins.baseNameOf path == "rustfmt.toml"
+          );
         isIdentityAuditAssetPath =
           path:
           toString path == "${sourceRoot}/README.md"
@@ -209,16 +232,20 @@
           src = ./.;
           filter =
             path: type:
-            craneLib.filterCargoSources path type
-            || isSourceFixturePath path
-            || isAnimusCompileTimeAssetPath path
-            || isRatsCompileTimeAssetPath path
-            || isPolicyAssetPath path
-            || isWorkflowTemplateAssetPath path
-            || isAgentEvaluationAssetPath path
-            || isOperationAssetPath path
-            || isRepositoryValidationAssetPath path
-            || isIdentityAuditAssetPath path;
+            !pkgs.lib.hasPrefix "${sourceRoot}/target/" (toString path)
+            && (
+              craneLib.filterCargoSources path type
+              || isSourceFixturePath path
+              || isAnimusCompileTimeAssetPath path
+              || isRatsCompileTimeAssetPath path
+              || isPolicyAssetPath path
+              || isWorkflowTemplateAssetPath path
+              || isAgentEvaluationAssetPath path
+              || isOperationAssetPath path
+              || isRepositoryValidationAssetPath path
+              || isWorkflowContractAssetPath path
+              || isIdentityAuditAssetPath path
+            );
         };
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
@@ -873,6 +900,22 @@
                   echo "unsorted transport peer fixture passed" >&2
                   exit 1
                 fi
+                nickel typecheck ${self}/contracts/workflow-exchange-handler-profile.ncl
+                nickel export --format json \
+                  ${self}/tests/fixtures/workflow-exchange-handler/profile-valid.ncl \
+                  > /dev/null
+                if nickel export --format json \
+                  ${self}/tests/fixtures/workflow-exchange-handler/negative/profile-zero-active.ncl \
+                  > /dev/null; then
+                  echo "zero workflow exchange active limit fixture passed" >&2
+                  exit 1
+                fi
+                if nickel export --format json \
+                  ${self}/tests/fixtures/workflow-exchange-handler/negative/profile-empty-routes.ncl \
+                  > /dev/null; then
+                  echo "empty workflow exchange route fixture passed" >&2
+                  exit 1
+                fi
                 touch "$out"
               '';
 
@@ -918,6 +961,7 @@
           workflow-contract-fmt = craneLib.cargoFmt {
             pname = "lattice-workflow-contract-format";
             src = workflowContractSource;
+            cargoExtraArgs = "--package lattice-workflow-contract";
           };
 
           workflow-transport-fmt = workflowContractCraneLib.cargoFmt {
