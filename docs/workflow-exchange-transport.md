@@ -19,6 +19,7 @@ The version-one envelope supports these operations:
 3. Apply one admitted cancel, pause, or resume control.
 4. Read one bounded log range linked to an admitted observation.
 5. Reconcile one exact accepted execution after uncertainty.
+6. Recover a lost dispatch acceptance by the original admitted request without redispatch authority.
 
 Observe, control, log-read, and reconciliation carry the original profile, request, and acceptance. The server can validate the complete linkage without ambient context.
 
@@ -49,6 +50,8 @@ The server checks peer credentials before request decoding. The socket path and 
 A failed connection before a complete write is not accepted. A failed or invalid response after a complete write has an unknown outcome.
 
 The client never converts unknown into failure or success. Reconciliation must name the same accepted execution.
+
+If dispatch acceptance is missing, `RecoverDispatch` carries the original admitted request. It returns only the exact linked acceptance or a closed rejection.
 
 ## Kiln integration
 

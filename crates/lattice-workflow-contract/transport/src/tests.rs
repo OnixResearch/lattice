@@ -184,7 +184,9 @@ impl WorkflowExchangeHandler for FixtureHandler {
     fn handle(&mut self, command: &ExchangeCommand) -> Result<ExchangeSuccess, HandlerError> {
         self.calls = self.calls.checked_add(1).expect("fixture call count remains bounded");
         match command {
-            ExchangeCommand::Dispatch { request, .. } => Ok(ExchangeSuccess::Accepted(accepted(request))),
+            ExchangeCommand::Dispatch { request, .. } | ExchangeCommand::RecoverDispatch { request, .. } => {
+                Ok(ExchangeSuccess::Accepted(accepted(request)))
+            }
             ExchangeCommand::Observe { request, accepted, .. }
             | ExchangeCommand::Control { request, accepted, .. }
             | ExchangeCommand::Reconcile { request, accepted, .. } => {

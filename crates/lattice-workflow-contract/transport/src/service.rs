@@ -108,6 +108,7 @@ fn rejection_for_admission(error: AdmissionError) -> Rejection {
 fn map_rejection(error: HandlerError) -> Rejection {
     let code = match error {
         HandlerError::Unavailable => RejectionCode::HandlerUnavailable,
+        HandlerError::NotFound => RejectionCode::NotFound,
         HandlerError::Rejected => RejectionCode::InvalidContract,
     };
     Rejection {

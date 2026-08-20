@@ -65,6 +65,36 @@ fn client_classifies_a_missing_response_as_unknown_after_write() {
 }
 
 #[test]
+fn recovery_disconnect_remains_unknown_without_automatic_redispatch() {
+    let directory = tempfile::tempdir().expect("temporary socket directory exists");
+    let socket_path = directory.path().join("workflow-recovery-disconnect.sock");
+    let listener = UnixListener::bind(&socket_path).expect("fixture listener binds");
+    let user_id = nix::unistd::getuid().as_raw();
+    let profile = transport_profile(user_id);
+    let maximum_frame_bytes = profile.limits.maximum_frame_bytes;
+    let server = thread::spawn(move || {
+        let (mut stream, _address) = listener.accept().expect("fixture connection is accepted");
+        read_frame(&mut stream, maximum_frame_bytes).expect("fixture recovery request is complete");
+    });
+    let contract_profile = contract_profile();
+    let request = workflow_request(&contract_profile);
+    let recovery = new_request(ExchangeCommand::RecoverDispatch {
+        profile: contract_profile,
+        request,
+    })
+    .expect("recovery request is encodable");
+
+    let endpoint = UnixEndpoint {
+        socket_path: &socket_path,
+        profile: &profile,
+    };
+    let result = UnixClient::new(endpoint).exchange(&recovery);
+    server.join().expect("fixture recovery server joins");
+
+    assert_eq!(result, Err(ClientFailure::UnknownAfterWrite));
+}
+
+#[test]
 fn client_classifies_a_malformed_response_as_unknown_after_write() {
     let directory = tempfile::tempdir().expect("temporary socket directory exists");
     let socket_path = directory.path().join("workflow-invalid-response.sock");

@@ -31,6 +31,8 @@ Both paths require an ordered explicit Unix user-ID allowlist. The server checks
 
 The client does not retry automatically.
 
+After an unknown dispatch, `RecoverDispatch` uses the original admitted request to look up the exact acceptance. Observation-only recovery fails closed.
+
 ## Verification
 
 From the Lattice repository root:
