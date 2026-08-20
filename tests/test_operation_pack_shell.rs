@@ -187,7 +187,7 @@ fn analyzer_timeout_and_truncation_are_explicit_and_block_required_parent_succes
     assert_eq!(timed_out.analyzer_outcomes[0].status, pack::analyzer::Status::TimedOut);
 
     let oversized = "x".repeat(TRUNCATED_OUTPUT_BYTES.saturating_mul(2));
-    let truncation_script = format!("#!/bin/sh\nprintf '%s\\n' '{oversized}'\n");
+    let truncation_script = format!("#!/bin/sh\nprintf '%s' '{oversized}'\n");
     let truncated = execute_with_analyzer(&truncation_script, SHORT_TIMEOUT_SECONDS, TRUNCATED_OUTPUT_BYTES);
     assert_eq!(truncated.status, pack::shell::execution::Status::Failed);
     assert_eq!(truncated.analyzer_outcomes[0].status, pack::analyzer::Status::Truncated);
