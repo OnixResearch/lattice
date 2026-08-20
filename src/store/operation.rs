@@ -45,9 +45,9 @@ impl Store {
                     .ok_or_else(|| StoreError::Conflict("operation durable start is missing".to_string()))?;
                 deserialize(current.value())?
             };
-            if current.state != crate::operation::RunState::Started || current.run_id != record.run_id {
+            if !terminal_matches_start(&current, record) {
                 return Err(StoreError::Conflict(
-                    "operation durable start does not match the terminal record".to_string(),
+                    "operation durable start does not match the terminal backend attempt".to_string(),
                 ));
             }
             table
@@ -107,6 +107,11 @@ fn insert_standard_operation_run(
     Ok(())
 }
 
+#[allow(
+    unknown_lints,
+    assertion_density,
+    reason = "one metadata-only projection keeps terminal status and exact backend route visible"
+)]
 fn operation_run_details(record: &crate::operation::RunRecord) -> RunDetailRecord {
     let status = if record.state == crate::operation::RunState::Completed {
         RunNodeDetailStatus::Completed
@@ -117,11 +122,24 @@ fn operation_run_details(record: &crate::operation::RunRecord) -> RunDetailRecor
         run_id: record.run_id,
         nodes: vec![RunNodeDetail {
             node_id: crate::engine::workflow::NodeId(OPERATION_RUN_NODE_ID),
-            node_label: "operation".to_string(),
+            node_label: format!(
+                "operation:{}:{}:{}",
+                record.backend_attempt.route.backend_class.label(),
+                record.backend_attempt.route.backend_identity,
+                record.backend_attempt.state.label()
+            ),
             status,
             cached: false,
             outputs: Vec::new(),
             error: (record.state != crate::operation::RunState::Completed).then(|| record.diagnostic.clone()),
         }],
     }
+}
+
+fn terminal_matches_start(current: &crate::operation::RunRecord, terminal: &crate::operation::RunRecord) -> bool {
+    current.state == crate::operation::RunState::Started
+        && current.run_id == terminal.run_id
+        && current.backend_attempt.attempt_identity == terminal.backend_attempt.attempt_identity
+        && current.backend_attempt.route == terminal.backend_attempt.route
+        && current.backend_attempt.state == crate::operation::BackendAttemptState::Admitted
 }

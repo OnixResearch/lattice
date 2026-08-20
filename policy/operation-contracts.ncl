@@ -14,6 +14,45 @@ let Bounds = {
   output_bytes | Number,
   artifact_bytes | Number,
 } in
+let BackendResources = {
+  memory_bytes | Number,
+  storage_bytes | Number,
+  cpu_milliseconds | Number,
+  wall_milliseconds | Number,
+} in
+# Rust admits only the closed enum values after Nickel validates this complete shape.
+let ExecutionRequirements = {
+  format | String,
+  filesystem | String,
+  network | String,
+  process | String,
+  terminal | String,
+  peripheral | String,
+  persistence | String,
+  isolation | String,
+  resources | BackendResources,
+} in
+let BackendRoute = {
+  schema | String,
+  planner_cohort | String,
+  planner_schema | String,
+  planner_plan_identity | Identity,
+  requirement_profile_identity | Identity,
+  backend_class | String,
+  backend_identity | Identity,
+  adapter_identity | Identity,
+  application_host_binding_identity | Identity,
+  runtime_authority_identity | Identity,
+  credential_reference_identity | Identity,
+  effect_permission_identity | Identity,
+  budget_identity | Identity,
+  resource_profile_identity | Identity,
+  enforcement_profile_identity | Identity,
+  persistence_policy_identity | Identity,
+  recovery_policy_identity | Identity,
+  policy_identity | Identity,
+  resources | BackendResources,
+} in
 let Field = {
   name | String,
   value_type | ValueType,
@@ -51,6 +90,7 @@ let OperationType = {
   tags | Array String,
   methods | Array Method,
   runtime | Runtime,
+  execution_requirements | ExecutionRequirements,
   capabilities | Array Capability,
   credential_bindings | Array CredentialBinding,
   bounds | Bounds,
@@ -96,6 +136,8 @@ let OperationInstance = {
       available | Bool,
       maximum_bounds | Bounds,
     },
+    execution_requirements | ExecutionRequirements,
+    backend_route | BackendRoute,
     capabilities | Array Capability,
     target | { _ | Dyn },
     credentials | { _ | SecretRef },

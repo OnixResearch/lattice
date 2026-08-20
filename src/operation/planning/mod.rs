@@ -11,6 +11,10 @@
     borrowed_argument_types,
     reason = "plan validators append diagnostics to one caller-owned growable accumulator"
 )]
+#![allow(
+    function_length,
+    reason = "one exact operation-plan constructor keeps identity-bearing admission fields visible"
+)]
 use std::collections::BTreeMap;
 
 pub fn plan(mut request: super::model::PlanRequest<'_>) -> Result<super::model::InvocationPlan, super::Error> {
@@ -59,6 +63,14 @@ pub fn plan(mut request: super::model::PlanRequest<'_>) -> Result<super::model::
     let output_contract_identity =
         operation_type.output_schema_identities.get(request.method).cloned().ok_or(super::Error::Encoding)?;
     let arguments_identity = super::identity::arguments(&arguments)?;
+    let backend_route = backend::plan_route(&backend::RouteContext {
+        requirements: &operation_type.definition.execution_requirements,
+        runtime: &request.runtime,
+        method_identity: &method_identity,
+        capabilities: &method.capabilities,
+        credentials: &request.instance.definition.credentials,
+        bounds: operation_type.definition.bounds,
+    })?;
     let mut plan = super::model::InvocationPlan {
         schema: super::model::PLAN_SCHEMA.to_string(),
         identity: String::new(),
@@ -74,6 +86,8 @@ pub fn plan(mut request: super::model::PlanRequest<'_>) -> Result<super::model::
         output_contract: method.output.clone(),
         output_contract_identity,
         runtime: request.runtime,
+        execution_requirements: operation_type.definition.execution_requirements.clone(),
+        backend_route,
         capabilities: method.capabilities.clone(),
         target: request.instance.definition.target.clone(),
         credentials: request.instance.definition.credentials.clone(),
@@ -106,6 +120,21 @@ pub fn validate_plan_identity(plan: &super::model::InvocationPlan) -> Result<(),
             super::model::DiagnosticCode::InvalidIdentity,
             "plan.output_contract_identity",
             "operation output contract does not match its identity",
+        ));
+    }
+    let backend_context = backend::RouteContext {
+        requirements: &plan.execution_requirements,
+        runtime: &plan.runtime,
+        method_identity: &plan.method_identity,
+        capabilities: &plan.capabilities,
+        credentials: &plan.credentials,
+        bounds: plan.bounds,
+    };
+    if backend::validate_route(&plan.backend_route, &backend_context).is_err() {
+        diagnostics.push(super::diagnostic(
+            super::model::DiagnosticCode::BackendDenied,
+            "plan.backend_route",
+            "operation backend route does not match current admitted facts",
         ));
     }
     let computed = super::identity::invocation(plan)?;
@@ -177,6 +206,7 @@ pub fn validate_plan_admission(
         && method_identity == Some(plan.method_identity.as_str())
         && output_identity == Some(plan.output_contract_identity.as_str())
         && plan.output_contract == method.output
+        && plan.execution_requirements == operation_type.definition.execution_requirements
         && plan.capabilities == method.capabilities
         && plan.bounds == operation_type.definition.bounds
         && plan.required_non_claims == operation_type.definition.required_non_claims;
@@ -208,3 +238,5 @@ pub fn validate_plan_admission(
 }
 
 include!("validation.rs");
+
+pub mod backend;

@@ -48,6 +48,10 @@ pub struct InstanceMetadata {
     pub credential_reference_count: usize,
 }
 
+pub fn decode_backend_compatibility_fixture(path: &std::path::Path) -> Result<serde_json::Value, super::Error> {
+    crate::config::load_nickel_as_json(path).map_err(super::Error::Nickel)
+}
+
 pub fn decode_catalog(path: &std::path::Path) -> Result<super::model::Catalog, super::Error> {
     let value = crate::config::load_nickel_as_json(path).map_err(super::Error::Nickel)?;
     serde_json::from_value::<super::model::Catalog>(value).map_err(|_| {

@@ -179,6 +179,8 @@ Lattice also provides an identity-bound [agent-evaluation lane](docs/agent-evalu
 
 [Typed operation contracts](docs/operation-contracts.md) define reusable methods separately from data-only instances. Direct runs and promoted workflow nodes share one identity-bound plan. Execution is bounded, preview-first, authority-checked, and metadata-only in durable evidence.
 
+[Admitted execution backend orchestration](docs/execution-backend-orchestration.md) binds one reviewed Animus planner cohort to product-owned route admission, durable attempts, recovery, and safe inspection.
+
 [Immutable operation data](docs/operation-data.md) preserves selected outputs as exact resource or file versions. A closed query IR resolves dynamic selectors before dispatch. Retention and orphan pruning remain separate.
 
 [Content-addressed operation packs](docs/operation-packs.md) distribute exact catalogs, external runtimes, analyzers, and passive skills. Pure admission binds trust, platform, license, capability, dependency, evidence, and lock facts before any effect.

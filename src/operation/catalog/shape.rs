@@ -34,6 +34,7 @@ fn validate_type_shape(
     validate_ordered_identifiers(&definition.tags, super::model::MAXIMUM_TAGS, &format!("{path}.tags"), diagnostics);
     validate_methods(definition, path, diagnostics);
     validate_runtime(&definition.runtime, path, diagnostics);
+    validate_execution_requirements(definition, path, diagnostics);
     validate_capabilities(&definition.capabilities, &format!("{path}.capabilities"), diagnostics);
     validate_credentials(&definition.credential_bindings, path, diagnostics);
     validate_cairn_profile(definition, path, diagnostics);
@@ -141,6 +142,20 @@ fn validate_runtime(
     }
 }
 
+fn validate_execution_requirements(
+    definition: &super::model::OperationType,
+    path: &str,
+    diagnostics: &mut Vec<super::model::Diagnostic>,
+) {
+    if definition.execution_requirements.validate().is_err() {
+        diagnostics.push(super::diagnostic(
+            super::model::DiagnosticCode::BackendDenied,
+            format!("{path}.execution_requirements"),
+            "operation execution requirements are incomplete or unbounded",
+        ));
+    }
+}
+
 fn validate_cairn_profile(
     definition: &super::model::OperationType,
     path: &str,
@@ -163,7 +178,8 @@ fn validate_cairn_profile(
         });
     let is_type_contract_exact = definition.id == super::readiness::CAIRN_PILOT_TYPE_ID
         && definition.capabilities == CAIRN_PILOT_CAPABILITIES
-        && definition.credential_bindings.is_empty();
+        && definition.credential_bindings.is_empty()
+        && definition.execution_requirements == super::backend::ExecutionRequirements::cairn_read_only();
     if !is_method_set_exact || !is_method_contract_set_exact || !is_type_contract_exact {
         diagnostics.push(super::diagnostic(
             super::model::DiagnosticCode::RuntimeUnavailable,

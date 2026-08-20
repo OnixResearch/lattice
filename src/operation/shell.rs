@@ -192,7 +192,10 @@ pub fn run_direct(request: DirectRunRequest<'_>) -> Result<super::run_model::Dir
         .begin_operation_run(request.plan, request.clock.observe_epoch_millis())
         .map_err(|error| super::Error::Store(error.to_string()))?;
     debug_assert_eq!(started.state, super::run_model::RunState::Started);
-    let observation = execute_authorized(&request, started.run_id);
+    let observation = match super::backend::admit_dispatch(request.plan, &started.backend_attempt) {
+        Ok(()) => execute_authorized(&request, started.run_id),
+        Err(_) => super::runtime::backend_denied("operation backend route changed after durable admission"),
+    };
     let terminal = started.finished(&observation, request.clock.observe_epoch_millis());
     request
         .store

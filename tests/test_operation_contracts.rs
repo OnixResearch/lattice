@@ -104,6 +104,7 @@ fn catalog(executor_identity: &str) -> operation::model::Catalog {
             key: operation::runtime::CAIRN_RUNTIME_KEY.to_string(),
             executor_identity: executor_identity.to_string(),
         },
+        execution_requirements: operation::ExecutionRequirements::cairn_read_only(),
         capabilities: vec![operation::CapabilityClass::ProcessRead],
         credential_bindings: Vec::new(),
         bounds: bounds(),
@@ -415,6 +416,12 @@ fn plan_identity_rejects_field_tampering() {
 
     assert!(operation::planning::validate_plan_identity(&tampered).is_err());
 
+    let mut backend_drift = fixture.plan.clone();
+    backend_drift.backend_route.backend_identity =
+        operation::identity::hash_bytes("test.backend-drift", b"another-backend");
+    backend_drift.identity = operation::identity::invocation(&backend_drift).expect("backend-drift identity");
+    assert!(operation::planning::validate_plan_identity(&backend_drift).is_err());
+
     let mut self_consistent_drift = fixture.plan.clone();
     self_consistent_drift.output_contract.deny_unknown_fields =
         !self_consistent_drift.output_contract.deny_unknown_fields;
@@ -427,6 +434,43 @@ fn plan_identity_rejects_field_tampering() {
         operation::planning::validate_plan_admission(&self_consistent_drift, &fixture.catalog, &fixture.instance,)
             .is_err()
     );
+}
+
+// r[verify lattice.execution_backend_orchestration.planner_mapping]
+// r[verify lattice.execution_backend_orchestration.verification]
+#[test]
+fn animus_backend_mapping_is_exact_for_every_reviewed_class() {
+    let requirements = operation::ExecutionRequirements::cairn_read_only();
+    let classes = [
+        operation::BackendClass::EmbeddedComponent,
+        operation::BackendClass::GuardedLocalProcess,
+        operation::BackendClass::IsolatedHost,
+        operation::BackendClass::ExternalMachine,
+    ];
+
+    for class in classes {
+        assert_eq!(
+            operation::backend::compatibility_projection(class, &requirements).expect("reviewed planner class maps"),
+            class
+        );
+    }
+}
+
+// r[verify lattice.execution_backend_orchestration.dispatch]
+// r[verify lattice.execution_backend_orchestration.verification]
+#[test]
+fn backend_retry_denies_substitution_and_unknown_outcomes() {
+    let fixture = fixture(r#"{"valid":true}"#);
+    let attempt = operation::BackendAttemptRecord::admitted(
+        &fixture.plan,
+        lattice::engine::executor::RunId(TEST_WORKFLOW_RUN_ID),
+    );
+    let mut changed = fixture.plan.backend_route.clone();
+    changed.backend_identity = operation::identity::hash_bytes("test.backend-substitution", b"different");
+
+    assert!(operation::backend::admit_retry_route(&attempt, &changed, false).is_err());
+    assert!(operation::backend::admit_retry_route(&attempt, &fixture.plan.backend_route, true).is_err());
+    assert!(operation::backend::admit_retry_route(&attempt, &fixture.plan.backend_route, false).is_ok());
 }
 
 #[test]
@@ -457,6 +501,12 @@ fn direct_run_persists_started_then_terminal_metadata_and_rejects_duplicate_disp
         .expect("load operation record")
         .expect("durable operation record");
     assert_eq!(durable, result.record);
+    assert_eq!(durable.backend_attempt.state, operation::BackendAttemptState::Observed);
+    assert_eq!(durable.backend_attempt.route.planner_cohort, operation::backend::PLANNER_COHORT);
+    let safe_backend_json = serde_json::to_string(&durable.backend_attempt.safe_view()).expect("safe backend view");
+    assert!(!safe_backend_json.contains(fixture.executable.to_string_lossy().as_ref()));
+    assert!(!safe_backend_json.contains("command"));
+    assert!(!safe_backend_json.contains("credential"));
     assert!(store.load_run(result.record.run_id).expect("standard run").is_some());
     assert!(
         store
@@ -499,6 +549,7 @@ fn missing_executor_after_planning_persists_unknown_without_retry() {
     .expect("unknown result remains durable");
 
     assert_eq!(result.record.state, operation::RunState::Unknown);
+    assert_eq!(result.record.backend_attempt.state, operation::BackendAttemptState::Unknown);
     assert!(result.output.is_none());
     assert!(
         operation::shell::run_direct(operation::shell::DirectRunRequest {
@@ -842,6 +893,12 @@ fn authored_nickel_catalog_and_instances_load_and_negative_fixtures_fail_closed(
     );
     assert!(
         operation::format::load_catalog(&root.join("tests/fixtures/operations/catalog-unknown-field.ncl")).is_err()
+    );
+    assert!(
+        operation::format::load_catalog(
+            &root.join("tests/fixtures/operations/catalog-unknown-execution-requirement.ncl")
+        )
+        .is_err()
     );
     assert!(
         operation::format::load_instances(

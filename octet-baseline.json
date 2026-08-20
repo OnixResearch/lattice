@@ -1,5 +1,5 @@
 {
-  "baseline_hash": "b3:ed5a97105f81114b4b8688e8194142fe9fda01fbf2f8ca05dd17cfe3e7383b00",
+  "baseline_hash": "b3:bfcb7ba5c2d26bea2c9b8f7def96b0c2831db5ea09f9eafa48ce8a2eee89d029",
   "finding_schema_version": 2,
   "findings": [
     {
@@ -1223,19 +1223,6 @@
       "semantic_id": "b3:210716110736fa2c",
       "severity": "warning",
       "stable_id": "b3:210716110736fa2c"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 2505 lines (limit: 300)",
-      "semantic_id": "b3:212d875e0c3257f7",
-      "severity": "warning",
-      "stable_id": "b3:212d875e0c3257f7"
     },
     {
       "column": 72,
@@ -2757,6 +2744,19 @@
       "semantic_id": "b3:438d573581f97e7d",
       "severity": "warning",
       "stable_id": "b3:438d573581f97e7d"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 2505 lines (limit: 300)",
+      "semantic_id": "b3:43d20409c09d7255",
+      "severity": "warning",
+      "stable_id": "b3:43d20409c09d7255"
     },
     {
       "column": 1,
@@ -5461,6 +5461,19 @@
       "semantic_id": "b3:7ef173cbf39fb9f8",
       "severity": "warning",
       "stable_id": "b3:7ef173cbf39fb9f8"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "underscore_in_module_filename",
+      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
+      "semantic_id": "b3:7f07f4ebfec11018",
+      "severity": "warning",
+      "stable_id": "b3:7f07f4ebfec11018"
     },
     {
       "column": 3,
@@ -8594,19 +8607,6 @@
       "semantic_id": "b3:c332841acd730d67",
       "severity": "warning",
       "stable_id": "b3:c332841acd730d67"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "underscore_in_module_filename",
-      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
-      "semantic_id": "b3:c3943ee3932075c6",
-      "severity": "warning",
-      "stable_id": "b3:c3943ee3932075c6"
     },
     {
       "column": 25,

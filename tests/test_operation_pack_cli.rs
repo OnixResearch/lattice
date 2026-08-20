@@ -37,7 +37,7 @@ fn fixture() -> Fixture {
     id = "cli-repository",
     display_alias = "CLI repository",
     type_id = "cairn.repository",
-    type_revision = "b3:04f4f2b5e880435887fd6e8d124b80b9e94c9037ff310aacca88f065d6bf6cc9",
+    type_revision = "b3:35bb448c27e5def0f6204d8fc3f14fa40275b73a735b1971a1c5954afa30bd2d",
     target = {{ repository_root = {:?} }},
     tags = {{}},
     method_defaults = {{}},
