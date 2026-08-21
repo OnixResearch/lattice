@@ -20,7 +20,7 @@
 - [x] [serial] Extend read-only status and explicit recover, retry, and abandon paths with persistence-uncertainty diagnostics. r[lattice.persistence_uncertainty.operator_actions]
 - [x] [serial] Keep Redb repair separate from workflow reconciliation and effect authority. r[lattice.persistence_uncertainty.repair_boundary]
 - [x] [parallel] Run scheduler and workflow storage-fault campaigns across commit and restart boundaries. r[lattice.persistence_uncertainty.validation]
-- [ ] [serial] Update non-claims and run focused tests, operator E2E, formatting, Clippy, Octet, Cairn gates, and Nix checks. r[lattice.persistence_uncertainty.validation]
+- [x] [serial] Update non-claims and run focused tests, operator E2E, formatting, Clippy, Octet, Cairn gates, and Nix checks. r[lattice.persistence_uncertainty.validation]
 
 ## Verification Coverage
 

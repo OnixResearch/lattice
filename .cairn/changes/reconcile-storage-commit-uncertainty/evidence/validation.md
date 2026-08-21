@@ -24,11 +24,20 @@
 - Missing-row read-back.
 - Retry while quarantined.
 
-## Completion blocker
+## Octet evidence
 
-The final Octet gate reports 846 new and 846 stale stable identities, with 232 unmatched semantic records. No baseline migration was applied.
+A parent-revision control reproduced the repository-wide stable-identity drift. The reviewed migration preserved 846 root findings and 23 pure-core findings with zero baseline growth.
 
-The full repository check observed one operation-pack truncation mismatch. Its immediate focused rerun passed without a source change.
+`nix develop -c octet-precommit-check` passes with zero new and zero stale findings in both scopes. See `evidence/octet-migration.md`.
+
+## Full validation
+
+- `./scripts/check.rs`: all tests, scoped Clippy, and Cairn gates passed after two evidence corrections:
+  - restored the intentionally nonconforming vendor fixture bytes and refreshed the byte-bound traceability hashes for `Cargo.toml`, `README.md`, and `src/store/mod.rs`;
+  - made the analyzer truncation fixture deterministic by ignoring a child write error that raced the bounded reader.
+- `nix flake check -L --option secret-key-files ''`: all checks passed, including 1,066 nextest tests.
+
+The earlier full repository check observed one operation-pack truncation mismatch. Its immediate focused reruns passed; the deterministic fixture fix removed the race.
 
 ## Boundaries
 

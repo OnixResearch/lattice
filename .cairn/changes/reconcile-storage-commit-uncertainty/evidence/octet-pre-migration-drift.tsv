@@ -1,0 +1,244 @@
+old=846 current=1077 retained=0 new=1077 stale=846 semantic-pairs=845 unmatched-new=232 unmatched-stale=1
+unmatched-new-lint	ambient_clock	1
+unmatched-new-lint	bool_naming	1
+unmatched-new-lint	explicit_defaults	29
+unmatched-new-lint	module_file_count	1
+unmatched-new-lint	no_unwrap	1
+unmatched-new-lint	non_trait_imports	191
+unmatched-new-lint	numeric_units	5
+unmatched-new-lint	platform_dependent_cast	2
+unmatched-new-lint	unbounded_collection_growth	1
+unmatched-stale-lint	module_file_count	1
+unmatched-stale	module_file_count	src/agent_node.rs	1	module directory `src` contains 16 Rust source files (limit: 7)
+unmatched-new	ambient_clock	src/tui/app.rs	2769	direct system clock read in production code
+unmatched-new	bool_naming	src/tui/input.rs	760	boolean binding `shift` should have a predicate prefix
+unmatched-new	explicit_defaults	src/engine/executor.rs	1301	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1323	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1333	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1344	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1345	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1355	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1356	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1366	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/engine/executor.rs	1367	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/n8n_json.rs	118	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	953	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	965	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	970	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1046	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1049	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1057	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1072	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1074	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1092	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1095	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1100	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1101	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1118	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1121	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/tui/panels.rs	1127	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/workflow_format.rs	193	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/workflow_format.rs	195	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/workflow_format.rs	226	implicit default on external type — construct with explicit values
+unmatched-new	explicit_defaults	src/workflow_format.rs	266	implicit default on external type — construct with explicit values
+unmatched-new	module_file_count	src/agent_node.rs	1	module directory `src` contains 17 Rust source files (limit: 7)
+unmatched-new	no_unwrap	src/tui/input.rs	606	`.expect()` in production code will panic on failure
+unmatched-new	non_trait_imports	src/config/mod.rs	13	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/config/mod.rs	10	non-trait import `Path` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/config/mod.rs	14	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/credentials.rs	3	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/credentials.rs	6	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/credentials.rs	4	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/credentials.rs	7	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/domain/model.rs	1	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/domain/model.rs	5	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/domain/model.rs	2	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/domain/model.rs	6	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/domain/model.rs	3	non-trait import `fmt` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	21	non-trait import `AgentRuntimeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	7	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	10	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	8	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	11	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	31	non-trait import `Value` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/executor.rs	46	non-trait import `image_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	7	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	10	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	121	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	14	non-trait import `PortId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	11	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	120	non-trait import `ValueData` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	119	non-trait import `Value` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	123	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/runner.rs	118	non-trait import `agent_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	11	non-trait import `AgentNodeSettings` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	8	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	30	non-trait import `FileOperationKind` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	6	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	17	non-trait import `NodeCredentialRefs` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/engine/workflow.rs	9	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/file_node.rs	7	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/file_node.rs	3	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/file_node.rs	8	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/headless.rs	4	non-trait import `AgentRuntimeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/headless.rs	1	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/headless.rs	2	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/headless.rs	9	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/http.rs	5	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/http.rs	3	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/http.rs	6	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	5	non-trait import `Arc` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	8	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	4	non-trait import `ErrorKind` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	3	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	12	non-trait import `ImageValue` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	7	non-trait import `Mutex` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/image_node.rs	9	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	6	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	9	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	7	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	15	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	13	non-trait import `NodeCredentialRefs` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	16	non-trait import `PortId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	10	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/n8n_json.rs	17	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	8	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	6	non-trait import `agent_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	7	non-trait import `control_flow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	9	non-trait import `file_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	10	non-trait import `http` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/node_kind_provider.rs	11	non-trait import `image_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/core.rs	6	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/core.rs	7	non-trait import `BTreeSet` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/core.rs	9	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/core.rs	10	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/format.rs	4	non-trait import `Path` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/format.rs	6	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/format.rs	3	non-trait import `fmt` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	8	non-trait import `AgentRuntimeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	3	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	10	non-trait import `RunId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	6	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	34	non-trait import `StoreError` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	33	non-trait import `Store` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	36	non-trait import `WorkflowDiagnostic` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	11	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	4	non-trait import `fmt` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/orchestration/shell.rs	12	non-trait import `runner` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	7	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	8	non-trait import `BTreeSet` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	11	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	9	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	17	non-trait import `NodeStatus` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	22	non-trait import `PortId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	18	non-trait import `RunId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	12	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	19	non-trait import `StepResult` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/replay.rs	16	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/scheduler.rs	6	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/scheduler.rs	7	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/scheduler.rs	4	non-trait import `fmt` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	22	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	14	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	15	non-trait import `Path` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	30	non-trait import `PortId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	27	non-trait import `RunId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	23	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	36	non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	28	non-trait import `Value` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/store/mod.rs	29	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	6	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	3	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	4	non-trait import `HashSet` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	12	non-trait import `RunId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	18	non-trait import `ScheduleDefinition` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	11	non-trait import `SecretRef` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	7	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	13	non-trait import `Value` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/triggers.rs	9	non-trait import `credentials` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	30	non-trait import `AgentOutputMode` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	31	non-trait import `AgentTarget` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	5	non-trait import `Arc` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	37	non-trait import `ConditionNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	43	non-trait import `Executor` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	3	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	38	non-trait import `MergeNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	48	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	41	non-trait import `NodeCredentialRefs` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	44	non-trait import `NodeStatus` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	45	non-trait import `RunId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	56	non-trait import `RunRecord` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	42	non-trait import `SecretRef` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	46	non-trait import `StepResult` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	57	non-trait import `Store` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	40	non-trait import `SubworkflowNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	47	non-trait import `Value` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	60	non-trait import `WorkflowDiagnostic` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	49	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	29	non-trait import `agent_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	35	non-trait import `control_flow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	26	non-trait import `error` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/app.rs	27	non-trait import `info` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/graph.rs	3	non-trait import `fmt` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/input.rs	15	non-trait import `node_bounds` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	35	non-trait import `AddNodeStep` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	36	non-trait import `App` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	37	non-trait import `FocusPanel` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	6	non-trait import `InteractionMode` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	5	non-trait import `NodeId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	39	non-trait import `PropertyEditField` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	28	non-trait import `ReplayCursor` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	30	non-trait import `ReplayTimeline` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	31	non-trait import `RunDetailRecord` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	33	non-trait import `RunNodeDetailStatus` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/tui/panels.rs	32	non-trait import `RunNodeDetail` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	17	non-trait import `AgentNodeSettings` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	18	non-trait import `AgentOutputMode` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	19	non-trait import `AgentTarget` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	22	non-trait import `ConditionBranch` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	23	non-trait import `ConditionNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	13	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	37	non-trait import `FileOperationKind` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	8	non-trait import `HashMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	9	non-trait import `HashSet` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	25	non-trait import `MergeNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	26	non-trait import `MergePolicy` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	39	non-trait import `MissedRunPolicy` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	33	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	30	non-trait import `NodeCredentialRefs` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	34	non-trait import `NodeRunnerSettings` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	40	non-trait import `OverlapPolicy` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	11	non-trait import `PathBuf` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	10	non-trait import `Path` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	41	non-trait import `RecurrenceRule` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	31	non-trait import `SecretRef` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	14	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	28	non-trait import `SubworkflowNodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	43	non-trait import `TriggerDefinition` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	36	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	16	non-trait import `agent_node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	20	non-trait import `config` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	21	non-trait import `control_flow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	38	non-trait import `node_kind_provider` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format.rs	32	non-trait import `runner` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format/choregraph.rs	3	non-trait import `BTreeMap` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_format/choregraph.rs	4	non-trait import `BTreeSet` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	3	non-trait import `Deserialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	9	non-trait import `NodeConfig` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	8	non-trait import `Node` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	10	non-trait import `PortDirection` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	11	non-trait import `PortId` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	4	non-trait import `Serialize` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	12	non-trait import `Workflow` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	6	non-trait import `credentials` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	13	non-trait import `node_kind_provider` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	7	non-trait import `runner` hides the owner path; prefer the qualified path at the use site
+unmatched-new	non_trait_imports	src/workflow_validation.rs	15	non-trait import `triggers` hides the owner path; prefer the qualified path at the use site
+unmatched-new	numeric_units	src/animus_agent/core.rs	108	`turn_limit` looks like a raw numeric quantity but has no unit suffix
+unmatched-new	numeric_units	src/animus_agent/shell.rs	13	`turn_limit` looks like a raw numeric quantity but has no unit suffix
+unmatched-new	numeric_units	src/engine/runner.rs	270	`port_id` looks like a raw numeric quantity but has no unit suffix
+unmatched-new	numeric_units	src/replay.rs	63	`byte_length` looks like a raw numeric quantity but has no unit suffix
+unmatched-new	numeric_units	src/tui/input.rs	606	`port_index` looks like a raw numeric quantity but has no unit suffix
+unmatched-new	platform_dependent_cast	src/tui/panels.rs	645	`as usize` from `u16` is platform-dependent
+unmatched-new	platform_dependent_cast	src/tui/panels.rs	1062	`as usize` from `u16` is platform-dependent
+unmatched-new	unbounded_collection_growth	src/engine/executor.rs	2625	collection grows in loop without a prior reservation or explicit local bound

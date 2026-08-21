@@ -13,7 +13,10 @@ const OUTPUT_BYTES: usize = 1_024;
 
 fn main() {
     let output = [b'x'; OUTPUT_BYTES];
-    std::io::stdout().write_all(&output).expect("write analyzer output");
+    let write_result = std::io::stdout().write_all(&output);
+    if write_result.is_err() {
+        return;
+    }
 }
 "#;
 
@@ -203,7 +206,12 @@ fn analyzer_timeout_and_truncation_are_explicit_and_block_required_parent_succes
         TRUNCATED_OUTPUT_BYTES,
     );
     assert_eq!(truncated.status, pack::shell::execution::Status::Failed);
-    assert_eq!(truncated.analyzer_outcomes[0].status, pack::analyzer::Status::Truncated);
+    assert_eq!(
+        truncated.analyzer_outcomes[0].status,
+        pack::analyzer::Status::Truncated,
+        "unexpected analyzer outcome: {:?}",
+        truncated.analyzer_outcomes[0]
+    );
 }
 
 #[test]
