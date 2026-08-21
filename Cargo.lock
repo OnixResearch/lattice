@@ -2865,6 +2865,7 @@ dependencies = [
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "transactional-reconciliation-core",
  "trybuild",
  "url",
  "which",
@@ -6216,6 +6217,11 @@ dependencies = [
  "tracing-core",
  "tracing-log",
 ]
+
+[[package]]
+name = "transactional-reconciliation-core"
+version = "0.1.0"
+source = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=606489b5f40298181214bb76bc3457b607f225d9#606489b5f40298181214bb76bc3457b607f225d9"
 
 [[package]]
 name = "tree-sitter"

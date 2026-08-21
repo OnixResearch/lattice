@@ -30,6 +30,10 @@
       url = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
       flake = false;
     };
+    transactional-reconciliation-core = {
+      url = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=606489b5f40298181214bb76bc3457b607f225d9";
+      flake = false;
+    };
   };
 
   outputs =
@@ -44,6 +48,7 @@
       choregraph,
       nickel-eval,
       content-identity-core,
+      transactional-reconciliation-core,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -257,6 +262,7 @@
         choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
+        transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=606489b5f40298181214bb76bc3457b607f225d9#606489b5f40298181214bb76bc3457b607f225d9";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -276,6 +282,10 @@
             else if builtins.all (package: package.source == contentIdentityCoreCargoSource) packages then
               checkout.overrideAttrs (_old: {
                 src = content-identity-core;
+              })
+            else if builtins.all (package: package.source == transactionalReconciliationCoreCargoSource) packages then
+              checkout.overrideAttrs (_old: {
+                src = transactional-reconciliation-core;
               })
             else
               checkout;
@@ -680,6 +690,38 @@
               touch "$out"
             '';
 
+        transactionalReconciliationCoreSourceCheck =
+          pkgs.runCommand "lattice-transactional-reconciliation-core-source"
+            {
+              nativeBuildInputs = [ pkgs.jq ];
+            }
+            ''
+              revision=606489b5f40298181214bb76bc3457b607f225d9
+              source_url=https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git
+              manifest=${transactional-reconciliation-core}/crates/transactional-reconciliation-core/Cargo.toml
+              test -f "$manifest"
+              test -f ${transactional-reconciliation-core}/LICENSE
+              grep --fixed-strings 'name = "transactional-reconciliation-core"' "$manifest" > /dev/null
+              grep --fixed-strings 'license = "MIT"' ${transactional-reconciliation-core}/Cargo.toml > /dev/null
+              grep --fixed-strings "transactional-reconciliation-core = { git = \"$source_url\", rev = \"$revision\" }" ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings "git+$source_url?rev=$revision#$revision" ${self}/Cargo.lock > /dev/null
+              jq --exit-status \
+                --arg revision "$revision" \
+                --arg source_url "$source_url" \
+                '.nodes["transactional-reconciliation-core"].locked.rev == $revision
+                  and .nodes["transactional-reconciliation-core"].locked.url == $source_url
+                  and .nodes["transactional-reconciliation-core"].original.rev == $revision' \
+                ${self}/flake.lock > /dev/null
+              if grep -R --fixed-strings 'github.com/OnixResearch/transactional-reconciliation-core' \
+                ${self}/Cargo.toml ${self}/Cargo.lock ${self}/flake.lock; then
+                echo 'forbidden transactional-reconciliation-core GitHub fallback' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'transactional_reconciliation_core::admit_dispatch' \
+                ${self}/src/reconciliation.rs > /dev/null
+              touch "$out"
+            '';
+
         traceabilityInventoryPolicyCheck =
           pkgs.runCommand "lattice-traceability-inventory-policy"
             {
@@ -993,6 +1035,9 @@
 
           # Exact content identity source and security-role boundary
           content-identity-core-source = contentIdentityCoreSourceCheck;
+
+          # Exact transactional reconciliation source and adapter path
+          transactional-reconciliation-core-source = transactionalReconciliationCoreSourceCheck;
 
           # Typed traceability inventory policy and negative fixture
           traceability-inventory-policy = traceabilityInventoryPolicyCheck;

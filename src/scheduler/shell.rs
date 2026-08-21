@@ -72,6 +72,9 @@ pub async fn execute_occurrence(
     if revision != occurrence.workflow_revision {
         return Err(Error::InvalidOccurrence(super::OccurrenceError::WorkflowRevisionMismatch.to_string()));
     }
+    let dispatch = crate::reconciliation::admit_occurrence(occurrence)
+        .map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
+    debug_assert_eq!(dispatch.attempt_identity().as_bytes().len(), blake3::OUT_LEN);
     let summary = crate::headless::run_owned_workflow(store, crate::headless::OwnedRunRequest {
         workflow_name: occurrence.workflow_name.clone(),
         run_id: occurrence.active_run_id,

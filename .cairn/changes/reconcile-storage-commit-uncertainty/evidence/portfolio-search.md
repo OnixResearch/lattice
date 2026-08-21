@@ -36,9 +36,9 @@ The search uses local source and repository validators. It uses three serial cor
 - Mechanism: classify explicit persistence observations and emit typed reconciliation decisions.
 - Claim: product-neutral deterministic classification stays outside Lattice storage and effect authority.
 - Artifact: `transactional-reconciliation-core` published revision and consumer tests.
-- State: blocked
-- Blocker: the configured GitHub repository does not exist or is inaccessible, and `gh` authentication is invalid.
-- Next check: restore GitHub authentication and establish `origin/main` for the producer repository.
+- State: active
+- Evidence: Radicle RID `rad:z4Tky6zvC8w4Y6c4YBzNxVbq5n752` publishes revision `606489b5f40298181214bb76bc3457b607f225d9`; focused Lattice and Mantle pilots pass.
+- Next check: complete and archive the producer persistence-observation extension before Lattice relies on its publication states.
 
 ### Lattice Redb quarantine shell
 
