@@ -5,6 +5,8 @@ const OCCURRENCE_SUBJECT_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.subject.
 const OCCURRENCE_INPUT_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.input.v1";
 const OCCURRENCE_SCOPE_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.scope.v1";
 const OCCURRENCE_ATTEMPT_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.attempt.v1";
+const OCCURRENCE_CONTENT_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.content.v1";
+const OCCURRENCE_PREDECESSOR_DOMAIN: &[u8] = b"lattice.scheduler.occurrence.predecessor.v1";
 const CORE_OPERATION_BOUND: u32 = 1;
 const CORE_PREREQUISITE_BOUND: u32 = 1;
 const LENGTH_FRAME_BYTES: usize = 8;
@@ -54,6 +56,7 @@ struct OccurrencePilot {
     plan: transactional_reconciliation_core::ImmutablePlan,
     current: transactional_reconciliation_core::CurrentFacts,
     reservation: transactional_reconciliation_core::AttemptReservation,
+    persistence_binding: transactional_reconciliation_core::PersistenceBinding,
 }
 
 fn plan_occurrence(occurrence: &crate::scheduler::ScheduleOccurrence) -> Result<OccurrencePilot, PilotError> {
@@ -91,10 +94,22 @@ fn plan_occurrence(occurrence: &crate::scheduler::ScheduleOccurrence) -> Result<
     let run_id_bytes = occurrence.active_run_id.0.to_le_bytes();
     let attempt_identity = digest(OCCURRENCE_ATTEMPT_DOMAIN, &[occurrence.identity.as_bytes(), &run_id_bytes])?;
     let reservation = transactional_reconciliation_core::reserve_attempt(&plan, operation_identity, attempt_identity)?;
+    let successor_content_identity = digest(OCCURRENCE_CONTENT_DOMAIN, &[
+        occurrence.identity.as_bytes(),
+        occurrence.workflow_revision.as_bytes(),
+        &run_id_bytes,
+    ])?;
+    let publication = transactional_reconciliation_core::plan_publication(&plan, &current, successor_content_identity)?;
+    let persistence_binding = transactional_reconciliation_core::PersistenceBinding::new(
+        publication,
+        reservation,
+        digest(OCCURRENCE_PREDECESSOR_DOMAIN, &[])?,
+    )?;
     Ok(OccurrencePilot {
         plan,
         current,
         reservation,
+        persistence_binding,
     })
 }
 
@@ -102,6 +117,12 @@ pub(crate) fn admit_occurrence(
     occurrence: &crate::scheduler::ScheduleOccurrence,
 ) -> Result<transactional_reconciliation_core::DispatchIntent, PilotError> {
     let pilot = plan_occurrence(occurrence)?;
+    let persisted = transactional_reconciliation_core::classify_commit(
+        pilot.persistence_binding,
+        transactional_reconciliation_core::CommitObservation::Applied(pilot.persistence_binding),
+    );
+    let published = transactional_reconciliation_core::admit_published(persisted, pilot.reservation)?;
+    debug_assert_eq!(published.binding(), pilot.persistence_binding);
     admit_observation(&pilot, transactional_reconciliation_core::ReservationObservation::Durable(pilot.reservation))
 }
 
@@ -158,6 +179,27 @@ mod tests {
 
         assert_eq!(dispatch.plan_identity(), pilot.plan.identity());
         assert_eq!(dispatch.attempt_identity(), pilot.reservation.attempt_identity());
+        Ok(())
+    }
+
+    #[test]
+    fn uncertain_publication_quarantines_until_exact_reopen() -> Result<(), super::PilotError> {
+        let pilot = super::plan_occurrence(&occurrence()?)?;
+        let uncertain = transactional_reconciliation_core::classify_commit(
+            pilot.persistence_binding,
+            transactional_reconciliation_core::CommitObservation::OutcomeUnknown,
+        );
+        let reconciled = transactional_reconciliation_core::reconcile_read_back(
+            uncertain,
+            transactional_reconciliation_core::ReadBackObservation::Reservation(pilot.persistence_binding),
+        )?;
+
+        assert!(matches!(
+            uncertain.quarantine(),
+            transactional_reconciliation_core::QuarantineStatus::Quarantined(_)
+        ));
+        assert_eq!(reconciled.state(), transactional_reconciliation_core::PersistenceState::Published);
+        assert_eq!(reconciled.quarantine(), transactional_reconciliation_core::QuarantineStatus::Clear);
         Ok(())
     }
 

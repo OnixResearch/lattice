@@ -31,7 +31,7 @@
       flake = false;
     };
     transactional-reconciliation-core = {
-      url = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=606489b5f40298181214bb76bc3457b607f225d9";
+      url = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=3942ec2a1b7a74fff71ad5e0bf7dc022216685e0";
       flake = false;
     };
   };
@@ -262,7 +262,7 @@
         choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
-        transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=606489b5f40298181214bb76bc3457b607f225d9#606489b5f40298181214bb76bc3457b607f225d9";
+        transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=3942ec2a1b7a74fff71ad5e0bf7dc022216685e0#3942ec2a1b7a74fff71ad5e0bf7dc022216685e0";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
           inherit src;
           overrideVendorGitCheckout =
@@ -696,7 +696,7 @@
               nativeBuildInputs = [ pkgs.jq ];
             }
             ''
-              revision=606489b5f40298181214bb76bc3457b607f225d9
+              revision=3942ec2a1b7a74fff71ad5e0bf7dc022216685e0
               source_url=https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git
               manifest=${transactional-reconciliation-core}/crates/transactional-reconciliation-core/Cargo.toml
               test -f "$manifest"

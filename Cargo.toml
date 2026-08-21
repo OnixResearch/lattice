@@ -77,7 +77,7 @@ bolero-generator = { version = "0.13.5", optional = true }
 proptest = { version = "1.11", optional = true }
 redb = "3.1.1"
 content-identity-core = { git = "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git", rev = "7f55597b5dc879b7601856e8d7fd0dbacaa2a498" }
-transactional-reconciliation-core = { git = "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git", rev = "606489b5f40298181214bb76bc3457b607f225d9" }
+transactional-reconciliation-core = { git = "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git", rev = "3942ec2a1b7a74fff71ad5e0bf7dc022216685e0" }
 nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git", rev = "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1" }
 blake3 = "1.8.3"
 crossterm = "0.29.0"
