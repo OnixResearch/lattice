@@ -555,9 +555,13 @@
                 and .admission.forbidden_fallbacks == ["floating", "github", "sibling", "vendor", "runtime"]
                 and (.admission.non_claims | length) == 5
               ' "$TMPDIR/admission.json" > /dev/null
-              if nickel export --format json \
+              set +e
+              nickel export --format json \
                 ${self}/tests/fixtures/radicle/negative/choregraph-floating-source.ncl \
-                > "$TMPDIR/invalid.json"; then
+                > "$TMPDIR/invalid.json"
+              invalid_source_status="$?"
+              set -e
+              if [ "$invalid_source_status" -eq 0 ]; then
                 echo 'floating Choregraph source unexpectedly passed' >&2
                 exit 1
               fi
@@ -593,7 +597,7 @@
                 "${self}/src/workflow_format/choregraph.rs" \
                 > "$TMPDIR/expected-choregraph-import-files"
               cmp "$TMPDIR/expected-choregraph-import-files" "$TMPDIR/choregraph-import-files"
-              grep --fixed-strings 'choregraph::lower_portable(&portable)?;' \
+              grep --fixed-strings 'choregraph::lower_portable(&workflow_to_portable(&workflow))?;' \
                 ${self}/src/workflow_format.rs > /dev/null
               if grep -E 'std::fs|std::process|std::net|std::env|Path|Command|read_to_string|read_dir|tokio::|async|unsafe' \
                 ${self}/src/workflow_format/choregraph.rs; then

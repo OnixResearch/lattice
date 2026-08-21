@@ -11,6 +11,8 @@ pub mod control_flow {
 pub mod credentials;
 pub mod engine;
 pub mod error;
+#[path = "workflow/expression/dependencies.rs"]
+pub mod expression_dependencies;
 pub mod expressions;
 pub mod file_node;
 pub mod guarded;

@@ -24,6 +24,7 @@ pub type RunnerTransitionError = seaglass_execution_graph::StepTransitionError;
 
 pub const LEGACY_MACHINE_STATE_SCHEMA: &str = "seaglass.execution-graph.state.v1";
 pub const CHOREGRAPH_MACHINE_STATE_SCHEMA: &str = choregraph_core::MACHINE_SCHEMA_V1;
+const RUNNER_PLAN_IDENTITY_DOMAIN: &[u8] = b"lattice.runner-plan.v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedMachineBinding {
@@ -31,6 +32,12 @@ pub struct PersistedMachineBinding {
     pub new_schema: String,
     pub workflow_revision: String,
     pub machine_identity: String,
+    #[serde(default = "empty_plan_identity")]
+    pub runner_plan_identity: String,
+}
+
+fn empty_plan_identity() -> String {
+    String::new()
 }
 
 impl PersistedMachineBinding {
@@ -40,6 +47,21 @@ impl PersistedMachineBinding {
             new_schema: CHOREGRAPH_MACHINE_STATE_SCHEMA.to_string(),
             workflow_revision: workflow_revision.into(),
             machine_identity: machine_identity.into(),
+            runner_plan_identity: String::new(),
+        }
+    }
+
+    pub fn expected_with_runner_plan(
+        workflow_revision: impl Into<String>,
+        machine_identity: impl Into<String>,
+        runner_plan_identity: impl Into<String>,
+    ) -> Self {
+        Self {
+            old_schema: LEGACY_MACHINE_STATE_SCHEMA.to_string(),
+            new_schema: CHOREGRAPH_MACHINE_STATE_SCHEMA.to_string(),
+            workflow_revision: workflow_revision.into(),
+            machine_identity: machine_identity.into(),
+            runner_plan_identity: runner_plan_identity.into(),
         }
     }
 }
@@ -67,6 +89,7 @@ pub enum PersistedStateIssue {
     UnsupportedSchema,
     StaleWorkflowRevision,
     StaleMachineIdentity,
+    StaleRunnerPlanIdentity,
     ForeignNode,
     AmbiguousNode,
     PartialState,
@@ -132,6 +155,7 @@ pub struct RunnerWorkflow {
     pub name: String,
     pub nodes: Vec<RunnerNode>,
     pub edges: Vec<RunnerEdge>,
+    pub expression_dependencies: Vec<crate::expression_dependencies::ExpressionDependency>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -192,6 +216,7 @@ pub enum RunnerDiagnosticCode {
     EdgeWrongDirection,
     EdgeSelfLoop,
     EdgeIncompatibleType,
+    InvalidExpressionDependency,
     CycleDetected,
     MissingRuntimeBinding,
     UnsupportedRuntimePolicy,
@@ -369,12 +394,20 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
     debug_assert!(nodes.iter().all(|node| workflow.graph.node(crate::engine::workflow::NodeId(node.id)).is_some()));
 
     let edges = runner_edges_from_workflow(workflow, &mut diagnostics);
+    let expression_dependencies = match expression_dependencies_for_workflow(workflow) {
+        Ok(dependencies) => dependencies,
+        Err(expression_diagnostics) => {
+            diagnostics.extend(expression_diagnostics);
+            Vec::new()
+        }
+    };
     if diagnostics.is_empty() {
         RunnerPlanBuild {
             plan: Some(RunnerWorkflow {
                 name: workflow.meta.name.clone(),
                 nodes,
                 edges,
+                expression_dependencies,
             }),
             diagnostics,
         }
@@ -384,6 +417,26 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
             diagnostics,
         }
     }
+}
+
+fn expression_dependencies_for_workflow(
+    workflow: &Workflow,
+) -> Result<Vec<crate::expression_dependencies::ExpressionDependency>, Vec<RunnerDiagnostic>> {
+    crate::expression_dependencies::workflow_projection(workflow)
+        .map(|projection| projection.expression_dependencies)
+        .map_err(|issues| {
+            issues
+                .into_iter()
+                .map(|issue| {
+                    runner_diagnostic(
+                        RunnerDiagnosticCode::InvalidExpressionDependency,
+                        Some(crate::engine::workflow::NodeId(issue.consumer_node)),
+                        issue.producer_output_port.map(|port| PortId(port.0)),
+                        format!("{}: {}", issue.config_field_path, issue.message),
+                    )
+                })
+                .collect()
+        })
 }
 
 fn runtime_binding_for_node(config: &NodeConfig, settings: Option<&NodeRunnerSettings>) -> RuntimeBinding {
@@ -414,7 +467,7 @@ fn default_runner_policy() -> RunnerPolicy {
     }
 }
 
-fn runtime_binding_for_config(config: &NodeConfig) -> RuntimeBinding {
+pub(crate) fn runtime_binding_for_config(config: &NodeConfig) -> RuntimeBinding {
     match config {
         NodeConfig::Shell { .. } => runtime_binding(RUNTIME_KIND_SHELL, RUNTIME_KEY_DEFAULT),
         NodeConfig::Http { .. } => runtime_binding(RUNTIME_KIND_HTTP, RUNTIME_KEY_DEFAULT),
@@ -529,6 +582,14 @@ fn port_types_compatible(source: &str, target: &str) -> bool {
 }
 
 // r[impl n8nclone.workflow_execution.runner_core.trellis_graph_admission]
+pub fn plan_identity(plan: &RunnerWorkflow) -> Result<String, serde_json::Error> {
+    let encoded = serde_json::to_vec(plan)?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(RUNNER_PLAN_IDENTITY_DOMAIN);
+    hasher.update(&encoded);
+    Ok(format!("blake3:{}", hasher.finalize().to_hex()))
+}
+
 pub fn admit_runner_plan(plan: &RunnerWorkflow) -> RunnerAdmission {
     match topological_order(plan) {
         Ok(topo_order) => RunnerAdmission::Accepted { topo_order },
@@ -609,10 +670,17 @@ fn shared_execution_graph(plan: &RunnerWorkflow) -> seaglass_execution_graph::Ex
         .iter()
         .map(|node| seaglass_execution_graph::ExecutionNode::new(node.id.to_string()))
         .collect();
+    debug_assert!(plan.edges.len() <= choregraph_core::DEFAULT_MAX_EDGES);
+    debug_assert!(plan.expression_dependencies.len() <= choregraph_core::DEFAULT_MAX_EDGES);
     let edges = plan
         .edges
         .iter()
         .map(|edge| (edge.source_node, edge.target_node))
+        .chain(
+            plan.expression_dependencies
+                .iter()
+                .map(|dependency| (dependency.producer_node, dependency.consumer_node)),
+        )
         .collect::<BTreeSet<_>>()
         .into_iter()
         .map(|(source, target)| seaglass_execution_graph::ExecutionEdge::new(source.to_string(), target.to_string()))
@@ -655,6 +723,9 @@ fn validate_persisted_binding(
     }
     if observed.machine_identity != expected.machine_identity {
         return Err(PersistedStateIssue::StaleMachineIdentity);
+    }
+    if observed.runner_plan_identity != expected.runner_plan_identity {
+        return Err(PersistedStateIssue::StaleRunnerPlanIdentity);
     }
     Ok(())
 }

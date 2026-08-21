@@ -293,6 +293,12 @@ pub enum WorkflowFormatError {
     ChoregraphLimitEncoding,
     ChoregraphLowering(choregraph_nickel::FrontendIssueCode),
     ChoregraphLoweringContract,
+    ChoregraphDependencyPortExhausted,
+    InvalidExpressionDependency {
+        node_id: u64,
+        field_path: String,
+        message: String,
+    },
     InvalidTimestamp(String),
     DuplicateNodeId(u64),
     DuplicatePortId(u64),
@@ -391,6 +397,14 @@ impl std::fmt::Display for WorkflowFormatError {
                 write!(f, "Choregraph lowering rejected the workflow: {}", choregraph_nickel::summary(*code))
             }
             Self::ChoregraphLoweringContract => write!(f, "Choregraph lowering returned no diagnostic"),
+            Self::ChoregraphDependencyPortExhausted => {
+                write!(f, "Choregraph expression dependency port identity is exhausted")
+            }
+            Self::InvalidExpressionDependency {
+                node_id,
+                field_path,
+                message,
+            } => write!(f, "node {node_id} has invalid expression dependency at {field_path}: {message}"),
             Self::InvalidTimestamp(value) => write!(f, "invalid workflow timestamp: {value}"),
             Self::DuplicateNodeId(node_id) => write!(f, "duplicate node id: {node_id}"),
             Self::DuplicatePortId(port_id) => write!(f, "duplicate port id: {port_id}"),
@@ -532,11 +546,7 @@ struct PortableRunnerFields {
 }
 
 fn portable_runner_fields(config: &NodeConfig, settings: Option<&NodeRunnerSettings>) -> PortableRunnerFields {
-    let default_binding = runner::build_runner_plan(&workflow_for_config(config.clone()))
-        .plan
-        .and_then(|plan| plan.nodes.into_iter().next())
-        .map(|node| node.runtime)
-        .expect("single-node workflow has runner binding");
+    let default_binding = runner::runtime_binding_for_config(config);
     PortableRunnerFields {
         runtime_kind: settings.map(|settings| settings.runtime_kind.clone()).unwrap_or(default_binding.kind),
         runtime_key: settings.map(|settings| settings.runtime_key.clone()).unwrap_or(default_binding.key),
@@ -545,26 +555,6 @@ fn portable_runner_fields(config: &NodeConfig, settings: Option<&NodeRunnerSetti
         retry_policy: settings.map(|settings| settings.retry_policy.clone()).unwrap_or_default(),
         artifact_policy: settings.map(|settings| settings.artifact_policy.clone()).unwrap_or_default(),
     }
-}
-
-fn workflow_for_config(config: NodeConfig) -> Workflow {
-    let mut workflow = Workflow::new("portable-runner-config", crate::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = match &config {
-        NodeConfig::Shell { command, .. } => workflow.add_shell_node("node", command),
-        NodeConfig::Http { method, url, .. } => workflow.add_http_node("node", method, url),
-        NodeConfig::File { operation, path, .. } => workflow.add_file_node("node", *operation, path),
-        NodeConfig::ImageInput { path, .. } => workflow.add_image_input_node("node", path),
-        NodeConfig::Agent(settings) => {
-            workflow.add_agent_node("node", settings.target, &settings.prompt, settings.output_mode)
-        }
-        NodeConfig::Operation(plan) => workflow.add_operation_node("node", (**plan).clone()),
-        NodeConfig::Condition(config) => workflow.add_condition_node("node", config.clone()),
-        NodeConfig::Merge(config) => workflow.add_merge_node("node", config.clone()),
-        NodeConfig::Subworkflow(config) => workflow.add_subworkflow_node("node", config.clone()),
-        NodeConfig::Approval(config) => workflow.add_approval_node("node", config.clone()),
-    };
-    workflow.set_node_config(node_id, config);
-    workflow
 }
 
 fn empty_portable_node_config(
@@ -1865,11 +1855,7 @@ fn file_operation_label(operation: FileOperationKind) -> &'static str {
 }
 
 fn portable_config_to_runner_settings(config: &PortableNodeConfig, node_config: &NodeConfig) -> NodeRunnerSettings {
-    let default_binding = runner::build_runner_plan(&workflow_for_config(node_config.clone()))
-        .plan
-        .and_then(|plan| plan.nodes.into_iter().next())
-        .map(|node| node.runtime)
-        .expect("single-node workflow has runner binding");
+    let default_binding = runner::runtime_binding_for_config(node_config);
 
     NodeRunnerSettings {
         runtime_kind: non_empty_or_default(&config.runtime_kind, default_binding.kind),
@@ -2338,9 +2324,10 @@ pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormat
     let json = config::load_nickel_as_json(path).map_err(WorkflowFormatError::Nickel)?;
     let portable = serde_json::from_value(json).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
-    choregraph::lower_portable(&portable)?;
     let resolved_agent_prompts = load_markdown_agent_prompts(path, &portable)?;
-    portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
+    let workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
+    choregraph::lower_portable(&workflow_to_portable(&workflow))?;
+    Ok(workflow)
 }
 
 /// Decode an already evaluated workflow and resolve prompt files from captured bundle assets.
@@ -2351,9 +2338,10 @@ pub fn from_nickel_value(
     let portable: PortableWorkflow =
         serde_json::from_value(value).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
-    choregraph::lower_portable(&portable)?;
     let resolved_agent_prompts = captured_markdown_agent_prompts(&portable, assets)?;
-    portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)
+    let workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
+    choregraph::lower_portable(&workflow_to_portable(&workflow))?;
+    Ok(workflow)
 }
 
 fn captured_markdown_agent_prompts(

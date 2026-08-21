@@ -1,7 +1,20 @@
 {
-  "baseline_hash": "b3:bfcb7ba5c2d26bea2c9b8f7def96b0c2831db5ea09f9eafa48ce8a2eee89d029",
+  "baseline_hash": "b3:fb51371ee7a48be085c3535f45af4b704dcb23101386ed8012310b4a9f366b57",
   "finding_schema_version": 2,
   "findings": [
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_validation.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 608 lines (limit: 300)",
+      "semantic_id": "b3:00306444453310b8",
+      "severity": "warning",
+      "stable_id": "b3:00306444453310b8"
+    },
     {
       "column": 1,
       "crate_name": "lattice",
@@ -109,19 +122,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/node_kind_provider.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 279,
-      "lint": "path_segment_repetition",
-      "message": "item name `validate_config_for_kind` repeats `kind` from ancestor path segment `node_kind_provider`",
-      "semantic_id": "b3:0290ed1b4fd008b8",
-      "severity": "warning",
-      "stable_id": "b3:0290ed1b4fd008b8"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/replay.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -131,19 +131,6 @@
       "semantic_id": "b3:02967e690ae73b35",
       "severity": "warning",
       "stable_id": "b3:02967e690ae73b35"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 289,
-      "lint": "path_segment_repetition",
-      "message": "item name `WorkflowFormatError` repeats `workflow` from ancestor path segment `workflow_format`",
-      "semantic_id": "b3:03748e027bece9ff",
-      "severity": "warning",
-      "stable_id": "b3:03748e027bece9ff"
     },
     {
       "column": 9,
@@ -980,19 +967,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 669 lines (limit: 300)",
-      "semantic_id": "b3:1a1c3b71fc0a9cdd",
-      "severity": "warning",
-      "stable_id": "b3:1a1c3b71fc0a9cdd"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/orchestration/shell.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -1210,6 +1184,19 @@
       "semantic_id": "b3:20b959f12b2a2f64",
       "severity": "warning",
       "stable_id": "b3:20b959f12b2a2f64"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/node_kind_provider.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 451 lines (limit: 300)",
+      "semantic_id": "b3:20ff3c3214287cfc",
+      "severity": "warning",
+      "stable_id": "b3:20ff3c3214287cfc"
     },
     {
       "column": 1,
@@ -2499,6 +2486,19 @@
       "stable_id": "b3:3aa21e58267a7ff4"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_validation.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 146,
+      "lint": "borrowed_argument_types",
+      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
+      "semantic_id": "b3:3ac6cf89dc592dce",
+      "severity": "warning",
+      "stable_id": "b3:3ac6cf89dc592dce"
+    },
+    {
       "column": 59,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -2655,19 +2655,6 @@
       "stable_id": "b3:40dbe9a8b66aa758"
     },
     {
-      "column": 27,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::safety",
-      "identity_status": "computed",
-      "line": 1868,
-      "lint": "no_unwrap",
-      "message": "`.expect()` in production code will panic on failure",
-      "semantic_id": "b3:4156682195cefdbf",
-      "severity": "warning",
-      "stable_id": "b3:4156682195cefdbf"
-    },
-    {
       "column": 1,
       "crate_name": "lattice",
       "file": "src/engine/runner.rs",
@@ -2744,19 +2731,6 @@
       "semantic_id": "b3:438d573581f97e7d",
       "severity": "warning",
       "stable_id": "b3:438d573581f97e7d"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 2505 lines (limit: 300)",
-      "semantic_id": "b3:43d20409c09d7255",
-      "severity": "warning",
-      "stable_id": "b3:43d20409c09d7255"
     },
     {
       "column": 1,
@@ -3268,19 +3242,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/node_kind_provider.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "underscore_in_module_filename",
-      "message": "module filename `node_kind_provider.rs` contains an underscore; prefer `node/kind/provider.rs`",
-      "semantic_id": "b3:4fcf6d3775a46ba2",
-      "severity": "warning",
-      "stable_id": "b3:4fcf6d3775a46ba2"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/engine/workflow.rs",
       "group": "tigerstyle::structure",
       "identity_status": "computed",
@@ -3355,19 +3316,6 @@
       "semantic_id": "b3:50a74c869917307f",
       "severity": "warning",
       "stable_id": "b3:50a74c869917307f"
-    },
-    {
-      "column": 90,
-      "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::safety",
-      "identity_status": "computed",
-      "line": 140,
-      "lint": "assertion_density",
-      "message": "function `validate_node_configs` has 0 assertion(s) in 27 lines (need 2+)",
-      "semantic_id": "b3:514c246cb664333c",
-      "severity": "warning",
-      "stable_id": "b3:514c246cb664333c"
     },
     {
       "column": 17,
@@ -4267,6 +4215,19 @@
       "stable_id": "b3:65dcd5d22a6af7c5"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "underscore_in_module_filename",
+      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
+      "semantic_id": "b3:665adcf8d8643d19",
+      "severity": "warning",
+      "stable_id": "b3:665adcf8d8643d19"
+    },
+    {
       "column": 63,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -4527,6 +4488,19 @@
       "stable_id": "b3:69b84df594fb8421"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_validation.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 96,
+      "lint": "path_segment_repetition",
+      "message": "item name `base_workflow_diagnostics` repeats `workflow` from ancestor path segment `workflow_validation`",
+      "semantic_id": "b3:6a8fcc6106e4a238",
+      "severity": "warning",
+      "stable_id": "b3:6a8fcc6106e4a238"
+    },
+    {
       "column": 5,
       "crate_name": "lattice",
       "file": "src/orchestration/core.rs",
@@ -4590,19 +4564,6 @@
       "semantic_id": "b3:6b0d0ac78aad47a8",
       "severity": "warning",
       "stable_id": "b3:6b0d0ac78aad47a8"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/node_kind_provider.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 436 lines (limit: 300)",
-      "semantic_id": "b3:6b1e0ef035738359",
-      "severity": "warning",
-      "stable_id": "b3:6b1e0ef035738359"
     },
     {
       "column": 1,
@@ -5463,19 +5424,6 @@
       "stable_id": "b3:7ef173cbf39fb9f8"
     },
     {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "underscore_in_module_filename",
-      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
-      "semantic_id": "b3:7f07f4ebfec11018",
-      "severity": "warning",
-      "stable_id": "b3:7f07f4ebfec11018"
-    },
-    {
       "column": 3,
       "crate_name": "lattice",
       "file": "src/replay.rs",
@@ -5621,19 +5569,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/engine/runner.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 327,
-      "lint": "path_segment_repetition",
-      "message": "item name `build_runner_plan` repeats `runner` from ancestor path segment `runner`",
-      "semantic_id": "b3:8348dac47f7c01db",
-      "severity": "warning",
-      "stable_id": "b3:8348dac47f7c01db"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/engine/executor.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -5712,19 +5647,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/engine/runner.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 131,
-      "lint": "path_segment_repetition",
-      "message": "item name `RunnerWorkflow` repeats `runner` from ancestor path segment `runner`",
-      "semantic_id": "b3:846d804e49c9f997",
-      "severity": "warning",
-      "stable_id": "b3:846d804e49c9f997"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/tui/input.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -5734,6 +5656,19 @@
       "semantic_id": "b3:84a9cfac27ca5476",
       "severity": "warning",
       "stable_id": "b3:84a9cfac27ca5476"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/engine/runner.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 154,
+      "lint": "path_segment_repetition",
+      "message": "item name `RunnerWorkflow` repeats `runner` from ancestor path segment `runner`",
+      "semantic_id": "b3:852c92f09463c652",
+      "severity": "warning",
+      "stable_id": "b3:852c92f09463c652"
     },
     {
       "column": 1,
@@ -5825,6 +5760,19 @@
       "semantic_id": "b3:875d95c290b202f5",
       "severity": "warning",
       "stable_id": "b3:875d95c290b202f5"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/node_kind_provider.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "underscore_in_module_filename",
+      "message": "module filename `node_kind_provider.rs` contains an underscore; prefer `node/kind/provider.rs`",
+      "semantic_id": "b3:8789afd50b1dbe38",
+      "severity": "warning",
+      "stable_id": "b3:8789afd50b1dbe38"
     },
     {
       "column": 1,
@@ -6100,6 +6048,19 @@
       "stable_id": "b3:8baa7b606197694a"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_validation.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "underscore_in_module_filename",
+      "message": "module filename `workflow_validation.rs` contains an underscore; prefer `workflow/validation.rs`",
+      "semantic_id": "b3:8bbd82ef80f4e49c",
+      "severity": "warning",
+      "stable_id": "b3:8bbd82ef80f4e49c"
+    },
+    {
       "column": 23,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -6202,19 +6163,6 @@
       "semantic_id": "b3:8db244dcaaa67f2d",
       "severity": "warning",
       "stable_id": "b3:8db244dcaaa67f2d"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 140,
-      "lint": "borrowed_argument_types",
-      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
-      "semantic_id": "b3:8de33f03db0fcca3",
-      "severity": "warning",
-      "stable_id": "b3:8de33f03db0fcca3"
     },
     {
       "column": 1,
@@ -6371,6 +6319,19 @@
       "semantic_id": "b3:91b4eb2879722b43",
       "severity": "warning",
       "stable_id": "b3:91b4eb2879722b43"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 2493 lines (limit: 300)",
+      "semantic_id": "b3:91b9341346d90ada",
+      "severity": "warning",
+      "stable_id": "b3:91b9341346d90ada"
     },
     {
       "column": 1,
@@ -6648,6 +6609,19 @@
     {
       "column": 1,
       "crate_name": "lattice",
+      "file": "src/engine/runner.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 1098 lines (limit: 300)",
+      "semantic_id": "b3:970562ef038d2c90",
+      "severity": "warning",
+      "stable_id": "b3:970562ef038d2c90"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
       "file": "src/engine/executor.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -6683,6 +6657,19 @@
       "semantic_id": "b3:9781dab2bea7d58d",
       "severity": "warning",
       "stable_id": "b3:9781dab2bea7d58d"
+    },
+    {
+      "column": 90,
+      "crate_name": "lattice",
+      "file": "src/workflow_validation.rs",
+      "group": "tigerstyle::safety",
+      "identity_status": "computed",
+      "line": 146,
+      "lint": "assertion_density",
+      "message": "function `validate_node_configs` has 0 assertion(s) in 24 lines (need 2+)",
+      "semantic_id": "b3:97a33d6bbf65b4b6",
+      "severity": "warning",
+      "stable_id": "b3:97a33d6bbf65b4b6"
     },
     {
       "column": 1,
@@ -6958,6 +6945,19 @@
       "stable_id": "b3:9de8adbb750e72ab"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/engine/executor.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 2801 lines (limit: 300)",
+      "semantic_id": "b3:9e509d6518d41479",
+      "severity": "warning",
+      "stable_id": "b3:9e509d6518d41479"
+    },
+    {
       "column": 18,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -7021,19 +7021,6 @@
       "semantic_id": "b3:9f33182c0981f68a",
       "severity": "warning",
       "stable_id": "b3:9f33182c0981f68a"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 2337,
-      "lint": "path_segment_repetition",
-      "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
-      "semantic_id": "b3:9f77199bdeb395e5",
-      "severity": "warning",
-      "stable_id": "b3:9f77199bdeb395e5"
     },
     {
       "column": 1,
@@ -7413,19 +7400,6 @@
       "stable_id": "b3:a7477cf3f019f6f9"
     },
     {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "underscore_in_module_filename",
-      "message": "module filename `workflow_validation.rs` contains an underscore; prefer `workflow/validation.rs`",
-      "semantic_id": "b3:a76ec92d5df46b59",
-      "severity": "warning",
-      "stable_id": "b3:a76ec92d5df46b59"
-    },
-    {
       "column": 73,
       "crate_name": "lattice",
       "file": "src/tui/input.rs",
@@ -7476,19 +7450,6 @@
       "semantic_id": "b3:a8d35ffea0451313",
       "severity": "warning",
       "stable_id": "b3:a8d35ffea0451313"
-    },
-    {
-      "column": 104,
-      "crate_name": "lattice",
-      "file": "src/node_kind_provider.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 279,
-      "lint": "function_length",
-      "message": "function `validate_config_for_kind` is 93 lines (limit: 70)",
-      "semantic_id": "b3:a94c25e5df7a67e3",
-      "severity": "warning",
-      "stable_id": "b3:a94c25e5df7a67e3"
     },
     {
       "column": 1,
@@ -7922,6 +7883,19 @@
     {
       "column": 1,
       "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 289,
+      "lint": "path_segment_repetition",
+      "message": "item name `WorkflowFormatError` repeats `workflow` from ancestor path segment `workflow_format`",
+      "semantic_id": "b3:b5669dc394d258d6",
+      "severity": "warning",
+      "stable_id": "b3:b5669dc394d258d6"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
       "file": "src/engine/workflow.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -7996,19 +7970,6 @@
       "semantic_id": "b3:b772d6e94720f96e",
       "severity": "warning",
       "stable_id": "b3:b772d6e94720f96e"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 304,
-      "lint": "ambiguous_params",
-      "message": "2 `&str` parameters are easy to swap by accident",
-      "semantic_id": "b3:b794ceb14ccee0af",
-      "severity": "warning",
-      "stable_id": "b3:b794ceb14ccee0af"
     },
     {
       "column": 1,
@@ -8308,19 +8269,6 @@
       "semantic_id": "b3:bdabfdeaad30a8df",
       "severity": "warning",
       "stable_id": "b3:bdabfdeaad30a8df"
-    },
-    {
-      "column": 27,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::safety",
-      "identity_status": "computed",
-      "line": 535,
-      "lint": "no_unwrap",
-      "message": "`.expect()` in production code will panic on failure",
-      "semantic_id": "b3:be574d680445362b",
-      "severity": "warning",
-      "stable_id": "b3:be574d680445362b"
     },
     {
       "column": 1,
@@ -8871,19 +8819,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 216,
-      "lint": "borrowed_argument_types",
-      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
-      "semantic_id": "b3:cd80f3e922fdd868",
-      "severity": "warning",
-      "stable_id": "b3:cd80f3e922fdd868"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/replay.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -8971,6 +8906,19 @@
       "semantic_id": "b3:cf3a0758ba9a4a30",
       "severity": "warning",
       "stable_id": "b3:cf3a0758ba9a4a30"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/node_kind_provider.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 285,
+      "lint": "path_segment_repetition",
+      "message": "item name `validate_config_for_kind` repeats `kind` from ancestor path segment `node_kind_provider`",
+      "semantic_id": "b3:cfa4f92dcbf6b64d",
+      "severity": "warning",
+      "stable_id": "b3:cfa4f92dcbf6b64d"
     },
     {
       "column": 9,
@@ -9376,6 +9324,19 @@
       "stable_id": "b3:d969e2dd16a9f1ae"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/workflow_format.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 2323,
+      "lint": "path_segment_repetition",
+      "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
+      "semantic_id": "b3:d9a1aab33dc91247",
+      "severity": "warning",
+      "stable_id": "b3:d9a1aab33dc91247"
+    },
+    {
       "column": 55,
       "crate_name": "lattice",
       "file": "src/workflow_format.rs",
@@ -9439,19 +9400,6 @@
       "semantic_id": "b3:db12bb66831de3e9",
       "severity": "warning",
       "stable_id": "b3:db12bb66831de3e9"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/engine/runner.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 1027 lines (limit: 300)",
-      "semantic_id": "b3:db58c45e8acbac85",
-      "severity": "warning",
-      "stable_id": "b3:db58c45e8acbac85"
     },
     {
       "column": 77,
@@ -9753,19 +9701,6 @@
       "stable_id": "b3:e1efcc48a2796cb3"
     },
     {
-      "column": 104,
-      "crate_name": "lattice",
-      "file": "src/node_kind_provider.rs",
-      "group": "tigerstyle::safety",
-      "identity_status": "computed",
-      "line": 279,
-      "lint": "assertion_density",
-      "message": "function `validate_config_for_kind` has 0 assertion(s) in 93 lines (need 2+)",
-      "semantic_id": "b3:e2212c08f67c44ce",
-      "severity": "warning",
-      "stable_id": "b3:e2212c08f67c44ce"
-    },
-    {
       "column": 5,
       "crate_name": "lattice",
       "file": "src/workflow_format.rs",
@@ -9803,19 +9738,6 @@
       "semantic_id": "b3:e2e852f942df22fa",
       "severity": "warning",
       "stable_id": "b3:e2e852f942df22fa"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_format.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 550,
-      "lint": "path_segment_repetition",
-      "message": "item name `workflow_for_config` repeats `workflow` from ancestor path segment `workflow_format`",
-      "semantic_id": "b3:e2f02960b8b4eecd",
-      "severity": "warning",
-      "stable_id": "b3:e2f02960b8b4eecd"
     },
     {
       "column": 1,
@@ -10236,19 +10158,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 91,
-      "lint": "path_segment_repetition",
-      "message": "item name `base_workflow_diagnostics` repeats `workflow` from ancestor path segment `workflow_validation`",
-      "semantic_id": "b3:e9b69399e49d680b",
-      "severity": "warning",
-      "stable_id": "b3:e9b69399e49d680b"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/node_kind_provider.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -10297,6 +10206,19 @@
       "semantic_id": "b3:ea7c9f599dc445d0",
       "severity": "warning",
       "stable_id": "b3:ea7c9f599dc445d0"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/engine/runner.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 352,
+      "lint": "path_segment_repetition",
+      "message": "item name `build_runner_plan` repeats `runner` from ancestor path segment `runner`",
+      "semantic_id": "b3:ea9f21cf22479702",
+      "severity": "warning",
+      "stable_id": "b3:ea9f21cf22479702"
     },
     {
       "column": 1,
@@ -10518,19 +10440,6 @@
       "semantic_id": "b3:f0636536052c77f0",
       "severity": "warning",
       "stable_id": "b3:f0636536052c77f0"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/workflow_validation.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 304,
-      "lint": "borrowed_argument_types",
-      "message": "parameter uses `&Vec<WorkflowDiagnostic>`; accept `&[WorkflowDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
-      "semantic_id": "b3:f0a99a635999331a",
-      "severity": "warning",
-      "stable_id": "b3:f0a99a635999331a"
     },
     {
       "column": 48,
@@ -10791,19 +10700,6 @@
       "semantic_id": "b3:f817cd639d2df004",
       "severity": "warning",
       "stable_id": "b3:f817cd639d2df004"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/engine/executor.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 2731 lines (limit: 300)",
-      "semantic_id": "b3:f877084ac71fb719",
-      "severity": "warning",
-      "stable_id": "b3:f877084ac71fb719"
     },
     {
       "column": 1,

@@ -14,6 +14,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Workflow domain boundaries](docs/workflow-domain-boundaries.md) define ownership for Lattice, Choregraph, Subwayrat, persistence, and time.
 
+[Explicit workflow expression dependencies](docs/expression-dependencies.md) define extraction, projection, runtime context, identity, and compatibility boundaries.
+
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
 ## Development

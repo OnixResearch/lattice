@@ -27,7 +27,7 @@ pub enum ExpressionSegment {
     Reference(ExpressionReference),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ExpressionPortId(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +72,14 @@ impl ExpressionContext {
         self.values.insert((node_id, port_id), value);
     }
 
+    pub fn contains(&self, node_id: u64, port_id: ExpressionPortId) -> bool {
+        self.values.contains_key(&(node_id, port_id))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
     fn get(&self, reference: &ExpressionReference) -> Option<&Value> {
         self.values.get(&(reference.node_id, reference.port_id))
     }
@@ -97,10 +105,15 @@ pub fn contains_expression(input: &str) -> bool {
 
 // r[impl n8nclone.workflow_execution.expression_mapping.syntax]
 pub fn parse_expression_template(input: &str) -> Result<ExpressionTemplate, ExpressionError> {
+    debug_assert!(!OPEN_DELIMITER.is_empty());
+    debug_assert!(!CLOSE_DELIMITER.is_empty());
     let mut segments = Vec::new();
     let mut rest = input;
     loop {
         let Some(open_index) = rest.find(OPEN_DELIMITER) else {
+            if rest.contains(CLOSE_DELIMITER) {
+                return Err(ExpressionError::InvalidSyntax("unexpected closing delimiter".to_string()));
+            }
             if !rest.is_empty() {
                 segments.push(ExpressionSegment::Literal(rest.to_string()));
             }
@@ -108,6 +121,9 @@ pub fn parse_expression_template(input: &str) -> Result<ExpressionTemplate, Expr
         };
 
         let literal = &rest[..open_index];
+        if literal.contains(CLOSE_DELIMITER) {
+            return Err(ExpressionError::InvalidSyntax("unexpected closing delimiter".to_string()));
+        }
         if !literal.is_empty() {
             segments.push(ExpressionSegment::Literal(literal.to_string()));
         }

@@ -74,7 +74,8 @@ fn adoption_boundaries_and_evidence_paths_remain_present() {
     for marker in FORBIDDEN_LOWERING_MARKERS {
         assert!(!LOWERING_CORE.contains(marker), "forbidden lowering marker: {marker}");
     }
-    assert!(WORKFLOW_SHELL.contains("choregraph::lower_portable(&portable)?"));
+    assert!(WORKFLOW_SHELL.contains("let workflow = portable_to_runtime_with_agent_prompts"));
+    assert!(WORKFLOW_SHELL.contains("choregraph::lower_portable(&workflow_to_portable(&workflow))?"));
     assert!(RUNNER_CORE.contains("seaglass_execution_graph::admit_graph"));
     assert!(RUNNER_CORE.contains("migrate_persisted_states"));
     assert!(RUNNER_CORE.contains("replay_persisted_events"));

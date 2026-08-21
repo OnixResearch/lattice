@@ -10,10 +10,11 @@ use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::PortDirection;
 use crate::engine::workflow::PortId;
 use crate::engine::workflow::Workflow;
-use crate::expressions;
 use crate::node_kind_provider;
 use crate::node_kind_provider::NodeKindValidationCode;
 use crate::triggers;
+
+const MAX_EXPRESSION_DIAGNOSTICS_PER_CONFIG: usize = 18;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,6 +53,10 @@ pub enum WorkflowDiagnosticCode {
     DuplicateApprovalGate,
     InvalidTriggerConfig,
     InvalidExpressionSyntax,
+    ExpressionProducerMissing,
+    ExpressionOutputPortMissing,
+    ExpressionSelfReference,
+    UnsupportedExpressionField,
     RunnerCycleDetected,
     RunnerMissingRuntimeBinding,
     RunnerUnsupportedRuntimePolicy,
@@ -101,6 +106,7 @@ fn base_workflow_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
     }
 
     validate_node_configs(workflow, &mut diagnostics);
+    diagnostics.extend(expression_dependency_diagnostics(workflow));
     diagnostics.extend(validate_approval_topology(workflow));
     validate_edges(workflow, &mut diagnostics);
     validate_control_flow_topology(workflow, &mut diagnostics);
@@ -139,9 +145,6 @@ pub fn format_diagnostic(diagnostic: &WorkflowDiagnostic) -> String {
 
 fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiagnostic>) {
     for node in workflow.graph.nodes() {
-        if let Some(config) = workflow.node_config(node.id) {
-            validate_config_expressions(node.id, config, diagnostics);
-        }
         match workflow.node_config(node.id) {
             Some(config) => diagnostics.extend(provider_diagnostics(node.id, &node.label, config)),
             None => diagnostics.push(fatal(
@@ -213,108 +216,43 @@ fn workflow_code_from_provider_code(code: NodeKindValidationCode) -> WorkflowDia
     }
 }
 
-fn validate_config_expressions(
-    node_id: crate::engine::workflow::NodeId,
-    config: &NodeConfig,
-    diagnostics: &mut Vec<WorkflowDiagnostic>,
-) {
-    match config {
-        NodeConfig::Shell { command, cwd, env, .. } => {
-            validate_expression_field(node_id, "command", command, diagnostics);
-            if let Some(cwd) = cwd {
-                validate_expression_field(node_id, "cwd", cwd, diagnostics);
-            }
-            for (name, value) in env {
-                validate_expression_field(node_id, &format!("env.{name}"), value, diagnostics);
-            }
-        }
-        NodeConfig::Http {
-            method,
-            url,
-            headers,
-            body,
-            ..
-        } => {
-            validate_expression_field(node_id, "method", method, diagnostics);
-            validate_expression_field(node_id, "url", url, diagnostics);
-            for (name, value) in headers {
-                validate_expression_field(node_id, &format!("header.{name}"), value, diagnostics);
-            }
-            if let Some(body) = body {
-                validate_expression_field(node_id, "body", body, diagnostics);
-            }
-        }
-        NodeConfig::File {
-            path,
-            content,
-            allowed_roots,
-            ..
-        } => {
-            validate_expression_field(node_id, "path", path, diagnostics);
-            if let Some(content) = content {
-                validate_expression_field(node_id, "content", content, diagnostics);
-            }
-            for root in allowed_roots {
-                validate_expression_field(node_id, "allowed_root", root, diagnostics);
-            }
-        }
-        NodeConfig::ImageInput {
-            path, allowed_roots, ..
-        } => {
-            validate_expression_field(node_id, "path", path, diagnostics);
-            for root in allowed_roots {
-                validate_expression_field(node_id, "allowed_root", root, diagnostics);
-            }
-        }
-        NodeConfig::Agent(settings) => validate_agent_expressions(node_id, settings, diagnostics),
-        NodeConfig::Operation(_)
-        | NodeConfig::Condition(_)
-        | NodeConfig::Merge(_)
-        | NodeConfig::Subworkflow(_)
-        | NodeConfig::Approval(_) => {}
-    }
-}
-
-#[allow(
-    unknown_lints,
-    borrowed_argument_types,
-    reason = "agent expression validation appends findings to the caller-owned diagnostic accumulator"
-)]
-fn validate_agent_expressions(
-    node_id: crate::engine::workflow::NodeId,
-    settings: &crate::agent_node::AgentNodeSettings,
-    diagnostics: &mut Vec<WorkflowDiagnostic>,
-) {
-    validate_expression_field(node_id, "prompt", &settings.prompt, diagnostics);
-    if let Some(model_hint) = &settings.model_hint {
-        validate_expression_field(node_id, "model_hint", model_hint, diagnostics);
-    }
-    validate_expression_field(node_id, "tool_policy", &settings.tool_policy, diagnostics);
-    for context_ref in &settings.context_refs {
-        validate_expression_field(node_id, "context_ref", context_ref, diagnostics);
-    }
-    if let Some(cwd) = &settings.cwd {
-        validate_expression_field(node_id, "cwd", cwd, diagnostics);
-    }
-    if let Some(session) = &settings.session {
-        validate_expression_field(node_id, "session", session, diagnostics);
-    }
-}
-
-fn validate_expression_field(
-    node_id: crate::engine::workflow::NodeId,
-    field_name: &str,
-    value: &str,
-    diagnostics: &mut Vec<WorkflowDiagnostic>,
-) {
-    for error in expressions::expression_error_fragments(value) {
-        diagnostics.push(fatal(
-            WorkflowDiagnosticCode::InvalidExpressionSyntax,
-            Some(node_id),
-            None,
-            format!("invalid expression in {field_name}: {error}"),
-        ));
-    }
+// r[impl lattice.workflow_validation.explicit_dependencies.admission]
+fn expression_dependency_diagnostics(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
+    let Err(issues) = crate::expression_dependencies::workflow_projection(workflow) else {
+        return Vec::new();
+    };
+    let diagnostics = issues
+        .into_iter()
+        .map(|issue| {
+            let code = match issue.code {
+                crate::expression_dependencies::ExpressionDependencyIssueCode::InvalidSyntax => {
+                    WorkflowDiagnosticCode::InvalidExpressionSyntax
+                }
+                crate::expression_dependencies::ExpressionDependencyIssueCode::MissingProducerNode => {
+                    WorkflowDiagnosticCode::ExpressionProducerMissing
+                }
+                crate::expression_dependencies::ExpressionDependencyIssueCode::MissingProducerOutputPort => {
+                    WorkflowDiagnosticCode::ExpressionOutputPortMissing
+                }
+                crate::expression_dependencies::ExpressionDependencyIssueCode::SelfReference => {
+                    WorkflowDiagnosticCode::ExpressionSelfReference
+                }
+                crate::expression_dependencies::ExpressionDependencyIssueCode::UnsupportedField => {
+                    WorkflowDiagnosticCode::UnsupportedExpressionField
+                }
+            };
+            fatal(
+                code,
+                Some(crate::engine::workflow::NodeId(issue.consumer_node)),
+                issue.producer_output_port.map(|port| PortId(port.0)),
+                format!("{}: {}", issue.config_field_path, issue.message),
+            )
+        })
+        .collect::<Vec<_>>();
+    let maximum_diagnostics = workflow.configs.len().saturating_mul(MAX_EXPRESSION_DIAGNOSTICS_PER_CONFIG);
+    debug_assert!(diagnostics.len() <= maximum_diagnostics);
+    debug_assert!(diagnostics.iter().all(|diagnostic| diagnostic.severity == DiagnosticSeverity::Fatal));
+    diagnostics
 }
 
 fn validate_approval_topology(workflow: &Workflow) -> Vec<WorkflowDiagnostic> {
@@ -629,7 +567,8 @@ fn workflow_diagnostic_from_runner(diagnostic: runner::RunnerDiagnostic) -> Opti
         | runner::RunnerDiagnosticCode::EdgePortMissing
         | runner::RunnerDiagnosticCode::EdgeWrongDirection
         | runner::RunnerDiagnosticCode::EdgeSelfLoop
-        | runner::RunnerDiagnosticCode::EdgeIncompatibleType => return None,
+        | runner::RunnerDiagnosticCode::EdgeIncompatibleType
+        | runner::RunnerDiagnosticCode::InvalidExpressionDependency => return None,
     };
     Some(fatal(code, diagnostic.node_id, diagnostic.port_id, diagnostic.message))
 }

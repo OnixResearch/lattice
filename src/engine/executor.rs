@@ -147,6 +147,10 @@ const HASH_TAG_INPUTS: &[u8] = b"inputs";
 const HASH_TAG_INPUT_PORT: &[u8] = b"input-port";
 const HASH_TAG_INPUT_TYPE: &[u8] = b"input-type";
 const HASH_TAG_INPUT_VALUE: &[u8] = b"input-value";
+const HASH_TAG_EXPRESSION_VALUES: &[u8] = b"expression-values";
+const HASH_TAG_EXPRESSION_NODE: &[u8] = b"expression-node";
+const HASH_TAG_EXPRESSION_PORT: &[u8] = b"expression-port";
+const HASH_TAG_EXPRESSION_VALUE: &[u8] = b"expression-value";
 const HASH_TAG_SOME: &[u8] = b"some";
 const HASH_TAG_NONE: &[u8] = b"none";
 const HASH_TAG_TRUE: &[u8] = b"true";
@@ -221,12 +225,23 @@ pub fn node_execution_cache_key_with_credentials(
     credentials: Option<&NodeCredentialRefs>,
     inputs: &HashMap<PortId, Value>,
 ) -> ContentHash {
+    node_execution_cache_key_with_expression_values(node_id, config, credentials, inputs, &BTreeMap::new())
+}
+
+fn node_execution_cache_key_with_expression_values(
+    node_id: crate::engine::workflow::NodeId,
+    config: &NodeConfig,
+    credentials: Option<&NodeCredentialRefs>,
+    inputs: &HashMap<PortId, Value>,
+    expression_values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
+) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     hasher.update(HASH_TAG_NODE_EXECUTION);
     update_u64(&mut hasher, HASH_TAG_NODE_ID, node_id.0);
     update_node_config_hash(&mut hasher, config);
     update_secret_refs_hash(&mut hasher, credentials);
     update_inputs_hash(&mut hasher, inputs);
+    update_expression_values_hash(&mut hasher, expression_values);
     ContentHash(*hasher.finalize().as_bytes())
 }
 
@@ -356,6 +371,23 @@ fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Valu
     }
 }
 
+fn update_expression_values_hash(
+    hasher: &mut blake3::Hasher,
+    values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
+) {
+    if values.is_empty() {
+        return;
+    }
+    hasher.update(HASH_TAG_EXPRESSION_VALUES);
+    update_len(hasher, values.len());
+    for ((node_id, port_id), value) in values {
+        update_u64(hasher, HASH_TAG_EXPRESSION_NODE, *node_id);
+        update_u64(hasher, HASH_TAG_EXPRESSION_PORT, port_id.0);
+        hasher.update(HASH_TAG_EXPRESSION_VALUE);
+        hasher.update(&value.hash.0);
+    }
+}
+
 fn update_env(hasher: &mut blake3::Hasher, env: &HashMap<String, String>) {
     update_env_with_tag(hasher, HASH_TAG_ENV, env);
 }
@@ -445,19 +477,32 @@ fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<Str
     inputs.values().flat_map(|value| value.sensitive_fragments.clone()).collect()
 }
 
-fn expression_context_from_workflow_outputs(
-    workflow: &Workflow,
+// r[impl lattice.workflow_validation.explicit_dependencies.context]
+fn expression_values_for_consumer(
+    plan: &runner::RunnerWorkflow,
+    consumer_node: crate::engine::workflow::NodeId,
     port_values: &HashMap<PortId, Value>,
+) -> Result<BTreeMap<(u64, expressions::ExpressionPortId), Value>, String> {
+    plan.expression_dependencies
+        .iter()
+        .filter(|dependency| dependency.consumer_node == consumer_node.0)
+        .map(|dependency| {
+            let port_id = PortId(dependency.producer_output_port.0);
+            let value = port_values.get(&port_id).ok_or_else(|| {
+                format!(
+                    "{}: expression reference node:{}:port:{} is unavailable",
+                    dependency.config_field_path, dependency.producer_node, dependency.producer_output_port.0
+                )
+            })?;
+            Ok(((dependency.producer_node, dependency.producer_output_port), value.clone()))
+        })
+        .collect()
+}
+
+fn expression_context_from_admitted_values(
+    values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
 ) -> ExpressionContext {
-    let mut context = ExpressionContext::new(HashMap::new());
-    for node in workflow.graph.nodes() {
-        for port in &node.output_ports {
-            if let Some(value) = port_values.get(&port.id) {
-                context.insert(node.id.0, expressions::ExpressionPortId(port.id.0), value.clone());
-            }
-        }
-    }
-    context
+    ExpressionContext::new(values.iter().map(|(key, value)| (*key, value.clone())).collect())
 }
 
 fn update_secret_refs_hash(hasher: &mut blake3::Hasher, credentials: Option<&NodeCredentialRefs>) {
@@ -1180,6 +1225,7 @@ struct NodeExecution<'a> {
     node_id: crate::engine::workflow::NodeId,
     inputs: &'a HashMap<PortId, Value>,
     expression_context: &'a ExpressionContext,
+    input_hash: Option<ContentHash>,
     parent_run_id: Option<RunId>,
     effect: EffectExecution<'a>,
 }
@@ -1380,6 +1426,7 @@ impl Executor {
             node_id,
             inputs,
             expression_context: &ExpressionContext::new(HashMap::new()),
+            input_hash: None,
             parent_run_id: None,
             effect: EffectExecution::Compatibility,
         })
@@ -1411,6 +1458,7 @@ impl Executor {
             node_id,
             inputs,
             expression_context: &ExpressionContext::new(HashMap::new()),
+            input_hash: None,
             parent_run_id: None,
             effect: EffectExecution::Exact { binding, dispatch },
         })
@@ -1423,6 +1471,7 @@ impl Executor {
             node_id,
             inputs,
             expression_context,
+            input_hash: precomputed_input_hash,
             parent_run_id,
             effect,
         } = execution;
@@ -1439,7 +1488,7 @@ impl Executor {
             }
         };
 
-        let fallback_input_hash = input_values_hash(inputs);
+        let fallback_input_hash = precomputed_input_hash.unwrap_or_else(|| input_values_hash(inputs));
 
         let config = match workflow.node_config(node_id) {
             Some(c) => c,
@@ -1454,7 +1503,8 @@ impl Executor {
             }
         };
         let node_credentials = workflow.node_credentials(node_id);
-        let input_hash = node_execution_cache_key_with_credentials(node_id, config, node_credentials, inputs);
+        let input_hash = precomputed_input_hash
+            .unwrap_or_else(|| node_execution_cache_key_with_credentials(node_id, config, node_credentials, inputs));
         if let EffectExecution::Exact { binding, .. } = &effect
             && !authorized_binding_matches_node(binding, node_id, config)
         {
@@ -2384,8 +2434,7 @@ impl Executor {
                 }
             }
 
-            // Check cache.
-            let input_hash = match workflow.node_config(node_id) {
+            let base_input_hash = match workflow.node_config(node_id) {
                 Some(config) => node_execution_cache_key_with_credentials(
                     node_id,
                     config,
@@ -2402,16 +2451,37 @@ impl Executor {
                 if let Some(session) = product_session.as_mut()
                     && let Err(error) = session.cancel(node_id)
                 {
-                    results.push(failed_product_step(node_id, input_hash, &choregraph_execution_error(error)));
+                    results.push(failed_product_step(node_id, base_input_hash, &choregraph_execution_error(error)));
                     continue;
                 }
                 results.push(StepResult {
                     node_id,
                     status: NodeStatus::Skipped,
-                    input_hash,
+                    input_hash: base_input_hash,
                 });
                 continue;
             }
+
+            let expression_values = match expression_values_for_consumer(&runner_plan, node_id, &port_values) {
+                Ok(values) => values,
+                Err(error) => {
+                    let step = failed_product_step(node_id, base_input_hash, &error);
+                    runner_states.insert(node_id.0, runner_step_state(&step.status));
+                    results.push(step);
+                    continue;
+                }
+            };
+            let input_hash = match workflow.node_config(node_id) {
+                Some(config) => node_execution_cache_key_with_expression_values(
+                    node_id,
+                    config,
+                    workflow.node_credentials(node_id),
+                    &inputs,
+                    &expression_values,
+                ),
+                None => base_input_hash,
+            };
+            let expression_context = expression_context_from_admitted_values(&expression_values);
 
             if matches!(workflow.node_config(node_id), Some(NodeConfig::Approval(_))) && control.stop_at_approval {
                 if control.resumed_gate == Some(node_id) {
@@ -2508,7 +2578,6 @@ impl Executor {
                 continue;
             }
 
-            let expression_context = expression_context_from_workflow_outputs(workflow, &port_values);
             let has_effectful_config = workflow.node_config(node_id).and_then(effect_operation).is_some();
             if !has_effectful_config
                 && let Some(session) = product_session.as_mut()
@@ -2529,6 +2598,7 @@ impl Executor {
                     node_id,
                     inputs: &inputs,
                     expression_context: &expression_context,
+                    input_hash: Some(input_hash),
                     parent_run_id: Some(run_id),
                     effect,
                 })

@@ -11,5 +11,13 @@
 pub mod content_identity;
 #[path = "control/flow.rs"]
 pub mod control_flow;
+#[path = "expression/dependencies.rs"]
+pub mod mapping;
+#[allow(
+    unknown_lints,
+    renamed_imports,
+    reason = "the compatibility name keeps the existing expression dependency API while the file uses a non-repeating module owner"
+)]
+pub use mapping as expression_dependencies;
 pub mod expressions;
 pub mod value;

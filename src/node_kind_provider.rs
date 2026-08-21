@@ -32,6 +32,7 @@ const DISPLAY_SUBWORKFLOW: &str = "Subworkflow";
 const DISPLAY_APPROVAL: &str = "Approval";
 const MIN_IMAGE_BYTE_BUDGET: usize = 1;
 const PRODUCT_FILE_ROOT_COUNT: usize = 1;
+const MAX_NODE_KIND_VALIDATION_ISSUES: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
@@ -276,6 +277,11 @@ fn property_line(label: &'static str, value: impl Into<String>) -> NodePropertyL
 
 // r[impl n8nclone.workflow_validation.node_kind_provider.config_validation]
 // r[impl n8nclone.workflow_validation.node_kind_provider.fallback]
+#[allow(
+    unknown_lints,
+    function_length,
+    reason = "one exhaustive NodeConfig match keeps new variants fail-closed until validation classifies them"
+)]
 pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<NodeKindValidationIssue> {
     let mut issues = Vec::new();
     match config {
@@ -288,13 +294,13 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
             }
         }
         NodeConfig::Http { method, url, .. } => {
-            if !http::validate_http_method(method) {
+            if !crate::expressions::contains_expression(method) && !http::validate_http_method(method) {
                 issues.push(issue(
                     NodeKindValidationCode::InvalidHttpMethod,
                     format!("HTTP node '{node_label}' has an invalid method"),
                 ));
             }
-            if !http::validate_http_url(url) {
+            if !crate::expressions::contains_expression(url) && !http::validate_http_url(url) {
                 issues.push(issue(
                     NodeKindValidationCode::InvalidHttpUrl,
                     format!("HTTP node '{node_label}' has an invalid URL"),
@@ -304,7 +310,10 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
         NodeConfig::File {
             path, allowed_roots, ..
         } => {
-            if !valid_product_file_target(path, allowed_roots)
+            let has_expression = crate::expressions::contains_expression(path)
+                || allowed_roots.iter().any(|root| crate::expressions::contains_expression(root));
+            if !has_expression
+                && !valid_product_file_target(path, allowed_roots)
                 && let Err(error) = file_node::validate_path_allowed(path, allowed_roots)
             {
                 issues.push(issue(NodeKindValidationCode::UnsafeFilePath, error.to_string()));
@@ -315,11 +324,15 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
             allowed_roots,
             max_bytes,
         } => {
-            if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
-                issues.push(issue(NodeKindValidationCode::UnsafeImagePath, error.to_string()));
-            }
-            if let Err(error) = image_node::validate_declared_format(path) {
-                issues.push(issue(NodeKindValidationCode::UnsupportedImageFormat, error.to_string()));
+            let has_expression = crate::expressions::contains_expression(path)
+                || allowed_roots.iter().any(|root| crate::expressions::contains_expression(root));
+            if !has_expression {
+                if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
+                    issues.push(issue(NodeKindValidationCode::UnsafeImagePath, error.to_string()));
+                }
+                if let Err(error) = image_node::validate_declared_format(path) {
+                    issues.push(issue(NodeKindValidationCode::UnsupportedImageFormat, error.to_string()));
+                }
             }
             if *max_bytes < MIN_IMAGE_BYTE_BUDGET {
                 issues.push(issue(
@@ -367,6 +380,8 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
             );
         }
     }
+    debug_assert!(issues.len() <= MAX_NODE_KIND_VALIDATION_ISSUES);
+    debug_assert!(issues.iter().all(|finding| !finding.message.is_empty()));
     issues
 }
 
