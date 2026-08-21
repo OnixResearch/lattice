@@ -34,6 +34,10 @@ fn label(value: &str) -> Label {
     Label::new(value.to_string()).expect("test label is canonical")
 }
 
+fn source_value(value: &str) -> SourceValue {
+    SourceValue::new(value.to_string()).expect("test source value is bounded and control-free")
+}
+
 fn profile() -> CapabilityProfile {
     CapabilityProfile {
         schema: PROFILE_SCHEMA.to_string(),
@@ -192,12 +196,13 @@ fn source_context_changes_request_identity_and_stale_identity_fails() {
     let mut first = request(&profile);
     first.source = Some(SourceContext {
         provider: label("radicle"),
-        repository: label("rad:zrepo"),
-        revision: label("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+        repository: source_value("rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE"),
+        revision: source_value("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
     });
     first.identity = request_identity(&first);
     let mut second = first.clone();
-    second.source.as_mut().expect("source context exists").revision = label("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    second.source.as_mut().expect("source context exists").revision =
+        source_value("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
     assert_ne!(first.identity, request_identity(&second));
     assert_eq!(validate_request(&profile, &first), Ok(()));
@@ -205,6 +210,15 @@ fn source_context_changes_request_identity_and_stale_identity_fails() {
         validate_request(&profile, &second).map_err(|error| error.code),
         Err(ErrorCode::RequestIdentityMismatch)
     );
+}
+
+// r[verify lattice.workflow_interchange.source_context.scenario.opaque]
+// r[verify lattice.workflow_interchange.source_context.scenario.control]
+#[test]
+fn source_values_preserve_mixed_case_and_reject_controls() {
+    let value = source_value("rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE");
+    assert_eq!(value.as_str(), "rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE");
+    assert_eq!(SourceValue::new("rad:zrepo\n".to_string()), Err(ValueError::InvalidSourceValue));
 }
 
 #[test]

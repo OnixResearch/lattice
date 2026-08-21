@@ -30,6 +30,10 @@ fn label(value: &str) -> Label {
     Label::new(value.to_string()).expect("test label is valid")
 }
 
+fn source_value(value: &str) -> SourceValue {
+    SourceValue::new(value.to_string()).expect("test source value is valid")
+}
+
 fn contract_profile() -> CapabilityProfile {
     CapabilityProfile {
         schema: PROFILE_SCHEMA.to_string(),
@@ -207,8 +211,8 @@ fn source_context_instantiates_exact_shell_environment_and_revision() {
     let (_directory, store, mut workflow, contract, mut request, mut profile) = fixture(&command);
     request.source = Some(SourceContext {
         provider: label("radicle"),
-        repository: label("rad:zrepo"),
-        revision: label(SOURCE_REVISION),
+        repository: source_value("rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE"),
+        revision: source_value(SOURCE_REVISION),
     });
     request.identity = lattice_workflow_contract::request_identity(&request);
     profile.routes[0].source_binding = super::SourceBindingMode::ShellEnvironment;
@@ -220,7 +224,7 @@ fn source_context_instantiates_exact_shell_environment_and_revision() {
     let crate::engine::workflow::NodeConfig::Shell { env, .. } = config else {
         panic!("mapped node must remain a shell node");
     };
-    assert_eq!(env.get(super::SOURCE_REPOSITORY_ENV).map(String::as_str), Some("rad:zrepo"));
+    assert_eq!(env.get(super::SOURCE_REPOSITORY_ENV).map(String::as_str), Some("rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE"));
     if let Some(crate::engine::workflow::NodeConfig::Shell { env, .. }) =
         workflow.configs.get_mut(&route.nodes[0].workflow_node_id)
     {

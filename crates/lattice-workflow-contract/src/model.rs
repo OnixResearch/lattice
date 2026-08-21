@@ -25,6 +25,9 @@ pub const LOG_READ_SCHEMA: &str = "lattice.workflow-log-read.v1";
 pub const BLAKE3_PREFIX: &str = "b3:";
 pub const BLAKE3_HEX_LENGTH: usize = 64;
 pub const MAXIMUM_LABEL_BYTES: usize = 128;
+pub const MAXIMUM_SOURCE_VALUE_BYTES: usize = 256;
+const ASCII_CONTROL_END_EXCLUSIVE: u8 = 32;
+const ASCII_DELETE: u8 = 127;
 pub const CONTRACT_MAXIMUM_CAPABILITY_ITEMS: u32 = 256;
 pub const CONTRACT_MAXIMUM_NODES: u32 = 4_096;
 pub const CONTRACT_MAXIMUM_EDGES: u32 = 16_384;
@@ -113,10 +116,45 @@ impl<'de> serde::Deserialize<'de> for Label {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SourceValue(String);
+
+impl SourceValue {
+    pub fn new(value: String) -> Result<Self, ValueError> {
+        let has_control = value.bytes().any(|byte| byte < ASCII_CONTROL_END_EXCLUSIVE || byte == ASCII_DELETE);
+        if value.is_empty() || value.len() > MAXIMUM_SOURCE_VALUE_BYTES || has_control {
+            Err(ValueError::InvalidSourceValue)
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl serde::Serialize for SourceValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SourceValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueError {
     InvalidIdentity,
     InvalidLabel,
+    InvalidSourceValue,
 }
 
 impl core::fmt::Display for ValueError {
@@ -124,6 +162,7 @@ impl core::fmt::Display for ValueError {
         match self {
             Self::InvalidIdentity => formatter.write_str("value is not a canonical BLAKE3 identity"),
             Self::InvalidLabel => formatter.write_str("value is not a canonical bounded label"),
+            Self::InvalidSourceValue => formatter.write_str("value is not a bounded control-free source value"),
         }
     }
 }
@@ -195,8 +234,8 @@ pub struct KilnLinkage {
 #[serde(deny_unknown_fields)]
 pub struct SourceContext {
     pub provider: Label,
-    pub repository: Label,
-    pub revision: Label,
+    pub repository: SourceValue,
+    pub revision: SourceValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
