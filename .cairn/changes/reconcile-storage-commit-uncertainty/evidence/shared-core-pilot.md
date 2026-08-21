@@ -4,7 +4,7 @@
 
 - RID: `rad:z4Tky6zvC8w4Y6c4YBzNxVbq5n752`
 - Git source: `https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git`
-- Revision: `3942ec2a1b7a74fff71ad5e0bf7dc022216685e0`
+- Revision: `eb2bd3441753af97bfcb247cef7cc22d72675b62`
 
 Cargo and Nix select the same full revision. The source-admission check rejects GitHub fallback and ambient sibling paths.
 

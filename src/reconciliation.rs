@@ -61,6 +61,8 @@ struct OccurrencePilot {
 
 fn plan_occurrence(occurrence: &crate::scheduler::ScheduleOccurrence) -> Result<OccurrencePilot, PilotError> {
     crate::scheduler::validate_schedule_occurrence(occurrence)?;
+    debug_assert!(!occurrence.identity.is_empty());
+    debug_assert_eq!(occurrence.attempt_run_ids.last().copied(), Some(occurrence.active_run_id));
     let desired_state_identity = digest(OCCURRENCE_INPUT_DOMAIN, &[occurrence.workflow_revision.as_bytes()])?;
     let policy_identity = digest(OCCURRENCE_POLICY_DOMAIN, &[])?;
     let operation = transactional_reconciliation_core::OperationDraft::new(
@@ -124,6 +126,28 @@ pub(crate) fn admit_occurrence(
     let published = transactional_reconciliation_core::admit_published(persisted, pilot.reservation)?;
     debug_assert_eq!(published.binding(), pilot.persistence_binding);
     admit_observation(&pilot, transactional_reconciliation_core::ReservationObservation::Durable(pilot.reservation))
+}
+
+pub(crate) fn classify_occurrence_commit(
+    occurrence: &crate::scheduler::ScheduleOccurrence,
+    observation: transactional_reconciliation_core::CommitObservation,
+) -> Result<transactional_reconciliation_core::PersistenceDecision, PilotError> {
+    let pilot = plan_occurrence(occurrence)?;
+    Ok(transactional_reconciliation_core::classify_commit(pilot.persistence_binding, observation))
+}
+
+pub(crate) fn reconcile_occurrence_commit(
+    decision: transactional_reconciliation_core::PersistenceDecision,
+    occurrence: Option<&crate::scheduler::ScheduleOccurrence>,
+) -> Result<transactional_reconciliation_core::PersistenceDecision, PilotError> {
+    let observation = match occurrence {
+        Some(occurrence) => {
+            let pilot = plan_occurrence(occurrence)?;
+            transactional_reconciliation_core::ReadBackObservation::Reservation(pilot.persistence_binding)
+        }
+        None => transactional_reconciliation_core::ReadBackObservation::Missing,
+    };
+    transactional_reconciliation_core::reconcile_read_back(decision, observation).map_err(PilotError::from)
 }
 
 fn admit_observation(

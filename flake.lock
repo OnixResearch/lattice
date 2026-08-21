@@ -1288,16 +1288,16 @@
     "transactional-reconciliation-core": {
       "flake": false,
       "locked": {
-        "lastModified": 1787327161,
-        "narHash": "sha256-Jm9FSHioxflP4QZX7dMyyM21mNY1XnRXfIdbH90g65k=",
+        "lastModified": 1787328365,
+        "narHash": "sha256-xkZ79TBbTHfjj8jM1b4+F3k2MdtkQ9TUGBinmNOpdKY=",
         "ref": "refs/heads/main",
-        "rev": "3942ec2a1b7a74fff71ad5e0bf7dc022216685e0",
-        "revCount": 7,
+        "rev": "eb2bd3441753af97bfcb247cef7cc22d72675b62",
+        "revCount": 8,
         "type": "git",
         "url": "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git"
       },
       "original": {
-        "rev": "3942ec2a1b7a74fff71ad5e0bf7dc022216685e0",
+        "rev": "eb2bd3441753af97bfcb247cef7cc22d72675b62",
         "type": "git",
         "url": "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git"
       }

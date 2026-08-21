@@ -4,6 +4,7 @@ impl Store {
         expected_version: u64,
         request: &crate::workflow::gate::ApprovalRequest,
     ) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
         let request_bytes = serialize(request)?;
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         {
@@ -38,6 +39,7 @@ impl Store {
         details: &RunDetailRecord,
         replay_events: &[ReplayEventRecord],
     ) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
         if request.run_id != run.run_id || request.run_id != details.run_id {
             return Err(StoreError::Conflict(
                 "workflow approval completion records do not share one run identity".to_string(),
@@ -97,6 +99,7 @@ impl Store {
     }
 
     pub fn advance_workflow_approval_gate(&self, input: WorkflowApprovalAdvance<'_>) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
         let WorkflowApprovalAdvance {
             expected_version,
             completed_request,

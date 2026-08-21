@@ -349,6 +349,56 @@ fn redb_claim_race_selects_one_occurrence_and_advances_once() {
     assert_eq!(store.next_run_id().expect("following run reserves").0, inserted[0].0 + 1);
 }
 
+// r[verify lattice.persistence_uncertainty.commit_outcomes]
+// r[verify lattice.persistence_uncertainty.quarantine]
+// r[verify lattice.persistence_uncertainty.reconciliation]
+// r[verify lattice.persistence_uncertainty.effect_gate]
+// r[verify lattice.persistence_uncertainty.validation]
+#[test]
+fn uncertain_claim_commit_quarantines_until_exact_readback() {
+    let (published_store, _published_dir) = common::temp_store();
+    published_store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("published fault schedule saves");
+    let request = plan_schedule_occurrence(&plan(SCHEDULE_ID, DUE_EPOCH_MS), WORKFLOW_REVISION)
+        .expect("uncertain occurrence plans");
+    assert!(matches!(
+        published_store.claim_schedule_occurrence_with_fault(&request, lattice::store::CommitFault::ObservationLost,),
+        Err(lattice::store::StoreError::PublicationUnknown)
+    ));
+    assert!(published_store.is_quarantined().expect("quarantine status reads"));
+    assert!(matches!(
+        published_store.claim_schedule_occurrence(&request),
+        Err(lattice::store::StoreError::Quarantined)
+    ));
+    assert_eq!(
+        published_store.reconcile_schedule_occurrence_publication().expect("exact successor reconciles"),
+        transactional_reconciliation_core::PersistenceState::Published
+    );
+    assert!(!published_store.is_quarantined().expect("cleared status reads"));
+    assert!(
+        published_store
+            .load_schedule_occurrence(&request.identity)
+            .expect("reconciled occurrence loads")
+            .is_some()
+    );
+
+    let (missing_store, _missing_dir) = common::temp_store();
+    missing_store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("missing fault schedule saves");
+    assert!(matches!(
+        missing_store
+            .claim_schedule_occurrence_with_fault(&request, lattice::store::CommitFault::CommitOutcomeUnknown,),
+        Err(lattice::store::StoreError::PublicationUnknown)
+    ));
+    assert_eq!(
+        missing_store.reconcile_schedule_occurrence_publication().expect("missing row stays classified"),
+        transactional_reconciliation_core::PersistenceState::PublicationUnknown
+    );
+    assert!(missing_store.is_quarantined().expect("missing quarantine reads"));
+    assert!(matches!(
+        missing_store.retry_schedule_occurrence(&request.identity, WORKFLOW_REVISION, true),
+        Err(lattice::store::StoreError::Quarantined)
+    ));
+}
+
 // r[verify lattice.scheduling.scheduler_occurrence_admission.scenario.atomic]
 #[test]
 fn missing_stale_and_exhausted_claims_do_not_mutate_schedule_state() {

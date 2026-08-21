@@ -9,10 +9,12 @@
 
 mod admission;
 mod exchange;
+mod quarantine;
 
 use std::collections::HashMap;
 use std::path::Path;
 
+pub use quarantine::CommitFault;
 use redb::Database;
 use redb::ReadableDatabase;
 use redb::ReadableTable;
@@ -283,6 +285,7 @@ pub trait OrchestrationStore {
 #[derive(Clone)]
 pub struct Store {
     db: std::sync::Arc<Database>,
+    quarantine: std::sync::Arc<std::sync::Mutex<Option<quarantine::State>>>,
 }
 
 // Occurrence admission stays isolated so its atomic transaction does not couple
@@ -343,6 +346,7 @@ impl Store {
         let db = Database::create(p).map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(Self {
             db: std::sync::Arc::new(db),
+            quarantine: std::sync::Arc::new(std::sync::Mutex::new(None)),
         })
     }
 
@@ -350,6 +354,7 @@ impl Store {
 
     /// Save a workflow.
     pub fn save_workflow(&self, workflow: &Workflow) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
         let data = serde_json::to_vec(workflow).map_err(|e| StoreError::Serialize(e.to_string()))?;
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
@@ -1118,6 +1123,7 @@ impl EffectAttemptRepository for Store {
         &self,
         binding: crate::engine::effect::authority::IntentBinding,
     ) -> Result<crate::engine::effect::authority::Attempt, StoreError> {
+        self.ensure_not_quarantined()?;
         let existing = std::collections::BTreeSet::new();
         let attempt = crate::engine::effect::authority::reserve_attempt(binding, &existing)
             .map_err(|error| StoreError::Conflict(format!("effect attempt reservation failed: {error:?}")))?;
@@ -1308,6 +1314,8 @@ pub enum StoreError {
     Deserialize(String),
     Conflict(String),
     NotFound(String),
+    PublicationUnknown,
+    Quarantined,
 }
 
 impl std::fmt::Display for StoreError {
@@ -1319,6 +1327,8 @@ impl std::fmt::Display for StoreError {
             Self::Deserialize(e) => write!(f, "deserialization error: {e}"),
             Self::Conflict(e) => write!(f, "store conflict: {e}"),
             Self::NotFound(e) => write!(f, "store item not found: {e}"),
+            Self::PublicationUnknown => f.write_str("storage publication outcome is unknown; reconcile before retry"),
+            Self::Quarantined => f.write_str("store is quarantined pending exact persistence reconciliation"),
         }
     }
 }

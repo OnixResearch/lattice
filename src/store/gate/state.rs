@@ -6,6 +6,7 @@ impl Store {
         details: &RunDetailRecord,
         replay_events: &[ReplayEventRecord],
     ) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
         if request.run_id != run.run_id || request.run_id != details.run_id {
             return Err(StoreError::Conflict(
                 "workflow approval suspension records do not share one run identity".to_string(),

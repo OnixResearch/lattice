@@ -3,7 +3,8 @@
 use redb::ReadableDatabase;
 use redb::ReadableTable;
 
-const OCCURRENCES: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("schedule_occurrences_v1");
+pub(super) const OCCURRENCES: redb::TableDefinition<&str, &[u8]> =
+    redb::TableDefinition::new("schedule_occurrences_v1");
 
 pub(super) fn ensure_table(txn: &redb::WriteTransaction) -> Result<(), super::StoreError> {
     let _ = txn.open_table(OCCURRENCES).map_err(|error| super::StoreError::Table(error.to_string()))?;
@@ -16,6 +17,17 @@ impl super::Store {
         &self,
         request: &crate::scheduler::ScheduleOccurrenceClaimRequest,
     ) -> Result<crate::scheduler::ScheduleOccurrenceClaimResolution, super::StoreError> {
+        self.claim_schedule_occurrence_with_fault(request, super::CommitFault::None)
+    }
+
+    // r[impl lattice.persistence_uncertainty.commit_outcomes]
+    // r[impl lattice.persistence_uncertainty.effect_gate]
+    pub fn claim_schedule_occurrence_with_fault(
+        &self,
+        request: &crate::scheduler::ScheduleOccurrenceClaimRequest,
+        fault: super::CommitFault,
+    ) -> Result<crate::scheduler::ScheduleOccurrenceClaimResolution, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let txn = self.db.begin_write().map_err(|error| super::StoreError::Db(error.to_string()))?;
         let existing = {
             let occurrences =
@@ -70,14 +82,56 @@ impl super::Store {
                 .insert(schedule.id.as_str(), schedule_data.as_slice())
                 .map_err(|error| super::StoreError::Db(error.to_string()))?;
         }
-        txn.commit().map_err(|error| super::StoreError::Db(error.to_string()))?;
+        if fault == super::CommitFault::CommitOutcomeUnknown {
+            let decision = crate::reconciliation::classify_occurrence_commit(
+                &occurrence,
+                transactional_reconciliation_core::CommitObservation::OutcomeUnknown,
+            )
+            .map_err(|error| super::StoreError::Conflict(error.to_string()))?;
+            self.quarantine(occurrence.identity.clone(), decision)?;
+            return Err(super::StoreError::PublicationUnknown);
+        }
+        let commit_result = txn.commit();
+        if commit_result.is_err() || fault == super::CommitFault::ObservationLost {
+            let decision = crate::reconciliation::classify_occurrence_commit(
+                &occurrence,
+                transactional_reconciliation_core::CommitObservation::OutcomeUnknown,
+            )
+            .map_err(|error| super::StoreError::Conflict(error.to_string()))?;
+            self.quarantine(occurrence.identity.clone(), decision)?;
+            return Err(super::StoreError::PublicationUnknown);
+        }
         Ok(crate::scheduler::ScheduleOccurrenceClaimResolution::Inserted(Box::new(occurrence)))
+    }
+
+    // r[impl lattice.persistence_uncertainty.reconciliation]
+    // r[impl lattice.persistence_uncertainty.operator_actions]
+    pub fn reconcile_schedule_occurrence_publication(
+        &self,
+    ) -> Result<transactional_reconciliation_core::PersistenceState, super::StoreError> {
+        let state = self
+            .quarantine_state()?
+            .ok_or(super::StoreError::Conflict("store is not quarantined".to_string()))?;
+        let txn = self.db.begin_read().map_err(|error| super::StoreError::Db(error.to_string()))?;
+        let occurrences = txn.open_table(OCCURRENCES).map_err(|error| super::StoreError::Table(error.to_string()))?;
+        let occurrence = occurrences
+            .get(state.operation_identity.as_str())
+            .map_err(|error| super::StoreError::Db(error.to_string()))?
+            .map(|data| super::deserialize::<crate::scheduler::ScheduleOccurrence>(data.value()))
+            .transpose()?;
+        let reconciled = crate::reconciliation::reconcile_occurrence_commit(state.decision, occurrence.as_ref())
+            .map_err(|error| super::StoreError::Conflict(error.to_string()))?;
+        if reconciled.quarantine() == transactional_reconciliation_core::QuarantineStatus::Clear {
+            self.clear_quarantine(reconciled)?;
+        }
+        Ok(reconciled.state())
     }
 
     pub fn load_schedule_occurrence(
         &self,
         identity: &str,
     ) -> Result<Option<crate::scheduler::ScheduleOccurrence>, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let txn = self.db.begin_read().map_err(|error| super::StoreError::Db(error.to_string()))?;
         let occurrences = txn.open_table(OCCURRENCES).map_err(|error| super::StoreError::Table(error.to_string()))?;
         let occurrence = occurrences
@@ -96,6 +150,7 @@ impl super::Store {
         &self,
         max_occurrence_count: u64,
     ) -> Result<Vec<crate::scheduler::ScheduleOccurrence>, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let max_occurrence_count = usize::try_from(max_occurrence_count)
             .map_err(|error| super::StoreError::Conflict(format!("occurrence list limit is unsupported: {error}")))?;
         let txn = self.db.begin_read().map_err(|error| super::StoreError::Db(error.to_string()))?;
@@ -122,6 +177,7 @@ impl super::Store {
         run_id: crate::engine::RunId,
         status: crate::scheduler::ScheduleOccurrenceStatus,
     ) -> Result<crate::scheduler::ScheduleOccurrence, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let txn = self.db.begin_write().map_err(|error| super::StoreError::Db(error.to_string()))?;
         let current = load_for_update(&txn, identity)?;
         let settled = crate::scheduler::settle_schedule_occurrence(&current, run_id, status)
@@ -137,6 +193,7 @@ impl super::Store {
         workflow_revision: &str,
         is_duplicate_risk_acknowledged: bool,
     ) -> Result<crate::scheduler::ScheduleOccurrence, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let txn = self.db.begin_write().map_err(|error| super::StoreError::Db(error.to_string()))?;
         let current = load_for_update(&txn, identity)?;
         if run_exists(&txn, current.active_run_id)? {
@@ -162,6 +219,7 @@ impl super::Store {
         identity: &str,
         is_unknown_outcome_acknowledged: bool,
     ) -> Result<crate::scheduler::ScheduleOccurrence, super::StoreError> {
+        self.ensure_not_quarantined()?;
         let txn = self.db.begin_write().map_err(|error| super::StoreError::Db(error.to_string()))?;
         let current = load_for_update(&txn, identity)?;
         if run_exists(&txn, current.active_run_id)? {

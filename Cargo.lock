@@ -6221,7 +6221,7 @@ dependencies = [
 [[package]]
 name = "transactional-reconciliation-core"
 version = "0.1.0"
-source = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=3942ec2a1b7a74fff71ad5e0bf7dc022216685e0#3942ec2a1b7a74fff71ad5e0bf7dc022216685e0"
+source = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=eb2bd3441753af97bfcb247cef7cc22d72675b62#eb2bd3441753af97bfcb247cef7cc22d72675b62"
 
 [[package]]
 name = "tree-sitter"

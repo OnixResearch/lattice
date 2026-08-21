@@ -18,6 +18,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Bounded ready-frontier dispatch](docs/bounded-ready-frontier.md) defines event-driven scheduling, capacities, conflicts, ordering, persistence, and proof boundaries.
 
+[Storage commit uncertainty](docs/storage-commit-uncertainty.md) defines commit outcomes, process-local quarantine, exact read-back reconciliation, and repair non-claims.
+
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
 [Durable workflow exchange application](docs/workflow-exchange-application.md) binds the published Unix transport to exact saved workflow revisions, durable acceptance, bounded observations, and explicit uncertainty.
