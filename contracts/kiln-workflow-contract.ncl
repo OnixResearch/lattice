@@ -11,6 +11,13 @@ let Label = std.contract.from_predicate (fun value =>
   && std.string.is_match "^[a-z0-9][a-z0-9._:-]*$" value
 ) in
 
+let SourceValue = std.contract.from_predicate (fun value =>
+  std.is_string value
+  && std.string.length value > 0
+  && std.string.length value <= 256
+  && std.string.is_match "^[^\\x00-\\x1f\\x7f]+$" value
+) in
+
 let PositiveNumber = std.contract.from_predicate (fun value =>
   std.is_number value && value > 0
 ) in
@@ -113,8 +120,8 @@ let KilnLinkage = {
 
 let SourceContext = {
   provider | Label,
-  repository | Label,
-  revision | Label,
+  repository | SourceValue,
+  revision | SourceValue,
 } in
 
 let WorkflowNode = {
@@ -233,6 +240,7 @@ let LogReadRequest = {
 {
   identity = Identity,
   label = Label,
+  source_value = SourceValue,
   capability_profile = CapabilityProfile,
   source_context = SourceContext,
   workflow_request = WorkflowRequest,

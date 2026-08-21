@@ -16,7 +16,11 @@ let admitted_total_log_bytes = 16384 in
     pipeline_revision_identity = canonical_identity,
     workflow_policy_identity = canonical_identity,
   },
-  source = null,
+  source = {
+    provider = "radicle",
+    repository = "rad:z2wsvXm5S2sJGvuV1k5JHiwi1PbKE",
+    revision = "2dec0fd67328c1eadd2f6c2bab2c71284750fcde",
+  },
   graph = {
     schema = "lattice.workflow-graph.v1",
     identity = canonical_identity,
