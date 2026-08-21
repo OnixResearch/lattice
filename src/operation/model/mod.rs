@@ -12,10 +12,10 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub const CATALOG_SCHEMA: &str = "lattice.operation-catalog.v1";
-pub const TYPE_SCHEMA_VERSION: u32 = 1;
+pub const CATALOG_SCHEMA: &str = "lattice.operation-catalog.v2";
+pub const TYPE_SCHEMA_VERSION: u32 = 2;
 pub const INSTANCE_SCHEMA: &str = "lattice.operation-instances.v1";
-pub const PLAN_SCHEMA: &str = "lattice.operation-invocation-plan.v1";
+pub const PLAN_SCHEMA: &str = "lattice.operation-invocation-plan.v2";
 pub const PROMOTION_SCHEMA: &str = "lattice.operation-promotion-plan.v1";
 pub const BLAKE3_PREFIX: &str = "b3:";
 pub const BLAKE3_HEX_LENGTH: usize = 64;

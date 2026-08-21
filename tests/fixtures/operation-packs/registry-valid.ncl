@@ -4,7 +4,7 @@
   entries = [
     {
       pack_id = "lattice.cairn-inspection-pack",
-      pack_identity = "b3:5da01e9f059c9b46d9dbc21320d0f69368bf75a6e17239e2b5d47108ba0fcdfe",
+      pack_identity = "b3:ea07a1e2ff4402aaf846179dc4de7d9a23d00354663933b0490cffb250f8d9dd",
       description = "Exact read-only Cairn inspection with bounded analysis",
       display_version = "1.0.0",
       channel = "beta",

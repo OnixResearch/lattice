@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:b75301e6a21b10f4257b07023c93ca8d541ecb20dd2bf644a1f2677b3aa01dbf",
+  "baseline_hash": "b3:6278225e312457e6b4ac0b310412e9730a8dae44b36561edd18de53c4636c1d9",
   "findings": [
     {
       "stable_id": "b3:00d83783bbd80a2c",
@@ -4966,6 +4966,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:72ca916913c64b21",
+      "semantic_id": "b3:72ca916913c64b21",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/workflow_format.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 2505 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:7375691d01137b90",
       "semantic_id": "b3:7375691d01137b90",
       "identity_status": "computed",
@@ -5171,19 +5184,6 @@
       "line": 283,
       "column": 1,
       "message": "parameter uses `&Vec<ReplayDiagnostic>`; accept `&[ReplayDiagnostic]` unless ownership, capacity, or exact owned type identity is required",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:78420018335048b0",
-      "semantic_id": "b3:78420018335048b0",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/workflow_format.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 2505 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -6708,19 +6708,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:9e7b56d4916b041c",
-      "semantic_id": "b3:9e7b56d4916b041c",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/workflow_format.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:9e820177488bd4da",
       "semantic_id": "b3:9e820177488bd4da",
       "identity_status": "computed",
@@ -7381,6 +7368,19 @@
       "line": 426,
       "column": 1,
       "message": "item name `default_agent_runtimes` repeats `agent` from ancestor path segment `agent_node`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:ab12a7393f360e4e",
+      "semantic_id": "b3:ab12a7393f360e4e",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/workflow_format.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
       "crate_name": "lattice"
     },
     {

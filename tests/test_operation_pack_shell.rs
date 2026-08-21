@@ -6,6 +6,16 @@ const VALID_FIXTURE: &str = "tests/fixtures/operation-packs/valid";
 const EXPECTED_RECORD_COUNT: usize = 2;
 const SHORT_TIMEOUT_SECONDS: u64 = 1;
 const TRUNCATED_OUTPUT_BYTES: usize = 64;
+const TRUNCATION_PROGRAM_SOURCE: &str = r#"
+use std::io::Write as _;
+
+const OUTPUT_BYTES: usize = 1_024;
+
+fn main() {
+    let output = [b'x'; OUTPUT_BYTES];
+    std::io::stdout().write_all(&output).expect("write analyzer output");
+}
+"#;
 
 fn fixture_root() -> std::path::PathBuf {
     std::fs::canonicalize(VALID_FIXTURE).expect("fixture root")
@@ -182,13 +192,16 @@ fn runtime_bytes_are_rechecked_after_admission_and_before_dispatch() {
 #[test]
 fn analyzer_timeout_and_truncation_are_explicit_and_block_required_parent_success() {
     let timeout_script = "#!/bin/sh\nwhile :; do\n  :\ndone\n";
-    let timed_out = execute_with_analyzer(timeout_script, SHORT_TIMEOUT_SECONDS, TRUNCATED_OUTPUT_BYTES);
+    let timed_out =
+        execute_with_analyzer(AnalyzerFixture::Script(timeout_script), SHORT_TIMEOUT_SECONDS, TRUNCATED_OUTPUT_BYTES);
     assert_eq!(timed_out.status, pack::shell::execution::Status::Failed);
     assert_eq!(timed_out.analyzer_outcomes[0].status, pack::analyzer::Status::TimedOut);
 
-    let oversized = "x".repeat(TRUNCATED_OUTPUT_BYTES.saturating_mul(2));
-    let truncation_script = format!("#!/bin/sh\nprintf '%s' '{oversized}'\n");
-    let truncated = execute_with_analyzer(&truncation_script, SHORT_TIMEOUT_SECONDS, TRUNCATED_OUTPUT_BYTES);
+    let truncated = execute_with_analyzer(
+        AnalyzerFixture::Rust(TRUNCATION_PROGRAM_SOURCE),
+        SHORT_TIMEOUT_SECONDS,
+        TRUNCATED_OUTPUT_BYTES,
+    );
     assert_eq!(truncated.status, pack::shell::execution::Status::Failed);
     assert_eq!(truncated.analyzer_outcomes[0].status, pack::analyzer::Status::Truncated);
 }
@@ -263,8 +276,13 @@ fn doctor_reports_distinct_cache_registry_platform_and_admission_states() {
     assert!(unhealthy.findings.iter().any(|finding| finding.id == "registry"));
 }
 
+enum AnalyzerFixture<'a> {
+    Script(&'a str),
+    Rust(&'a str),
+}
+
 fn execute_with_analyzer(
-    analyzer_script: &str,
+    analyzer_fixture: AnalyzerFixture<'_>,
     timeout_seconds: u64,
     output_bytes: usize,
 ) -> pack::shell::execution::Report {
@@ -272,7 +290,23 @@ fn execute_with_analyzer(
     let pack_root = root.path().join("pack");
     copy_pack(&fixture_root(), &pack_root);
     let analyzer_path = pack_root.join("analyzer-fixture");
-    std::fs::write(&analyzer_path, analyzer_script).expect("custom analyzer");
+    match analyzer_fixture {
+        AnalyzerFixture::Script(source) => {
+            std::fs::write(&analyzer_path, source).expect("custom analyzer script");
+        }
+        AnalyzerFixture::Rust(source) => {
+            let source_path = root.path().join("analyzer-fixture.rs");
+            std::fs::write(&source_path, source).expect("custom analyzer Rust source");
+            let status = std::process::Command::new("rustc")
+                .arg("--edition=2024")
+                .arg(&source_path)
+                .arg("-o")
+                .arg(&analyzer_path)
+                .status()
+                .expect("compile custom analyzer");
+            assert!(status.success());
+        }
+    }
     let mut candidate = pack::shell::load(&fixture_root()).expect("candidate");
     let bytes = std::fs::read(&analyzer_path).expect("custom analyzer bytes");
     let content = candidate
@@ -357,7 +391,7 @@ fn instance_source(repository: &std::path::Path) -> String {
     id = "local-repository",
     display_alias = "Local repository",
     type_id = "cairn.repository",
-    type_revision = "b3:04f4f2b5e880435887fd6e8d124b80b9e94c9037ff310aacca88f065d6bf6cc9",
+    type_revision = "b3:35bb448c27e5def0f6204d8fc3f14fa40275b73a735b1971a1c5954afa30bd2d",
     target = {{ repository_root = "{}" }},
     tags = {{ environment = "test" }},
     method_defaults = {{}},

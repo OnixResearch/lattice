@@ -15,9 +15,10 @@ use lattice::operation_pack::model::ReleaseChannel;
 use lattice::operation_pack::model::ReleaseMetadata;
 use lattice::operation_pack::model::RuntimeArtifact;
 use lattice::operation_pack::model::SkillManifest;
+use lattice::operation_pack::pack_identity;
 
 const FIXTURE_ROOT: &str = "tests/fixtures/operation-packs/valid";
-const OPERATION_TYPE_REVISION: &str = "b3:04f4f2b5e880435887fd6e8d124b80b9e94c9037ff310aacca88f065d6bf6cc9";
+const OPERATION_TYPE_REVISION: &str = "b3:35bb448c27e5def0f6204d8fc3f14fa40275b73a735b1971a1c5954afa30bd2d";
 const ANALYZER_OUTPUT_SCHEMA: &[u8] = b"lattice.operation-pack-analyzer-output.v1";
 const ANALYZER_RETENTION: &[u8] = b"lattice.operation-pack-analyzer-retention.v1";
 const OPERATION_TIMEOUT_SECONDS: u64 = 60;
@@ -145,7 +146,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         probe: None,
         required_non_claims: lattice::operation_pack::model::REQUIRED_NON_CLAIMS.map(str::to_string).to_vec(),
     };
+    let manifest = lattice::operation_pack::validate_manifest(manifest)?;
     println!("{}", serde_json::to_string_pretty(&manifest)?);
     eprintln!("manifest_identity={}", manifest_identity(&manifest)?);
+    eprintln!("pack_identity={}", pack_identity(&manifest)?);
     Ok(())
 }

@@ -7,8 +7,8 @@
       id = "operation-catalog",
       role = "operation_catalog",
       path = "operation-catalog.ncl",
-      content_identity = "b3:6af8dc4ec3d875562ea8e9b5a90fe4bd4c44481157dd5f82480227f3156c355e",
-      byte_length = 2640,
+      content_identity = "b3:f24a07d605665328e08b58899e1c5252e0a0656c89b7b5d5d4b41feab8bb733b",
+      byte_length = 3165,
       media_class = "nickel",
     },
     {
@@ -47,7 +47,7 @@
   operations = [
     {
       type_id = "cairn.repository",
-      type_revision = "b3:04f4f2b5e880435887fd6e8d124b80b9e94c9037ff310aacca88f065d6bf6cc9",
+      type_revision = "b3:35bb448c27e5def0f6204d8fc3f14fa40275b73a735b1971a1c5954afa30bd2d",
       catalog_content_id = "operation-catalog",
       runtime_id = "cairn-runtime",
       launch_label = "cairn-read-only-v1",

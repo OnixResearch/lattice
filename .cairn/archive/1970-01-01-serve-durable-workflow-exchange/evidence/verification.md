@@ -50,14 +50,14 @@ The unconstrained parallel workspace run exposed the known process-fixture colli
 
 Cairn validation and the task gate passed before and after accepted-spec sync.
 
-Traceability remains an expected repository-wide failure. A detached comparison with base revision `83b2943f467ee6179a7cc9bf8ddd4b998baa46d2` proved exact set equality:
+Traceability remains an expected repository-wide failure. After merging current remote `main`, a detached comparison with base revision `71628cd` proved exact set equality:
 
 ```text
 missing: base=139 current=139 added=0 removed=0
 dangling: base=3 current=3 added=0 removed=0
 ```
 
-No `lattice.workflow_interchange.application_*` requirement is missing or dangling. The current traceability receipt BLAKE3 is `5e85c51e47bec621603f4b6ddac1c0126ff886f858adccdd429a241be29472da`.
+No `lattice.workflow_interchange.application_*` requirement is missing or dangling. The merged traceability receipt BLAKE3 is `1c12ad62b3296e1862d7914e51fd582c3d93ad0fe9c1fd1f790a93909f1e75d5`.
 
 ## Claim boundary
 

@@ -11,7 +11,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-pub const RUN_SCHEMA: &str = "lattice.operation-run.v1";
+pub const RUN_SCHEMA: &str = "lattice.operation-run.v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -34,6 +34,7 @@ pub struct RunRecord {
     pub type_revision: String,
     pub instance_identity: String,
     pub method_identity: String,
+    pub backend_attempt: super::backend::BackendAttemptRecord,
     pub output_identity: Option<String>,
     pub output_bytes: usize,
     pub stderr_bytes: usize,
@@ -58,6 +59,7 @@ impl RunRecord {
             type_revision: plan.type_revision.clone(),
             instance_identity: plan.instance_identity.clone(),
             method_identity: plan.method_identity.clone(),
+            backend_attempt: super::backend::BackendAttemptRecord::admitted(plan, run_id),
             output_identity: None,
             output_bytes: 0,
             stderr_bytes: 0,
@@ -74,9 +76,16 @@ impl RunRecord {
             super::runtime::ObservationClass::DeterministicFailure => RunState::Failed,
             super::runtime::ObservationClass::Unknown => RunState::Unknown,
         };
+        let backend_state = match observation.class {
+            super::runtime::ObservationClass::Completed | super::runtime::ObservationClass::DeterministicFailure => {
+                super::backend::BackendAttemptState::Observed
+            }
+            super::runtime::ObservationClass::Unknown => super::backend::BackendAttemptState::Unknown,
+        };
         Self {
             state,
             finished_epoch_millis: Some(observed_epoch_millis),
+            backend_attempt: self.backend_attempt.finish(backend_state),
             output_identity: observation.output_identity.clone(),
             output_bytes: observation.output_bytes,
             stderr_bytes: observation.stderr_bytes,

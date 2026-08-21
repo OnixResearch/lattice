@@ -7,13 +7,13 @@
 use serde::Serialize;
 
 const FRAME_SEPARATOR: &[u8] = b"\0";
-const TYPE_REVISION_DOMAIN: &str = "lattice.operation-type-revision.v1";
+const TYPE_REVISION_DOMAIN: &str = "lattice.operation-type-revision.v2";
 const METHOD_DOMAIN: &str = "lattice.operation-method.v1";
 const SCHEMA_DOMAIN: &str = "lattice.operation-schema.v1";
-const CATALOG_DOMAIN: &str = "lattice.operation-catalog.v1";
+const CATALOG_DOMAIN: &str = "lattice.operation-catalog.v2";
 const INSTANCE_DOMAIN: &str = "lattice.operation-instance.v1";
 const ARGUMENTS_DOMAIN: &str = "lattice.operation-arguments.v1";
-const INVOCATION_DOMAIN: &str = "lattice.operation-invocation.v1";
+const INVOCATION_DOMAIN: &str = "lattice.operation-invocation.v2";
 const PROMOTION_DOMAIN: &str = "lattice.operation-promotion.v1";
 const CONTENT_DOMAIN: &str = "lattice.operation-promotion-content.v1";
 const EXECUTOR_DOMAIN: &str = "lattice.operation-executor.v1";
@@ -28,6 +28,7 @@ struct TypeRevisionMaterial<'a> {
     schema_version: u32,
     methods: Vec<MethodMaterial<'a>>,
     runtime: &'a super::model::RuntimeRequirement,
+    execution_requirements: &'a super::backend::ExecutionRequirements,
     capabilities: &'a [super::model::CapabilityClass],
     credential_bindings: &'a [super::model::CredentialBinding],
     bounds: super::model::Bounds,
@@ -72,6 +73,8 @@ struct InvocationMaterial<'a> {
     arguments_identity: &'a str,
     output_contract_identity: &'a str,
     runtime: &'a super::model::RuntimeFact,
+    execution_requirements: &'a super::backend::ExecutionRequirements,
+    backend_route: &'a super::backend::BackendRoutePlan,
     capabilities: &'a [super::model::CapabilityClass],
     target: &'a std::collections::BTreeMap<String, serde_json::Value>,
     credentials: &'a std::collections::BTreeMap<String, crate::credentials::SecretRef>,
@@ -114,6 +117,7 @@ pub fn type_revision(definition: &super::model::OperationType) -> Result<String,
         schema_version: definition.schema_version,
         methods: definition.methods.iter().map(method_material).collect(),
         runtime: &definition.runtime,
+        execution_requirements: &definition.execution_requirements,
         capabilities: &definition.capabilities,
         credential_bindings: &definition.credential_bindings,
         bounds: definition.bounds,
@@ -179,6 +183,8 @@ pub fn invocation(plan: &super::model::InvocationPlan) -> Result<String, super::
         arguments_identity: &plan.arguments_identity,
         output_contract_identity: &plan.output_contract_identity,
         runtime: &plan.runtime,
+        execution_requirements: &plan.execution_requirements,
+        backend_route: &plan.backend_route,
         capabilities: &plan.capabilities,
         target: &plan.target,
         credentials: &plan.credentials,

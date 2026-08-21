@@ -201,6 +201,7 @@
         isPolicyAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/policy/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/contracts/" (toString path)
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/contracts/generated/policy.json"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";

@@ -245,6 +245,10 @@ pub fn process_failure(error: crate::agent_node::ProcessError) -> Observation {
     }
 }
 
+pub fn backend_denied(message: &str) -> Observation {
+    deterministic(message)
+}
+
 pub fn unknown(message: &str) -> Observation {
     Observation {
         class: ObservationClass::Unknown,

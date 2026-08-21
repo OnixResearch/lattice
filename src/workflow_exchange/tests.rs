@@ -177,6 +177,8 @@ fn observed(response: ExchangeResponse) -> ExecutionObservation {
 }
 
 // r[verify lattice.workflow_interchange.application_profile]
+// r[verify lattice.workflow_interchange.application_profile.scenario.admitted]
+// r[verify lattice.workflow_interchange.application_profile.scenario.drift]
 #[test]
 fn handler_profile_and_exact_route_reject_revision_drift() {
     let (_directory, _store, workflow, _contract, request, mut profile) = fixture(TEST_COMMAND);
@@ -192,10 +194,15 @@ fn handler_profile_and_exact_route_reject_revision_drift() {
 }
 
 // r[verify lattice.workflow_interchange.application_admission]
+// r[verify lattice.workflow_interchange.application_admission.scenario.recovery]
 // r[verify lattice.workflow_interchange.application_execution]
+// r[verify lattice.workflow_interchange.application_execution.scenario.completed]
 // r[verify lattice.workflow_interchange.application_recovery]
 // r[verify lattice.workflow_interchange.application_logs]
+// r[verify lattice.workflow_interchange.application_logs.scenario.linked]
+// r[verify lattice.workflow_interchange.application_logs.scenario.absent]
 // r[verify lattice.workflow_interchange.application_verification]
+// r[verify lattice.workflow_interchange.application_verification.scenario.focused]
 #[test]
 fn dispatch_executes_once_recovers_acceptance_and_reads_bounded_log() {
     let (_directory, store, _workflow, contract, request, profile) = fixture(TEST_COMMAND);
@@ -263,6 +270,7 @@ fn dispatch_executes_once_recovers_acceptance_and_reads_bounded_log() {
     assert!(matches!(response.result, ExchangeResult::Rejected(_)));
 }
 
+// r[verify lattice.workflow_interchange.application_admission.scenario.conflict]
 #[test]
 fn reused_idempotency_key_with_changed_request_is_rejected() {
     let (_directory, store, _workflow, contract, request, profile) = fixture(TEST_COMMAND);
@@ -284,6 +292,8 @@ fn reused_idempotency_key_with_changed_request_is_rejected() {
 }
 
 // r[verify lattice.workflow_interchange.application_lifecycle]
+// r[verify lattice.workflow_interchange.application_lifecycle.scenario.cancel]
+// r[verify lattice.workflow_interchange.application_lifecycle.scenario.stale]
 #[test]
 fn stale_cancel_and_unsupported_pause_fail_closed() {
     let (_directory, store, _workflow, contract, request, mut profile) = fixture("sleep 2");
@@ -383,6 +393,7 @@ fn stale_cancel_and_unsupported_pause_fail_closed() {
     service.handler_mut().wait_for_workers();
 }
 
+// r[verify lattice.workflow_interchange.application_recovery.scenario.restart]
 #[test]
 fn accepted_execution_without_live_worker_becomes_unknown_without_redispatch() {
     let (_directory, store, _workflow, contract, request, profile) = fixture(TEST_COMMAND);
@@ -409,6 +420,7 @@ fn accepted_execution_without_live_worker_becomes_unknown_without_redispatch() {
     assert!(!observation.successful);
 }
 
+// r[verify lattice.workflow_interchange.application_execution.scenario.authority]
 #[test]
 fn unavailable_route_authority_denies_effects_without_fallback() {
     let (_directory, store, _workflow, contract, request, mut profile) = fixture(TEST_COMMAND);
@@ -434,6 +446,7 @@ fn unavailable_route_authority_denies_effects_without_fallback() {
     assert!(!observation.successful);
 }
 
+// r[verify lattice.workflow_interchange.application_command.scenario.invalid]
 #[test]
 fn typed_handler_profile_loads_and_negative_profiles_fail() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -446,6 +459,7 @@ fn typed_handler_profile_loads_and_negative_profiles_fail() {
 }
 
 // r[verify lattice.workflow_interchange.application_command]
+// r[verify lattice.workflow_interchange.application_command.scenario.valid]
 #[cfg(target_os = "linux")]
 #[test]
 fn unix_service_composes_the_application_handler_and_bounded_transport() {
