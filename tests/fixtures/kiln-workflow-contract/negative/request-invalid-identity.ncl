@@ -4,7 +4,7 @@ let admitted_log_references = 8 in
 let admitted_log_read_bytes = 4096 in
 let admitted_total_log_bytes = 16384 in
 ({
-  schema = "lattice.workflow-request.v1",
+  schema = "lattice.workflow-request.v2",
   identity = "b3:not-canonical",
   idempotency_key = canonical_identity,
   profile_identity = canonical_identity,
@@ -16,6 +16,7 @@ let admitted_total_log_bytes = 16384 in
     pipeline_revision_identity = canonical_identity,
     workflow_policy_identity = canonical_identity,
   },
+  source = null,
   graph = {
     schema = "lattice.workflow-graph.v1",
     identity = canonical_identity,

@@ -89,6 +89,7 @@ fn workflow_request(profile: &CapabilityProfile) -> WorkflowRequest {
             pipeline_revision_identity: identity('6'),
             workflow_policy_identity: identity('7'),
         },
+        source: None,
         graph,
         controls: RequestedControls {
             cancel: true,

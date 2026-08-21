@@ -24,7 +24,7 @@ use crate::model::WorkflowRequest;
 
 const PROFILE_IDENTITY_DOMAIN: &str = "lattice.workflow-profile.identity.v1";
 const GRAPH_IDENTITY_DOMAIN: &str = "lattice.workflow-graph.identity.v1";
-const REQUEST_IDENTITY_DOMAIN: &str = "lattice.workflow-request.identity.v1";
+const REQUEST_IDENTITY_DOMAIN: &str = "lattice.workflow-request.identity.v2";
 const OBSERVATION_IDENTITY_DOMAIN: &str = "lattice.workflow-observation.identity.v1";
 
 struct Frame(blake3::Hasher);
@@ -150,6 +150,12 @@ pub fn request_identity(request: &WorkflowRequest) -> Identity {
     frame.identity("candidate_identity", &request.kiln.candidate_identity);
     frame.identity("pipeline_revision_identity", &request.kiln.pipeline_revision_identity);
     frame.identity("workflow_policy_identity", &request.kiln.workflow_policy_identity);
+    frame.boolean("has_source_context", request.source.is_some());
+    if let Some(source) = &request.source {
+        frame.string("source_provider", source.provider.as_str());
+        frame.string("source_repository", source.repository.as_str());
+        frame.string("source_revision", source.revision.as_str());
+    }
     frame.identity("graph_identity", &request.graph.identity);
     frame.boolean("control_cancel", request.controls.cancel);
     frame.boolean("control_pause", request.controls.pause);

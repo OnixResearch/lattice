@@ -68,6 +68,15 @@ let OptionalIdentity = std.contract.from_predicate (fun value =>
   value == null || (std.is_string value && std.string.is_match "^b3:[0-9a-f]{64}$" value)
 ) in
 
+let Nullable = fun Contract =>
+  std.contract.custom (fun label value =>
+    if value == null then
+      'Ok value
+    else
+      std.contract.check Contract label value
+  )
+in
+
 let ContractLimits = {
   maximum_nodes | PositiveNumber,
   maximum_edges | PositiveNumber,
@@ -100,6 +109,12 @@ let KilnLinkage = {
   candidate_identity | Identity,
   pipeline_revision_identity | Identity,
   workflow_policy_identity | Identity,
+} in
+
+let SourceContext = {
+  provider | Label,
+  repository | Label,
+  revision | Label,
 } in
 
 let WorkflowNode = {
@@ -135,12 +150,13 @@ let ObservationPolicy = {
 } in
 
 let WorkflowRequest = {
-  schema | std.contract.from_predicate (fun value => value == "lattice.workflow-request.v1"),
+  schema | std.contract.from_predicate (fun value => value == "lattice.workflow-request.v2"),
   identity | Identity,
   idempotency_key | Identity,
   profile_identity | Identity,
   platform | Label,
   kiln | KilnLinkage,
+  source | Nullable SourceContext,
   graph | WorkflowGraph,
   controls | RequestedControls,
   observation | ObservationPolicy,
@@ -218,6 +234,7 @@ let LogReadRequest = {
   identity = Identity,
   label = Label,
   capability_profile = CapabilityProfile,
+  source_context = SourceContext,
   workflow_request = WorkflowRequest,
   workflow_accepted = WorkflowAccepted,
   execution_observation = ExecutionObservation,

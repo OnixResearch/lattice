@@ -30,6 +30,21 @@ pub async fn run_owned_workflow_with_authority_provider(
     request: OwnedRunRequest,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+    run_owned_workflow_with_authority_provider_and_cancellation(
+        store,
+        request,
+        authority_provider,
+        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+    )
+    .await
+}
+
+pub async fn run_owned_workflow_with_authority_provider_and_cancellation(
+    store: &crate::store::Store,
+    request: OwnedRunRequest,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+    cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
     let workflow_name = request.workflow_name;
     let agent_runtime = request.agent_runtime;
     run_saved_workflow_with_executor_factory(
@@ -40,7 +55,10 @@ pub async fn run_owned_workflow_with_authority_provider(
             owner: request.owner,
             authority_provider,
         },
-        || crate::engine::executor::Executor::new_with_agent_runtime_config(agent_runtime),
+        || {
+            crate::engine::executor::Executor::new_with_agent_runtime_config(agent_runtime)
+                .with_cancellation(cancellation)
+        },
     )
     .await
 }
@@ -50,6 +68,18 @@ pub(super) async fn run_saved_workflow_with_executor_factory(
     request: ProductRunRequest<'_>,
     executor_factory: impl FnOnce() -> crate::engine::executor::Executor,
 ) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+    let workflow = request
+        .store
+        .load_workflow(request.workflow_name)?
+        .ok_or_else(|| super::HeadlessRunError::WorkflowNotFound(request.workflow_name.to_string()))?;
+    run_workflow_snapshot_with_executor_factory(request, workflow, executor_factory).await
+}
+
+pub(super) async fn run_workflow_snapshot_with_executor_factory(
+    request: ProductRunRequest<'_>,
+    workflow: crate::engine::workflow::Workflow,
+    executor_factory: impl FnOnce() -> crate::engine::executor::Executor,
+) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
     let ProductRunRequest {
         store,
         workflow_name,
@@ -57,9 +87,9 @@ pub(super) async fn run_saved_workflow_with_executor_factory(
         owner,
         authority_provider,
     } = request;
-    let workflow = store
-        .load_workflow(workflow_name)?
-        .ok_or_else(|| super::HeadlessRunError::WorkflowNotFound(workflow_name.to_string()))?;
+    if workflow.meta.name != workflow_name {
+        return Err(super::HeadlessRunError::WorkflowNotFound(workflow_name.to_string()));
+    }
     let diagnostics = crate::workflow_validation::validate_workflow(&workflow);
     if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
         return Err(super::HeadlessRunError::Validation(crate::workflow_validation::fatal_diagnostics(&diagnostics)));
@@ -110,6 +140,38 @@ pub(super) async fn run_saved_workflow_with_executor_factory(
     store.save_run_replay_events(run_id, &replay_events)?;
 
     Ok(summary)
+}
+
+#[derive(Debug, Clone)]
+pub struct SnapshotRunRequest {
+    pub workflow: crate::engine::workflow::Workflow,
+    pub run_id: crate::engine::executor::RunId,
+    pub owner: crate::store::RunOwner,
+    pub agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    pub cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+pub async fn run_workflow_snapshot_with_authority_provider_and_cancellation(
+    store: &crate::store::Store,
+    request: SnapshotRunRequest,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+    let workflow_name = request.workflow.meta.name.clone();
+    run_workflow_snapshot_with_executor_factory(
+        ProductRunRequest {
+            store,
+            workflow_name: &workflow_name,
+            run_id: request.run_id,
+            owner: request.owner,
+            authority_provider,
+        },
+        request.workflow,
+        || {
+            crate::engine::executor::Executor::new_with_agent_runtime_config(request.agent_runtime)
+                .with_cancellation(request.cancellation)
+        },
+    )
+    .await
 }
 
 fn run_record_from_summary_with_owner(

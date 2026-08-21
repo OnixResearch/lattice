@@ -97,6 +97,7 @@ fn request(profile: &CapabilityProfile) -> WorkflowRequest {
             pipeline_revision_identity: identity('7'),
             workflow_policy_identity: identity('8'),
         },
+        source: None,
         graph,
         controls: RequestedControls {
             cancel: true,
@@ -181,6 +182,29 @@ fn profile_and_request_are_admitted_deterministically() {
     assert_eq!(validate_request(&profile, &request), Ok(()));
     assert_eq!(request.identity, request_identity(&request));
     assert_eq!(request.graph.identity, graph_identity(&request.graph));
+}
+
+// r[verify lattice.workflow_interchange.source_context]
+// r[verify lattice.workflow_interchange.source_context.scenario.identity]
+#[test]
+fn source_context_changes_request_identity_and_stale_identity_fails() {
+    let profile = profile();
+    let mut first = request(&profile);
+    first.source = Some(SourceContext {
+        provider: label("radicle"),
+        repository: label("rad:zrepo"),
+        revision: label("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+    });
+    first.identity = request_identity(&first);
+    let mut second = first.clone();
+    second.source.as_mut().expect("source context exists").revision = label("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+
+    assert_ne!(first.identity, request_identity(&second));
+    assert_eq!(validate_request(&profile, &first), Ok(()));
+    assert_eq!(
+        validate_request(&profile, &second).map_err(|error| error.code),
+        Err(ErrorCode::RequestIdentityMismatch)
+    );
 }
 
 #[test]

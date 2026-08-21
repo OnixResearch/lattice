@@ -18,6 +18,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
+[Durable workflow exchange application](docs/workflow-exchange-application.md) binds the published Unix transport to exact saved workflow revisions, durable acceptance, bounded observations, and explicit uncertainty.
+
 ## Development
 
 ```bash

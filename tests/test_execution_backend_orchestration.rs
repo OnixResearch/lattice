@@ -1,10 +1,21 @@
 // r[verify lattice.execution_backend_orchestration.contract]
+// r[verify lattice.execution_backend_orchestration.contract.scenario.accepted]
+// r[verify lattice.execution_backend_orchestration.contract.scenario.unknown]
 // r[verify lattice.execution_backend_orchestration.planner_mapping]
+// r[verify lattice.execution_backend_orchestration.planner_mapping.scenario.compatible]
+// r[verify lattice.execution_backend_orchestration.planner_mapping.scenario.drift]
 // r[verify lattice.execution_backend_orchestration.admission]
+// r[verify lattice.execution_backend_orchestration.admission.scenario.accepted]
+// r[verify lattice.execution_backend_orchestration.admission.scenario.denied]
 // r[verify lattice.execution_backend_orchestration.persistence]
+// r[verify lattice.execution_backend_orchestration.persistence.scenario.crash]
 // r[verify lattice.execution_backend_orchestration.dispatch]
+// r[verify lattice.execution_backend_orchestration.dispatch.scenario.drift]
+// r[verify lattice.execution_backend_orchestration.dispatch.scenario.unknown]
 // r[verify lattice.execution_backend_orchestration.inspection]
+// r[verify lattice.execution_backend_orchestration.inspection.scenario.read_only]
 // r[verify lattice.execution_backend_orchestration.verification]
+// r[verify lattice.execution_backend_orchestration.verification.scenario.focused]
 
 const PLANNER_REVISION: &str = "54b2fdaf57ac9bbc34e6c73f75d803d625f84ec0";
 const POSITIVE_FIXTURE: &str = "tests/fixtures/execution-backends/plan-guarded-local.ncl";
