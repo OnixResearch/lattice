@@ -1,0 +1,18 @@
+## Tasks
+
+- [x] [serial] Record serial executor, cache, effect-attempt, authorization, backend, recovery, result-order, and critical-path baselines. r[lattice.workflow_execution.ready_frontier.baseline]
+- [x] [depends:make-workflow-dependencies-explicit] Pin the accepted Choregraph readiness-completeness source and validate exact frontier compatibility. r[lattice.workflow_execution.ready_frontier.choregraph]
+- [x] [depends:orchestrate-admitted-execution-backends] Reconcile backend, memoization, and effect-attempt ownership before executor changes. r[lattice.workflow_execution.ready_frontier.integration]
+- [x] [depends:lattice.workflow_execution.ready_frontier.choregraph] Add typed Nickel total-capacity and resource-lane policy with positive named bounds and serial omission behavior. r[lattice.workflow_execution.ready_frontier.capacity]
+- [x] [depends:lattice.workflow_execution.ready_frontier.capacity] Implement the pure frontier planner with stable selection and exact blocker classes. r[lattice.workflow_execution.ready_frontier.planner]
+- [x] [depends:lattice.workflow_execution.ready_frontier.planner] Add pure resource-conflict admission that fails closed for unresolved effect aliases. r[lattice.workflow_execution.ready_frontier.conflicts]
+- [x] [depends:lattice.workflow_execution.ready_frontier.conflicts] Refactor the shell to prepare immutable node inputs, authority, backend, credentials, attempts, and conflict facts before concurrent dispatch. r[lattice.workflow_execution.ready_frontier.dispatch]
+- [x] [depends:lattice.workflow_execution.ready_frontier.dispatch] Reduce each completion through persisted state and Choregraph readiness without a dependency-level barrier. r[lattice.workflow_execution.ready_frontier.completion]
+- [x] [depends:lattice.workflow_execution.ready_frontier.completion] Keep canonical result order stable and record observed completion order separately. r[lattice.workflow_execution.ready_frontier.determinism]
+- [x] [parallel] Add positive diamond, fork, join, expression, cache, capacity, and non-conflicting effect fixtures. r[lattice.workflow_execution.ready_frontier.positive]
+- [x] [parallel] Add negative premature, over-capacity, lane, conflict, missing-preparation, failure, cancellation, suspension, stale-plan, and result-order fixtures. r[lattice.workflow_execution.ready_frontier.negative]
+- [x] [parallel] Add crash and recovery fixtures for several prepared, started, completed, failed, cancelled, and uncertain attempts. r[lattice.workflow_execution.ready_frontier.recovery]
+- [x] [serial] Add the production-linked planner proof and expected-failure proof fixtures. r[lattice.workflow_execution.ready_frontier.refinement]
+- [x] [serial] Compare serial, dependency-level, and ready-frontier modes with bounded benchmark fixtures and record identities and non-claims. r[lattice.workflow_execution.ready_frontier.benchmark]
+- [x] [serial] Update operator configuration, inspection, architecture, rollout, and recovery documentation. r[lattice.workflow_execution.ready_frontier.evidence]
+- [x] [serial] Run focused tests, `scripts/check.rs`, Octet, Cairn validation and gates, crash rails, and relevant Nix checks. r[lattice.workflow_execution.ready_frontier.validation]

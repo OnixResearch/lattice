@@ -10,10 +10,25 @@ pub fn detail_record_from_results(
     workflow: &crate::engine::workflow::Workflow,
     results: &[crate::engine::executor::StepResult],
 ) -> crate::store::RunDetailRecord {
+    let observed_completion_order = results.iter().map(|step| step.node_id).collect::<Vec<_>>();
+    detail_record_from_results_with_completion_order(run_id, workflow, results, observed_completion_order)
+}
+
+pub fn detail_record_from_results_with_completion_order(
+    run_id: crate::engine::executor::RunId,
+    workflow: &crate::engine::workflow::Workflow,
+    results: &[crate::engine::executor::StepResult],
+    observed_completion_order: Vec<crate::engine::workflow::NodeId>,
+) -> crate::store::RunDetailRecord {
     let nodes = results.iter().map(|step| node_detail_from_step(workflow, step)).collect::<Vec<_>>();
     debug_assert_eq!(nodes.len(), results.len());
+    debug_assert_eq!(observed_completion_order.len(), results.len());
     debug_assert!(nodes.iter().all(|node| !node.node_label.is_empty()));
-    crate::store::RunDetailRecord { run_id, nodes }
+    crate::store::RunDetailRecord {
+        run_id,
+        nodes,
+        observed_completion_order,
+    }
 }
 
 fn node_detail_from_step(

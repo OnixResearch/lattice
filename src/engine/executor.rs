@@ -228,7 +228,7 @@ pub fn node_execution_cache_key_with_credentials(
     node_execution_cache_key_with_expression_values(node_id, config, credentials, inputs, &BTreeMap::new())
 }
 
-fn node_execution_cache_key_with_expression_values(
+pub(super) fn node_execution_cache_key_with_expression_values(
     node_id: crate::engine::workflow::NodeId,
     config: &NodeConfig,
     credentials: Option<&NodeCredentialRefs>,
@@ -245,7 +245,7 @@ fn node_execution_cache_key_with_expression_values(
     ContentHash(*hasher.finalize().as_bytes())
 }
 
-fn input_values_hash(inputs: &HashMap<PortId, Value>) -> ContentHash {
+pub(super) fn input_values_hash(inputs: &HashMap<PortId, Value>) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     update_inputs_hash(&mut hasher, inputs);
     ContentHash(*hasher.finalize().as_bytes())
@@ -478,7 +478,7 @@ fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<Str
 }
 
 // r[impl lattice.workflow_validation.explicit_dependencies.context]
-fn expression_values_for_consumer(
+pub(super) fn expression_values_for_consumer(
     plan: &runner::RunnerWorkflow,
     consumer_node: crate::engine::workflow::NodeId,
     port_values: &HashMap<PortId, Value>,
@@ -499,7 +499,7 @@ fn expression_values_for_consumer(
         .collect()
 }
 
-fn expression_context_from_admitted_values(
+pub(super) fn expression_context_from_admitted_values(
     values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
 ) -> ExpressionContext {
     ExpressionContext::new(values.iter().map(|(key, value)| (*key, value.clone())).collect())
@@ -662,7 +662,7 @@ fn authorized_file_output(
     }
 }
 
-fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
+pub(super) fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
     match config {
         NodeConfig::Shell { .. } => Some(EFFECT_OPERATION_SHELL),
         NodeConfig::Http { .. } => Some(EFFECT_OPERATION_HTTP),
@@ -736,7 +736,7 @@ fn dispatch_error(error: crate::engine::effect::dispatch::Error) -> String {
     format!("effect dispatch failed: {error:?}")
 }
 
-fn choregraph_execution_error(error: crate::engine::effect::execution::Error) -> String {
+pub(super) fn choregraph_execution_error(error: crate::engine::effect::execution::Error) -> String {
     format!("{CHOREGRAPH_EXECUTION_FAILURE}: {error}")
 }
 
@@ -1052,7 +1052,7 @@ fn value_to_json(value: &Value) -> serde_json::Value {
 }
 
 // r[impl n8nclone.workflow_execution.runtime_registry.typed_output_contract]
-fn completed_step_result(
+pub(super) fn completed_step_result(
     node_id: crate::engine::workflow::NodeId,
     input_hash: ContentHash,
     node: &Node,
@@ -1211,23 +1211,23 @@ struct RuntimeParts {
     local_process: LocalProcessConfig,
 }
 
-enum EffectExecution<'a> {
+pub(super) enum EffectExecution<'a> {
     Compatibility,
     Exact {
         binding: &'a crate::engine::effect::authority::IntentBinding,
         dispatch: &'a crate::engine::effect::dispatch::Shell,
     },
-    Product(&'a mut crate::engine::effect::execution::Session),
+    Product(&'a std::sync::Arc<parking_lot::Mutex<crate::engine::effect::execution::Session>>),
 }
 
-struct NodeExecution<'a> {
-    workflow: &'a Workflow,
-    node_id: crate::engine::workflow::NodeId,
-    inputs: &'a HashMap<PortId, Value>,
-    expression_context: &'a ExpressionContext,
-    input_hash: Option<ContentHash>,
-    parent_run_id: Option<RunId>,
-    effect: EffectExecution<'a>,
+pub(super) struct NodeExecution<'a> {
+    pub(super) workflow: &'a Workflow,
+    pub(super) node_id: crate::engine::workflow::NodeId,
+    pub(super) inputs: &'a HashMap<PortId, Value>,
+    pub(super) expression_context: &'a ExpressionContext,
+    pub(super) input_hash: Option<ContentHash>,
+    pub(super) parent_run_id: Option<RunId>,
+    pub(super) effect: EffectExecution<'a>,
 }
 
 /// The executor.
@@ -1241,6 +1241,9 @@ pub struct Executor {
     local_process: LocalProcessConfig,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub(super) frontier_policy: lattice_core::scheduling::CapacityPolicy,
+    frontier_conflicts: BTreeMap<u64, lattice_core::scheduling::ConflictState>,
+    observed_completion_order: Vec<crate::engine::workflow::NodeId>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -1275,6 +1278,9 @@ impl Executor {
             local_process: components.local_process,
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
             cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            frontier_policy: crate::engine::frontier::serial_capacity_policy(),
+            frontier_conflicts: BTreeMap::new(),
+            observed_completion_order: Vec::new(),
         }
     }
 
@@ -1380,6 +1386,48 @@ impl Executor {
         self
     }
 
+    pub fn with_frontier_policy(
+        mut self,
+        policy: lattice_core::scheduling::CapacityPolicy,
+    ) -> Result<Self, lattice_core::scheduling::PolicyError> {
+        lattice_core::scheduling::validate_policy(&policy)?;
+        self.frontier_policy = policy;
+        Ok(self)
+    }
+
+    pub fn with_resolved_resource_alias(
+        mut self,
+        node_id: crate::engine::workflow::NodeId,
+        alias: impl Into<String>,
+    ) -> Result<Self, &'static str> {
+        let alias = alias.into();
+        if alias.trim().is_empty() {
+            return Err("resource alias must not be empty");
+        }
+        self.frontier_conflicts.insert(node_id.0, lattice_core::scheduling::ConflictState::Resolved(alias));
+        Ok(self)
+    }
+
+    // r[impl lattice.workflow_execution.ready_frontier.determinism]
+    pub fn observed_completion_order(&self) -> &[crate::engine::workflow::NodeId] {
+        &self.observed_completion_order
+    }
+
+    pub fn frontier_policy_identity(&self) -> Result<String, serde_json::Error> {
+        crate::engine::frontier::capacity_policy_identity(&self.frontier_policy)
+    }
+
+    pub(super) fn cancellation_requested(&self) -> bool {
+        self.cancellation.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(super) fn frontier_conflict(
+        &self,
+        node_id: crate::engine::workflow::NodeId,
+    ) -> Option<&lattice_core::scheduling::ConflictState> {
+        self.frontier_conflicts.get(&node_id.0)
+    }
+
     pub fn new_with_clients(
         credential_provider: Box<dyn CredentialProvider>,
         http_client: Box<dyn HttpClient>,
@@ -1465,7 +1513,7 @@ impl Executor {
         .await
     }
 
-    async fn execute_node_with_expression_context(&self, execution: NodeExecution<'_>) -> StepResult {
+    pub(super) async fn execute_node_with_expression_context(&self, execution: NodeExecution<'_>) -> StepResult {
         let NodeExecution {
             workflow,
             node_id,
@@ -1622,19 +1670,32 @@ impl Executor {
                     EffectExecution::Product(session) => {
                         let request = shell_process_request(&shell_input, &self.local_process);
                         let payload = crate::engine::effect::runtime::process_plan_identity(&request);
-                        match session.bind_effect(node_id, &payload) {
-                            Ok(binding) => {
-                                let dispatch = session.dispatch();
-                                let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
-                                    dispatch,
-                                    self.http_client.as_ref(),
-                                    &self.local_process,
-                                    self.cancellation.as_ref(),
-                                );
-                                dispatch
-                                    .dispatch(&runtime, binding, &request)
-                                    .map(shell_output_values)
-                                    .map_err(dispatch_error)
+                        let prepared = {
+                            let mut session = session.lock();
+                            session.bind_effect(node_id, &payload).map(|binding| (binding, session.dispatch_handle()))
+                        };
+                        match prepared {
+                            Ok((binding, dispatch)) => {
+                                let local_process = self.local_process.clone();
+                                let cancellation = std::sync::Arc::clone(&self.cancellation);
+                                match tokio::task::spawn_blocking(move || {
+                                    let http_client = NoopHttpClient;
+                                    let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                        dispatch.as_ref(),
+                                        &http_client,
+                                        &local_process,
+                                        cancellation.as_ref(),
+                                    );
+                                    dispatch
+                                        .dispatch(&runtime, binding, &request)
+                                        .map(shell_output_values)
+                                        .map_err(dispatch_error)
+                                })
+                                .await
+                                {
+                                    Ok(result) => result,
+                                    Err(_) => Err(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()),
+                                }
                             }
                             Err(error) => Err(choregraph_execution_error(error)),
                         }
@@ -1746,11 +1807,14 @@ impl Executor {
                     }
                     EffectExecution::Product(session) => {
                         let payload = crate::engine::effect::runtime::network_plan_identity(&request);
-                        match session.bind_effect(node_id, &payload) {
-                            Ok(binding) => {
-                                let dispatch = session.dispatch();
+                        let prepared = {
+                            let mut session = session.lock();
+                            session.bind_effect(node_id, &payload).map(|binding| (binding, session.dispatch_handle()))
+                        };
+                        match prepared {
+                            Ok((binding, dispatch)) => {
                                 let runtime = crate::engine::effect::runtime::Adapters::new(
-                                    dispatch,
+                                    dispatch.as_ref(),
                                     self.http_client.as_ref(),
                                     &self.local_process,
                                 );
@@ -1857,10 +1921,13 @@ impl Executor {
                     }
                     EffectExecution::Product(session) => authorized_file_request(&plan).and_then(|request| {
                         let payload = crate::engine::effect::runtime::file_plan_identity(&request);
-                        let binding = session.bind_effect(node_id, &payload).map_err(choregraph_execution_error)?;
-                        let dispatch = session.dispatch();
+                        let (binding, dispatch) = {
+                            let mut session = session.lock();
+                            let binding = session.bind_effect(node_id, &payload).map_err(choregraph_execution_error)?;
+                            (binding, session.dispatch_handle())
+                        };
                         let runtime = crate::engine::effect::runtime::Adapters::new(
-                            dispatch,
+                            dispatch.as_ref(),
                             self.http_client.as_ref(),
                             &self.local_process,
                         );
@@ -2104,11 +2171,16 @@ impl Executor {
                         }
                     }
                     EffectExecution::Product(session) => {
-                        let binding = session.bind_effect(node_id, &payload).map_err(choregraph_execution_error);
-                        binding.and_then(|binding| {
-                            let dispatch = session.dispatch();
+                        let prepared = {
+                            let mut session = session.lock();
+                            session
+                                .bind_effect(node_id, &payload)
+                                .map(|binding| (binding, session.dispatch_handle()))
+                                .map_err(choregraph_execution_error)
+                        };
+                        prepared.and_then(|(binding, dispatch)| {
                             let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
-                                dispatch,
+                                dispatch.as_ref(),
                                 self.http_client.as_ref(),
                                 &self.local_process,
                                 self.cancellation.as_ref(),
@@ -2350,9 +2422,10 @@ impl Executor {
         product_context: Option<&crate::engine::effect::execution::RunContext>,
         control: ExecutionControl<'_>,
     ) -> ApprovalRunOutcome {
+        self.observed_completion_order.clear();
         let run_id = RunId(self.next_run_id);
         self.next_run_id = self.next_run_id.saturating_add(1);
-        let mut product_session = match product_context {
+        let product_session = match product_context {
             Some(context) => {
                 let session = if control.checkpoint.is_empty() {
                     crate::engine::effect::execution::Session::new(workflow, context)
@@ -2364,7 +2437,7 @@ impl Executor {
                     )
                 };
                 match session {
-                    Ok(session) => Some(session),
+                    Ok(session) => Some(std::sync::Arc::new(parking_lot::Mutex::new(session))),
                     Err(error) => {
                         let diagnostic = choregraph_execution_error(error);
                         return ApprovalRunOutcome {
@@ -2391,6 +2464,29 @@ impl Executor {
         };
 
         info!(run = %run_id, nodes = topo.len(), "starting workflow execution");
+
+        let has_approval_gate =
+            topo.iter().any(|node_id| matches!(workflow.node_config(*node_id), Some(NodeConfig::Approval(_))));
+        if (!control.stop_at_approval || !has_approval_gate) && control.checkpoint.is_empty() {
+            let outcome = crate::engine::frontier::runtime::run(crate::engine::frontier::runtime::RunRequest {
+                executor: self,
+                workflow,
+                cache,
+                bound_inputs,
+                run_id,
+                runner_plan: &runner_plan,
+                canonical_order: &topo,
+                product_session: product_session.clone(),
+            })
+            .await;
+            self.observed_completion_order = outcome.observed_completion_order;
+            info!(run = %run_id, steps = outcome.results.len(), "workflow frontier execution complete");
+            return ApprovalRunOutcome {
+                run_id,
+                results: outcome.results,
+                suspension: None,
+            };
+        }
 
         let maximum_step_count = topo.len();
         let mut results = Vec::with_capacity(maximum_step_count);
@@ -2448,8 +2544,8 @@ impl Executor {
             if decision != runner::DurableRunnerDecision::Execute {
                 debug!(node = ?node_id, ?decision, "shared graph lifecycle blocked node execution");
                 runner_states.insert(node_id.0, runner::RunnerStepState::Cancelled);
-                if let Some(session) = product_session.as_mut()
-                    && let Err(error) = session.cancel(node_id)
+                if let Some(session) = product_session.as_ref()
+                    && let Err(error) = session.lock().cancel(node_id)
                 {
                     results.push(failed_product_step(node_id, base_input_hash, &choregraph_execution_error(error)));
                     continue;
@@ -2505,8 +2601,11 @@ impl Executor {
                         ));
                         continue;
                     }
-                    if let Some(session) = product_session.as_mut()
-                        && (session.mark_ready(node_id).is_err() || session.start_pure(node_id).is_err())
+                    if let Some(session) = product_session.as_ref()
+                        && {
+                            let mut session = session.lock();
+                            session.mark_ready(node_id).is_err() || session.start_pure(node_id).is_err()
+                        }
                     {
                         let step = failed_product_step(node_id, input_hash, CHOREGRAPH_EXECUTION_FAILURE);
                         runner_states.insert(node_id.0, runner_step_state(&step.status));
@@ -2514,8 +2613,8 @@ impl Executor {
                         continue;
                     }
                     let step = completed_step_result(node_id, input_hash, node, outputs.clone(), false);
-                    let step = match product_session.as_mut() {
-                        Some(session) => match session.finish(node_id, &step.status) {
+                    let step = match product_session.as_ref() {
+                        Some(session) => match session.lock().finish(node_id, &step.status) {
                             Ok(()) => step,
                             Err(error) => failed_product_step(node_id, input_hash, &choregraph_execution_error(error)),
                         },
@@ -2537,8 +2636,8 @@ impl Executor {
                 };
             }
 
-            if let Some(session) = product_session.as_mut()
-                && let Err(error) = session.mark_ready(node_id)
+            if let Some(session) = product_session.as_ref()
+                && let Err(error) = session.lock().mark_ready(node_id)
             {
                 let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
                 runner_states.insert(node_id.0, runner_step_state(&step.status));
@@ -2551,8 +2650,8 @@ impl Executor {
                 let Some(node) = workflow.graph.node(node_id) else {
                     continue;
                 };
-                if let Some(session) = product_session.as_mut()
-                    && let Err(error) = session.start_pure(node_id)
+                if let Some(session) = product_session.as_ref()
+                    && let Err(error) = session.lock().start_pure(node_id)
                 {
                     let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
                     runner_states.insert(node_id.0, runner_step_state(&step.status));
@@ -2560,8 +2659,8 @@ impl Executor {
                     continue;
                 }
                 let step = completed_step_result(node_id, input_hash, node, cached_outputs.clone(), true);
-                if let Some(session) = product_session.as_mut()
-                    && let Err(error) = session.finish(node_id, &step.status)
+                if let Some(session) = product_session.as_ref()
+                    && let Err(error) = session.lock().finish(node_id, &step.status)
                 {
                     let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
                     runner_states.insert(node_id.0, runner_step_state(&step.status));
@@ -2580,15 +2679,15 @@ impl Executor {
 
             let has_effectful_config = workflow.node_config(node_id).and_then(effect_operation).is_some();
             if !has_effectful_config
-                && let Some(session) = product_session.as_mut()
-                && let Err(error) = session.start_pure(node_id)
+                && let Some(session) = product_session.as_ref()
+                && let Err(error) = session.lock().start_pure(node_id)
             {
                 let step = failed_product_step(node_id, input_hash, &choregraph_execution_error(error));
                 runner_states.insert(node_id.0, runner_step_state(&step.status));
                 results.push(step);
                 continue;
             }
-            let effect = match product_session.as_mut() {
+            let effect = match product_session.as_ref() {
                 Some(session) => EffectExecution::Product(session),
                 None => EffectExecution::Compatibility,
             };
@@ -2603,8 +2702,8 @@ impl Executor {
                     effect,
                 })
                 .await;
-            let step = match product_session.as_mut() {
-                Some(session) => match session.finish(node_id, &step.status) {
+            let step = match product_session.as_ref() {
+                Some(session) => match session.lock().finish(node_id, &step.status) {
                     Ok(()) => step,
                     Err(error) => failed_product_step(node_id, input_hash, &choregraph_execution_error(error)),
                 },
@@ -2623,6 +2722,7 @@ impl Executor {
         }
 
         info!(run = %run_id, steps = results.len(), "workflow execution complete");
+        self.observed_completion_order = results.iter().map(|step| step.node_id).collect();
         ApprovalRunOutcome {
             run_id,
             results,
@@ -2645,7 +2745,7 @@ fn failed_product_run(workflow: &Workflow, diagnostic: &str) -> Vec<StepResult> 
         .collect()
 }
 
-fn failed_product_step(
+pub(super) fn failed_product_step(
     node_id: crate::engine::workflow::NodeId,
     input_hash: ContentHash,
     diagnostic: &str,
@@ -2737,17 +2837,15 @@ async fn execute_shell(
 }
 
 /// Gather input values for a node from upstream edge outputs.
-fn gather_inputs(
+pub(super) fn gather_inputs(
     workflow: &Workflow,
     node_id: crate::engine::workflow::NodeId,
     port_values: &HashMap<PortId, Value>,
 ) -> HashMap<PortId, Value> {
-    let mut inputs = HashMap::new();
-
-    let node = match workflow.graph.node(node_id) {
-        Some(n) => n,
-        None => return inputs,
+    let Some(node) = workflow.graph.node(node_id) else {
+        return HashMap::new();
     };
+    let mut inputs = HashMap::with_capacity(node.input_ports.len());
 
     for input_port in &node.input_ports {
         // Find the edge targeting this input port.
@@ -2774,7 +2872,7 @@ fn approval_gate_outputs_valid(node: &Node, outputs: &HashMap<PortId, Value>) ->
     })
 }
 
-fn runner_step_state(status: &NodeStatus) -> runner::RunnerStepState {
+pub(super) fn runner_step_state(status: &NodeStatus) -> runner::RunnerStepState {
     match status {
         NodeStatus::Completed { .. } => runner::RunnerStepState::Completed,
         NodeStatus::Failed { .. } => runner::RunnerStepState::Failed,

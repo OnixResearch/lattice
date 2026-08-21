@@ -749,6 +749,10 @@ fn merged_progress_input_rejects_duplicate_or_malformed_process_observations() {
                 error: None,
             },
         ],
+        observed_completion_order: vec![
+            lattice::engine::workflow::NodeId(1),
+            lattice::engine::workflow::NodeId(2),
+        ],
     };
     let summary = lattice::guarded::evidence::summarize(lattice::guarded::authority::CAIRN_BUNDLE_ID, &details)
         .expect("guarded evidence summary");

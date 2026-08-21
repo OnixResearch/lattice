@@ -1,5 +1,5 @@
 {
-  "baseline_hash": "b3:c02c531102f2318ab4738e030397defefc60c1148ee143d50e833012624e9e1e",
+  "baseline_hash": "b3:c4af20cc25b4e7d25d7973f0f445db6af88f16967714ea8efff8b1f54a1acc54",
   "finding_schema_version": 2,
   "findings": [
     {
@@ -2421,6 +2421,19 @@
       "stable_id": "b3:3e25f61df78860f7"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/tui/app.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 4042 lines (limit: 300)",
+      "semantic_id": "b3:3e601acb64fe6b34",
+      "severity": "warning",
+      "stable_id": "b3:3e601acb64fe6b34"
+    },
+    {
       "column": 40,
       "crate_name": "lattice",
       "file": "src/replay.rs",
@@ -2536,19 +2549,6 @@
       "semantic_id": "b3:4048cc01e6527e41",
       "severity": "warning",
       "stable_id": "b3:4048cc01e6527e41"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/store/mod.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 1513 lines (limit: 300)",
-      "semantic_id": "b3:4053231dffde1964",
-      "severity": "warning",
-      "stable_id": "b3:4053231dffde1964"
     },
     {
       "column": 1,
@@ -4670,6 +4670,19 @@
       "stable_id": "b3:6ded133fa6437a8c"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/engine/executor.rs",
+      "group": "tigerstyle::naming",
+      "identity_status": "computed",
+      "line": 1234,
+      "lint": "path_segment_repetition",
+      "message": "item name `Executor` repeats `executor` from ancestor path segment `executor`",
+      "semantic_id": "b3:6df9e6c8020099e6",
+      "severity": "warning",
+      "stable_id": "b3:6df9e6c8020099e6"
+    },
+    {
       "column": 13,
       "crate_name": "lattice",
       "file": "src/n8n_json.rs",
@@ -5840,6 +5853,19 @@
       "stable_id": "b3:89a13efc4306a336"
     },
     {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/engine/executor.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 2899 lines (limit: 300)",
+      "semantic_id": "b3:89ebf56fa2997626",
+      "severity": "warning",
+      "stable_id": "b3:89ebf56fa2997626"
+    },
+    {
       "column": 35,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -6215,6 +6241,19 @@
       "semantic_id": "b3:9272d58971027f6c",
       "severity": "warning",
       "stable_id": "b3:9272d58971027f6c"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
+      "file": "src/config/mod.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 642 lines (limit: 300)",
+      "semantic_id": "b3:9363a1b1e5e98f0d",
+      "severity": "warning",
+      "stable_id": "b3:9363a1b1e5e98f0d"
     },
     {
       "column": 9,
@@ -7712,19 +7751,6 @@
       "stable_id": "b3:b62715d7e2398daa"
     },
     {
-      "column": 17,
-      "crate_name": "lattice",
-      "file": "src/engine/executor.rs",
-      "group": "tigerstyle::safety",
-      "identity_status": "computed",
-      "line": 2688,
-      "lint": "unbounded_collection_growth",
-      "message": "collection grows in loop without a prior reservation or explicit local bound",
-      "semantic_id": "b3:b62caa70d6c27ae9",
-      "severity": "warning",
-      "stable_id": "b3:b62caa70d6c27ae9"
-    },
-    {
       "column": 1,
       "crate_name": "lattice",
       "file": "src/tui/panels.rs",
@@ -8477,19 +8503,6 @@
       "semantic_id": "b3:c892600a48b73c07",
       "severity": "warning",
       "stable_id": "b3:c892600a48b73c07"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/tui/app.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 3999 lines (limit: 300)",
-      "semantic_id": "b3:c896f265a155948d",
-      "severity": "warning",
-      "stable_id": "b3:c896f265a155948d"
     },
     {
       "column": 1,
@@ -9313,6 +9326,19 @@
     {
       "column": 1,
       "crate_name": "lattice",
+      "file": "src/store/mod.rs",
+      "group": "tigerstyle::structure",
+      "identity_status": "computed",
+      "line": 1,
+      "lint": "excessive_file_length",
+      "message": "source file is 1521 lines (limit: 300)",
+      "semantic_id": "b3:d9fdec7f9de9fb36",
+      "severity": "warning",
+      "stable_id": "b3:d9fdec7f9de9fb36"
+    },
+    {
+      "column": 1,
+      "crate_name": "lattice",
       "file": "src/workflow_format.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -9504,19 +9530,6 @@
       "semantic_id": "b3:deaaf4ae5c580dfb",
       "severity": "warning",
       "stable_id": "b3:deaaf4ae5c580dfb"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/config/mod.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 659 lines (limit: 300)",
-      "semantic_id": "b3:df090ac7af073c3f",
-      "severity": "warning",
-      "stable_id": "b3:df090ac7af073c3f"
     },
     {
       "column": 1,
@@ -10444,19 +10457,6 @@
     {
       "column": 1,
       "crate_name": "lattice",
-      "file": "src/engine/executor.rs",
-      "group": "tigerstyle::structure",
-      "identity_status": "computed",
-      "line": 1,
-      "lint": "excessive_file_length",
-      "message": "source file is 2801 lines (limit: 300)",
-      "semantic_id": "b3:f5b9663ddb4505fb",
-      "severity": "warning",
-      "stable_id": "b3:f5b9663ddb4505fb"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
       "file": "src/orchestration/shell.rs",
       "group": "tigerstyle::naming",
       "identity_status": "computed",
@@ -10544,19 +10544,6 @@
       "semantic_id": "b3:f8b26a5e5b754dee",
       "severity": "warning",
       "stable_id": "b3:f8b26a5e5b754dee"
-    },
-    {
-      "column": 1,
-      "crate_name": "lattice",
-      "file": "src/engine/executor.rs",
-      "group": "tigerstyle::naming",
-      "identity_status": "computed",
-      "line": 1188,
-      "lint": "path_segment_repetition",
-      "message": "item name `Executor` repeats `executor` from ancestor path segment `executor`",
-      "semantic_id": "b3:f903a81a3a99a18e",
-      "severity": "warning",
-      "stable_id": "b3:f903a81a3a99a18e"
     },
     {
       "column": 1,

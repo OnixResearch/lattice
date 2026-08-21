@@ -1047,14 +1047,7 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
         }
     };
 
-    match headless::run_saved_workflow_with_agent_runtime_config(
-        &store,
-        &args.workflow,
-        run_id,
-        app_config.effective_agent_runtime(),
-    )
-    .await
-    {
+    match headless::run_saved_workflow_with_app_config(&store, &args.workflow, run_id, app_config).await {
         Ok(summary) => {
             match args.output {
                 RunOutputFormat::Text => println!("{}", headless::render_run_summary_text(&summary)),

@@ -198,6 +198,8 @@
             toString path
           )
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/themes/" (toString path);
+        isRuntimeConfigAssetPath = path: toString path == "${sourceRoot}/src/config/default.ncl";
+        isCompileTimeDocPath = path: toString path == "${sourceRoot}/docs/bounded-ready-frontier.md";
         isPolicyAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/policy/" (toString path)
@@ -239,6 +241,8 @@
               || isSourceFixturePath path
               || isAnimusCompileTimeAssetPath path
               || isRatsCompileTimeAssetPath path
+              || isRuntimeConfigAssetPath path
+              || isCompileTimeDocPath path
               || isPolicyAssetPath path
               || isWorkflowTemplateAssetPath path
               || isAgentEvaluationAssetPath path

@@ -275,4 +275,5 @@ pub use shell::SnapshotRunRequest;
 pub use shell::run_owned_workflow;
 pub use shell::run_owned_workflow_with_authority_provider;
 pub use shell::run_owned_workflow_with_authority_provider_and_cancellation;
+pub use shell::run_saved_workflow_with_app_config;
 pub use shell::run_workflow_snapshot_with_authority_provider_and_cancellation;

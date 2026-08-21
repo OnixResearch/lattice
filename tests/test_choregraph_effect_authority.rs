@@ -357,6 +357,7 @@ fn unavailable_authority_records_deterministic_denial() {
     assert_eq!(events[0].state, authority::OutcomeState::Denied);
 }
 
+// r[verify lattice.workflow_execution.ready_frontier.dispatch.scenario.persistence_failure]
 #[test]
 fn authority_mismatch_and_persistence_failure_stop_before_adapters() {
     let requested = binding(FILE_RESOURCE, FILE_ABILITY, authority::CollaborationScopeBinding::Unscoped);
@@ -456,6 +457,30 @@ fn store_reserves_before_effect_and_rejects_duplicates() {
     let unknown = authority::observed_outcome_event(&attempt, authority::OutcomeState::UnknownAfterDispatch, None);
     store.save_effect_outcome(&unknown).expect("record unknown crash boundary");
     assert_eq!(unknown.state, authority::OutcomeState::UnknownAfterDispatch);
+}
+
+// r[verify lattice.workflow_execution.ready_frontier.recovery]
+// r[verify lattice.workflow_execution.ready_frontier.recovery.scenario.uncertain_attempts]
+#[test]
+fn crash_keeps_each_concurrent_attempt_independently_uncertain() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let store = lattice::store::Store::new(temp.path().join("concurrent-effects.redb")).expect("store");
+    let bindings = [
+        binding(FILE_RESOURCE, FILE_ABILITY, authority::CollaborationScopeBinding::Unscoped),
+        binding(NETWORK_RESOURCE, NETWORK_ABILITY, authority::CollaborationScopeBinding::Unscoped),
+    ];
+    let attempts = bindings
+        .into_iter()
+        .map(|candidate| store.reserve_effect_attempt(candidate).expect("reserve independent attempt"))
+        .collect::<Vec<_>>();
+
+    for attempt in &attempts {
+        let unknown = authority::observed_outcome_event(attempt, authority::OutcomeState::UnknownAfterDispatch, None);
+        store.save_effect_outcome(&unknown).expect("record independent unknown outcome");
+        let retained = store.load_effect_outcome(&unknown.identity).expect("load outcome").expect("outcome exists");
+        assert_eq!(retained.attempt, attempt.identity);
+        assert_eq!(retained.state, authority::OutcomeState::UnknownAfterDispatch);
+    }
 }
 
 struct NoRoots;

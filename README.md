@@ -16,6 +16,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Explicit workflow expression dependencies](docs/expression-dependencies.md) define extraction, projection, runtime context, identity, and compatibility boundaries.
 
+[Bounded ready-frontier dispatch](docs/bounded-ready-frontier.md) defines event-driven scheduling, capacities, conflicts, ordering, persistence, and proof boundaries.
+
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
 [Durable workflow exchange application](docs/workflow-exchange-application.md) binds the published Unix transport to exact saved workflow revisions, durable acceptance, bounded observations, and explicit uncertainty.
@@ -52,7 +54,8 @@ Lattice pins these packages from Choregraph:
 The source identity is:
 
 - RID: `rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF`
-- Revision: `0b2000edaf86d5a7a8601246afbc0d526f4a2a07`
+- Runtime revision: `0b2000edaf86d5a7a8601246afbc0d526f4a2a07`
+- Readiness proof revision: `b3e08e19750f53bdbcae970cdf58a47a791ed20b`
 
 Cargo, Nix, and Crane use the same source. The old vendored execution-graph implementation is removed.
 
@@ -382,7 +385,7 @@ verus verus/example_spec.rs
 - [Pi coding agent](https://pi.dev) — generic agent SDK and RPC reference.
 - [Clankers](https://github.com/brittonr/clankers) — generic coding-agent integration reference.
 - [Trellis](../trellis/) — verified graph, lifecycle, replay, effect, and identity primitives.
-- [Choregraph](https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git) — graph, machine, and role-projection source at revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07`.
+- [Choregraph](https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git) — runtime source at revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07` and readiness-completeness evidence at revision `b3e08e19750f53bdbcae970cdf58a47a791ed20b`.
 - [Basalt](https://github.com/OnixResearch/basalt) — policy core vendored from revision `bb8fb5f4a763f532df96b6e65407163ac668834e` because anonymous source access is unavailable. Nested Cargo manifests are normalized locally; `vendor-cargo-deps/basalt/NORMALIZATION.md` records that boundary.
 - [Cap Root](https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git) — lexical path admission at revision `545e77e5a49e4e1d34037aa9a82d924944ac0a1b`.
 - [execution-graph](https://git.onix.computer/z2oYsb9jGTyp68BKYhzpivY1eK58a.git) — compatibility and rollback reference.

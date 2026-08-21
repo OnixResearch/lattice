@@ -145,6 +145,21 @@ impl Session {
         Ok(session)
     }
 
+    pub fn ready_frontier(&self) -> Result<Vec<crate::engine::workflow::NodeId>, Error> {
+        let ready = choregraph_core::ready_nodes(&self.machine, &self.state).map_err(|_| Error::TransitionDenied)?;
+        ready
+            .into_iter()
+            .map(|node_id| {
+                node_id
+                    .as_str()
+                    .strip_prefix(CHOREGRAPH_NODE_PREFIX)
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .map(crate::engine::workflow::NodeId)
+                    .ok_or(Error::TransitionDenied)
+            })
+            .collect()
+    }
+
     pub fn mark_ready(&mut self, node_id: crate::engine::workflow::NodeId) -> Result<(), Error> {
         let event = choregraph_core::ConcreteEvent::new(node_reference(node_id), choregraph_core::Action::MarkReady);
         self.apply_without_bindings(&event)?;
@@ -218,6 +233,11 @@ impl Session {
     #[must_use]
     pub fn dispatch(&self) -> &super::dispatch::Shell {
         self.dispatch.as_ref()
+    }
+
+    #[must_use]
+    pub fn dispatch_handle(&self) -> std::sync::Arc<super::dispatch::Shell> {
+        std::sync::Arc::clone(&self.dispatch)
     }
 
     fn apply_without_bindings(&mut self, event: &choregraph_core::ConcreteEvent) -> Result<(), Error> {

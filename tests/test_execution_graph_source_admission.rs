@@ -10,6 +10,7 @@ const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
 const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
 const REVISION: &str = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
+const READINESS_PROOF_REVISION: &str = "b3e08e19750f53bdbcae970cdf58a47a791ed20b";
 const ARCHIVE_BLAKE3: &str = "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e";
 const LICENSE: &str = "AGPL-3.0-or-later";
 const HTTPS_URL: &str = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
@@ -54,6 +55,7 @@ fn admission_matches(source: &str) -> bool {
         "status = 'accepted".to_owned(),
         format!("rid = \"{RID}\""),
         format!("revision = \"{REVISION}\""),
+        format!("readiness_proof_revision = \"{READINESS_PROOF_REVISION}\""),
         format!("source_url = \"{HTTPS_URL}\""),
         format!("source_archive_blake3 = \"{ARCHIVE_BLAKE3}\""),
         format!("license = \"{LICENSE}\""),
@@ -62,6 +64,7 @@ fn admission_matches(source: &str) -> bool {
         format!("publication_receipt_revision = \"{HISTORICAL_PUBLICATION_REVISION}\""),
         "publication_receipt_matches_revision = false".to_owned(),
         "execution_graph_baseline = true".to_owned(),
+        "readiness_completeness = true".to_owned(),
         "forbidden_fallbacks = [\"floating\", \"github\", \"sibling\", \"vendor\", \"runtime\"]".to_owned(),
     ];
     required_lines

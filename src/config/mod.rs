@@ -18,7 +18,7 @@ use crate::agent_node::AgentRuntimeConfig;
 pub mod identity;
 
 const DEFAULT_SHELL_TIMEOUT_SECS: u64 = 60;
-const DEFAULT_MAX_PARALLELISM: usize = 4;
+const SERIAL_MAX_PARALLELISM: u32 = 1;
 const DEFAULT_SHELL: &str = "sh";
 
 /// Application-level configuration loaded from Nickel.
@@ -30,8 +30,12 @@ pub struct AppConfig {
     pub default_timeout_secs: u64,
     /// Shell to use for commands (default: "sh").
     pub shell: String,
-    /// Max parallel node executions.
-    pub max_parallelism: usize,
+    /// Maximum concurrent node executions. Omission preserves serial execution.
+    #[serde(default = "serial_max_parallelism")]
+    pub max_parallelism: u32,
+    /// Named resource limits. An empty map is valid only for serial omission.
+    #[serde(default = "empty_resource_lanes")]
+    pub resource_lanes: std::collections::BTreeMap<String, u32>,
     /// Production command and OpenAI-compatible agent runtime configuration.
     #[serde(default)]
     pub agent_runtime: AgentRuntimeConfig,
@@ -47,7 +51,8 @@ impl Default for AppConfig {
             data_dir,
             default_timeout_secs: DEFAULT_SHELL_TIMEOUT_SECS,
             shell: DEFAULT_SHELL.into(),
-            max_parallelism: DEFAULT_MAX_PARALLELISM,
+            max_parallelism: SERIAL_MAX_PARALLELISM,
+            resource_lanes: std::collections::BTreeMap::new(),
             agent_runtime: AgentRuntimeConfig::default(),
             process_limits: crate::process::core::LimitConfig::default(),
         }
@@ -64,6 +69,20 @@ impl AppConfig {
         };
         runtime
     }
+
+    pub fn frontier_capacity_policy(
+        &self,
+    ) -> Result<lattice_core::scheduling::CapacityPolicy, lattice_core::scheduling::PolicyError> {
+        crate::engine::frontier::capacity_policy(self.max_parallelism, &self.resource_lanes)
+    }
+}
+
+const fn serial_max_parallelism() -> u32 {
+    SERIAL_MAX_PARALLELISM
+}
+
+fn empty_resource_lanes() -> std::collections::BTreeMap<String, u32> {
+    std::collections::BTreeMap::new()
 }
 
 /// Imperative shell: collect environment and filesystem facts for the default data directory.
@@ -117,7 +136,7 @@ pub struct TemplateParameter {
     pub description: String,
     #[serde(default)]
     pub default: Option<TemplateParameterDefault>,
-    #[serde(default)]
+    #[serde(default = "parameter_is_optional")]
     pub required: bool,
     #[serde(default)]
     pub min: Option<f64>,
@@ -131,6 +150,10 @@ pub enum TemplateParameterType {
     String,
     Number,
     Bool,
+}
+
+const fn parameter_is_optional() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -447,54 +470,14 @@ pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, Stri
 }
 
 /// Generate a default config.ncl file.
+#[allow(unknown_lints)]
+#[allow(
+    path_segment_repetition,
+    reason = "the public API names the exact generated config.ncl artifact"
+)]
 pub fn default_config_ncl() -> &'static str {
-    r#"let PositiveNumber = std.contract.from_predicate (fun value =>
-  std.is_number value && value > 0
-) in
-let ProcessLimits = {
-  stdin_max_bytes | PositiveNumber,
-  stdout_max_bytes | PositiveNumber,
-  stderr_max_bytes | PositiveNumber,
-  command_agent_timeout_secs | PositiveNumber,
-  poll_interval_millis | PositiveNumber,
-  teardown_grace_millis | PositiveNumber,
-} in
-let stream_limit_bytes = 64 * 1024 * 1024 in
-let command_agent_timeout_secs = 600 in
-let process_poll_interval_millis = 10 in
-let process_teardown_grace_millis = 1000 in
-let process_limits = {
-  stdin_max_bytes = stream_limit_bytes,
-  stdout_max_bytes = stream_limit_bytes,
-  stderr_max_bytes = stream_limit_bytes,
-  command_agent_timeout_secs = command_agent_timeout_secs,
-  poll_interval_millis = process_poll_interval_millis,
-  teardown_grace_millis = process_teardown_grace_millis,
-} | ProcessLimits in
-{
-  data_dir = "~/.lattice",
-  default_timeout_secs = 60,
-  shell = "sh",
-  max_parallelism = 4,
-  process_limits = process_limits,
-  agent_runtime = {
-    max_output_bytes = 64 * 1024 * 1024,
-    runtimes = {
-      pi = {
-        command = "pi",
-        args = ["--no-session", "-p", "{prompt}"],
-      },
-      clankers = {
-        command = "clankers",
-        args = ["-p", "{prompt}"],
-      },
-    },
-    openai_compatible = {},
-  },
+    include_str!("default.ncl")
 }
-"#
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DefaultNodeTemplateFile {
     pub file_name: &'static str,

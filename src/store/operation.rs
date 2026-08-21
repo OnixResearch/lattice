@@ -118,10 +118,11 @@ fn operation_run_details(record: &crate::operation::RunRecord) -> RunDetailRecor
     } else {
         RunNodeDetailStatus::Failed
     };
+    let node_id = crate::engine::workflow::NodeId(OPERATION_RUN_NODE_ID);
     RunDetailRecord {
         run_id: record.run_id,
         nodes: vec![RunNodeDetail {
-            node_id: crate::engine::workflow::NodeId(OPERATION_RUN_NODE_ID),
+            node_id,
             node_label: format!(
                 "operation:{}:{}:{}",
                 record.backend_attempt.route.backend_class.label(),
@@ -133,6 +134,7 @@ fn operation_run_details(record: &crate::operation::RunRecord) -> RunDetailRecor
             outputs: Vec::new(),
             error: (record.state != crate::operation::RunState::Completed).then(|| record.diagnostic.clone()),
         }],
+        observed_completion_order: vec![node_id],
     }
 }
 

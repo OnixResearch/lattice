@@ -48,6 +48,8 @@ fn exact_source_and_prerequisites_are_aligned() {
     assert!(FLAKE_SOURCE.contains(CHOREGRAPH_REVISION));
     assert!(FLAKE_SOURCE.contains(CHOREGRAPH_URL));
     assert!(SOURCE_ADMISSION.contains(CHOREGRAPH_REVISION));
+    assert!(SOURCE_ADMISSION.contains("readiness_proof_revision = \"b3e08e19750f53bdbcae970cdf58a47a791ed20b\""));
+    assert!(SOURCE_ADMISSION.contains("readiness_completeness = true"));
     assert!(SOURCE_ADMISSION.contains("execution_graph_baseline = true"));
     assert!(SOURCE_ADMISSION.contains("nickel_evaluator_baseline = true"));
     assert!(FLOATING_SOURCE.contains("admission.revision | force = \"main\""));

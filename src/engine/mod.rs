@@ -7,6 +7,7 @@ pub mod child;
 pub mod domain;
 pub mod effect;
 pub mod executor;
+pub mod frontier;
 pub mod protocol;
 pub mod runner;
 pub mod value;

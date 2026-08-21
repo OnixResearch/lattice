@@ -120,6 +120,7 @@ fn details(run_id: RunId) -> RunDetailRecord {
             }],
             error: Some(PRIVATE_AUTHORIZATION.to_string()),
         }],
+        observed_completion_order: vec![NodeId(NODE_ID_VALUE)],
     }
 }
 

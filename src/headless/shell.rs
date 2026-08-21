@@ -16,6 +16,49 @@ pub(super) struct ProductRunRequest<'a> {
     pub authority_provider: &'a dyn crate::engine::effect::execution::RunContextProvider,
 }
 
+pub async fn run_saved_workflow_with_app_config(
+    store: &crate::store::Store,
+    workflow_name: &str,
+    run_id: crate::engine::executor::RunId,
+    app_config: &crate::config::AppConfig,
+) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+    let agent_runtime = app_config.effective_agent_runtime();
+    let frontier_policy = app_config.frontier_capacity_policy().unwrap_or_else(|error| {
+        tracing::error!(?error, "invalid frontier policy, preserving serial execution");
+        crate::engine::frontier::serial_capacity_policy()
+    });
+    debug_assert!(frontier_policy.total_slots > 0);
+    debug_assert!(!frontier_policy.lane_slots.is_empty());
+    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    run_saved_workflow_with_executor_factory(
+        ProductRunRequest {
+            store,
+            workflow_name,
+            run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider: &authority_provider,
+        },
+        || configured_executor(agent_runtime, frontier_policy),
+    )
+    .await
+}
+
+fn configured_executor(
+    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    frontier_policy: lattice_core::scheduling::CapacityPolicy,
+) -> crate::engine::executor::Executor {
+    let fallback_runtime = agent_runtime.clone();
+    match crate::engine::executor::Executor::new_with_agent_runtime_config(agent_runtime)
+        .with_frontier_policy(frontier_policy)
+    {
+        Ok(executor) => executor,
+        Err(error) => {
+            tracing::error!(?error, "validated frontier policy was rejected, preserving serial execution");
+            crate::engine::executor::Executor::new_with_agent_runtime_config(fallback_runtime)
+        }
+    }
+}
+
 // r[impl lattice.agent_orchestration.run_identity]
 pub async fn run_owned_workflow(
     store: &crate::store::Store,
@@ -104,6 +147,7 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
         .map_err(|error| super::HeadlessRunError::Validation(vec![authority_context_diagnostic(error.to_string())]))?;
     let cache = std::collections::HashMap::new();
     let outcome = executor.run_authorized_until_approval(&workflow, &cache, &authority).await;
+    let observed_completion_order = executor.observed_completion_order().to_vec();
     super::persist_completed_outputs_to_cache(store, &outcome.results);
     if let Some(suspension) = outcome.suspension {
         let (summary, _request) =
@@ -124,7 +168,12 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
     let summary = super::summarize_run(run_id, &workflow, &results);
     let finished_epoch_ms = super::run_finished_epoch_ms();
     let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
-    let details = crate::run::history::detail_record_from_results(run_id, &workflow, &results);
+    let details = crate::run::history::detail_record_from_results_with_completion_order(
+        run_id,
+        &workflow,
+        &results,
+        observed_completion_order,
+    );
     debug_assert_eq!(details.run_id, run_id);
     debug_assert_eq!(details.nodes.len(), results.len());
     store.save_run(&record)?;

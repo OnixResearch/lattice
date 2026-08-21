@@ -20,4 +20,6 @@ pub mod mapping;
 )]
 pub use mapping as expression_dependencies;
 pub mod expressions;
+#[path = "frontier/planner.rs"]
+pub mod scheduling;
 pub mod value;

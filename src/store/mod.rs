@@ -141,7 +141,15 @@ pub struct RunNodeDetail {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunDetailRecord {
     pub run_id: RunId,
+    /// Canonical graph-ordered node details.
     pub nodes: Vec<RunNodeDetail>,
+    /// Actual terminal observation order, separate from canonical presentation.
+    #[serde(default = "empty_observed_completion_order")]
+    pub observed_completion_order: Vec<crate::engine::workflow::NodeId>,
+}
+
+fn empty_observed_completion_order() -> Vec<crate::engine::workflow::NodeId> {
+    Vec::new()
 }
 
 pub struct WorkflowApprovalAdvance<'a> {

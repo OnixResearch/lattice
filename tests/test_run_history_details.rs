@@ -94,6 +94,7 @@ fn detail_record(run_id: RunId) -> RunDetailRecord {
             }],
             error: None,
         }],
+        observed_completion_order: vec![NodeId(RUN_ID_VALUE)],
     }
 }
 
@@ -277,6 +278,7 @@ fn app_renders_empty_node_output_and_unavailable_rerun_as_recoverable() {
             outputs: Vec::new(),
             error: None,
         }],
+        observed_completion_order: vec![NodeId(RUN_ID_VALUE)],
     };
     {
         let store = app.store.as_ref().expect("app store available");

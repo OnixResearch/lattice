@@ -178,6 +178,8 @@ fn resume_command(
     }
 }
 
+// r[verify lattice.workflow_execution.ready_frontier.boundary]
+// r[verify lattice.workflow_execution.ready_frontier.boundary.scenario.approval]
 // r[verify lattice.workflow_approval.suspension]
 // r[verify lattice.workflow_approval.suspension.persisted]
 // r[verify lattice.workflow_approval.decision]

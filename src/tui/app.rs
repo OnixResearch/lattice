@@ -160,6 +160,7 @@ enum RunEvent {
         run_id: RunId,
         workflow: Box<Workflow>,
         results: Vec<StepResult>,
+        observed_completion_order: Vec<crate::engine::workflow::NodeId>,
     },
 }
 
@@ -573,7 +574,14 @@ fn canceled_run_detail_record(
             }
         })
         .collect::<Vec<_>>();
-    RunDetailRecord { run_id, nodes }
+    let observed_completion_order = nodes.iter().map(|node| node.node_id).collect::<Vec<_>>();
+    debug_assert_eq!(nodes.len(), workflow.graph.node_count());
+    debug_assert_eq!(observed_completion_order.len(), nodes.len());
+    RunDetailRecord {
+        run_id,
+        nodes,
+        observed_completion_order,
+    }
 }
 
 fn run_detail_status_from_node_run_status(status: NodeRunStatus) -> RunNodeDetailStatus {
@@ -1020,6 +1028,12 @@ impl App {
         let graph = crate::tui::graph::empty_subwayrat();
         let graph_state = NodeGraphState::new(graph, INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
         let agent_runtime = config.effective_agent_runtime();
+        let frontier_policy = config.frontier_capacity_policy().unwrap_or_else(|error| {
+            error!(?error, "invalid frontier policy, preserving serial execution");
+            crate::engine::frontier::serial_capacity_policy()
+        });
+        debug_assert!(frontier_policy.total_slots > 0);
+        debug_assert!(!frontier_policy.lane_slots.is_empty());
 
         let store = match Store::new(crate::config::store_path(&config.data_dir)) {
             Ok(s) => Some(s),
@@ -1064,7 +1078,18 @@ impl App {
             last_drag_canvas: None,
             dirty: false,
             confirm_quit: false,
-            executor_factory: Arc::new(move || Executor::new_with_agent_runtime_config(agent_runtime.clone())),
+            executor_factory: Arc::new(move || {
+                let fallback_runtime = agent_runtime.clone();
+                match Executor::new_with_agent_runtime_config(agent_runtime.clone())
+                    .with_frontier_policy(frontier_policy.clone())
+                {
+                    Ok(executor) => executor,
+                    Err(error) => {
+                        error!(?error, "validated frontier policy was rejected, preserving serial execution");
+                        Executor::new_with_agent_runtime_config(fallback_runtime)
+                    }
+                }
+            }),
             authority_provider: Arc::new(crate::engine::effect::execution::UnavailableRunContextSource),
         }
     }
@@ -2574,11 +2599,17 @@ impl App {
                     })
                     .collect(),
             };
+            let observed_completion_order = if executor.observed_completion_order().is_empty() {
+                results.iter().map(|step| step.node_id).collect()
+            } else {
+                executor.observed_completion_order().to_vec()
+            };
             if sender
                 .send(RunEvent::Completed {
                     run_id,
                     workflow: Box::new(workflow),
                     results,
+                    observed_completion_order,
                 })
                 .is_err()
             {
@@ -2649,15 +2680,22 @@ impl App {
                     run_id,
                     workflow,
                     results,
+                    observed_completion_order,
                 } => {
-                    self.finish_workflow_run(run_id, &workflow, results);
+                    self.finish_workflow_run(run_id, &workflow, results, observed_completion_order);
                     self.active_run = None;
                 }
             }
         }
     }
 
-    fn finish_workflow_run(&mut self, run_id: RunId, run_workflow: &Workflow, results: Vec<StepResult>) {
+    fn finish_workflow_run(
+        &mut self,
+        run_id: RunId,
+        run_workflow: &Workflow,
+        results: Vec<StepResult>,
+        observed_completion_order: Vec<crate::engine::workflow::NodeId>,
+    ) {
         for step in &results {
             let node_label = run_workflow.graph.node(step.node_id).map(|n| n.label.as_str()).unwrap_or("?");
             match &step.status {
@@ -2707,7 +2745,12 @@ impl App {
         self.run_state.active_replay_timeline =
             Some(crate::replay::build_replay_timeline(run_id, &replay_events, None));
         self.save_run_record(run_id, &run_workflow.meta.name, cache_hits, failures, results.len());
-        self.save_run_detail_record(run_detail_record_from_results(run_id, run_workflow, &results));
+        self.save_run_detail_record(crate::run::history::detail_record_from_results_with_completion_order(
+            run_id,
+            run_workflow,
+            &results,
+            observed_completion_order,
+        ));
         self.save_run_replay_events(run_id, replay_events);
         self.output.push_line(&format!("── run {} complete ({} steps) ──", run_id, results.len()));
     }
@@ -3746,7 +3789,7 @@ mod tests {
 
         app.workflow = run_workflow.clone();
         app.workflow.graph.node_mut(node_id).expect("current node exists").label = MUTATED_NODE_LABEL.to_string();
-        app.finish_workflow_run(RunId(SNAPSHOT_RUN_ID), &run_workflow, vec![step]);
+        app.finish_workflow_run(RunId(SNAPSHOT_RUN_ID), &run_workflow, vec![step], vec![node_id]);
 
         let lines = output_text_lines(&app);
         assert!(lines.iter().any(|line| line.contains(SNAPSHOT_NODE_LABEL)), "lines: {lines:?}");
