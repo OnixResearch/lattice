@@ -81,6 +81,7 @@ fn request(profile: &CapabilityProfile, operation_identity: Identity) -> Workflo
             pipeline_revision_identity: identity('6'),
             workflow_policy_identity: identity('7'),
         },
+        source: None,
         graph,
         controls: RequestedControls {
             cancel: true,
@@ -145,6 +146,7 @@ fn fixture(
             workflow_name: TEST_WORKFLOW.to_string(),
             workflow_revision: facts.revision,
             effect_authority: super::EffectAuthorityMode::RouteExact,
+            source_binding: super::SourceBindingMode::Unavailable,
             nodes: vec![super::RouteNode {
                 request_node_id: request.graph.nodes[0].id.clone(),
                 operation_identity,
@@ -191,6 +193,64 @@ fn handler_profile_and_exact_route_reject_revision_drift() {
         super::validate_route(&profile.routes[0], &request, &facts),
         Err(super::RouteError::WorkflowRevision)
     );
+}
+
+// r[verify lattice.workflow_interchange.source_binding]
+// r[verify lattice.workflow_interchange.source_binding.scenario.admitted]
+// r[verify lattice.workflow_interchange.source_binding.scenario.collision]
+// r[verify lattice.workflow_interchange.source_authority]
+// r[verify lattice.workflow_interchange.source_authority.scenario.drift]
+#[test]
+fn source_context_instantiates_exact_shell_environment_and_revision() {
+    const SOURCE_REVISION: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let command = format!("test \"$LATTICE_SOURCE_REVISION\" = {SOURCE_REVISION}");
+    let (_directory, store, mut workflow, contract, mut request, mut profile) = fixture(&command);
+    request.source = Some(SourceContext {
+        provider: label("radicle"),
+        repository: label("rad:zrepo"),
+        revision: label(SOURCE_REVISION),
+    });
+    request.identity = lattice_workflow_contract::request_identity(&request);
+    profile.routes[0].source_binding = super::SourceBindingMode::ShellEnvironment;
+    let route = profile.routes[0].clone();
+    let (instantiated, instantiated_revision) =
+        super::instantiate_workflow(&route, &request, workflow.clone()).expect("source binding is admitted");
+    assert_ne!(instantiated_revision, route.workflow_revision);
+    let config = instantiated.configs.get(&route.nodes[0].workflow_node_id).expect("mapped node config exists");
+    let crate::engine::workflow::NodeConfig::Shell { env, .. } = config else {
+        panic!("mapped node must remain a shell node");
+    };
+    assert_eq!(env.get(super::SOURCE_REPOSITORY_ENV).map(String::as_str), Some("rad:zrepo"));
+    if let Some(crate::engine::workflow::NodeConfig::Shell { env, .. }) =
+        workflow.configs.get_mut(&route.nodes[0].workflow_node_id)
+    {
+        env.insert(super::SOURCE_REVISION_ENV.to_string(), "collision".to_string());
+    }
+    assert_eq!(
+        super::instantiate_workflow(&route, &request, workflow).map(|_| ()),
+        Err(super::RouteError::SourceCollision)
+    );
+
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+        .expect("handler starts");
+    let mut service = WorkflowExchangeService::new(handler);
+    let dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: contract.clone(),
+        request: request.clone(),
+    })
+    .expect("dispatch envelope is valid");
+    let accepted = accepted_from_response(service.exchange(&dispatch).expect("dispatch succeeds"));
+    assert_eq!(accepted.workflow_identity, instantiated_revision);
+    service.handler_mut().wait_for_workers();
+    let observe = new_request(ExchangeCommand::Observe {
+        profile: contract,
+        request,
+        accepted: accepted.clone(),
+    })
+    .expect("observe envelope is valid");
+    let observation = observed(service.exchange(&observe).expect("observe succeeds"));
+    assert_eq!(observation.workflow_identity, accepted.workflow_identity);
+    assert_eq!(observation.state, ExecutionState::Completed);
 }
 
 // r[verify lattice.workflow_interchange.application_admission]
@@ -277,7 +337,7 @@ fn reused_idempotency_key_with_changed_request_is_rejected() {
     let route = profile.routes[0].clone();
     let profile_identity = super::handler_profile_identity(&profile).expect("handler profile identity exists");
     let first = store
-        .admit_workflow_exchange(request.clone(), &route, profile_identity.clone())
+        .admit_workflow_exchange(request.clone(), &route, route.workflow_revision.clone(), profile_identity.clone())
         .expect("first request is admitted");
     assert!(matches!(first, super::AdmissionResolution::Inserted(_)));
 
@@ -285,7 +345,7 @@ fn reused_idempotency_key_with_changed_request_is_rejected() {
     changed.kiln.attempt_identity = identity('a');
     changed.identity = lattice_workflow_contract::request_identity(&changed);
     let error = store
-        .admit_workflow_exchange(changed, &route, profile_identity)
+        .admit_workflow_exchange(changed, &route, route.workflow_revision.clone(), profile_identity)
         .expect_err("changed request cannot reuse idempotency");
     assert!(matches!(error, crate::store::StoreError::Conflict(_)));
     assert_eq!(validate_profile(&contract), Ok(()));
@@ -400,7 +460,7 @@ fn accepted_execution_without_live_worker_becomes_unknown_without_redispatch() {
     let route = profile.routes[0].clone();
     let profile_identity = super::handler_profile_identity(&profile).expect("handler profile identity exists");
     let admitted = store
-        .admit_workflow_exchange(request.clone(), &route, profile_identity)
+        .admit_workflow_exchange(request.clone(), &route, route.workflow_revision.clone(), profile_identity)
         .expect("request is durably admitted");
     let super::AdmissionResolution::Inserted(record) = admitted else {
         panic!("fixture must insert one execution");

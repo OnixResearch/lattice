@@ -113,6 +113,11 @@ pub fn validate_route(
     if route.workflow_revision != facts.revision {
         return Err(RouteError::WorkflowRevision);
     }
+    match (route.source_binding, request.source.is_some()) {
+        (super::SourceBindingMode::Unavailable, true) => return Err(RouteError::SourceUnexpected),
+        (super::SourceBindingMode::ShellEnvironment, false) => return Err(RouteError::SourceRequired),
+        (super::SourceBindingMode::Unavailable, false) | (super::SourceBindingMode::ShellEnvironment, true) => {}
+    }
     if route.nodes.len() != request.graph.nodes.len() || facts.node_ids.len() != route.nodes.len() {
         return Err(RouteError::NodeCount);
     }

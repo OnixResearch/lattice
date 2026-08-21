@@ -38,18 +38,19 @@ const ZERO_CURSOR: u64 = 0;
 pub fn initial_record(
     request: WorkflowRequest,
     route: &WorkflowRoute,
+    execution_workflow_revision: Identity,
     profile_identity: Identity,
     run_id: u64,
 ) -> Result<ExecutionRecord, TransitionError> {
     let execution_identity = framed_identity(
         EXECUTION_IDENTITY_DOMAIN,
-        &(request.identity.as_str(), route.workflow_revision.as_str(), run_id, profile_identity.as_str()),
+        &(request.identity.as_str(), execution_workflow_revision.as_str(), run_id, profile_identity.as_str()),
     )?;
     let accepted = WorkflowAccepted {
         schema: ACCEPTED_SCHEMA.to_string(),
         request_identity: request.identity.clone(),
         idempotency_key: request.idempotency_key.clone(),
-        workflow_identity: route.workflow_revision.clone(),
+        workflow_identity: execution_workflow_revision.clone(),
         execution_identity,
     };
     let nodes = route
@@ -58,7 +59,7 @@ pub fn initial_record(
         .map(|node| {
             let adapter_identity = framed_identity(
                 ADAPTER_IDENTITY_DOMAIN,
-                &(route.workflow_revision.as_str(), node.workflow_node_id, node.operation_identity.as_str()),
+                &(execution_workflow_revision.as_str(), node.workflow_node_id, node.operation_identity.as_str()),
             )?;
             Ok(DurableNode {
                 request_node_id: node.request_node_id.clone(),
@@ -75,7 +76,7 @@ pub fn initial_record(
         accepted,
         handler_profile_identity: profile_identity,
         workflow_name: route.workflow_name.clone(),
-        workflow_revision: route.workflow_revision.clone(),
+        workflow_revision: execution_workflow_revision,
         run_id,
         sequence: 0,
         state: DurableExecutionState::Queued,

@@ -32,6 +32,7 @@ let profile | Contract.HandlerProfile = {
     workflow_name = "kiln-ci",
     workflow_revision = "b3:3333333333333333333333333333333333333333333333333333333333333333",
     effect_authority = "route_exact",
+    source_binding = "shell_environment",
     nodes = [{
       request_node_id = "build",
       operation_identity = "b3:4444444444444444444444444444444444444444444444444444444444444444",

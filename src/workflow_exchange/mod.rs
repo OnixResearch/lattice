@@ -3,6 +3,7 @@
 mod admission;
 mod application;
 mod authority;
+mod binding;
 mod core;
 mod model;
 mod projection;
@@ -21,6 +22,10 @@ pub use application::ApplicationHandler;
 pub use application::load_profile;
 pub use application::serve;
 pub use authority::RouteExactAuthorityProvider;
+pub use binding::SOURCE_PROVIDER_ENV;
+pub use binding::SOURCE_REPOSITORY_ENV;
+pub use binding::SOURCE_REVISION_ENV;
+pub use binding::instantiate_workflow;
 pub use model::*;
 pub use projection::observation;
 pub use projection::retained_log;

@@ -39,6 +39,10 @@ let EffectAuthority = std.contract.from_predicate (fun value =>
   value == "unavailable" || value == "route_exact"
 ) in
 
+let SourceBinding = std.contract.from_predicate (fun value =>
+  value == "unavailable" || value == "shell_environment"
+) in
+
 let RequiredNonClaims = std.contract.from_predicate (fun value =>
   value == [
     "handler admission does not prove workflow correctness",
@@ -67,6 +71,7 @@ let Route = {
   workflow_name | Label,
   workflow_revision | Identity,
   effect_authority | EffectAuthority,
+  source_binding | SourceBinding,
   nodes | RouteNodeList | Array RouteNode,
 } in
 

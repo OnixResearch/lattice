@@ -14,6 +14,7 @@ impl super::Store {
         &self,
         request: lattice_workflow_contract::WorkflowRequest,
         route: &crate::workflow_exchange::WorkflowRoute,
+        execution_workflow_revision: lattice_workflow_contract::Identity,
         handler_profile_identity: lattice_workflow_contract::Identity,
     ) -> Result<crate::workflow_exchange::AdmissionResolution, super::StoreError> {
         let transaction = self.db.begin_write().map_err(store_db_error)?;
@@ -60,8 +61,14 @@ impl super::Store {
             return Ok(crate::workflow_exchange::AdmissionResolution::Existing(existing));
         }
         let run_id = super::reserve_run_id(&transaction)?;
-        let record = crate::workflow_exchange::initial_record(request, route, handler_profile_identity, run_id.0)
-            .map_err(transition_error)?;
+        let record = crate::workflow_exchange::initial_record(
+            request,
+            route,
+            execution_workflow_revision,
+            handler_profile_identity,
+            run_id.0,
+        )
+        .map_err(transition_error)?;
         let bytes = super::serialize(&record)?;
         let execution_identity = record.accepted.execution_identity.as_str();
         {

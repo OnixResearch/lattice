@@ -39,6 +39,13 @@ pub enum EffectAuthorityMode {
     RouteExact,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceBindingMode {
+    Unavailable,
+    ShellEnvironment,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RouteNode {
@@ -55,6 +62,7 @@ pub struct WorkflowRoute {
     pub workflow_name: String,
     pub workflow_revision: Identity,
     pub effect_authority: EffectAuthorityMode,
+    pub source_binding: SourceBindingMode,
     pub nodes: Vec<RouteNode>,
 }
 
@@ -98,6 +106,10 @@ pub enum RouteError {
     NodeCount,
     NodeMapping,
     EdgeMapping,
+    SourceRequired,
+    SourceUnexpected,
+    SourceTarget,
+    SourceCollision,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

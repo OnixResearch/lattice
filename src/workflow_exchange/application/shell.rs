@@ -127,9 +127,16 @@ impl ApplicationHandler {
             .ok_or(HandlerError::NotFound)?;
         let facts = super::worker::workflow_facts(&workflow).map_err(|_| HandlerError::Rejected)?;
         super::validate_route(&route, request, &facts).map_err(|_| HandlerError::Rejected)?;
+        let (workflow, execution_workflow_revision) =
+            super::instantiate_workflow(&route, request, workflow).map_err(|_| HandlerError::Rejected)?;
         let resolution = self
             .store
-            .admit_workflow_exchange(request.clone(), &route, self.profile_identity.clone())
+            .admit_workflow_exchange(
+                request.clone(),
+                &route,
+                execution_workflow_revision,
+                self.profile_identity.clone(),
+            )
             .map_err(map_admission_error)?;
         match resolution {
             AdmissionResolution::Existing(record) => Ok(record.accepted),

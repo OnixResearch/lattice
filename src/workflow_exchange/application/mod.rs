@@ -12,7 +12,6 @@ mod worker;
 pub use service::load_profile;
 pub use service::serve;
 pub use shell::ApplicationHandler;
-#[cfg(test)]
 pub(super) use worker::workflow_facts;
 
 pub(super) use super::AdmissionResolution;
@@ -28,6 +27,7 @@ pub(super) use super::WorkflowFacts;
 pub(super) use super::WorkflowRoute;
 pub(super) use super::complete;
 pub(super) use super::handler_profile_identity;
+pub(super) use super::instantiate_workflow;
 pub(super) use super::mark_running;
 pub(super) use super::mark_unknown;
 pub(super) use super::observation;

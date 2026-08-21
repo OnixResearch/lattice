@@ -16,7 +16,7 @@ pub use error::*;
 pub use observation::*;
 
 pub const PROFILE_SCHEMA: &str = "lattice.workflow-profile.v1";
-pub const REQUEST_SCHEMA: &str = "lattice.workflow-request.v1";
+pub const REQUEST_SCHEMA: &str = "lattice.workflow-request.v2";
 pub const GRAPH_SCHEMA: &str = "lattice.workflow-graph.v1";
 pub const ACCEPTED_SCHEMA: &str = "lattice.workflow-accepted.v1";
 pub const OBSERVATION_SCHEMA: &str = "lattice.workflow-observation.v1";
@@ -193,6 +193,14 @@ pub struct KilnLinkage {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct SourceContext {
+    pub provider: Label,
+    pub repository: Label,
+    pub revision: Label,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorkflowNode {
     pub id: Label,
     pub kind: Label,
@@ -242,6 +250,8 @@ pub struct WorkflowRequest {
     pub profile_identity: Identity,
     pub platform: Label,
     pub kiln: KilnLinkage,
+    #[serde(default)]
+    pub source: Option<SourceContext>,
     pub graph: WorkflowGraph,
     pub controls: RequestedControls,
     pub observation: ObservationPolicy,
