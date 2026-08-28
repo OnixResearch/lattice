@@ -15,6 +15,7 @@ const TEST_USER_ID: u32 = 1_000;
 const TEST_IDENTITY_DIGITS: usize = 64;
 const TEST_WORKFLOW: &str = "exchange-test";
 const TEST_COMMAND: &str = "printf exchange";
+const TEST_FAILURE_EXIT_CODE: i32 = 2;
 const TEST_SOCKET: &str = "/tmp/lattice-workflow-exchange-test.sock";
 const SOCKET_READY_ATTEMPTS: usize = 100;
 const SOCKET_READY_DELAY_MILLISECONDS: u64 = 10;
@@ -332,6 +333,37 @@ fn dispatch_executes_once_recovers_acceptance_and_reads_bounded_log() {
         lattice_workflow_transport::request_identity(&missing.command).expect("changed log request identity is valid");
     let response = service.exchange(&missing).expect("missing log returns a closed response");
     assert!(matches!(response.result, ExchangeResult::Rejected(_)));
+}
+
+// r[verify lattice.workflow_interchange.application_execution]
+// r[verify lattice.workflow_interchange.application_execution.scenario.nonzero]
+#[test]
+fn nonzero_shell_exit_is_terminal_failure() {
+    let command = format!("printf provider-error >&2; exit {TEST_FAILURE_EXIT_CODE}");
+    let (_directory, store, _workflow, contract, request, profile) = fixture(&command);
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+        .expect("handler starts");
+    let mut service = WorkflowExchangeService::new(handler);
+    let dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: contract.clone(),
+        request: request.clone(),
+    })
+    .expect("dispatch envelope is valid");
+    let accepted = accepted_from_response(service.exchange(&dispatch).expect("dispatch succeeds"));
+    service.handler_mut().wait_for_workers();
+    let observe = new_request(ExchangeCommand::Observe {
+        profile: contract,
+        request,
+        accepted,
+    })
+    .expect("observe envelope is valid");
+    let observation = observed(service.exchange(&observe).expect("failed execution is observed"));
+    assert_eq!(observation.state, ExecutionState::Failed);
+    assert!(observation.terminal);
+    assert!(!observation.successful);
+    assert_eq!(observation.nodes.len(), 1);
+    assert_eq!(observation.nodes[0].state, NodeState::Failed);
+    assert!(!observation.nodes[0].successful);
 }
 
 // r[verify lattice.workflow_interchange.application_admission.scenario.conflict]

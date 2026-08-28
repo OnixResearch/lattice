@@ -18,6 +18,8 @@ use super::EffectAuthorityMode;
 use super::ExecutionRecord;
 use super::WorkflowFacts;
 
+const SUCCESSFUL_SHELL_EXIT_TEXT: &str = "exit code: 0";
+
 pub(super) struct WorkerInput {
     pub store: crate::store::Store,
     pub admitted: ExecutionRecord,
@@ -51,6 +53,7 @@ pub(super) fn run(input: WorkerInput) {
             crate::engine::RunId(running.run_id),
         )),
     };
+    let completion_workflow = workflow.clone();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
     let result = match runtime {
         Ok(runtime) => {
@@ -72,7 +75,7 @@ pub(super) fn run(input: WorkerInput) {
         Ok(Some(current)) => current,
         _ => return,
     };
-    let facts = completion_facts(&store, &current, result);
+    let facts = completion_facts(&store, &current, &completion_workflow, result);
     let next = match super::complete(&current, &facts) {
         Ok(next) => next,
         Err(_) => return mark_unknown(&store, &current),
@@ -85,6 +88,7 @@ pub(super) fn run(input: WorkerInput) {
 fn completion_facts(
     store: &crate::store::Store,
     record: &ExecutionRecord,
+    workflow: &crate::engine::workflow::Workflow,
     result: Result<crate::headless::HeadlessRunSummary, crate::headless::HeadlessRunError>,
 ) -> CompletionFacts {
     let Ok(summary) = result else {
@@ -103,7 +107,7 @@ fn completion_facts(
                 .into_iter()
                 .filter_map(|node| {
                     let result = match node.status {
-                        crate::store::RunNodeDetailStatus::Completed => DurableNodeResult::Completed,
+                        crate::store::RunNodeDetailStatus::Completed => completed_node_result(workflow, &node),
                         crate::store::RunNodeDetailStatus::Failed => DurableNodeResult::Failed,
                         crate::store::RunNodeDetailStatus::Skipped => DurableNodeResult::Skipped,
                         crate::store::RunNodeDetailStatus::Pending | crate::store::RunNodeDetailStatus::Running => {
@@ -121,6 +125,33 @@ fn completion_facts(
         failed_before_results: nodes.is_empty() && summary.node_count != 0,
         nodes,
     }
+}
+
+fn completed_node_result(
+    workflow: &crate::engine::workflow::Workflow,
+    node: &crate::store::RunNodeDetail,
+) -> DurableNodeResult {
+    let Some(graph_node) = workflow.graph.node(node.node_id) else {
+        return DurableNodeResult::Failed;
+    };
+    let mut exit_ports = graph_node
+        .output_ports
+        .iter()
+        .filter(|port| port.type_tag == crate::engine::TypeTag::ExitCode.as_str());
+    let Some(exit_port) = exit_ports.next() else {
+        return DurableNodeResult::Completed;
+    };
+    if exit_ports.next().is_some() {
+        return DurableNodeResult::Failed;
+    }
+    let mut exit_outputs = node.outputs.iter().filter(|output| output.port_id == exit_port.id);
+    let Some(exit) = exit_outputs.next() else {
+        return DurableNodeResult::Failed;
+    };
+    if exit.text != SUCCESSFUL_SHELL_EXIT_TEXT || exit_outputs.next().is_some() {
+        return DurableNodeResult::Failed;
+    }
+    DurableNodeResult::Completed
 }
 
 fn mark_unknown(store: &crate::store::Store, current: &ExecutionRecord) {
