@@ -22,6 +22,8 @@ pub mod image_node;
 pub mod n8n_json;
 pub mod nickel;
 pub mod node_kind_provider;
+// r[impl lattice.node_result_cache.boundary]
+pub mod node_result_cache;
 pub mod openai;
 pub mod operation;
 pub mod operation_data;

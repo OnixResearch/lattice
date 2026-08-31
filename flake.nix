@@ -871,7 +871,7 @@
                 touch "$out"
               '';
 
-          # Run tests with nextest
+          # Serialize process-heavy tests so the sandbox does not exhaust child-process capacity.
           nextest = craneLib.cargoNextest {
             inherit
               src
@@ -880,6 +880,7 @@
               nativeBuildInputs
               buildInputs
               ;
+            cargoNextestExtraArgs = "--test-threads 1";
             partitions = 1;
             partitionType = "count";
           };

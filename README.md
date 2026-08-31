@@ -18,6 +18,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Bounded ready-frontier dispatch](docs/bounded-ready-frontier.md) defines event-driven scheduling, capacities, conflicts, ordering, persistence, and proof boundaries.
 
+[Bounded DAG node memoization](docs/dag-node-memoization.md) defines canonical cache keys, explicit bounds, pure retention decisions, deferred release, and executor non-claims.
+
 [Storage commit uncertainty](docs/storage-commit-uncertainty.md) defines commit outcomes, process-local quarantine, exact read-back reconciliation, and repair non-claims.
 
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
@@ -402,5 +404,6 @@ verus verus/example_spec.rs
 - [Aspen Octet burn-down guard](../aspen/scripts/octet-burndown.scm) — guarded-round burn-down reference; not a Lattice runtime dependency.
 - [mc Ralph Cairn drain loop](../../mc/scripts/ralph-drain-cairns.scm) — bounded drain-loop reference; not a Lattice runtime dependency.
 - [universal-weave](https://github.com/transkatgirl/universal-weave) — Loom-style branching tree/DAG primitives. Design reference only for future branching-run exploration in the TUI. Not a dependency: the run DAG stays with Choregraph, and records stay in redb with BLAKE3 identity.
+- [adanil-code/LRUHashTable](https://github.com/adanil-code/LRUHashTable) — Apache-2.0 retention design reference at revision `f0e436326d36b6909e67c93de387edf19c14f5c1`. No source was copied.
 
 Lattice does not adopt Swamp dynamic TypeScript loading, YAML/CEL authoring, plaintext secrets, or registry metadata as authority.
