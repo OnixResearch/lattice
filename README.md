@@ -22,6 +22,8 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
+[Radicle core pilot decisions](docs/radicle-core-pilot-decisions.md) record why Lattice rejected unproduced change-admission and effect-attempt extractions without adding fallback dependencies.
+
 [Durable workflow exchange application](docs/workflow-exchange-application.md) binds the published Unix transport to exact saved workflow revisions, durable acceptance, bounded observations, and explicit uncertainty.
 
 ## Development
