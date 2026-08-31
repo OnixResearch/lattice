@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nickel-1-17-0.url = "github:nickel-lang/nickel/1320a983e6c3d1e2fb53dd2464b084b4903b1426";
     crane.url = "github:ipetkov/crane";
     rust-overlay = {
       url = "github:oxalica/rust-overlay/3c38e1e1ba9c8d7030f7b5a801398ea7d8a6fdc0";
@@ -23,7 +24,7 @@
       flake = false;
     };
     nickel-eval = {
-      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a";
       flake = false;
     };
     content-identity-core = {
@@ -40,6 +41,7 @@
     {
       self,
       nixpkgs,
+      nickel-1-17-0,
       crane,
       rust-overlay,
       flake-utils,
@@ -54,9 +56,13 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
+        exactNickel = nickel-1-17-0.packages.${system}.default;
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ (import rust-overlay) ];
+          overlays = [
+            (import rust-overlay)
+            (_final: _previous: { nickel = exactNickel; })
+          ];
         };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -260,7 +266,7 @@
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
-        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a#f23be09e41337de8fa729274f50023f861ae0e8a";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=eb2bd3441753af97bfcb247cef7cc22d72675b62#eb2bd3441753af97bfcb247cef7cc22d72675b62";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
@@ -283,7 +289,9 @@
               checkout.overrideAttrs (_old: {
                 src = content-identity-core;
               })
-            else if builtins.all (package: package.source == transactionalReconciliationCoreCargoSource) packages then
+            else if
+              builtins.all (package: package.source == transactionalReconciliationCoreCargoSource) packages
+            then
               checkout.overrideAttrs (_old: {
                 src = transactional-reconciliation-core;
               })
@@ -825,6 +833,43 @@
 
         checks = {
           inherit lattice;
+
+          # r[impl lattice.nickel_toolchain.cohort]
+          # r[impl lattice.nickel_toolchain.fixture_cohort]
+          # r[verify lattice.nickel_toolchain.compatibility]
+          nickel-cohort-exact =
+            pkgs.runCommand "lattice-nickel-cohort-exact"
+              {
+                nativeBuildInputs = [
+                  pkgs.gnugrep
+                  pkgs.nickel
+                ];
+              }
+              ''
+                fixture_root=${self}/tests/fixtures/nickel-toolchain
+                test '${nickel-1-17-0.rev}' = '1320a983e6c3d1e2fb53dd2464b084b4903b1426'
+                test "$(nickel --version)" = 'nickel-lang-cli nickel 1.17.0 (rev 1320a98)'
+                grep -F 'f23be09e41337de8fa729274f50023f861ae0e8a' ${self}/Cargo.toml >/dev/null
+                grep -F 'nickel-lang-core = "=0.18.0"' ${self}/Cargo.toml >/dev/null
+                if grep -E 'bf16cf223ed3dfe75a28f02ac21ed7891a60bac1|nickel-lang-core = "=0.17.0"' \
+                  ${self}/Cargo.toml ${self}/docs/nickel-eval-source.md; then
+                  echo 'old, mixed, or fallback Nickel evaluator source remains' >&2
+                  exit 1
+                fi
+                nickel export --format json "$fixture_root/positive/workflow.ncl" >/dev/null
+                for fixture in \
+                  "$fixture_root/negative/malformed.ncl" \
+                  "$fixture_root/negative/missing-import.ncl" \
+                  "$fixture_root/negative/contract.ncl" \
+                  ${self}/tests/fixtures/operation-packs/manifest-policy-invalid.ncl \
+                  ${self}/tests/fixtures/workflow-transport/negative/profile-zero-frame.ncl; do
+                  if nickel export --format json "$fixture" >/dev/null 2>&1; then
+                    echo "invalid Nickel fixture unexpectedly passed: $fixture" >&2
+                    exit 1
+                  fi
+                done
+                touch "$out"
+              '';
 
           # Run tests with nextest
           nextest = craneLib.cargoNextest {

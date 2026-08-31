@@ -1,13 +1,12 @@
 use std::path::Path;
 
-use nickel_lang_core::error::NullReporter;
 use nickel_lang_core::eval::cache::CacheImpl;
-use nickel_lang_core::program::Program;
+use nickel_lang_core::program::ProgramBuilder;
 use nickel_lang_core::serialize::ExportFormat;
 use nickel_lang_core::serialize::{self};
 
 const RID: &str = "z21miuQLqLwe1HkaMu2mEZy5fdG9F";
-const REVIEWED_OBJECT: &str = "bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+const REVIEWED_OBJECT: &str = "f23be09e41337de8fa729274f50023f861ae0e8a";
 const ADAPTER: &str = "https://seed.radicle.garden/";
 const FORBIDDEN_SOURCES: [&str; 4] = ["github.com", "path = \"../nickel", "branch =", "tag ="];
 const PRODUCT_FIXTURES: [&str; 4] = [
@@ -18,9 +17,10 @@ const PRODUCT_FIXTURES: [&str; 4] = [
 ];
 const PROPOSAL_FIXTURE: &str = r#"{ proposal_id = "review-1", revision = 1, accepted = false }"#;
 
-fn legacy_file(path: &Path) -> Result<serde_json::Value, String> {
-    let mut program = Program::<CacheImpl>::new_from_file(path, std::io::sink(), NullReporter {})
-        .map_err(|error| format!("{error:?}"))?;
+// r[verify lattice.nickel_toolchain.fixture_cohort]
+fn direct_cohort_file(path: &Path) -> Result<serde_json::Value, String> {
+    let mut program =
+        ProgramBuilder::new().add_path(path).build::<CacheImpl>().map_err(|error| format!("{error:?}"))?;
     let runtime = program.eval_full_for_export().map_err(|error| format!("{error:?}"))?;
     serialize::validate(ExportFormat::Json, &runtime).map_err(|error| format!("{error:?}"))?;
     let mut json = Vec::new();
@@ -50,24 +50,24 @@ fn source_is_admitted(cargo: &str, flake: &str) -> bool {
 }
 
 #[test]
-fn legacy_and_shared_evaluators_agree_for_lattice_fixtures() {
+fn direct_and_shared_cohort_evaluators_agree_for_lattice_fixtures() {
     for fixture in PRODUCT_FIXTURES {
         let path = Path::new(fixture);
-        let legacy = legacy_file(path).expect("legacy product fixture evaluates");
+        let direct = direct_cohort_file(path).expect("direct cohort product fixture evaluates");
         let shared = nickel_eval::evaluate_to_json(path).expect("shared product fixture evaluates");
-        assert_eq!(legacy, shared, "product fixture differs: {fixture}");
+        assert_eq!(direct, shared, "product fixture differs: {fixture}");
     }
 
     let directory = tempfile::tempdir().expect("temporary directory");
     let proposal = directory.path().join("proposal.ncl");
     std::fs::write(&proposal, PROPOSAL_FIXTURE).expect("proposal fixture writes");
-    let legacy = legacy_file(&proposal).expect("legacy proposal evaluates");
+    let direct = direct_cohort_file(&proposal).expect("direct cohort proposal evaluates");
     let shared = nickel_eval::evaluate_to_json(&proposal).expect("shared proposal evaluates");
-    assert_eq!(legacy, shared);
+    assert_eq!(direct, shared);
 }
 
 #[test]
-fn legacy_and_shared_evaluators_reject_invalid_fixtures() {
+fn direct_and_shared_cohort_evaluators_reject_invalid_fixtures() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let malformed = directory.path().join("malformed.ncl");
     let missing_import = directory.path().join("missing-import.ncl");
@@ -75,7 +75,7 @@ fn legacy_and_shared_evaluators_reject_invalid_fixtures() {
     std::fs::write(&missing_import, r#"import "missing.ncl""#).expect("import fixture writes");
 
     for fixture in [&malformed, &missing_import] {
-        assert!(legacy_file(fixture).is_err());
+        assert!(direct_cohort_file(fixture).is_err());
         assert!(nickel_eval::evaluate_to_json(fixture).is_err());
     }
 }
