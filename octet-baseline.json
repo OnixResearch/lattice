@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:6eb4570332b384aca2ac7d9ca187779754f28c5157306e9cc1ca6ab2f68e576a",
+  "baseline_hash": "b3:bc74c05e471b3b041165002972a4a0789c9b0a75672d03b01dc4d022db098000",
   "findings": [
     {
       "stable_id": "b3:000fd76cb2aaf6a3",
@@ -46,7 +46,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 215,
+      "line": 245,
       "column": 1,
       "message": "item name `AgentCommandOutput` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -189,7 +189,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 524,
+      "line": 585,
       "column": 1,
       "message": "item name `parse_agent_output_mode` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -205,6 +205,19 @@
       "line": 38,
       "column": 1,
       "message": "item name `ImageError` repeats `image` from ancestor path segment `image_node`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:048f4ea717d7988e",
+      "semantic_id": "b3:048f4ea717d7988e",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 656,
+      "column": 1,
+      "message": "item name `render_agent_command_prompt` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
     },
     {
@@ -416,6 +429,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:0b6d13cb0ed98bae",
+      "semantic_id": "b3:0b6d13cb0ed98bae",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:0b81dbe049db770e",
       "semantic_id": "b3:0b81dbe049db770e",
       "identity_status": "computed",
@@ -533,19 +559,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:0e8e8f88d886c8fb",
-      "semantic_id": "b3:0e8e8f88d886c8fb",
-      "identity_status": "computed",
-      "lint": "borrowed_argument_types",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 614,
-      "column": 1,
-      "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:0ef1f2d557fb388c",
       "semantic_id": "b3:0ef1f2d557fb388c",
       "identity_status": "computed",
@@ -559,6 +572,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:0efdd4bf4ff8e532",
+      "semantic_id": "b3:0efdd4bf4ff8e532",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 996 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:0fd51cdbe7dbbba8",
       "semantic_id": "b3:0fd51cdbe7dbbba8",
       "identity_status": "computed",
@@ -569,19 +595,6 @@
       "line": 193,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:0ff9076475cfb594",
-      "semantic_id": "b3:0ff9076475cfb594",
-      "identity_status": "computed",
-      "lint": "path_segment_repetition",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 594,
-      "column": 1,
-      "message": "item name `render_agent_command_prompt` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
     },
     {
@@ -624,19 +637,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:114d8686521c24ad",
-      "semantic_id": "b3:114d8686521c24ad",
-      "identity_status": "computed",
-      "lint": "path_segment_repetition",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 537,
-      "column": 1,
-      "message": "item name `plan_agent_command` repeats `agent` from ancestor path segment `agent_node`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:116cac778ca02482",
       "semantic_id": "b3:116cac778ca02482",
       "identity_status": "computed",
@@ -670,7 +670,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 515,
+      "line": 576,
       "column": 1,
       "message": "item name `parse_agent_target` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -1099,7 +1099,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 38,
+      "line": 37,
       "column": 47,
       "message": "unprotected unsigned multiplication may overflow",
       "crate_name": "lattice"
@@ -1440,6 +1440,19 @@
       "line": 1162,
       "column": 42,
       "message": "function `validate_proposal` has 0 assertion(s) in 24 lines (need 2+)",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:23c15c40d64f29da",
+      "semantic_id": "b3:23c15c40d64f29da",
+      "identity_status": "computed",
+      "lint": "module_file_count",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module directory `src` contains 17 Rust source files (limit: 7)",
       "crate_name": "lattice"
     },
     {
@@ -1814,7 +1827,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 903,
+      "line": 979,
       "column": 40,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -2009,7 +2022,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 447,
+      "line": 508,
       "column": 1,
       "message": "item name `default_agent_output_max_bytes` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -2061,7 +2074,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 52,
+      "line": 51,
       "column": 1,
       "message": "item name `AgentOutputMode` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -2087,7 +2100,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 668,
+      "line": 744,
       "column": 1,
       "message": "item name `process_request_for_agent_command` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -2191,7 +2204,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 38,
+      "line": 37,
       "column": 47,
       "message": "unprotected unsigned multiplication may overflow",
       "crate_name": "lattice"
@@ -2269,7 +2282,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 621,
+      "line": 697,
       "column": 1,
       "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -2412,7 +2425,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 318,
+      "line": 348,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2750,7 +2763,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 314,
+      "line": 344,
       "column": 1,
       "message": "item name `AgentOutputFileEnvelope` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -2997,7 +3010,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 86,
+      "line": 115,
       "column": 1,
       "message": "item name `AgentCommandRuntimeConfig` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -3010,7 +3023,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 641,
+      "line": 717,
       "column": 1,
       "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -3052,6 +3065,19 @@
       "line": 4,
       "column": 1,
       "message": "non-trait import `ErrorKind` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:4d21869ed70c9d40",
+      "semantic_id": "b3:4d21869ed70c9d40",
+      "identity_status": "computed",
+      "lint": "path_segment_repetition",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 598,
+      "column": 1,
+      "message": "item name `plan_agent_command` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
     },
     {
@@ -3192,7 +3218,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/animus_agent/core.rs",
-      "line": 108,
+      "line": 115,
       "column": 28,
       "message": "`turn_limit` looks like a raw numeric quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -3569,7 +3595,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 194,
+      "line": 224,
       "column": 1,
       "message": "item name `NoopAgentAdapter` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -3751,7 +3777,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 649,
+      "line": 725,
       "column": 1,
       "message": "item name `run_agent_command` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -4115,22 +4141,9 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 45,
+      "line": 44,
       "column": 1,
       "message": "item name `AgentTarget` repeats `agent` from ancestor path segment `agent_node`",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:667f19092144eb55",
-      "semantic_id": "b3:667f19092144eb55",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 920 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -4284,7 +4297,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 88,
+      "line": 117,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -4414,7 +4427,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 203,
+      "line": 233,
       "column": 1,
       "message": "item name `AgentCommandPlan` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -4791,7 +4804,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 626,
+      "line": 702,
       "column": 13,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "lattice"
@@ -4843,7 +4856,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 782,
+      "line": 858,
       "column": 1,
       "message": "item name `load_agent_output_file` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -5623,7 +5636,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 657,
+      "line": 733,
       "column": 1,
       "message": "item name `run_agent_command_with_runner` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -6006,6 +6019,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:92ae906b977ca863",
+      "semantic_id": "b3:92ae906b977ca863",
+      "identity_status": "computed",
+      "lint": "borrowed_argument_types",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 684,
+      "column": 1,
+      "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:92b5e037596afc84",
       "semantic_id": "b3:92b5e037596afc84",
       "identity_status": "computed",
@@ -6039,7 +6065,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 608,
+      "line": 678,
       "column": 1,
       "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -6078,7 +6104,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 507,
+      "line": 568,
       "column": 1,
       "message": "item name `agent_target_label` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -6143,7 +6169,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 913,
+      "line": 989,
       "column": 1,
       "message": "item name `validate_agent_response_mode` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -6507,7 +6533,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 158,
+      "line": 188,
       "column": 1,
       "message": "item name `AgentError` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -6806,7 +6832,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 426,
+      "line": 487,
       "column": 1,
       "message": "item name `default_agent_runtimes` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -7066,7 +7092,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 902,
+      "line": 978,
       "column": 40,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -7170,7 +7196,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 119,
+      "line": 149,
       "column": 1,
       "message": "item name `AgentResponse` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -7423,19 +7449,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:b42b792f59372234",
-      "semantic_id": "b3:b42b792f59372234",
-      "identity_status": "computed",
-      "lint": "raw_arithmetic_overflow",
-      "group": "tigerstyle::safety",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 617,
-      "column": 71,
-      "message": "unprotected unsigned addition may overflow",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:b46323c965842b44",
       "semantic_id": "b3:b46323c965842b44",
       "identity_status": "computed",
@@ -7443,7 +7456,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 323,
+      "line": 353,
       "column": 1,
       "message": "item name `AgentOutputFile` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -7508,7 +7521,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 693,
+      "line": 769,
       "column": 1,
       "message": "item name `decode_agent_command_output` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -7950,7 +7963,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 680,
+      "line": 756,
       "column": 1,
       "message": "item name `agent_command_output_from_process_output` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -8197,7 +8210,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 760,
+      "line": 836,
       "column": 1,
       "message": "item name `parse_agent_output_file_envelope` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -8535,7 +8548,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 633,
+      "line": 709,
       "column": 1,
       "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -8795,7 +8808,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 60,
+      "line": 59,
       "column": 1,
       "message": "item name `AgentNodeSettings` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -8912,7 +8925,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 316,
+      "line": 346,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -9250,7 +9263,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 696,
+      "line": 772,
       "column": 40,
       "message": "function `decode_agent_command_output` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -9276,7 +9289,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 104,
+      "line": 134,
       "column": 1,
       "message": "item name `AgentRequest` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -9874,7 +9887,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 245,
+      "line": 275,
       "column": 27,
       "message": "`limit` looks like a raw numeric quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -9939,7 +9952,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 641,
+      "line": 717,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -9952,7 +9965,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 610,
+      "line": 680,
       "column": 68,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "lattice"
@@ -10095,7 +10108,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 904,
+      "line": 980,
       "column": 38,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -10186,7 +10199,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/animus_agent/core.rs",
-      "line": 87,
+      "line": 94,
       "column": 5,
       "message": "`turn_limit` looks like a raw numeric quantity but has no unit suffix",
       "crate_name": "lattice"
@@ -10420,7 +10433,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 150,
+      "line": 180,
       "column": 1,
       "message": "item name `AgentOutput` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -10446,7 +10459,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/agent_node.rs",
-      "line": 358,
+      "line": 388,
       "column": 1,
       "message": "item name `ProductionAgentAdapter` repeats `agent` from ancestor path segment `agent_node`",
       "crate_name": "lattice"
@@ -10569,19 +10582,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:f83ab9785415bf73",
-      "semantic_id": "b3:f83ab9785415bf73",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:f89bd3e5fe4329a6",
       "semantic_id": "b3:f89bd3e5fe4329a6",
       "identity_status": "computed",
@@ -10670,19 +10670,6 @@
       "line": 578,
       "column": 20,
       "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:fa6c08bcaaced92c",
-      "semantic_id": "b3:fa6c08bcaaced92c",
-      "identity_status": "computed",
-      "lint": "module_file_count",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module directory `src` contains 17 Rust source files (limit: 7)",
       "crate_name": "lattice"
     },
     {

@@ -198,6 +198,8 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+        isToonVendorPath =
+          path: pkgs.lib.hasPrefix "${sourceRoot}/src/vendor-cargo-deps/toon-format/" (toString path);
         isRatsCompileTimeAssetPath =
           path:
           toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
@@ -251,6 +253,7 @@
               craneLib.filterCargoSources path type
               || isSourceFixturePath path
               || isAnimusCompileTimeAssetPath path
+              || isToonVendorPath path
               || isRatsCompileTimeAssetPath path
               || isRuntimeConfigAssetPath path
               || isCompileTimeDocPath path
@@ -749,6 +752,70 @@
               touch "$out"
             '';
 
+        structuredInputProjectionPolicyCheck =
+          pkgs.runCommand "lattice-structured-input-projection-policy"
+            {
+              nativeBuildInputs = [
+                pkgs.b3sum
+                pkgs.coreutils
+                pkgs.gnugrep
+                pkgs.jq
+                pkgs.nickel
+              ];
+            }
+            ''
+              set -eu
+              fixture_root=${src}/tests/fixtures/structured-input-projection
+              nickel typecheck ${src}/policy/structured-input-projection.ncl
+              nickel typecheck ${src}/policy/structured-input-projection-pilot.ncl
+              nickel export --format json "$fixture_root/valid.ncl" > valid.json
+              nickel export --format json "$fixture_root/pilot-profile.ncl" > pilot-profile.json
+              test "$(b3sum pilot-profile.json | cut -d ' ' -f 1)" = '27eee071c780b8dab66147e9accff08352665b7c69b819a753a6be5eeb297e90'
+              test "$(b3sum "$fixture_root/system-prompt.txt" | cut -d ' ' -f 1)" = '75a8ec59ad2ce4381d9f153250c2317867061bc773c6a3bd0c0bb566ae386843'
+              test "$(b3sum "$fixture_root/pilot-corpus.json" | cut -d ' ' -f 1)" = 'cb0a3d8ee865a076ed86d6b3a01228002928985f10d1ad5040c8816203535869'
+              test "$(b3sum ${src}/src/agent_prompt/evaluation.rs | cut -d ' ' -f 1)" = '04d31e4d08149443e9119cf2d508b4b006ece476085c35a781a954f9a228914e'
+              for fixture in "$fixture_root"/negative/*.ncl; do
+                if nickel export --format json "$fixture" > /dev/null 2>&1; then
+                  echo "invalid structured-input projection fixture passed: $fixture" >&2
+                  exit 1
+                fi
+              done
+              if grep --fixed-strings 'toon-format =' ${src}/Cargo.toml ${src}/Cargo.lock; then
+                echo 'TOON must not change the accepted Lattice Cargo dependency identity' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/encode/mod.rs' ${src}/src/lib.rs > /dev/null
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/decode/mod.rs' ${src}/src/lib.rs > /dev/null
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/utils/mod.rs' ${src}/src/lib.rs > /dev/null
+              toon_root=${src}/src/vendor-cargo-deps/toon-format
+              compile_root=${src}/src/vendor-cargo-deps/toon-format-compile
+              compile_manifest_lines=$(cd "$compile_root/src" && find . -type f -name '*.rs' -printf '%P\n' | LC_ALL=C sort | while IFS= read -r derived; do printf '%s  ./%s\n' "$(b3sum "$derived" | cut -d ' ' -f 1)" "$derived"; done)
+              test "$(printf '%s\n' "$compile_manifest_lines" | b3sum | cut -d ' ' -f 1)" = '2e255cece2de6905eb001898f6303699dad50422155480ad39d0f9a487a5356d' || { echo 'derived compile tree drifted from the recorded sync output' >&2; exit 1; }
+              if grep --recursive --fixed-strings 'cfg(test)' "$compile_root/src"; then
+                echo 'derived compile tree still carries upstream inline tests' >&2
+                exit 1
+              fi
+              test "$(b3sum "$toon_root/Cargo.toml" | cut -d ' ' -f 1)" = '2c55674a9d444937cc5f19c5a0b5d0bf7668de47dbafb2f72c32dade1833692f'
+              test "$(b3sum "$toon_root/Cargo.toml.orig" | cut -d ' ' -f 1)" = '2e93f61b34f641ac14439d2ceada6707bf01f34b8e8171ccd2edd47baec26c71'
+              test "$(b3sum "$toon_root/UPSTREAM-FILES.b3" | cut -d ' ' -f 1)" = '7aef44e975bdab7a0a705bf824f5ffa0e292bd2d1cb122c6f1585364ad33dc01'
+              (cd "$toon_root" && b3sum --check UPSTREAM-FILES.b3)
+              if grep --fixed-strings 'features = ["preserve_order"]' "$toon_root/Cargo.toml"; then
+                echo 'vendored TOON product manifest enables serde_json/preserve_order' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'features = ["preserve_order"]' "$toon_root/Cargo.toml.orig" > /dev/null
+              nickel export --format json "$toon_root/SOURCE.ncl" > toon-source.json
+              jq --exit-status '
+                .revision == "2136cb1a35f3ed63be733bb74d36b89d3b4592dd"
+                and .crates_io_sha256 == "8f89570c1a68d73941f728cca32a4345b2ffca36667ad921af336c60309a3e7e"
+                and .rust_source_modified == false
+                and .manifest_only_patch == true
+                and .default_cli_or_tui_enabled == false
+                and .serde_json_preserve_order_enabled == false
+              ' toon-source.json > /dev/null
+              touch "$out"
+            '';
+
         agentEvaluationCatalogCheck =
           pkgs.runCommand "lattice-agent-evaluation-catalog"
             {
@@ -1016,6 +1083,7 @@
                 touch "$out"
               '';
 
+          structured-input-projection-policy = structuredInputProjectionPolicyCheck;
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
           operation-contract-catalog = operationContractCheck;
           operation-data-policy = operationDataPolicyCheck;

@@ -44,6 +44,9 @@ const ALLOWED_TYPED_IDENTITY_RESOLUTIONS: &[(&str, &str)] = &[
     ("src/orchestration/core.rs", "3 `&str` parameters are easy to swap by accident"),
     ("src/store/mod.rs", "2 `&str` parameters are easy to swap by accident"),
 ];
+const ALLOWED_RESOLVED_AGENT_FILE: &str = "src/agent_node.rs";
+const ALLOWED_RESOLVED_OVERFLOW_LINT: &str = "raw_arithmetic_overflow";
+const ALLOWED_RESOLVED_OVERFLOW_MESSAGE: &str = "unprotected unsigned addition may overflow";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Migration {
@@ -305,7 +308,10 @@ fn migrate(old: &Value, candidate: &Value) -> Result<Migration, String> {
             .get(&key)
             .zip(candidate_groups.get(&key))
             .is_some_and(|(old_values, candidate_values)| old_values.len() == candidate_values.len());
-        if has_matching_count {
+        let survives_allowlisted_resolution = unmatched_old.iter().any(|diagnostic| {
+            diagnostic.ends_with(&format!("key={key}")) && allowed_resolved_finding(diagnostic)
+        });
+        if has_matching_count || survives_allowlisted_resolution {
             migrated.push(finding.clone());
         }
     }
@@ -322,7 +328,29 @@ fn migration_is_accepted(migration: &Migration) -> bool {
     if !migration.unmatched_candidate.is_empty() {
         return false;
     }
+    if migration.unmatched_old.iter().any(|diagnostic| resolution_grows_finding_count(diagnostic)) {
+        // A resolution may only shrink an allowlisted finding group; any
+        // candidate-count increase must fail closed instead of rebaselining.
+        return false;
+    }
     migration.unmatched_old.iter().all(|diagnostic| allowed_resolved_finding(diagnostic))
+}
+
+fn resolution_grows_finding_count(diagnostic: &str) -> bool {
+    let Some((counts, _)) = diagnostic.split_once(" key=") else {
+        return false;
+    };
+    let Some((old_part, candidate_part)) = counts.split_once(" candidate=") else {
+        return false;
+    };
+    let old_count = old_part
+        .rsplit("old=")
+        .next()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or_default();
+    candidate_part
+        .parse::<usize>()
+        .is_ok_and(|candidate_count| candidate_count > old_count)
 }
 
 fn allowed_resolved_finding(diagnostic: &str) -> bool {
@@ -336,7 +364,13 @@ fn allowed_resolved_finding(diagnostic: &str) -> bool {
         && ALLOWED_TYPED_IDENTITY_RESOLUTIONS
             .iter()
             .any(|(file, message)| diagnostic.contains(file) && diagnostic.contains(message));
-    is_validation_resolution || is_headless_import_resolution || is_typed_identity_resolution
+    // The structured-input projection moved the prompt display-index addition
+    // out of agent_node into the saturating-add renderer, resolving one
+    // accepted overflow finding without changing any other debt.
+    let is_agent_overflow_resolution = diagnostic.contains(ALLOWED_RESOLVED_OVERFLOW_LINT)
+        && diagnostic.contains(ALLOWED_RESOLVED_AGENT_FILE)
+        && diagnostic.contains(ALLOWED_RESOLVED_OVERFLOW_MESSAGE);
+    is_validation_resolution || is_headless_import_resolution || is_typed_identity_resolution || is_agent_overflow_resolution
 }
 
 fn baseline_hash(stable_ids: &[String]) -> String {
@@ -514,6 +548,48 @@ fn self_test() -> Result<(), String> {
     let unapproved_migration = migrate(&unapproved_old, &empty_candidate)?;
     if migration_is_accepted(&unapproved_migration) {
         return Err("unapproved resolved finding was accepted".to_string());
+    }
+
+    let kept_overflow = finding_with_lint(
+        "b3:kept-overflow",
+        "lattice",
+        ALLOWED_RESOLVED_OVERFLOW_LINT,
+        ALLOWED_RESOLVED_AGENT_FILE,
+        ALLOWED_RESOLVED_OVERFLOW_MESSAGE,
+    );
+    let shrink_old = serde_json::json!({"findings": [
+        finding("b3:kept", "lattice", "kept finding"),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+    ]});
+    let shrink_candidate = serde_json::json!({"findings": [
+        finding("b3:kept", "lattice", "kept finding"),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+    ]});
+    let shrink_migration = migrate(&shrink_old, &shrink_candidate)?;
+    if !migration_is_accepted(&shrink_migration)
+        || shrink_migration.findings.len() != 3
+        || shrink_migration
+            .findings
+            .iter()
+            .filter(|value| value.get("lint").and_then(|lint| lint.as_str()) == Some(ALLOWED_RESOLVED_OVERFLOW_LINT))
+            .count() != 2
+    {
+        return Err("allowlisted resolution did not keep the remaining candidates".to_string());
+    }
+
+    let grow_candidate = serde_json::json!({"findings": [
+        finding("b3:kept", "lattice", "kept finding"),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+        kept_overflow.clone(),
+    ]});
+    let grow_migration = migrate(&shrink_old, &grow_candidate)?;
+    if migration_is_accepted(&grow_migration) {
+        return Err("candidate-count increase was not refused".to_string());
     }
     Ok(())
 }

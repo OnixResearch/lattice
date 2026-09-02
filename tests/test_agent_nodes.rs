@@ -173,6 +173,7 @@ fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: 
     AgentRuntimeConfig {
         runtimes,
         openai_compatible: BTreeMap::new(),
+        structured_input_projection: Default::default(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
         local_process: Default::default(),
     }
@@ -200,6 +201,7 @@ fn runtime_config_for_script(
     AgentRuntimeConfig {
         runtimes,
         openai_compatible: BTreeMap::new(),
+        structured_input_projection: Default::default(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
         local_process: Default::default(),
     }
@@ -294,7 +296,7 @@ fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
     );
 
     let plan = plan_agent_command(&config, &request).expect("command plan builds");
-    let prompt = render_agent_command_prompt(&request);
+    let prompt = render_agent_command_prompt(&request).expect("default prompt renders");
 
     assert_eq!(plan.program, "pi-test");
     assert!(plan.args.iter().any(|arg| arg == "--model"));

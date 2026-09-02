@@ -25,9 +25,19 @@ let OpenAiRuntime = {
   enable_thinking | Dyn,
   system_prompt | String,
 } in
+let Projection = std.contract.from_predicate (fun value =>
+  std.is_string value
+  && (value == "json_pretty" || value == "json_compact" || value == "toon_v3")
+) in
+let StructuredInputProjectionPolicy = {
+  pi | optional | Projection,
+  clankers | optional | Projection,
+  animus | optional | Projection,
+} in
 let AgentRuntime = {
   max_output_bytes | Number,
   runtimes | Dyn,
+  structured_input_projection | StructuredInputProjectionPolicy,
   openai_compatible | {
     pi | OpenAiRuntime,
     clankers | OpenAiRuntime,
@@ -84,6 +94,11 @@ let local_runtime = {
     max_output_bytes = global_output_budget_bytes,
     # Explicitly empty: each target must select exactly one transport.
     runtimes = {},
+    # Experimental and target-scoped. Omit a target to retain pretty JSON.
+    structured_input_projection = {
+      pi = "toon_v3",
+      clankers = "json_compact",
+    },
     openai_compatible = {
       pi = local_runtime,
       clankers = local_runtime,

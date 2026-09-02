@@ -316,7 +316,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.missing-route-request-unchanged-zero-dispatch"
@@ -328,7 +328,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.existing-route-bypasses-animus"
@@ -340,11 +340,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
+          "blake3": "cb7f9efe5394b89fe869200014af0dd8c30db49d842a075688634796fc247300"
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.transport-only-credential-omission"
@@ -356,11 +356,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
+          "blake3": "cb7f9efe5394b89fe869200014af0dd8c30db49d842a075688634796fc247300"
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.redacted-single-provider-failure"
@@ -384,7 +384,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.fixed-loop-dispatches-once-and-returns"
@@ -408,11 +408,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
+          "blake3": "645506645699b3c5009763be5f9932f6c695641c6ea9a70d51b352603cb04aac"
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.identity-admission-rejects-before-shell"
@@ -424,11 +424,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
+          "blake3": "645506645699b3c5009763be5f9932f6c695641c6ea9a70d51b352603cb04aac"
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.authority-content-remains-ordinary-output"
@@ -440,7 +440,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.runner-executes-one-typed-animus-node"
@@ -452,7 +452,7 @@
       "evidence": [
         {
           "path": "src/animus_agent/shell.rs",
-          "blake3": "63625e8dab3627e390f91ebbc866021326483f0b39436abc216ecd0ace9e1bcf"
+          "blake3": "cb7f9efe5394b89fe869200014af0dd8c30db49d842a075688634796fc247300"
         },
         {
           "path": "src/animus_agent/shell/tests.rs",
@@ -468,7 +468,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.text-json-values-and-safe-metadata"
@@ -480,11 +480,11 @@
       "evidence": [
         {
           "path": "src/animus_agent/core.rs",
-          "blake3": "818987c343e82b1543f1c5099563316ca4d9e368a51cfd56f3b586bb837f5bb8"
+          "blake3": "645506645699b3c5009763be5f9932f6c695641c6ea9a70d51b352603cb04aac"
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "8c8cc36264c0fee2a43d7b2e8c96da2c5663e532b2d53bfc7ace0c7ebc52649d"
+          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
         }
       ],
       "rationale_code": "assertions.unsupported-preflight-zero-dispatch"
