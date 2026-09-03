@@ -30,6 +30,8 @@ False completion includes format fallback, current-spec claims for v3 output, TO
 | Global Lattice default | Replace pretty JSON in every prompt immediately | Rejected because it changes existing prompts before model-specific evidence exists. |
 | Per-target input projection | Keep typed JSON and render one selected profile before dispatch | Selected because it isolates the experiment at the existing shared seam. |
 | Compact JSON baseline | Compare TOON with compact JSON, not only pretty JSON | Selected because whitespace removal captures much of the available saving without a new notation. |
+| Direct Cargo dependency | Add `toon-format` to the product dependency graph | Rejected because its `serde_json/preserve_order` feature changes unrelated JSON bytes and every accepted Octet identity. |
+| Exact vendored codec boundary | Verify upstream source bytes and derive only the required codec modules | Selected because it preserves the existing dependency graph and deterministic JSON ordering while keeping provenance reproducible. |
 
 ## Data and Control Flow
 
@@ -90,9 +92,11 @@ If a selected codec cannot encode and recover an input unambiguously, the core r
 
 The pilot names the profile `toon_v3`. It does not use an unversioned `toon` label.
 
-The initial dependency is `toon-format` v0.5.0 with `default-features = false`. Cargo generates the lockfile update. The change must not edit `flake.lock` manually or add a flake input for a normal crates.io dependency.
+The initial direct `toon-format` v0.5.0 dependency was rejected after it enabled `serde_json/preserve_order` across the product graph. That changed unrelated prompt bytes and every accepted Octet identity.
 
-Codec fixtures bind the selected crate version, profile ID, exact output, and strict round-trip result. An upstream v4 implementation requires an explicit design update and new fixtures. It must not silently change the meaning of `toon_v3`.
+Lattice instead keeps exact reviewed upstream source under `src/vendor-cargo-deps/toon-format/`. `UPSTREAM-FILES.b3` binds selected source bytes, `SOURCE.ncl` binds the repository, revision, release, license, and package checksum, and `scripts/sync_toon_format.rs` reproduces the snapshot. A deterministic derived tree contains only the required library modules and uses the crate-wide `BTreeMap` ordering. `Cargo.toml`, `Cargo.lock`, and `flake.lock` remain unchanged.
+
+Codec fixtures bind the selected source version, profile ID, exact output, and strict round-trip result. An upstream v4 implementation requires an explicit design update and new fixtures. It must not silently change the meaning of `toon_v3`.
 
 The runtime uses TOON for prompt input only. It does not invoke the TOON decoder on model output. Strict decoding is a fixture and evaluation tool for local projection equivalence.
 
@@ -133,7 +137,7 @@ TOON does not prevent prompt injection. The pilot preserves the same trust class
 
 ## Risks and Trade-offs
 
-- The added crate increases dependency and review surface even with default features disabled.
+- The vendored source increases review surface and requires exact synchronization and derived-tree freshness checks.
 - A target-level profile can change prompt behavior for every node on that target. The explicit policy makes this authority visible.
 - Compact JSON can equal or beat TOON on mixed data. The pilot can produce a negative result.
 - Provider token usage can be absent or implementation-defined. Such evidence remains bounded.

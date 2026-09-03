@@ -19,6 +19,7 @@ const LINE_NUMBER_BASE: usize = 1;
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
+const TOON_SYNC_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/sync_toon_format.rs"];
 const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "--check",
     "--edition",
@@ -49,6 +50,13 @@ const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "scripts/traceability-inventory.rs",
     "hash",
     "tests/fixtures/traceability-inventory-coverage.json",
+];
+const TOON_SYNC_SCRIPT_TEST_ARGS: &[&str] = &[
+    "-q",
+    "-Zscript",
+    "test",
+    "--manifest-path",
+    "scripts/sync_toon_format.rs",
 ];
 const WORKFLOW_BOUNDARY_SELF_TEST_ARGS: &[&str] = &[
     "-q",
@@ -126,6 +134,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "TOON sync script format",
+        program: RUSTFMT_PROGRAM,
+        args: TOON_SYNC_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "workflow boundary script format",
         program: RUSTFMT_PROGRAM,
         args: WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS,
@@ -153,6 +167,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "inventory script smoke",
         program: CARGO_PROGRAM,
         args: INVENTORY_SCRIPT_SMOKE_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "TOON sync script tests",
+        program: CARGO_PROGRAM,
+        args: TOON_SYNC_SCRIPT_TEST_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {

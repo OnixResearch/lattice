@@ -98,6 +98,7 @@ fn production_adapter_rejects_missing_or_ambiguous_routes_before_transport() {
         AgentRuntimeConfig {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::new(),
+            structured_input_projection: Default::default(),
             max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
             local_process: Default::default(),
         },

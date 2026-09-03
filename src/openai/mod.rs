@@ -1,13 +1,17 @@
 //! OpenAI-compatible chat-completions planning, bounded transport, and decoding.
 
 mod core;
+mod projection;
 mod reasoning;
 mod transport;
 
 pub use core::decode_response;
-pub use core::execute;
-pub use core::plan_chat;
 
+pub use projection::ProjectedChat;
+pub use projection::execute;
+pub use projection::execute_with_projection;
+pub use projection::plan_chat;
+pub use projection::plan_chat_with_projection;
 pub use transport::ReqwestClient;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 120;

@@ -12,7 +12,7 @@ A bounded Lattice pilot can test TOON at the final model-input boundary. The pil
 - Preserve `json_pretty` as the default for omitted policy so existing prompts remain byte-compatible.
 - Extract a pure prompt-projection core that accepts typed values and an explicit profile, then returns rendered sections or a stable error.
 - Route command, native OpenAI-compatible, and bounded Animus leaf prompts through the same selected projection before provider effects.
-- Pin the reviewed Rust TOON implementation without default CLI or TUI features, and identify its output as `toon_v3` rather than current-spec TOON.
+- Pin the exact reviewed Rust TOON library source, derive only the required codec modules, and identify its output as `toon_v3` rather than current-spec TOON.
 - Fail before model dispatch when the selected profile cannot represent an input unambiguously. Do not switch formats silently.
 - Keep OpenAI request envelopes, JSON model output, workflow values, Nickel configuration, n8n interchange, durable history, and evidence formats unchanged.
 - Add a checked pilot corpus and an exact outcome comparator for pretty JSON, compact JSON, and TOON v3.
@@ -43,7 +43,7 @@ A bounded Lattice pilot can test TOON at the final model-input boundary. The pil
 ## Impact
 
 - **Behavior**: additive target policy; omitted policy preserves the current prompt.
-- **Files**: agent runtime configuration, common prompt renderer, provider shells, Nickel examples/contracts, focused fixtures/tests, pilot evidence, Cargo dependency metadata, README references, and Cairn traceability artifacts.
-- **Dependencies**: reviewed `toon-format` Rust crate with default features disabled; Cargo must generate any `Cargo.lock` change.
+- **Files**: agent runtime configuration, common prompt renderer, provider shells, Nickel examples/contracts, focused fixtures/tests, pilot evidence, exact vendored-source metadata, README references, and Cairn traceability artifacts.
+- **Dependencies**: no new Cargo dependency; the reviewed `toon-format` source and derived compile tree are pinned by checked identities and a deterministic synchronization tool.
 - **Compatibility**: provider wire JSON, output JSON, durable values, and existing configuration defaults remain unchanged.
 - **Validation**: pre-change focused baselines, unit and route tests, strict codec fixtures, controlled pilot comparison, `scripts/check.rs`, Octet, Cairn gates, and bounded Nix checks.

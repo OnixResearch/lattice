@@ -11,7 +11,7 @@ let LatticeTraceabilityProfile = {
     { root = "examples", source_kind = "rust_source", extensions = ["rs"] },
     { root = "examples", source_kind = "nickel_source", extensions = ["ncl"] },
     { root = "scripts", source_kind = "tool_source", extensions = ["rs"] },
-    { root = "cairn-policy", source_kind = "nickel_source", extensions = ["ncl"] },
+    { root = "cairn-policy/fixtures", source_kind = "nickel_source", extensions = ["ncl"] },
   ],
   marker_verbs = ["impl", "verify", "depends", "related"],
   assurance_level = "declared",

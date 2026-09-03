@@ -1,0 +1,1 @@
+Return exactly one JSON object that satisfies the task. Do not add commentary.

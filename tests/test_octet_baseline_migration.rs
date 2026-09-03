@@ -8,6 +8,12 @@ const REQUIRED_FRAGMENTS: &[&str] = &[
     "const ALLOWED_RESOLVED_FUNCTION: &str = \"workflow_diagnostic_from_runner\"",
     "const ALLOWED_RESOLVED_HEADLESS_IMPORTS: &[&str] = &[\"`replay`\", \"`workflow_validation`\"]",
     "const ALLOWED_TYPED_IDENTITY_RESOLUTIONS: &[(&str, &str)]",
+    "const ALLOWED_RESOLVED_AGENT_FILE: &str = \"src/agent_node.rs\"",
+    "const ALLOWED_RESOLVED_OVERFLOW_MESSAGE: &str = \"unprotected unsigned addition may overflow\"",
+    "moved the prompt display-index addition",
+    "resolution_grows_finding_count",
+    "A resolution may only shrink an allowlisted finding group",
+    "survives_allowlisted_resolution",
     "if !migration.unmatched_candidate.is_empty()",
     "migration.unmatched_old.iter().all(|diagnostic| allowed_resolved_finding(diagnostic))",
     "unapproved resolved import was accepted",
@@ -16,6 +22,8 @@ const REQUIRED_FRAGMENTS: &[&str] = &[
     "unapproved resolved finding was accepted",
     "unique.entry(stable_id).or_insert(finding)",
     "duplicate stable finding IDs were not deduplicated",
+    "allowlisted resolution did not keep the remaining candidates",
+    "candidate-count increase was not refused",
     "semantic finding sets differ outside the exact resolved-finding allowlist",
 ];
 
