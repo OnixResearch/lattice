@@ -1,0 +1,2 @@
+command=nix build .#checks.x86_64-linux.octet --no-link -L --option builders local
+verdict=PASS
