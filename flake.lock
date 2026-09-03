@@ -84,6 +84,23 @@
       }
     },
     "cairn": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788405605,
+        "narHash": "sha256-9MTFmFa6hfe2caWTHl5ptyx62Cfdj/rr5ABzFFccaUs=",
+        "ref": "refs/heads/main",
+        "rev": "5e1fe08d62149b286ff583eb056e655fe92e3cf1",
+        "revCount": 422,
+        "type": "git",
+        "url": "ssh://git@github.com/OnixResearch/cairn.git"
+      },
+      "original": {
+        "rev": "5e1fe08d62149b286ff583eb056e655fe92e3cf1",
+        "type": "git",
+        "url": "ssh://git@github.com/OnixResearch/cairn.git"
+      }
+    },
+    "cairn_2": {
       "inputs": {
         "artifact": "artifact",
         "nickel-export": "nickel-export",
@@ -107,7 +124,7 @@
         "type": "github"
       }
     },
-    "cairn_2": {
+    "cairn_3": {
       "inputs": {
         "nixpkgs": [
           "octet",
@@ -132,7 +149,7 @@
         "type": "github"
       }
     },
-    "cairn_3": {
+    "cairn_4": {
       "inputs": {
         "nixpkgs": [
           "octet",
@@ -158,7 +175,7 @@
         "type": "github"
       }
     },
-    "cairn_4": {
+    "cairn_5": {
       "inputs": {
         "nixpkgs": [
           "octet",
@@ -769,7 +786,7 @@
     },
     "nickel-export": {
       "inputs": {
-        "cairn": "cairn_2",
+        "cairn": "cairn_3",
         "nixpkgs": [
           "octet",
           "cairn",
@@ -955,7 +972,7 @@
       "inputs": {
         "aeneas": "aeneas",
         "aeneasCharon": "aeneasCharon",
-        "cairn": "cairn",
+        "cairn": "cairn_2",
         "crane": "crane_8",
         "dylint-src": "dylint-src_5",
         "flake-utils": "flake-utils_9",
@@ -1007,6 +1024,7 @@
     "root": {
       "inputs": {
         "bounded-exec": "bounded-exec",
+        "cairn": "cairn",
         "cap-root": "cap-root",
         "choregraph": "choregraph",
         "content-identity-core": "content-identity-core",
@@ -1232,7 +1250,7 @@
     },
     "slotcar": {
       "inputs": {
-        "cairn": "cairn_3",
+        "cairn": "cairn_4",
         "crane": "crane_5",
         "dylint-src": "dylint-src_2",
         "flake-utils": "flake-utils_6",
@@ -1277,7 +1295,7 @@
     },
     "slotcar_3": {
       "inputs": {
-        "cairn": "cairn_4",
+        "cairn": "cairn_5",
         "crane": "crane_7",
         "dylint-src": "dylint-src_4",
         "flake-utils": "flake-utils_8",
