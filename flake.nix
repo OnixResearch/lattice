@@ -11,6 +11,10 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     octet.url = "github:OnixResearch/octet/bac0f3220ada38110c03498ccf2beae5ee83e642";
+    cairn = {
+      url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=5e1fe08d62149b286ff583eb056e655fe92e3cf1";
+      flake = false;
+    };
     bounded-exec = {
       url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
@@ -46,6 +50,7 @@
       rust-overlay,
       flake-utils,
       octet,
+      cairn,
       bounded-exec,
       choregraph,
       nickel-eval,
@@ -63,6 +68,34 @@
             (import rust-overlay)
             (_final: _previous: { nickel = exactNickel; })
           ];
+        };
+
+        cairnCli = pkgs.writeShellApplication {
+          name = "cairn";
+          runtimeInputs = [ pkgs.nix ];
+          text = ''
+            policy_path=${pkgs.lib.escapeShellArg "${self}/cairn-policy/generated/cairn-policy.json"}
+            source_flake=${pkgs.lib.escapeShellArg "path:${cairn}"}
+
+            has_policy_arg=false
+            for argument in "$@"; do
+              if [ "$argument" = "--policy" ]; then
+                has_policy_arg=true
+                break
+              fi
+            done
+
+            command="''${1:-}"
+            case "$command" in
+              agent-receipt|change|doctor|validate|release-readiness|policy|probe|steel-orchestration|traceability|tracey|migrate|gate|sync|archive)
+                if [ "$has_policy_arg" = false ]; then
+                  exec nix run "$source_flake#cairn" -- "$@" --policy "$policy_path"
+                fi
+                ;;
+            esac
+
+            exec nix run "$source_flake#cairn" -- "$@"
+          '';
         };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -893,6 +926,7 @@
       {
         packages = {
           default = lattice;
+          cairn = cairnCli;
           lattice = lattice;
           workflow-contract-octet-deny-all = workflowContractOctetRunner;
           workflow-transport-octet-deny-all = workflowTransportOctetRunner;
@@ -1168,6 +1202,7 @@
               rust-analyzer
             ])
             ++ [
+              cairnCli
               octet.packages.${system}.cargo-octet
               octetPreCommitCheck
               workflowContractOctetRunner
