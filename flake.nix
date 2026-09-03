@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nickel-1-17-0.url = "github:nickel-lang/nickel/1320a983e6c3d1e2fb53dd2464b084b4903b1426";
     crane.url = "github:ipetkov/crane";
     rust-overlay = {
       url = "github:oxalica/rust-overlay/3c38e1e1ba9c8d7030f7b5a801398ea7d8a6fdc0";
@@ -10,6 +11,10 @@
     };
     flake-utils.url = "github:numtide/flake-utils";
     octet.url = "github:OnixResearch/octet/bac0f3220ada38110c03498ccf2beae5ee83e642";
+    cairn = {
+      url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=5e1fe08d62149b286ff583eb056e655fe92e3cf1";
+      flake = false;
+    };
     bounded-exec = {
       url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
@@ -23,7 +28,7 @@
       flake = false;
     };
     nickel-eval = {
-      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a";
       flake = false;
     };
     content-identity-core = {
@@ -40,10 +45,12 @@
     {
       self,
       nixpkgs,
+      nickel-1-17-0,
       crane,
       rust-overlay,
       flake-utils,
       octet,
+      cairn,
       bounded-exec,
       choregraph,
       nickel-eval,
@@ -54,9 +61,41 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
+        exactNickel = nickel-1-17-0.packages.${system}.default;
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ (import rust-overlay) ];
+          overlays = [
+            (import rust-overlay)
+            (_final: _previous: { nickel = exactNickel; })
+          ];
+        };
+
+        cairnCli = pkgs.writeShellApplication {
+          name = "cairn";
+          runtimeInputs = [ pkgs.nix ];
+          text = ''
+            policy_path=${pkgs.lib.escapeShellArg "${self}/cairn-policy/generated/cairn-policy.json"}
+            source_flake=${pkgs.lib.escapeShellArg "path:${cairn}"}
+
+            has_policy_arg=false
+            for argument in "$@"; do
+              if [ "$argument" = "--policy" ]; then
+                has_policy_arg=true
+                break
+              fi
+            done
+
+            command="''${1:-}"
+            case "$command" in
+              agent-receipt|change|doctor|validate|release-readiness|policy|probe|steel-orchestration|traceability|tracey|migrate|gate|sync|archive)
+                if [ "$has_policy_arg" = false ]; then
+                  exec nix run "$source_flake#cairn" -- "$@" --policy "$policy_path"
+                fi
+                ;;
+            esac
+
+            exec nix run "$source_flake#cairn" -- "$@"
+          '';
         };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -192,6 +231,8 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+        isToonVendorPath =
+          path: pkgs.lib.hasPrefix "${sourceRoot}/src/vendor-cargo-deps/toon-format/" (toString path);
         isRatsCompileTimeAssetPath =
           path:
           toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
@@ -245,6 +286,7 @@
               craneLib.filterCargoSources path type
               || isSourceFixturePath path
               || isAnimusCompileTimeAssetPath path
+              || isToonVendorPath path
               || isRatsCompileTimeAssetPath path
               || isRuntimeConfigAssetPath path
               || isCompileTimeDocPath path
@@ -260,7 +302,7 @@
 
         boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
-        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=bf16cf223ed3dfe75a28f02ac21ed7891a60bac1#bf16cf223ed3dfe75a28f02ac21ed7891a60bac1";
+        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a#f23be09e41337de8fa729274f50023f861ae0e8a";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=eb2bd3441753af97bfcb247cef7cc22d72675b62#eb2bd3441753af97bfcb247cef7cc22d72675b62";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
@@ -283,7 +325,9 @@
               checkout.overrideAttrs (_old: {
                 src = content-identity-core;
               })
-            else if builtins.all (package: package.source == transactionalReconciliationCoreCargoSource) packages then
+            else if
+              builtins.all (package: package.source == transactionalReconciliationCoreCargoSource) packages
+            then
               checkout.overrideAttrs (_old: {
                 src = transactional-reconciliation-core;
               })
@@ -741,6 +785,70 @@
               touch "$out"
             '';
 
+        structuredInputProjectionPolicyCheck =
+          pkgs.runCommand "lattice-structured-input-projection-policy"
+            {
+              nativeBuildInputs = [
+                pkgs.b3sum
+                pkgs.coreutils
+                pkgs.gnugrep
+                pkgs.jq
+                pkgs.nickel
+              ];
+            }
+            ''
+              set -eu
+              fixture_root=${src}/tests/fixtures/structured-input-projection
+              nickel typecheck ${src}/policy/structured-input-projection.ncl
+              nickel typecheck ${src}/policy/structured-input-projection-pilot.ncl
+              nickel export --format json "$fixture_root/valid.ncl" > valid.json
+              nickel export --format json "$fixture_root/pilot-profile.ncl" > pilot-profile.json
+              test "$(b3sum pilot-profile.json | cut -d ' ' -f 1)" = '27eee071c780b8dab66147e9accff08352665b7c69b819a753a6be5eeb297e90'
+              test "$(b3sum "$fixture_root/system-prompt.txt" | cut -d ' ' -f 1)" = '75a8ec59ad2ce4381d9f153250c2317867061bc773c6a3bd0c0bb566ae386843'
+              test "$(b3sum "$fixture_root/pilot-corpus.json" | cut -d ' ' -f 1)" = 'cb0a3d8ee865a076ed86d6b3a01228002928985f10d1ad5040c8816203535869'
+              test "$(b3sum ${src}/src/agent_prompt/evaluation.rs | cut -d ' ' -f 1)" = '04d31e4d08149443e9119cf2d508b4b006ece476085c35a781a954f9a228914e'
+              for fixture in "$fixture_root"/negative/*.ncl; do
+                if nickel export --format json "$fixture" > /dev/null 2>&1; then
+                  echo "invalid structured-input projection fixture passed: $fixture" >&2
+                  exit 1
+                fi
+              done
+              if grep --fixed-strings 'toon-format =' ${src}/Cargo.toml ${src}/Cargo.lock; then
+                echo 'TOON must not change the accepted Lattice Cargo dependency identity' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/encode/mod.rs' ${src}/src/lib.rs > /dev/null
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/decode/mod.rs' ${src}/src/lib.rs > /dev/null
+              grep --fixed-strings 'vendor-cargo-deps/toon-format-compile/src/utils/mod.rs' ${src}/src/lib.rs > /dev/null
+              toon_root=${src}/src/vendor-cargo-deps/toon-format
+              compile_root=${src}/src/vendor-cargo-deps/toon-format-compile
+              compile_manifest_lines=$(cd "$compile_root/src" && find . -type f -name '*.rs' -printf '%P\n' | LC_ALL=C sort | while IFS= read -r derived; do printf '%s  ./%s\n' "$(b3sum "$derived" | cut -d ' ' -f 1)" "$derived"; done)
+              test "$(printf '%s\n' "$compile_manifest_lines" | b3sum | cut -d ' ' -f 1)" = '2e255cece2de6905eb001898f6303699dad50422155480ad39d0f9a487a5356d' || { echo 'derived compile tree drifted from the recorded sync output' >&2; exit 1; }
+              if grep --recursive --fixed-strings 'cfg(test)' "$compile_root/src"; then
+                echo 'derived compile tree still carries upstream inline tests' >&2
+                exit 1
+              fi
+              test "$(b3sum "$toon_root/Cargo.toml" | cut -d ' ' -f 1)" = '2c55674a9d444937cc5f19c5a0b5d0bf7668de47dbafb2f72c32dade1833692f'
+              test "$(b3sum "$toon_root/Cargo.toml.orig" | cut -d ' ' -f 1)" = '2e93f61b34f641ac14439d2ceada6707bf01f34b8e8171ccd2edd47baec26c71'
+              test "$(b3sum "$toon_root/UPSTREAM-FILES.b3" | cut -d ' ' -f 1)" = '7aef44e975bdab7a0a705bf824f5ffa0e292bd2d1cb122c6f1585364ad33dc01'
+              (cd "$toon_root" && b3sum --check UPSTREAM-FILES.b3)
+              if grep --fixed-strings 'features = ["preserve_order"]' "$toon_root/Cargo.toml"; then
+                echo 'vendored TOON product manifest enables serde_json/preserve_order' >&2
+                exit 1
+              fi
+              grep --fixed-strings 'features = ["preserve_order"]' "$toon_root/Cargo.toml.orig" > /dev/null
+              nickel export --format json "$toon_root/SOURCE.ncl" > toon-source.json
+              jq --exit-status '
+                .revision == "2136cb1a35f3ed63be733bb74d36b89d3b4592dd"
+                and .crates_io_sha256 == "8f89570c1a68d73941f728cca32a4345b2ffca36667ad921af336c60309a3e7e"
+                and .rust_source_modified == false
+                and .manifest_only_patch == true
+                and .default_cli_or_tui_enabled == false
+                and .serde_json_preserve_order_enabled == false
+              ' toon-source.json > /dev/null
+              touch "$out"
+            '';
+
         agentEvaluationCatalogCheck =
           pkgs.runCommand "lattice-agent-evaluation-catalog"
             {
@@ -818,6 +926,7 @@
       {
         packages = {
           default = lattice;
+          cairn = cairnCli;
           lattice = lattice;
           workflow-contract-octet-deny-all = workflowContractOctetRunner;
           workflow-transport-octet-deny-all = workflowTransportOctetRunner;
@@ -826,7 +935,44 @@
         checks = {
           inherit lattice;
 
-          # Run tests with nextest
+          # r[impl lattice.nickel_toolchain.cohort]
+          # r[impl lattice.nickel_toolchain.fixture_cohort]
+          # r[verify lattice.nickel_toolchain.compatibility]
+          nickel-cohort-exact =
+            pkgs.runCommand "lattice-nickel-cohort-exact"
+              {
+                nativeBuildInputs = [
+                  pkgs.gnugrep
+                  pkgs.nickel
+                ];
+              }
+              ''
+                fixture_root=${self}/tests/fixtures/nickel-toolchain
+                test '${nickel-1-17-0.rev}' = '1320a983e6c3d1e2fb53dd2464b084b4903b1426'
+                test "$(nickel --version)" = 'nickel-lang-cli nickel 1.17.0 (rev 1320a98)'
+                grep -F 'f23be09e41337de8fa729274f50023f861ae0e8a' ${self}/Cargo.toml >/dev/null
+                grep -F 'nickel-lang-core = "=0.18.0"' ${self}/Cargo.toml >/dev/null
+                if grep -E 'bf16cf223ed3dfe75a28f02ac21ed7891a60bac1|nickel-lang-core = "=0.17.0"' \
+                  ${self}/Cargo.toml ${self}/docs/nickel-eval-source.md; then
+                  echo 'old, mixed, or fallback Nickel evaluator source remains' >&2
+                  exit 1
+                fi
+                nickel export --format json "$fixture_root/positive/workflow.ncl" >/dev/null
+                for fixture in \
+                  "$fixture_root/negative/malformed.ncl" \
+                  "$fixture_root/negative/missing-import.ncl" \
+                  "$fixture_root/negative/contract.ncl" \
+                  ${self}/tests/fixtures/operation-packs/manifest-policy-invalid.ncl \
+                  ${self}/tests/fixtures/workflow-transport/negative/profile-zero-frame.ncl; do
+                  if nickel export --format json "$fixture" >/dev/null 2>&1; then
+                    echo "invalid Nickel fixture unexpectedly passed: $fixture" >&2
+                    exit 1
+                  fi
+                done
+                touch "$out"
+              '';
+
+          # Serialize process-heavy tests so the sandbox does not exhaust child-process capacity.
           nextest = craneLib.cargoNextest {
             inherit
               src
@@ -835,6 +981,7 @@
               nativeBuildInputs
               buildInputs
               ;
+            cargoNextestExtraArgs = "--test-threads 1";
             partitions = 1;
             partitionType = "count";
           };
@@ -970,6 +1117,7 @@
                 touch "$out"
               '';
 
+          structured-input-projection-policy = structuredInputProjectionPolicyCheck;
           agent-evaluation-catalog = agentEvaluationCatalogCheck;
           operation-contract-catalog = operationContractCheck;
           operation-data-policy = operationDataPolicyCheck;
@@ -1054,6 +1202,7 @@
               rust-analyzer
             ])
             ++ [
+              cairnCli
               octet.packages.${system}.cargo-octet
               octetPreCommitCheck
               workflowContractOctetRunner

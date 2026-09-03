@@ -1,0 +1,13 @@
+{
+  "model_identity": "model:VibeThinker-3B",
+  "corpus_identity": "b3:cb0a3d8ee865a076ed86d6b3a01228002928985f10d1ad5040c8816203535869",
+  "comparator_identity": "b3:04d31e4d08149443e9119cf2d508b4b006ece476085c35a781a954f9a228914e",
+  "task_count": 2,
+  "compact_prompt_tokens": null,
+  "toon_v3_prompt_tokens": null,
+  "verdict": "inconclusive_missing_outcome",
+  "recommends_default_promotion": false,
+  "claims_billing_truth": false,
+  "claims_equal_accuracy": false,
+  "claims_production_readiness": false
+}

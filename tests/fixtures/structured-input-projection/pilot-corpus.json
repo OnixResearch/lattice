@@ -1,0 +1,25 @@
+{
+  "schema": "lattice.structured-input-projection-corpus.v1",
+  "tasks": [
+    {
+      "id": "owner-lookup",
+      "prompt": "Return the owner name as JSON.",
+      "input": {
+        "projects": [
+          { "id": 1, "owner": "Ada" },
+          { "id": 2, "owner": "Lin" }
+        ],
+        "selected_id": 1
+      },
+      "expected_output": { "owner": "Ada" }
+    },
+    {
+      "id": "bounded-total",
+      "prompt": "Return the total as JSON.",
+      "input": {
+        "values": [1, 2]
+      },
+      "expected_output": { "total": 3 }
+    }
+  ]
+}

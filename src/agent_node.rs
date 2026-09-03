@@ -25,7 +25,6 @@ const MODEL_PLACEHOLDER: &str = "{model}";
 const SESSION_PLACEHOLDER: &str = "{session}";
 const OUTPUT_MODE_PLACEHOLDER: &str = "{output_mode}";
 const TEXT_INPUT_HEADING: &str = "Text input";
-const JSON_INPUT_HEADING: &str = "JSON input";
 const IMAGE_INPUT_HEADING: &str = "Image input";
 const CONTEXT_REFS_HEADING: &str = "Context references";
 const TOOL_POLICY_HEADING: &str = "Tool policy";
@@ -76,10 +75,40 @@ pub struct AgentRuntimeConfig {
     pub runtimes: BTreeMap<String, AgentCommandRuntimeConfig>,
     #[serde(default = "empty_openai_runtimes")]
     pub openai_compatible: BTreeMap<String, crate::openai::RuntimeConfig>,
+    // r[impl lattice.agent_runtime.structured_input_projection]
+    #[serde(default)]
+    pub structured_input_projection: StructuredInputProjectionPolicy,
     #[serde(default = "default_agent_output_max_bytes")]
     pub max_output_bytes: usize,
     #[serde(skip, default)]
     pub local_process: crate::process::core::RuntimeConfig,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StructuredInputProjectionPolicy {
+    #[serde(default = "absent_projection")]
+    pub pi: Option<crate::agent_prompt::StructuredInputProjection>,
+    #[serde(default = "absent_projection")]
+    pub clankers: Option<crate::agent_prompt::StructuredInputProjection>,
+    #[serde(default = "absent_projection")]
+    pub animus: Option<crate::agent_prompt::StructuredInputProjection>,
+}
+
+fn absent_projection() -> Option<crate::agent_prompt::StructuredInputProjection> {
+    None
+}
+
+impl StructuredInputProjectionPolicy {
+    #[must_use]
+    pub fn for_target(&self, target: AgentTarget) -> crate::agent_prompt::StructuredInputProjection {
+        match target {
+            AgentTarget::Pi => self.pi,
+            AgentTarget::Clankers => self.clankers,
+            AgentTarget::Animus => self.animus,
+        }
+        .unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +123,7 @@ impl Default for AgentRuntimeConfig {
         Self {
             runtimes: default_agent_runtimes(),
             openai_compatible: BTreeMap::new(),
+            structured_input_projection: StructuredInputProjectionPolicy::default(),
             max_output_bytes: default_agent_output_max_bytes(),
             local_process: crate::process::core::RuntimeConfig::default(),
         }
@@ -385,9 +415,12 @@ impl Default for ProductionAgentAdapter {
     }
 }
 
+// r[impl lattice.agent_runtime.structured_input_projection.scenario.selected]
+// r[impl lattice.agent_runtime.projection_boundaries.scenario.evidence]
 impl AgentAdapter for ProductionAgentAdapter {
     fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
-        match runtime_route_for_target(&self.config, request.target)? {
+        let projection = self.config.structured_input_projection.for_target(request.target);
+        let response = match runtime_route_for_target(&self.config, request.target)? {
             RuntimeRoute::Command => {
                 let plan = plan_agent_command(&self.config, request)?;
                 let output = run_agent_command(&plan, &self.config.local_process)?;
@@ -395,23 +428,51 @@ impl AgentAdapter for ProductionAgentAdapter {
             }
             RuntimeRoute::OpenAi(runtime) => {
                 let global_output_max_bytes = global_output_max_bytes(&self.config)?;
-                crate::openai::execute(
-                    runtime,
-                    request,
+                crate::openai::execute_with_projection(
+                    crate::openai::ProjectedChat {
+                        runtime,
+                        request,
+                        projection,
+                        global_output_max_bytes,
+                    },
                     context,
-                    global_output_max_bytes,
                     self.openai_transport.as_ref(),
                 )
             }
-            RuntimeRoute::Animus(runtime) => crate::animus_agent::execute(
-                runtime,
-                request,
+            RuntimeRoute::Animus(runtime) => crate::animus_agent::execute_with_projection(
+                crate::openai::ProjectedChat {
+                    runtime,
+                    request,
+                    projection,
+                    global_output_max_bytes: global_output_max_bytes(&self.config)?,
+                },
                 context,
-                global_output_max_bytes(&self.config)?,
                 self.openai_transport.as_ref(),
             ),
-        }
+        }?;
+        Ok(attach_projection_metadata(response, projection, request.json_inputs.len()))
     }
+}
+
+fn attach_projection_metadata(
+    mut response: AgentResponse,
+    projection: crate::agent_prompt::StructuredInputProjection,
+    input_count: usize,
+) -> AgentResponse {
+    let facts = serde_json::json!({
+        "profile": projection.profile_id(),
+        "implementation": projection.implementation(),
+        "structured_input_count": input_count,
+    });
+    if let Some(metadata) = response.metadata.as_object_mut() {
+        metadata.insert("structured_input_projection".to_string(), facts);
+    } else {
+        response.metadata = serde_json::json!({
+            "provider_metadata": response.metadata,
+            "structured_input_projection": facts,
+        });
+    }
+    response
 }
 
 fn global_output_max_bytes(config: &AgentRuntimeConfig) -> Result<u64, AgentError> {
@@ -537,7 +598,8 @@ pub fn parse_agent_output_mode(value: &str) -> Result<AgentOutputMode, AgentErro
 pub fn plan_agent_command(config: &AgentRuntimeConfig, request: &AgentRequest) -> Result<AgentCommandPlan, AgentError> {
     let runtime = command_runtime_for_target(config, request.target)?;
     let program = runtime_command_for_target(runtime, request.target)?;
-    let prompt = render_agent_command_prompt(request);
+    let projection = config.structured_input_projection.for_target(request.target);
+    let prompt = render_prompt_with_projection(request, projection)?;
     let args = command_args_for_request(runtime, request, &prompt);
     Ok(AgentCommandPlan {
         target: request.target,
@@ -591,18 +653,26 @@ fn render_command_arg_template(template: impl AsRef<str>, request: &AgentRequest
     non_empty_trimmed(&rendered).map(str::to_string)
 }
 
-pub fn render_agent_command_prompt(request: &AgentRequest) -> String {
+pub fn render_agent_command_prompt(request: &AgentRequest) -> Result<String, AgentError> {
+    render_prompt_with_projection(request, crate::agent_prompt::StructuredInputProjection::JsonPretty)
+}
+
+// r[impl lattice.agent_runtime.projection_boundaries]
+pub fn render_prompt_with_projection(
+    request: &AgentRequest,
+    projection: crate::agent_prompt::StructuredInputProjection,
+) -> Result<String, AgentError> {
     let mut sections = Vec::new();
     sections.push(request.prompt.clone());
     append_text_input_sections(&mut sections, &request.text_inputs);
-    append_json_input_sections(&mut sections, &request.json_inputs);
+    append_json_input_sections(&mut sections, &request.json_inputs, projection)?;
     append_image_input_sections(&mut sections, &request.image_inputs);
     append_optional_list_section(&mut sections, CONTEXT_REFS_HEADING, &request.context_refs);
     append_optional_string_section(&mut sections, TOOL_POLICY_HEADING, &request.tool_policy);
     if let Some(model_hint) = request.model_hint.as_ref() {
         append_optional_string_section(&mut sections, MODEL_HINT_HEADING, model_hint);
     }
-    sections.join("\n\n")
+    Ok(sections.join("\n\n"))
 }
 
 fn append_text_input_sections(sections: &mut Vec<String>, inputs: &[String]) {
@@ -611,11 +681,17 @@ fn append_text_input_sections(sections: &mut Vec<String>, inputs: &[String]) {
     }
 }
 
-fn append_json_input_sections(sections: &mut Vec<String>, inputs: &[serde_json::Value]) {
-    for (index, input) in inputs.iter().enumerate() {
-        let rendered = serde_json::to_string_pretty(input).unwrap_or_else(|_| input.to_string());
-        sections.push(format!("{JSON_INPUT_HEADING} {}:\n{rendered}", index + DISPLAY_INDEX_BASE));
+fn append_json_input_sections(
+    sections: &mut Vec<String>,
+    inputs: &[serde_json::Value],
+    projection: crate::agent_prompt::StructuredInputProjection,
+) -> Result<(), AgentError> {
+    let rendered = crate::agent_prompt::render_structured_inputs(inputs, projection)
+        .map_err(|error| AgentError::PreflightRejected(error.to_string()))?;
+    for input in rendered {
+        sections.push(format!("{}:\n{}", input.heading, input.body));
     }
+    Ok(())
 }
 
 fn append_image_input_sections(sections: &mut Vec<String>, inputs: &[ImageValue]) {

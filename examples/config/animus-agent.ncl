@@ -27,9 +27,19 @@ let OpenAiRuntime = {
   enable_thinking | Dyn,
   system_prompt | String,
 } in
+let Projection = std.contract.from_predicate (fun value =>
+  std.is_string value
+  && (value == "json_pretty" || value == "json_compact" || value == "toon_v3")
+) in
+let StructuredInputProjectionPolicy = {
+  pi | optional | Projection,
+  clankers | optional | Projection,
+  animus | optional | Projection,
+} in
 let AgentRuntime = {
   max_output_bytes | Number,
   runtimes | Dyn,
+  structured_input_projection | StructuredInputProjectionPolicy,
   openai_compatible | {
     animus | OpenAiRuntime,
   },
@@ -72,6 +82,10 @@ let process_teardown_grace_millis = 1000 in
     max_output_bytes = global_output_budget_bytes,
     # Animus is a leaf runtime, never a command runtime or outer orchestrator.
     runtimes = {},
+    # Experimental and input-only. Omit this entry to retain pretty JSON.
+    structured_input_projection = {
+      animus = "toon_v3",
+    },
     openai_compatible = {
       animus = {
         endpoint = local_chat_completions_endpoint,

@@ -135,6 +135,7 @@ fn runtime_registry(key: &str, runtime: OpenAiRuntimeConfig) -> AgentRuntimeConf
     AgentRuntimeConfig {
         runtimes: BTreeMap::new(),
         openai_compatible: BTreeMap::from([(key.to_string(), runtime)]),
+        structured_input_projection: Default::default(),
         max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
         local_process: Default::default(),
     }
@@ -291,6 +292,7 @@ fn missing_or_failed_animus_provider_does_not_fallback() {
         AgentRuntimeConfig {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::new(),
+            structured_input_projection: Default::default(),
             max_output_bytes: GLOBAL_OUTPUT_MAX_BYTES,
             local_process: Default::default(),
         },
@@ -377,7 +379,7 @@ async fn typed_examples_load_validate_and_execute_through_the_runner() {
 
     assert_eq!(diagnostics.len(), NO_DIAGNOSTICS);
     assert_eq!(settings.target, AgentTarget::Animus);
-    assert!(matches!(result.status, NodeStatus::Completed { .. }));
+    assert!(matches!(result.status, NodeStatus::Completed { .. }), "unexpected status: {:?}", result.status);
     assert_eq!(transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
 }
 

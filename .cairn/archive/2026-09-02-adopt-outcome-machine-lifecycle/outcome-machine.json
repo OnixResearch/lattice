@@ -1,0 +1,67 @@
+{
+  "activity_counts_are_completion_evidence": false,
+  "ai_assistance": {
+    "completion_authority": "repository",
+    "hidden_session_state_required": false,
+    "used": true
+  },
+  "completion": {
+    "evidence": [
+      {
+        "blake3": "5bca52837771e688f0b90c64c9bd929b43854824ac679016d74c776cf3196162",
+        "kind": "receipt",
+        "path": "evidence/planned-sync-rejection.json"
+      },
+      {
+        "blake3": "8e166da60a0dd6903ff164edc84aa8cd17537d79d1308bc992f180e038e339ed",
+        "kind": "receipt",
+        "path": "evidence/fresh-state-task-gate.json"
+      },
+      {
+        "blake3": "ba8fae58b95010e55a3ddd16f0f0a3bf6d3b1e21b82c84de2c8cec034c7d9b11",
+        "kind": "test",
+        "path": "evidence/repository-check.txt"
+      }
+    ],
+    "status": "observed"
+  },
+  "deterministic_checks": [
+    "Repository-owned Cairn planning and completion gates",
+    "Lattice Octet pre-commit rail",
+    "Nix evaluation of the pinned Cairn runner",
+    "Exact BLAKE3 revalidation of change-local evidence"
+  ],
+  "fresh_state_reproduction": {
+    "evidence": [
+      {
+        "blake3": "8e166da60a0dd6903ff164edc84aa8cd17537d79d1308bc992f180e038e339ed",
+        "kind": "receipt",
+        "path": "evidence/fresh-state-task-gate.json"
+      }
+    ],
+    "rationale": "The repository-owned Cairn task gate passed from a new Nix invocation after the pin update.",
+    "status": "observed"
+  },
+  "maintenance_owner": "Lattice maintainers",
+  "non_claims": [
+    "This record does not prove workflow correctness, evidence truth, external effect truth, or release eligibility.",
+    "Lattice checks and maintainers retain orchestration, effect, and release authority."
+  ],
+  "route": {
+    "details": {
+      "current_consumer": "Lattice maintainers and workflow delivery changes",
+      "durable_capability_contribution": "A repository-pinned lifecycle runner that blocks unsupported completion before sync or archive",
+      "immediate_outcome": "Prove that a Lattice change cannot complete from agent output or task activity alone",
+      "repeatability_plan": "Use the pinned Cairn revision, repository checks, tracked review record, and BLAKE3-bound evidence"
+    },
+    "kind": "delivery"
+  },
+  "schema": "cairn.outcome-machine-review.v1",
+  "tracked_inputs": [
+    "Cairn revision 5e1fe08d62149b286ff583eb056e655fe92e3cf1",
+    "Cairn policy hash 302bc1f8bcb27920c37a6bdc21865e2ca1fbb5a38c268570b3fc326734e59942",
+    "Lattice flake input and Cairn runner",
+    "Lattice Octet pre-commit rail",
+    "Change-local rejection and fresh-state evidence"
+  ]
+}

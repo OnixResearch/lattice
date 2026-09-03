@@ -53,6 +53,13 @@ pub fn program_identity(program: &str) -> String {
 pub fn plan_execution(
     request: &crate::agent_node::AgentRequest,
 ) -> Result<ExecutionPlan, crate::agent_node::AgentError> {
+    plan_execution_with_projection(request, crate::agent_prompt::StructuredInputProjection::JsonPretty)
+}
+
+pub fn plan_execution_with_projection(
+    request: &crate::agent_node::AgentRequest,
+    projection: crate::agent_prompt::StructuredInputProjection,
+) -> Result<ExecutionPlan, crate::agent_node::AgentError> {
     validate_execution_admission(
         request,
         ProgramIdentityCheck {
@@ -64,7 +71,7 @@ pub fn plan_execution(
 
     let mut summary_request = request.clone();
     summary_request.model_hint = None;
-    let summary = crate::agent_node::render_agent_command_prompt(&summary_request);
+    let summary = crate::agent_node::render_prompt_with_projection(&summary_request, projection)?;
     if summary.trim().is_empty() {
         return Err(crate::agent_node::AgentError::MissingPrompt);
     }

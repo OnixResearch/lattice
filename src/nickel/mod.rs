@@ -1,4 +1,6 @@
 //! Thin Lattice adapter over the canonical Radicle Nickel evaluator.
+//!
+//! r[impl lattice.nickel_toolchain.boundary]
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafeFailure {
@@ -62,6 +64,8 @@ mod tests {
         assert_eq!(value["enabled"], true);
     }
 
+    // r[verify lattice.nickel_toolchain.boundary]
+    // r[verify lattice.nickel_toolchain.compatibility]
     #[test]
     fn adapter_evaluates_captured_source() {
         let value = evaluate_source("{ enabled = true }").expect("captured Nickel evaluates");

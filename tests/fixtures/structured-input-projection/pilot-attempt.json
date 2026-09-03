@@ -1,0 +1,20 @@
+{
+  "schema": "lattice.structured-input-projection-pilot-attempt.v1",
+  "date": "2026-09-02",
+  "model": "VibeThinker-3B",
+  "endpoint_class": "controlled_local_openai_compatible",
+  "endpoint": "http://127.0.0.1:13305/v1/chat/completions",
+  "probe_endpoint": "http://127.0.0.1:13305/v1/models",
+  "status": "provider_unavailable",
+  "transport_exit_code": 7,
+  "task_dispatch_count": 0,
+  "prompt_token_observations": 0,
+  "raw_prompts_retained": false,
+  "raw_responses_retained": false,
+  "recommendation": "inconclusive_keep_json_pretty_default",
+  "non_claims": [
+    "No model task outcome was observed.",
+    "No provider token count was observed.",
+    "No billing, accuracy, latency, or production claim is made."
+  ]
+}
