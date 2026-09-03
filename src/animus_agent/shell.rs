@@ -170,7 +170,30 @@ pub fn execute(
     global_output_max_bytes: u64,
     transport: &dyn Transport,
 ) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
-    let plan = super::plan_execution(request)?;
+    execute_with_projection(
+        crate::openai::ProjectedChat {
+            runtime,
+            request,
+            projection: crate::agent_prompt::StructuredInputProjection::JsonPretty,
+            global_output_max_bytes,
+        },
+        context,
+        transport,
+    )
+}
+
+pub fn execute_with_projection(
+    input: crate::openai::ProjectedChat<'_>,
+    context: &crate::agent_node::ExecutionContext,
+    transport: &dyn Transport,
+) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+    let crate::openai::ProjectedChat {
+        runtime,
+        request,
+        projection,
+        global_output_max_bytes,
+    } = input;
+    let plan = super::plan_execution_with_projection(request, projection)?;
     debug_assert!(!plan.summary.trim().is_empty());
     debug_assert_eq!(plan.program_identity, super::BUILTIN_PROGRAM_IDENTITY);
     debug_assert!(plan.turn_limit > 0);

@@ -288,6 +288,7 @@ fn pi_agent_runtime(command: String) -> AgentRuntimeConfig {
     AgentRuntimeConfig {
         runtimes,
         openai_compatible: BTreeMap::new(),
+        structured_input_projection: Default::default(),
         max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
         local_process: Default::default(),
     }

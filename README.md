@@ -18,9 +18,13 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Bounded ready-frontier dispatch](docs/bounded-ready-frontier.md) defines event-driven scheduling, capacities, conflicts, ordering, persistence, and proof boundaries.
 
+[Bounded DAG node memoization](docs/dag-node-memoization.md) defines canonical cache keys, explicit bounds, pure retention decisions, deferred release, and executor non-claims.
+
 [Storage commit uncertainty](docs/storage-commit-uncertainty.md) defines commit outcomes, process-local quarantine, exact read-back reconciliation, and repair non-claims.
 
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
+
+[Radicle core pilot decisions](docs/radicle-core-pilot-decisions.md) record why Lattice rejected unproduced change-admission and effect-attempt extractions without adding fallback dependencies.
 
 [Durable workflow exchange application](docs/workflow-exchange-application.md) binds the published Unix transport to exact saved workflow revisions, durable acceptance, bounded observations, and explicit uncertainty.
 
@@ -229,6 +233,8 @@ Lattice retains credentials, transport limits, graph boundaries, effects, budget
 
 The first profile performs one model dispatch. It supports text or JSON output.
 
+[Structured-input prompt projection](docs/structured-input-projection.md) provides target-scoped pretty JSON, compact JSON, and experimental TOON v3 input profiles. Omitted policy keeps pretty JSON. Projection errors stop before provider effects.
+
 It exposes no tools, arbitrary Steel programs, profile loading, sessions, fallback, Animus graphs, or Animus persistence.
 
 Returned metadata contains bounded identities and counts. It excludes prompts, responses, credentials, and a second provenance ledger.
@@ -400,5 +406,7 @@ verus verus/example_spec.rs
 - [Aspen Octet burn-down guard](../aspen/scripts/octet-burndown.scm) — guarded-round burn-down reference; not a Lattice runtime dependency.
 - [mc Ralph Cairn drain loop](../../mc/scripts/ralph-drain-cairns.scm) — bounded drain-loop reference; not a Lattice runtime dependency.
 - [universal-weave](https://github.com/transkatgirl/universal-weave) — Loom-style branching tree/DAG primitives. Design reference only for future branching-run exploration in the TUI. Not a dependency: the run DAG stays with Choregraph, and records stay in redb with BLAKE3 identity.
+- [adanil-code/LRUHashTable](https://github.com/adanil-code/LRUHashTable) — Apache-2.0 retention design reference at revision `f0e436326d36b6909e67c93de387edf19c14f5c1`. No source was copied.
+- [toon-format/toon-rust](https://github.com/toon-format/toon-rust) — MIT-licensed prompt-projection source at revision `2136cb1a35f3ed63be733bb74d36b89d3b4592dd`; Lattice vendors crate `0.5.0` with a recorded manifest-only dependency patch and labels its output `toon_v3`.
 
 Lattice does not adopt Swamp dynamic TypeScript loading, YAML/CEL authoring, plaintext secrets, or registry metadata as authority.

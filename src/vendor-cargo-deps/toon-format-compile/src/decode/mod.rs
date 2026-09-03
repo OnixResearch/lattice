@@ -1,0 +1,281 @@
+//! Decoder Implementation
+pub mod expansion;
+#[cfg(feature = "layout")]
+pub(crate) mod layout_builder;
+pub mod parser;
+pub mod scanner;
+pub mod validation;
+
+use serde_json::Value;
+
+use crate::types::{
+    DecodeOptions,
+    ToonResult,
+};
+
+/// Decode a TOON string into any deserializable type.
+///
+/// This function accepts any type implementing `serde::Deserialize`, including:
+/// - Custom structs with `#[derive(Deserialize)]`
+/// - `serde_json::Value`
+/// - Built-in types (Vec, HashMap, etc.)
+///
+/// # Examples
+///
+/// **With custom structs:**
+/// ```ignore
+/// use serde::Deserialize;
+/// use toon_format::{
+///     decode,
+///     DecodeOptions,
+/// };
+///
+/// #[derive(Deserialize, Debug, PartialEq)]
+/// struct User {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let toon = "name: Alice\nage: 30";
+/// let user: User = decode(toon, &DecodeOptions::default())?;
+/// assert_eq!(user.name, "Alice");
+/// assert_eq!(user.age, 30);
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+///
+/// **With JSON values:**
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::{
+///     decode,
+///     DecodeOptions,
+/// };
+///
+/// let input = "name: Alice\nage: 30";
+/// let result: Value = decode(input, &DecodeOptions::default())?;
+/// assert_eq!(result["name"], json!("Alice"));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode<T: serde::de::DeserializeOwned>(
+    input: &str,
+    options: &DecodeOptions,
+) -> ToonResult<T> {
+    let mut parser = parser::Parser::new(input, options.clone())?;
+    let value = parser.parse()?;
+    let final_value = apply_path_expansion(value, options)?;
+    serde_json::from_value(final_value)
+        .map_err(|e| crate::types::ToonError::DeserializationError(e.to_string()))
+}
+
+/// Apply path expansion to a decoded value if enabled in `options`.
+///
+/// Shared by [`decode`] and [`decode_with_layout`] so both paths see the same
+/// post-parse transformation.
+fn apply_path_expansion(value: Value, options: &DecodeOptions) -> ToonResult<Value> {
+    use crate::types::PathExpansionMode;
+    if options.expand_paths != PathExpansionMode::Off {
+        let json_value = crate::types::JsonValue::from(value);
+        let expanded =
+            expansion::expand_paths_recursive(json_value, options.expand_paths, options.strict)?;
+        Ok(Value::from(expanded))
+    } else {
+        Ok(value)
+    }
+}
+
+/// Decode with strict validation enabled (validates array lengths,
+/// indentation).
+///
+/// # Examples
+///
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::decode_strict;
+///
+/// // Valid array length
+/// let result: Value = decode_strict("items[2]: a,b")?;
+/// assert_eq!(result["items"], json!(["a", "b"]));
+///
+/// // Invalid array length (will error)
+/// assert!(decode_strict::<Value>("items[3]: a,b").is_err());
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode_strict<T: serde::de::DeserializeOwned>(input: &str) -> ToonResult<T> {
+    decode(input, &DecodeOptions::new().with_strict(true))
+}
+
+/// Decode with strict validation and additional options.
+///
+/// # Examples
+///
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::{
+///     decode_strict_with_options,
+///     DecodeOptions,
+/// };
+///
+/// let options = DecodeOptions::new()
+///     .with_strict(true)
+///     .with_delimiter(toon_format::Delimiter::Pipe);
+/// let result: Value = decode_strict_with_options("items[2|]: a|b", &options)?;
+/// assert_eq!(result["items"], json!(["a", "b"]));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode_strict_with_options<T: serde::de::DeserializeOwned>(
+    input: &str,
+    options: &DecodeOptions,
+) -> ToonResult<T> {
+    let opts = options.clone().with_strict(true);
+    decode(input, &opts)
+}
+
+/// Decode without type coercion (strings remain strings).
+///
+/// # Examples
+///
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::decode_no_coerce;
+///
+/// // Without coercion: quoted strings that look like numbers stay as strings
+/// let result: Value = decode_no_coerce("value: \"123\"")?;
+/// assert_eq!(result["value"], json!("123"));
+///
+/// // With default coercion: unquoted "true" becomes boolean
+/// let result: Value = toon_format::decode_default("value: true")?;
+/// assert_eq!(result["value"], json!(true));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode_no_coerce<T: serde::de::DeserializeOwned>(input: &str) -> ToonResult<T> {
+    decode(input, &DecodeOptions::new().with_coerce_types(false))
+}
+
+/// Decode without type coercion and with additional options.
+///
+/// # Examples
+///
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::{
+///     decode_no_coerce_with_options,
+///     DecodeOptions,
+/// };
+///
+/// let options = DecodeOptions::new()
+///     .with_coerce_types(false)
+///     .with_strict(false);
+/// let result: Value = decode_no_coerce_with_options("value: \"123\"", &options)?;
+/// assert_eq!(result["value"], json!("123"));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode_no_coerce_with_options<T: serde::de::DeserializeOwned>(
+    input: &str,
+    options: &DecodeOptions,
+) -> ToonResult<T> {
+    let opts = options.clone().with_coerce_types(false);
+    decode(input, &opts)
+}
+
+/// Decode with default options (strict mode, type coercion enabled).
+///
+/// Works with any type implementing `serde::Deserialize`.
+///
+/// # Examples
+///
+/// **With structs:**
+/// ```ignore
+/// use serde::Deserialize;
+/// use toon_format::decode_default;
+///
+/// #[derive(Deserialize)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let input = "name: Alice\nage: 30";
+/// let person: Person = decode_default(input)?;
+/// assert_eq!(person.name, "Alice");
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+///
+/// **With JSON values:**
+/// ```ignore
+/// use serde_json::{
+///     json,
+///     Value,
+/// };
+/// use toon_format::decode_default;
+///
+/// let input = "tags[3]: reading,gaming,coding";
+/// let result: Value = decode_default(input)?;
+/// assert_eq!(result["tags"], json!(["reading", "gaming", "coding"]));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+pub fn decode_default<T: serde::de::DeserializeOwned>(input: &str) -> ToonResult<T> {
+    decode(input, &DecodeOptions::default())
+}
+
+/// Decode a TOON document and return the value alongside layout metadata
+/// describing how the document was actually written on the wire.
+///
+/// Available only when the `layout` cargo feature is enabled.
+///
+/// **Experimental.** This API supports independent exploration of schema
+/// and tooling use cases and is not part of the TOON specification.
+/// See [`crate::layout`] for the metadata types.
+///
+/// # Pointer semantics with `expand_paths`
+///
+/// JSON pointers in the returned [`Layout`](crate::layout::Layout) reflect
+/// the document's *pre-expansion* structure — i.e. the key names the parser
+/// actually saw on the wire. When `options.expand_paths` is `Safe`, the
+/// returned value is restructured (e.g. `a.b: 1` becomes `{"a": {"b": 1}}`)
+/// but layout pointers still address the original keys. For unambiguous
+/// pointer-to-value lookups, prefer `PathExpansionMode::Off` (the default).
+///
+/// # Examples
+///
+/// ```ignore
+/// use toon_format::{
+///     decode_with_layout,
+///     DecodeOptions,
+///     NodeLayout,
+/// };
+///
+/// let toon = "users[2]{id,name}:\n  1,Alice\n  2,Bob";
+/// let (_value, layout) = decode_with_layout(toon, &DecodeOptions::default())?;
+///
+/// assert!(matches!(
+///     layout.get("/users"),
+///     Some(NodeLayout::Tabular { .. })
+/// ));
+/// # Ok::<(), toon_format::ToonError>(())
+/// ```
+#[cfg(feature = "layout")]
+pub fn decode_with_layout(
+    input: &str,
+    options: &DecodeOptions,
+) -> ToonResult<(Value, crate::layout::Layout)> {
+    let mut parser = parser::Parser::new(input, options.clone())?.with_layout();
+    let value = parser.parse()?;
+    let final_value = apply_path_expansion(value, options)?;
+    let layout = parser.take_layout().unwrap_or_default();
+    Ok((final_value, layout))
+}
