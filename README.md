@@ -79,7 +79,7 @@ Lattice retains these functions:
 - persistence and retries
 - triggers, diagnostics, UI, and evidence
 
-Lattice also consumes the frozen Choregraph role-projection cohort. It executes exact local protocols with durable uncertainty and current product authority. See [projected role-protocol execution](docs/role-protocol-execution.md).
+Lattice also consumes the frozen Choregraph role-projection cohort. It executes exact local protocols with durable uncertainty and current product authority. The reviewed consumer profile is `profiles/role-protocol-runtime-v1.ncl`. See [projected role-protocol execution](docs/role-protocol-execution.md).
 
 Nickel workflow import converts decoded values into a bounded in-memory `lattice-workflow-v2` value.
 

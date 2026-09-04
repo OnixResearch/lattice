@@ -1,0 +1,66 @@
+{
+  "authority": {
+    "contract": "lattice-role-protocol",
+    "credentials": "references_only",
+    "evaluation": "current_product",
+    "placement": "consumer_owned"
+  },
+  "capabilities": {
+    "automatic_retry": false,
+    "cli_authority": "unavailable",
+    "configured_adapters": false,
+    "effect_dispatch": "library_only",
+    "operator_commands": [
+      "create",
+      "inspect",
+      "recover",
+      "retry",
+      "abandon",
+      "replay"
+    ],
+    "replay_dispatches_effects": false
+  },
+  "non_claims": [
+    "profile admission does not authorize protocol effects",
+    "service planning does not prove process execution",
+    "runtime placement does not prove target health",
+    "operator commands do not provide autonomous dispatch",
+    "source linkage does not prove protocol correctness",
+    "profile checks do not establish release eligibility"
+  ],
+  "required_inputs": [
+    "config_path",
+    "plan_path",
+    "service_user",
+    "state_directory"
+  ],
+  "runtime": {
+    "binary": "lattice",
+    "command_prefix": [
+      "--config",
+      "__CONFIG_PATH__",
+      "protocol"
+    ],
+    "package": "lattice",
+    "repository": "rad:z2yGPFsQZsUcFNkiyR4Dkj22BuxnC",
+    "revision": "cbb5db0e4844b466dcd1877218eb1f00a2a7caf2",
+    "source_manifest_identity": "b3:ef80b33109874f6d090efe4791e2980538c5901f4f137ad6d336aa9b675a6a16",
+    "supported_systems": [
+      "aarch64-linux",
+      "x86_64-linux"
+    ]
+  },
+  "schema": "lattice.role-protocol-runtime-profile.v1",
+  "service": {
+    "create_argv": [
+      "create",
+      "__PLAN_PATH__"
+    ],
+    "mode": "operator_oneshot",
+    "restart": "no",
+    "service_user_binding": "consumer_required",
+    "start_at_boot": false,
+    "state_backend": "redb",
+    "state_directory_binding": "consumer_required"
+  }
+}

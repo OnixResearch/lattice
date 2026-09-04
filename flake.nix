@@ -698,6 +698,100 @@
               touch "$out"
             '';
 
+        # r[verify lattice.role_protocol.runtime_profile]
+        # r[verify lattice.role_protocol.runtime_profile.scenario.operator]
+        # r[verify lattice.role_protocol.runtime_profile.scenario.unsupported]
+        # r[verify lattice.role_protocol.runtime_profile.scenario.identity]
+        # r[verify lattice.role_protocol.runtime_profile.scenario.authority]
+        roleProtocolRuntimeProfileCheck =
+          pkgs.runCommand "lattice-role-protocol-runtime-profile"
+            {
+              nativeBuildInputs = [
+                pkgs.b3sum
+                pkgs.coreutils
+                pkgs.diffutils
+                pkgs.gnugrep
+                pkgs.jq
+                pkgs.nickel
+              ];
+            }
+            ''
+              set -eu
+              contract=${self}/contracts/role-protocol-runtime-profile.ncl
+              profile=${self}/profiles/role-protocol-runtime-v1.ncl
+              generated=${self}/profiles/generated/role-protocol-runtime-v1.json
+              generated_hash=${self}/profiles/generated/role-protocol-runtime-v1.blake3
+              source_manifest=${self}/profiles/generated/lattice-role-protocol-runtime-source-v1.blake3
+              fixture_root=${self}/tests/fixtures/role-protocol-runtime-profile
+
+              nickel typecheck "$contract"
+              nickel export --format json "$profile" | jq --sort-keys . > "$TMPDIR/profile.json"
+              cmp "$generated" "$TMPDIR/profile.json"
+
+              expected_profile_hash="$(cat "$generated_hash")"
+              actual_profile_hash="$(b3sum "$generated" | cut -d ' ' -f 1)"
+              test "$actual_profile_hash" = "$expected_profile_hash"
+
+              source_manifest_hash="$(b3sum "$source_manifest" | cut -d ' ' -f 1)"
+              test "$source_manifest_hash" = 'ef80b33109874f6d090efe4791e2980538c5901f4f137ad6d336aa9b675a6a16'
+              test "$(wc -l < "$source_manifest")" -eq 24
+              sort --check --key=2,2 "$source_manifest"
+              test "$(grep --extended-regexp --count '^[0-9a-f]{64}  [A-Za-z0-9._/-]+$' "$source_manifest")" -eq 24
+              (cd ${self} && b3sum --check "$source_manifest")
+              if sed --regexp-extended 's/^[0-9a-f]{64}  //' "$source_manifest" \
+                | grep --extended-regexp '(^/|(^|/)\.\.(/|$))'; then
+                echo 'runtime source manifest contains an unsafe path' >&2
+                exit 1
+              fi
+
+              jq --exit-status \
+                --arg profile_hash "$expected_profile_hash" \
+                --arg source_manifest "b3:$source_manifest_hash" '
+                  .schema == "lattice.role-protocol-runtime-profile.v1"
+                  and .runtime.repository == "rad:z2yGPFsQZsUcFNkiyR4Dkj22BuxnC"
+                  and .runtime.revision == "cbb5db0e4844b466dcd1877218eb1f00a2a7caf2"
+                  and .runtime.source_manifest_identity == $source_manifest
+                  and .runtime.package == "lattice"
+                  and .runtime.binary == "lattice"
+                  and .runtime.command_prefix == ["--config", "__CONFIG_PATH__", "protocol"]
+                  and .service.mode == "operator_oneshot"
+                  and .service.start_at_boot == false
+                  and .capabilities.operator_commands == ["create", "inspect", "recover", "retry", "abandon", "replay"]
+                  and .capabilities.effect_dispatch == "library_only"
+                  and .capabilities.cli_authority == "unavailable"
+                  and .capabilities.configured_adapters == false
+                  and .authority.placement == "consumer_owned"
+                  and (.required_inputs | length) == 4
+                  and (.non_claims | length) == 6
+                  and ($profile_hash | length) == 64
+                ' "$generated" > /dev/null
+
+              for fixture in "$fixture_root"/negative/*.ncl; do
+                if nickel export --format json "$fixture" > /dev/null 2>&1; then
+                  echo "invalid runtime profile unexpectedly passed: $fixture" >&2
+                  exit 1
+                fi
+              done
+
+              protocol_cli=${self}/src/engine/protocol/cli.rs
+              grep --fixed-strings 'struct UnavailableAuthority;' "$protocol_cli" > /dev/null
+              grep --fixed-strings 'std::collections::HashMap::new()' "$protocol_cli" > /dev/null
+              sed -n '/^pub enum CliCommand {$/,/^}$/p' "$protocol_cli" \
+                | grep --extended-regexp '^    [A-Z][A-Za-z]+([[:space:]]*\{|,)' \
+                | sed --regexp-extended 's/^    ([A-Za-z]+).*/\1/' \
+                > "$TMPDIR/commands"
+              printf '%s\n' Create Inspect Recover Retry Abandon Replay > "$TMPDIR/expected-commands"
+              cmp "$TMPDIR/expected-commands" "$TMPDIR/commands"
+
+              if grep --extended-regexp --ignore-case \
+                '(-----BEGIN|/home/|/tmp/|https?://|"(password|token|private_key|endpoint)")' \
+                "$profile" "$generated"; then
+                echo 'runtime profile contains secret, endpoint, or host-path material' >&2
+                exit 1
+              fi
+              touch "$out"
+            '';
+
         contentIdentityCoreSourceCheck =
           pkgs.runCommand "lattice-content-identity-core-source"
             {
@@ -934,6 +1028,8 @@
 
         checks = {
           inherit lattice;
+
+          role-protocol-runtime-profile = roleProtocolRuntimeProfileCheck;
 
           # r[impl lattice.nickel_toolchain.cohort]
           # r[impl lattice.nickel_toolchain.fixture_cohort]

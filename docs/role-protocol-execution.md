@@ -20,6 +20,22 @@ A session plan contains one placement for each role. A native placement binds on
 
 A missing, extra, reordered, mixed-kind, or mismatched placement fails before session persistence. Placement data does not grant authority.
 
+## Published runtime profile
+
+r[impl lattice.role_protocol.runtime_profile]
+
+`profiles/role-protocol-runtime-v1.ncl` defines the reviewed consumer profile. Its canonical JSON and BLAKE3 sidecar are under `profiles/generated/`.
+
+The profile binds runtime revision `cbb5db0e4844b466dcd1877218eb1f00a2a7caf2`. It also binds the selected source manifest, package, binary, command prefix, state backend, and authority contract.
+
+The profile supports create, inspect, recover, retry, abandon, and replay. It describes an operator-invoked one-shot service that does not start at boot.
+
+The CLI does not dispatch protocol effects. It uses unavailable authority and empty adapter registries. Effect dispatch remains a Rust library surface for an authorized product adapter.
+
+OnixOS can use this profile for compatibility checks and dry-run service planning. OnixOS still owns the machine, service user, paths, package derivation, policy references, and activation decision.
+
+A future daemon or dispatching CLI requires a new profile identity and separate review. Consumers must fail when requested behavior exceeds this profile.
+
 ## Durable order
 
 A dispatch uses this order:
