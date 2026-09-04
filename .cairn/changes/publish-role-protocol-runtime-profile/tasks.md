@@ -15,4 +15,4 @@
 - [x] [parallel] Document the supported OnixOS consumer boundary and unsupported autonomous-dispatch behavior. r[lattice.role_protocol.runtime_profile]
 - [x] [serial] Run positive and negative Nickel checks, source-manifest verification, Nix checks, formatting, Cairn validation, and lifecycle gates. r[lattice.role_protocol.runtime_profile]
 - [x] [serial] Run the adversarial audit and block archive for widened behavior, secret material, authority transfer, or claim promotion. r[lattice.role_protocol.runtime_profile]
-- [ ] [serial] Sync the accepted specification and archive only with an immutable profile publication commit and consumer pin. r[lattice.role_protocol.runtime_profile]
+- [x] [serial] Sync the accepted specification and archive only with an immutable profile publication commit and consumer pin. r[lattice.role_protocol.runtime_profile]
