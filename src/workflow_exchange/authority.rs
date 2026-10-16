@@ -14,8 +14,6 @@ use crate::engine::executor::RunId;
 
 const RUN_DOMAIN: &[u8] = b"lattice.workflow-exchange-run-authority.v1";
 const AUTHORITY_DOMAIN: &[u8] = b"lattice.workflow-exchange-route-authority.v1";
-const GRANT_DOMAIN: &[u8] = b"lattice.workflow-exchange-route-grant.v1";
-const RECEIPT_DOMAIN: &[u8] = b"lattice.workflow-exchange-route-receipt.v1";
 const FILE_CONTRACT: &str = "lattice-file";
 const NETWORK_CONTRACT: &str = "lattice-network";
 const PROCESS_CONTRACT: &str = "lattice-process";
@@ -23,8 +21,6 @@ const PROTOCOL_CONTRACT: &str = "lattice-role-protocol";
 
 #[derive(Debug, Clone)]
 pub struct RouteExactAuthorityProvider {
-    handler_profile_identity: String,
-    request_identity: String,
     workflow_revision: String,
     run_id: RunId,
     run_reference: String,
@@ -51,8 +47,6 @@ impl RouteExactAuthorityProvider {
             workflow_revision.as_str(),
         ]);
         Self {
-            handler_profile_identity: handler_profile_identity.as_str().to_string(),
-            request_identity: request_identity.as_str().to_string(),
             workflow_revision: workflow_revision.as_str().to_string(),
             run_id,
             run_reference,
@@ -76,8 +70,6 @@ impl execution::RunContextProvider for RouteExactAuthorityProvider {
         };
         let shell = dispatch::Shell::new(
             Box::new(RouteExactAuthorityFacts {
-                handler_profile_identity: self.handler_profile_identity.clone(),
-                request_identity: self.request_identity.clone(),
                 workflow_revision: self.workflow_revision.clone(),
                 run_reference: self.run_reference.clone(),
                 authority_reference: self.authority_reference.clone(),
@@ -96,8 +88,6 @@ impl execution::RunContextProvider for RouteExactAuthorityProvider {
 }
 
 struct RouteExactAuthorityFacts {
-    handler_profile_identity: String,
-    request_identity: String,
     workflow_revision: String,
     run_reference: String,
     authority_reference: String,
@@ -118,45 +108,18 @@ impl dispatch::AuthorityFactsProvider for RouteExactAuthorityFacts {
             return Err(dispatch::Error::AuthorityDenied);
         }
         let contract_id = contract_for_ability(binding.ability.as_str()).ok_or(dispatch::Error::AuthorityDenied)?;
-        let resource = binding.resource.as_str().to_string();
-        let ability = binding.ability.as_str().to_string();
-        let request_ref = binding.request.as_str().to_string();
-        let grant_ref = authority::blake3_reference(GRANT_DOMAIN, &[
-            self.handler_profile_identity.as_str(),
-            self.request_identity.as_str(),
-            self.workflow_revision.as_str(),
-            request_ref.as_str(),
-        ]);
-        let receipt_ref = authority::blake3_reference(RECEIPT_DOMAIN, &[grant_ref.as_str(), request_ref.as_str()]);
         Ok(authority::AuthorizationFacts {
             binding: binding.clone(),
-            basalt_input: basalt::authority_core::AuthorityInput {
-                schema: basalt::authority_core::AUTHORITY_INPUT_SCHEMA.to_string(),
+            evidence: authority::Evidence::LocalOperator(authority::LocalOperatorGrant {
+                authority_ref: self.authority_reference.clone(),
+                operation: binding.operation.as_str().to_string(),
                 request: basalt::authority_core::AuthorityRequest {
                     contract_id: contract_id.to_string(),
-                    resource: resource.clone(),
-                    ability: ability.clone(),
-                    request_ref: request_ref.clone(),
+                    resource: binding.resource.as_str().to_string(),
+                    ability: binding.ability.as_str().to_string(),
+                    request_ref: binding.request.as_str().to_string(),
                 },
-                verified_grants: vec![basalt::authority_core::VerifiedGrantRef {
-                    grant_ref: grant_ref.clone(),
-                    verification_receipt_ref: receipt_ref.clone(),
-                    resource,
-                    ability,
-                    kind: basalt::authority_core::VerifiedGrantKind::Direct,
-                }],
-                verification_receipts: vec![basalt::authority_core::UcanVerificationReceiptRef {
-                    receipt_ref,
-                    request_ref,
-                    verified_grant_refs: vec![grant_ref],
-                    disposition: basalt::authority_core::VerificationRefDisposition::Current,
-                }],
-                policy_refs: vec![dispatch::trusted_policy_ref(contract_id)],
-                caveat: basalt::authority_core::AuthorityCaveatDisposition::Satisfied,
-                replay: basalt::authority_core::AuthorityReplayDisposition::Admitted,
-                claims: vec![basalt::authority_core::AuthorityClaim::ExactRequest],
-                non_claims: basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_string).to_vec(),
-            },
+            }),
             trusted_policy_ref: dispatch::trusted_policy_ref(contract_id),
             scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
             scope_snapshot: None,

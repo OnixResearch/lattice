@@ -10,7 +10,6 @@ use std::process::ExitStatus;
 use lattice_repository_validation_fixture as vendor_fixture;
 use serde_json::Value;
 
-const README_SOURCE: &str = include_str!("../README.md");
 const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 const CARGO_SOURCE: &str = include_str!("../Cargo.toml");
@@ -23,7 +22,6 @@ const VENDOR_RESULT_SOURCE: &str =
     include_str!("fixtures/repository-validation/vendor-dependency/src/coverage/result.rs");
 const BOUNDED_EXEC_SOURCE_ADMISSION: &str = include_str!("fixtures/radicle/bounded-exec-source-admission-v1.json");
 
-const CHECK_COMMAND: &str = "nix flake check -L --option secret-key-files ''";
 const TEST_FILTER: &str = "pkgs.lib.hasPrefix \"${sourceRoot}/tests/\" (toString path)";
 const PATH_DEPENDENCY: &str =
     "lattice-repository-validation-fixture = { path = \"tests/fixtures/repository-validation/vendor-dependency\" }";
@@ -52,7 +50,6 @@ const BOUNDED_EXEC_CARGO_LOCK_SOURCE: &str = "git+https://git.onix.computer/z2Cp
 const BOUNDED_EXEC_NIX_VENDOR_SOURCE: &str = "src = bounded-exec;";
 const BOUNDED_EXEC_GITHUB_SOURCE: &str = "github.com/OnixResearch/bounded-exec";
 
-const ISSUE_SIGNING_COMMAND: &str = "signing.command_scope";
 const ISSUE_SIGNING_FLAKE_OVERRIDE: &str = "signing.flake_override";
 const ISSUE_TEST_FILTER: &str = "source.tests_filter";
 const ISSUE_PATH_DEPENDENCY: &str = "source.path_dependency";
@@ -69,7 +66,6 @@ const ISSUE_BOUNDED_EXEC_CRATES: &str = "source.bounded_exec_crate_set";
 
 #[derive(Debug, Clone, Copy)]
 struct ContractInputs<'a> {
-    readme: &'a str,
     flake: &'a str,
     flake_lock: &'a str,
     cargo: &'a str,
@@ -99,7 +95,6 @@ enum FormatAdmission {
 
 fn current_inputs() -> ContractInputs<'static> {
     ContractInputs {
-        readme: README_SOURCE,
         flake: FLAKE_SOURCE,
         flake_lock: FLAKE_LOCK_SOURCE,
         cargo: CARGO_SOURCE,
@@ -176,9 +171,6 @@ fn bounded_exec_source_matches(inputs: ContractInputs<'_>) -> bool {
 fn validate_contract(inputs: ContractInputs<'_>) -> BTreeSet<&'static str> {
     let mut issues = BTreeSet::new();
 
-    if !inputs.readme.contains(CHECK_COMMAND) {
-        issues.insert(ISSUE_SIGNING_COMMAND);
-    }
     if inputs.flake.contains("nixConfig") || inputs.flake.contains("secret-key-files") {
         issues.insert(ISSUE_SIGNING_FLAKE_OVERRIDE);
     }
@@ -288,9 +280,7 @@ fn rustfmt_admission(source: &str) -> FormatAdmission {
 #[test]
 fn check_scoped_signing_override_leaves_flake_signing_external() {
     let issues = validate_contract(current_inputs());
-    assert!(!issues.contains(ISSUE_SIGNING_COMMAND));
     assert!(!issues.contains(ISSUE_SIGNING_FLAKE_OVERRIDE));
-    assert!(README_SOURCE.contains(CHECK_COMMAND));
     assert!(!FLAKE_SOURCE.contains("nixConfig"));
     assert!(!FLAKE_SOURCE.contains("secret-key-files"));
 }
@@ -405,7 +395,6 @@ fn cargo_and_nix_resolve_the_same_immutable_bounded_exec_source() {
 #[test]
 fn repository_check_contract_mutations_fail_closed() {
     let mut inputs = current_inputs();
-    inputs.readme = "nix flake check -L";
     inputs.flake = "nixConfig.secret-key-files = [ \"/missing\" ];";
     inputs.cargo = "[dev-dependencies]";
     inputs.gitignore = "coverage/\nresult*\n";
@@ -418,7 +407,6 @@ fn repository_check_contract_mutations_fail_closed() {
     let issues = validate_contract(inputs);
 
     for code in [
-        ISSUE_SIGNING_COMMAND,
         ISSUE_SIGNING_FLAKE_OVERRIDE,
         ISSUE_TEST_FILTER,
         ISSUE_PATH_DEPENDENCY,

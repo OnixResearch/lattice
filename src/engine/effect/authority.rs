@@ -131,11 +131,26 @@ pub struct ScopeSnapshotFacts {
 #[derive(Debug, Clone)]
 pub struct AuthorizationFacts {
     pub binding: IntentBinding,
-    pub basalt_input: basalt::authority_core::AuthorityInput,
+    pub evidence: Evidence,
     pub trusted_policy_ref: basalt::authority_core::BasaltPolicyRef,
     pub scope_requirement: ScopeRequirement,
     pub scope_snapshot: Option<ScopeSnapshotFacts>,
     pub revocation: RevocationDisposition,
+}
+
+/// Distinct trust boundaries: verified external UCAN facts or first-party local admission.
+#[derive(Debug, Clone)]
+pub enum Evidence {
+    VerifiedUcan(basalt::authority_core::AuthorityInput),
+    LocalOperator(LocalOperatorGrant),
+}
+
+/// A host-admitted local capability, never a token-verification receipt.
+#[derive(Debug, Clone)]
+pub struct LocalOperatorGrant {
+    pub(crate) authority_ref: String,
+    pub(crate) operation: String,
+    pub(crate) request: basalt::authority_core::AuthorityRequest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

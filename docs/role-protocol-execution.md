@@ -28,6 +28,8 @@ r[impl lattice.role_protocol.runtime_profile]
 
 The profile binds runtime revision `cbb5db0e4844b466dcd1877218eb1f00a2a7caf2`. It also binds the selected source manifest, package, binary, command prefix, state backend, and authority contract.
 
+The Nix profile check verifies that manifest against the separately pinned published runtime source, not the evolving checkout. Current protocol CLI boundaries and effect-authority behavior are checked independently.
+
 The profile supports create, inspect, recover, retry, abandon, and replay. It describes an operator-invoked one-shot service that does not start at boot.
 
 The CLI does not dispatch protocol effects. It uses unavailable authority and empty adapter registries. Effect dispatch remains a Rust library surface for an authorized product adapter.

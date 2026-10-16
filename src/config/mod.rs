@@ -26,6 +26,9 @@ const DEFAULT_SHELL: &str = "sh";
 pub struct AppConfig {
     /// Directory for redb database and other state.
     pub data_dir: PathBuf,
+    /// Absolute path to an operator-supplied effect authority profile. Omission denies effects.
+    #[serde(default = "no_effect_authority")]
+    pub effect_authority: Option<PathBuf>,
     /// Default shell command timeout in seconds.
     pub default_timeout_secs: u64,
     /// Shell to use for commands (default: "sh").
@@ -49,6 +52,7 @@ impl Default for AppConfig {
         let data_dir = default_data_dir().unwrap_or_else(|| PathBuf::from(identity::CANONICAL_DATA_DIR_NAME));
         Self {
             data_dir,
+            effect_authority: None,
             default_timeout_secs: DEFAULT_SHELL_TIMEOUT_SECS,
             shell: DEFAULT_SHELL.into(),
             max_parallelism: SERIAL_MAX_PARALLELISM,
@@ -59,7 +63,23 @@ impl Default for AppConfig {
     }
 }
 
+const fn no_effect_authority() -> Option<PathBuf> {
+    None
+}
+
 impl AppConfig {
+    /// Select standalone authority without falling back from an invalid selected profile.
+    pub fn effect_authority_provider(
+        &self,
+    ) -> std::sync::Arc<dyn crate::engine::effect::execution::RunContextProvider> {
+        match &self.effect_authority {
+            Some(path) => {
+                std::sync::Arc::new(crate::engine::effect::standalone::OperatorRunContextSource::new(path.clone()))
+            }
+            None => std::sync::Arc::new(crate::engine::effect::execution::UnavailableRunContextSource),
+        }
+    }
+
     /// Derive the explicit process runtime consumed by every executor entry point.
     pub fn effective_agent_runtime(&self) -> AgentRuntimeConfig {
         let mut runtime = self.agent_runtime.clone();

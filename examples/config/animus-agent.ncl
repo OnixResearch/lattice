@@ -48,6 +48,9 @@ let AppConfig = {
   data_dir | String,
   default_timeout_secs | Number,
   shell | String,
+  effect_authority | optional | std.contract.from_predicate (fun value =>
+    value == null || std.is_string value
+  ),
   max_parallelism | Number,
   agent_runtime | AgentRuntime,
   process_limits | ProcessLimits,

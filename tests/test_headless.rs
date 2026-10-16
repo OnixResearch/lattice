@@ -116,7 +116,7 @@ impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
         let request_ref = binding.request.as_str().to_owned();
         Ok(authority::AuthorizationFacts {
             binding: binding.clone(),
-            basalt_input: basalt::authority_core::AuthorityInput {
+            evidence: authority::Evidence::VerifiedUcan(basalt::authority_core::AuthorityInput {
                 schema: basalt::authority_core::AUTHORITY_INPUT_SCHEMA.to_owned(),
                 request: basalt::authority_core::AuthorityRequest {
                     contract_id: PROCESS_CONTRACT.to_owned(),
@@ -142,7 +142,7 @@ impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
                 replay: basalt::authority_core::AuthorityReplayDisposition::Admitted,
                 claims: vec![basalt::authority_core::AuthorityClaim::ExactRequest],
                 non_claims: basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned).to_vec(),
-            },
+            }),
             trusted_policy_ref: dispatch::trusted_policy_ref(PROCESS_CONTRACT),
             scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
             scope_snapshot: None,

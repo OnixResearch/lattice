@@ -74,7 +74,7 @@ fn effect_binding(slot: &str, source: String) -> choregraph_nickel::EvaluatedRef
     }
 }
 
-fn effect_contract(config: &super::PortableNodeConfig) -> Option<(&'static str, &'static str)> {
+pub(crate) fn effect_contract(config: &super::PortableNodeConfig) -> Option<(&'static str, &'static str)> {
     match config.kind.as_str() {
         "shell" | "operation" => Some((RESOURCE_PROCESS_PREFIX, "process/execute")),
         "http" => Some((RESOURCE_NETWORK_PREFIX, "network/request")),

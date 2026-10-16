@@ -155,6 +155,23 @@ pub async fn retry_occurrence(
     is_duplicate_risk_acknowledged: bool,
     agent_runtime: crate::agent_node::AgentRuntimeConfig,
 ) -> Result<super::ScheduleOccurrence, Error> {
+    retry_occurrence_with_authority_provider(
+        store,
+        identity,
+        is_duplicate_risk_acknowledged,
+        agent_runtime,
+        &crate::engine::effect::execution::UnavailableRunContextSource,
+    )
+    .await
+}
+
+pub async fn retry_occurrence_with_authority_provider(
+    store: &crate::store::Store,
+    identity: &str,
+    is_duplicate_risk_acknowledged: bool,
+    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<super::ScheduleOccurrence, Error> {
     let current = load_occurrence(store, identity)?;
     if current.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
         return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
@@ -164,7 +181,7 @@ pub async fn retry_occurrence(
     }
     let revision = load_workflow_revision(store, &current.workflow_name)?;
     let retried = store.retry_schedule_occurrence(identity, &revision, is_duplicate_risk_acknowledged)?;
-    execute_occurrence(store, &retried, agent_runtime).await?;
+    execute_occurrence_with_authority_provider(store, &retried, agent_runtime, authority_provider).await?;
     load_occurrence(store, identity)
 }
 

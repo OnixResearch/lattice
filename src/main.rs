@@ -68,6 +68,8 @@ enum CliCommand {
     Run(RunCommandArgs),
     /// Inspect persisted run evidence without emitting arbitrary content
     Runs(RunsCommandArgs),
+    /// Inspect saved workflow identities and effect requirements without granting authority
+    Authority(AuthorityCommandArgs),
     /// Serve the bounded durable workflow exchange
     WorkflowExchange(WorkflowExchangeCommandArgs),
     /// Export a saved workflow to a typed Nickel file
@@ -134,6 +136,21 @@ enum RunsCliCommand {
     },
     /// Explicitly repair an existing redb store after an unclean writer exit
     Repair,
+}
+
+#[derive(clap::Args, Debug)]
+struct AuthorityCommandArgs {
+    #[command(subcommand)]
+    command: AuthorityCliCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum AuthorityCliCommand {
+    /// Print exact workflow identities and required grants as JSON without executing it
+    Inspect {
+        /// Saved workflow name to inspect
+        workflow_name: String,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -446,6 +463,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Some(CliCommand::Runs(runs_args)) = &args.command {
         return Ok(run_runs_command(&app_config, runs_args));
     }
+    if let Some(CliCommand::Authority(authority_args)) = &args.command {
+        return Ok(run_authority_command(&app_config, authority_args));
+    }
     if let Some(CliCommand::Operation(operation_args)) = &args.command {
         return Ok(lattice::operation::cli::run(&app_config, operation_args));
     }
@@ -465,6 +485,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     match args.command {
         Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
         Some(CliCommand::Runs(_)) => unreachable!("runs command returns before data-directory side effects"),
+        Some(CliCommand::Authority(_)) => {
+            unreachable!("authority inspection returns before data-directory side effects")
+        }
         Some(CliCommand::WorkflowExchange(exchange_args)) => {
             Ok(run_workflow_exchange_command(&app_config, &exchange_args))
         }
@@ -793,6 +816,7 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
         Ok(store) => store,
         Err(error) => return orchestration_failure(&error),
     };
+    let authority_provider = app_config.effect_authority_provider();
     match &args.command {
         OrchestrationCliCommand::Validate { path, output } => {
             let definition = match orchestration::load_definition_nickel_file(path) {
@@ -816,7 +840,12 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(definition) => definition,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::start(&store, definition, actor, app_config.effective_agent_runtime()).await {
+            match orchestration::start_with_execution(&store, definition, actor, orchestration::ProductExecution {
+                agent_runtime: app_config.effective_agent_runtime(),
+                authority_provider: authority_provider.as_ref(),
+            })
+            .await
+            {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -859,7 +888,16 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(proposal) => proposal,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::approve(&store, instance, proposal, actor, app_config.effective_agent_runtime()).await
+            match orchestration::approve_with_execution(&store, orchestration::ProductApproval {
+                instance_id: instance.clone(),
+                proposal,
+                actor: actor.clone(),
+                execution: orchestration::ProductExecution {
+                    agent_runtime: app_config.effective_agent_runtime(),
+                    authority_provider: authority_provider.as_ref(),
+                },
+            })
+            .await
             {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
@@ -897,13 +935,16 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
             instance,
             actor,
             output,
-        } => match orchestration::retry(
+        } => match orchestration::retry_with_execution(
             &store,
             orchestration::RetryRequest {
                 instance_id: instance,
                 actor,
             },
-            app_config.effective_agent_runtime(),
+            orchestration::ProductExecution {
+                agent_runtime: app_config.effective_agent_runtime(),
+                authority_provider: authority_provider.as_ref(),
+            },
         )
         .await
         {
@@ -970,6 +1011,31 @@ fn render_orchestration_output(output: &str) -> ExitCode {
 fn orchestration_failure(message: &str) -> ExitCode {
     eprintln!("Orchestration failed: {message}");
     ExitCode::FAILURE
+}
+
+fn run_authority_command(app_config: &config::AppConfig, args: &AuthorityCommandArgs) -> ExitCode {
+    let AuthorityCliCommand::Inspect { workflow_name } = &args.command;
+    let result = (|| -> Result<String, String> {
+        let workflow = Store::load_workflow_read_only(&config::store_path(&app_config.data_dir), workflow_name)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| format!("workflow not found: {workflow_name}"))?;
+        let inspection =
+            lattice::engine::effect::standalone::inspect_workflow(&workflow).map_err(|error| format!("{error:?}"))?;
+        serde_json::to_string_pretty(&inspection).map_err(|error| error.to_string())
+    })();
+    match result {
+        Ok(rendered) => match write_stdout_and_flush(&format!("{rendered}\n")) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("Authority inspection failed: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Err(error) => {
+            eprintln!("Authority inspection failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn run_runs_command(app_config: &config::AppConfig, args: &RunsCommandArgs) -> ExitCode {
@@ -1098,6 +1164,7 @@ async fn run_scheduler_daemon_once(
     };
     let now_epoch_ms = args.now_epoch_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
     let evaluation = scheduler::evaluate_due_runs(&schedules, now_epoch_ms, &std::collections::HashSet::new());
+    let authority_provider = app_config.effect_authority_provider();
 
     for skipped in evaluation.skipped_runs {
         if skipped.reason == ScheduleSkipReason::MissedRunSkipped {
@@ -1150,17 +1217,22 @@ async fn run_scheduler_daemon_once(
                 continue;
             }
         };
-        let outcome =
-            match scheduler::shell::execute_occurrence(&store, &occurrence, app_config.effective_agent_runtime()).await
-            {
-                Ok(summary) => ScheduleDaemonOutcome::Started {
-                    schedule_id: plan.schedule_id.clone(),
-                    workflow_name: plan.workflow_name.clone(),
-                    summary: Box::new(summary),
-                    next_run_epoch_ms: plan.next_run_epoch_ms,
-                },
-                Err(error) => schedule_error_outcome(&plan, error.to_string()),
-            };
+        let outcome = match scheduler::shell::execute_occurrence_with_authority_provider(
+            &store,
+            &occurrence,
+            app_config.effective_agent_runtime(),
+            authority_provider.as_ref(),
+        )
+        .await
+        {
+            Ok(summary) => ScheduleDaemonOutcome::Started {
+                schedule_id: plan.schedule_id.clone(),
+                workflow_name: plan.workflow_name.clone(),
+                summary: Box::new(summary),
+                next_run_epoch_ms: plan.next_run_epoch_ms,
+            },
+            Err(error) => schedule_error_outcome(&plan, error.to_string()),
+        };
         println!("{}", scheduler::render_daemon_outcome(&outcome));
     }
 
@@ -1195,6 +1267,7 @@ async fn run_scheduler_occurrences_command(
         Ok(store) => store,
         Err(error) => return scheduler_occurrence_failure(&error.to_string()),
     };
+    let authority_provider = app_config.effect_authority_provider();
     match &args.command {
         SchedulerOccurrenceCliCommand::List { limit, output } => {
             if *limit == 0 || *limit > MAX_SCHEDULE_OCCURRENCE_LIMIT {
@@ -1220,11 +1293,12 @@ async fn run_scheduler_occurrences_command(
             identity,
             acknowledge_duplicate_risk,
             output,
-        } => match scheduler::shell::retry_occurrence(
+        } => match scheduler::shell::retry_occurrence_with_authority_provider(
             &store,
             identity,
             *acknowledge_duplicate_risk,
             app_config.effective_agent_runtime(),
+            authority_provider.as_ref(),
         )
         .await
         {
@@ -1440,6 +1514,7 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
     let store = std::sync::Arc::new(store);
     let triggers = std::sync::Arc::new(triggers);
     let provider = std::sync::Arc::new(provider);
+    let authority_provider = app_config.effect_authority_provider();
     let mut handlers = tokio::task::JoinSet::new();
     loop {
         while let Some(result) = handlers.try_join_next() {
@@ -1459,8 +1534,17 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
         let store = std::sync::Arc::clone(&store);
         let triggers = std::sync::Arc::clone(&triggers);
         let provider = std::sync::Arc::clone(&provider);
+        let authority_provider = std::sync::Arc::clone(&authority_provider);
         handlers.spawn(async move {
-            let response = handle_webhook_connection(&mut stream, &store, &triggers, &provider, limits).await;
+            let response = handle_webhook_connection(
+                &mut stream,
+                &store,
+                &triggers,
+                &provider,
+                limits,
+                authority_provider.as_ref(),
+            )
+            .await;
             if let Err(error) = stream.write_all(&webhooks::render(&response)).await {
                 tracing::warn!(error = %error, "failed to write webhook listener response");
             }
@@ -1511,6 +1595,7 @@ async fn handle_webhook_connection(
     triggers: &[TriggerDefinition],
     provider: &CredentialProviderRegistry,
     limits: webhooks::RequestLimits,
+    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
 ) -> webhooks::Reply {
     let request = match webhooks::read_raw(stream, limits).await {
         Ok(request) => request,
@@ -1526,7 +1611,9 @@ async fn handle_webhook_connection(
     let context = webhooks::admission_context(&[], accepted_epoch_ms);
 
     match webhooks::decide_request(&request, triggers, provider, &context, limits) {
-        webhooks::Decision::Admitted(plan) => execute_webhook_plan(store, triggers, plan, accepted_epoch_ms).await,
+        webhooks::Decision::Admitted(plan) => {
+            execute_webhook_plan(store, triggers, plan, accepted_epoch_ms, authority_provider).await
+        }
         webhooks::Decision::Rejected(rejection) => {
             if let Some(record) = webhooks::run_record_for_rejection(&rejection)
                 && let Err(error) = store.save_trigger_run(&record)
@@ -1543,6 +1630,7 @@ async fn execute_webhook_plan(
     triggers: &[TriggerDefinition],
     plan: lattice::triggers::TriggerRunPlan,
     accepted_epoch_ms: i64,
+    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
 ) -> webhooks::Reply {
     let Some(trigger) = triggers.iter().find(|trigger| trigger.id == plan.trigger_id) else {
         return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
@@ -1573,7 +1661,7 @@ async fn execute_webhook_plan(
     };
     match decision {
         lattice::triggers::WebhookAdmissionDecision::ExecuteUnclaimed => {
-            match headless::run_admitted_trigger_plan(store, &plan).await {
+            match headless::run_admitted_trigger_plan_with_authority_provider(store, &plan, authority_provider).await {
                 Ok(summary) => webhooks::accepted(&plan.trigger_id, summary.run_id),
                 Err(error) => {
                     tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook trigger execution failed");
@@ -1582,7 +1670,7 @@ async fn execute_webhook_plan(
             }
         }
         lattice::triggers::WebhookAdmissionDecision::ExecuteClaimed { run_id } => {
-            execute_claimed_webhook_plan(store, &plan, &claim_plan, run_id).await
+            execute_claimed_webhook_plan(store, &plan, &claim_plan, run_id, authority_provider).await
         }
         lattice::triggers::WebhookAdmissionDecision::RejectDuplicate { .. } => {
             webhooks::rejected_for_code(webhooks::RejectionCode::DuplicateIdempotencyKey)
@@ -1595,11 +1683,12 @@ async fn execute_claimed_webhook_plan(
     plan: &lattice::triggers::TriggerRunPlan,
     claim_plan: &lattice::triggers::WebhookClaimPlan,
     run_id: lattice::engine::RunId,
+    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
 ) -> webhooks::Reply {
     let lattice::triggers::WebhookClaimPlan::Required(request) = claim_plan else {
         return webhooks::execution_failed(&plan.trigger_id);
     };
-    match headless::run_claimed_trigger_plan(store, plan, run_id).await {
+    match headless::run_claimed_trigger_plan_with_authority_provider(store, plan, run_id, authority_provider).await {
         Ok(summary) if summary.status == lattice::headless::HeadlessRunStatus::Succeeded => {
             webhooks::accepted(&plan.trigger_id, summary.run_id)
         }

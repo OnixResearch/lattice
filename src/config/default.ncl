@@ -57,6 +57,8 @@ let configured_process_limits = {
   data_dir = "~/.lattice",
   default_timeout_secs = 60,
   shell = "sh",
+  # Select only an absolute operator-owned profile path; null keeps effects unavailable.
+  effect_authority = null,
   max_parallelism = concurrency.total_slots,
   resource_lanes = concurrency.resource_lanes,
   process_limits = configured_process_limits,

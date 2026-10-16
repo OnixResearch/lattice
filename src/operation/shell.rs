@@ -6,8 +6,6 @@
 
 const LOCAL_AUTHORITY_RUN_DOMAIN: &[u8] = b"lattice.operation-local-run.v1";
 const LOCAL_AUTHORITY_DOMAIN: &[u8] = b"lattice.operation-local-read-only-authority.v1";
-const LOCAL_GRANT_DOMAIN: &[u8] = b"lattice.operation-local-read-only-grant.v1";
-const LOCAL_RECEIPT_DOMAIN: &[u8] = b"lattice.operation-local-read-only-receipt.v1";
 const LOCAL_AUTHORITY_CONTRACT: &str = "lattice-process";
 const TYPED_OPERATION_EFFECT: &str = "lattice/operation";
 const PROCESS_EXECUTE_ABILITY: &str = "process/execute";
@@ -113,48 +111,22 @@ impl crate::engine::effect::dispatch::AuthorityFactsProvider for LocalAuthorityF
         if !is_binding_exact {
             return Err(crate::engine::effect::dispatch::Error::AuthorityDenied);
         }
-        let resource = binding.resource.as_str().to_string();
-        let ability = binding.ability.as_str().to_string();
-        let request_ref = binding.request.as_str().to_string();
-        let grant_ref = crate::engine::effect::authority::blake3_reference(LOCAL_GRANT_DOMAIN, &[
-            self.plan_identity.as_str(),
-            request_ref.as_str(),
-        ]);
-        let receipt_ref = crate::engine::effect::authority::blake3_reference(LOCAL_RECEIPT_DOMAIN, &[
-            grant_ref.as_str(),
-            request_ref.as_str(),
-        ]);
+        let authority_ref =
+            crate::engine::effect::authority::blake3_reference(LOCAL_AUTHORITY_DOMAIN, &[self.plan_identity.as_str()]);
         Ok(crate::engine::effect::authority::AuthorizationFacts {
             binding: binding.clone(),
-            basalt_input: basalt::authority_core::AuthorityInput {
-                schema: basalt::authority_core::AUTHORITY_INPUT_SCHEMA.to_string(),
-                request: basalt::authority_core::AuthorityRequest {
-                    contract_id: LOCAL_AUTHORITY_CONTRACT.to_string(),
-                    resource: resource.clone(),
-                    ability: ability.clone(),
-                    request_ref: request_ref.clone(),
+            evidence: crate::engine::effect::authority::Evidence::LocalOperator(
+                crate::engine::effect::authority::LocalOperatorGrant {
+                    authority_ref,
+                    operation: TYPED_OPERATION_EFFECT.to_string(),
+                    request: basalt::authority_core::AuthorityRequest {
+                        contract_id: LOCAL_AUTHORITY_CONTRACT.to_string(),
+                        resource: self.expected_resource.clone(),
+                        ability: PROCESS_EXECUTE_ABILITY.to_string(),
+                        request_ref: binding.request.as_str().to_string(),
+                    },
                 },
-                verified_grants: vec![basalt::authority_core::VerifiedGrantRef {
-                    grant_ref: grant_ref.clone(),
-                    verification_receipt_ref: receipt_ref.clone(),
-                    resource,
-                    ability,
-                    kind: basalt::authority_core::VerifiedGrantKind::Direct,
-                }],
-                verification_receipts: vec![basalt::authority_core::UcanVerificationReceiptRef {
-                    receipt_ref,
-                    request_ref,
-                    verified_grant_refs: vec![grant_ref],
-                    disposition: basalt::authority_core::VerificationRefDisposition::Current,
-                }],
-                policy_refs: vec![crate::engine::effect::dispatch::trusted_policy_ref(
-                    LOCAL_AUTHORITY_CONTRACT,
-                )],
-                caveat: basalt::authority_core::AuthorityCaveatDisposition::Satisfied,
-                replay: basalt::authority_core::AuthorityReplayDisposition::Admitted,
-                claims: vec![basalt::authority_core::AuthorityClaim::ExactRequest],
-                non_claims: basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_string).to_vec(),
-            },
+            ),
             trusted_policy_ref: crate::engine::effect::dispatch::trusted_policy_ref(LOCAL_AUTHORITY_CONTRACT),
             scope_requirement: crate::engine::effect::authority::ScopeRequirement::UnscopedPermitted,
             scope_snapshot: None,

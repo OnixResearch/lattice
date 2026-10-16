@@ -1028,6 +1028,7 @@ impl App {
         let graph = crate::tui::graph::empty_subwayrat();
         let graph_state = NodeGraphState::new(graph, INITIAL_VIEWPORT_WIDTH, INITIAL_VIEWPORT_HEIGHT);
         let agent_runtime = config.effective_agent_runtime();
+        let authority_provider = config.effect_authority_provider();
         let frontier_policy = config.frontier_capacity_policy().unwrap_or_else(|error| {
             error!(?error, "invalid frontier policy, preserving serial execution");
             crate::engine::frontier::serial_capacity_policy()
@@ -1090,7 +1091,7 @@ impl App {
                     }
                 }
             }),
-            authority_provider: Arc::new(crate::engine::effect::execution::UnavailableRunContextSource),
+            authority_provider,
         }
     }
 

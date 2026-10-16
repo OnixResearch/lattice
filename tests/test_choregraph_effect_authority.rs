@@ -168,7 +168,7 @@ fn facts(scope: authority::CollaborationScopeBinding) -> authority::Authorizatio
     let binding = binding(FILE_RESOURCE, FILE_ABILITY, scope);
     authority::AuthorizationFacts {
         binding,
-        basalt_input: basalt_input(FILE_RESOURCE, FILE_ABILITY, FILE_CONTRACT),
+        evidence: authority::Evidence::VerifiedUcan(basalt_input(FILE_RESOURCE, FILE_ABILITY, FILE_CONTRACT)),
         trusted_policy_ref: dispatch::trusted_policy_ref(FILE_CONTRACT),
         scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
         scope_snapshot: None,
@@ -200,17 +200,17 @@ fn allows_current_scope_protected_authority() {
 #[test]
 fn denies_missing_wrong_and_replayed_authority() {
     let mut missing = facts(authority::CollaborationScopeBinding::Unscoped);
-    missing.basalt_input.verified_grants.clear();
+    missing.verified_ucan_mut().verified_grants.clear();
     let mut wrong_resource = facts(authority::CollaborationScopeBinding::Unscoped);
-    wrong_resource.basalt_input.request.resource = "lattice://file/other".to_owned();
+    wrong_resource.verified_ucan_mut().request.resource = "lattice://file/other".to_owned();
     let mut wrong_ability = facts(authority::CollaborationScopeBinding::Unscoped);
-    wrong_ability.basalt_input.verified_grants[0].ability = "file/read".to_owned();
+    wrong_ability.verified_ucan_mut().verified_grants[0].ability = "file/read".to_owned();
     let mut wrong_request = facts(authority::CollaborationScopeBinding::Unscoped);
-    wrong_request.basalt_input.request.request_ref = RECEIPT_REF.to_owned();
+    wrong_request.verified_ucan_mut().request.request_ref = RECEIPT_REF.to_owned();
     let mut stale_policy = facts(authority::CollaborationScopeBinding::Unscoped);
     stale_policy.trusted_policy_ref.artifact_ref = RECEIPT_REF.to_owned();
     let mut replayed = facts(authority::CollaborationScopeBinding::Unscoped);
-    replayed.basalt_input.replay = AuthorityReplayDisposition::Denied;
+    replayed.verified_ucan_mut().replay = AuthorityReplayDisposition::Denied;
     let mut revoked = facts(authority::CollaborationScopeBinding::Unscoped);
     revoked.revocation = authority::RevocationDisposition::Revoked;
 
@@ -322,20 +322,28 @@ impl dispatch::AuthorityFactsProvider for DynamicNetworkFacts {
     fn load(&self, binding: &authority::IntentBinding) -> Result<authority::AuthorizationFacts, dispatch::Error> {
         let mut authorization_facts = end_to_end_authorization_facts(binding.clone());
         authorization_facts.binding = binding.clone();
-        authorization_facts.basalt_input.request.request_ref = binding.request.as_str().to_owned();
+        authorization_facts.verified_ucan_mut().request.request_ref = binding.request.as_str().to_owned();
         authorization_facts.verification_receipt_request(binding.request.as_str());
         Ok(authorization_facts)
     }
 }
 
 trait AuthorizationFactsTestExtension {
+    fn verified_ucan_mut(&mut self) -> &mut AuthorityInput;
     fn verification_receipt_request(&mut self, request_ref: &str);
 }
 
 impl AuthorizationFactsTestExtension for authority::AuthorizationFacts {
+    fn verified_ucan_mut(&mut self) -> &mut AuthorityInput {
+        match &mut self.evidence {
+            authority::Evidence::VerifiedUcan(input) => input,
+            authority::Evidence::LocalOperator(_) => panic!("fixture requires verified UCAN evidence"),
+        }
+    }
+
     fn verification_receipt_request(&mut self, request_ref: &str) {
-        self.basalt_input.request.request_ref = request_ref.to_owned();
-        for receipt in &mut self.basalt_input.verification_receipts {
+        self.verified_ucan_mut().request.request_ref = request_ref.to_owned();
+        for receipt in &mut self.verified_ucan_mut().verification_receipts {
             receipt.request_ref = request_ref.to_owned();
         }
     }
@@ -528,7 +536,8 @@ fn dispatch_records_unknown_after_post_effect_persistence_failure() {
     );
     let mut authorization_facts = facts(authority::CollaborationScopeBinding::Unscoped);
     authorization_facts.binding = binding.clone();
-    authorization_facts.basalt_input = basalt_input(NETWORK_RESOURCE, NETWORK_ABILITY, "lattice-network");
+    authorization_facts.evidence =
+        authority::Evidence::VerifiedUcan(basalt_input(NETWORK_RESOURCE, NETWORK_ABILITY, "lattice-network"));
     authorization_facts.trusted_policy_ref = dispatch::trusted_policy_ref("lattice-network");
     let unknown = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let shell = dispatch::Shell::new(
@@ -850,7 +859,8 @@ fn dispatch_shell_authorizes_runs_adapter_and_records_outcome() {
     );
     let mut authorization_facts = facts(authority::CollaborationScopeBinding::Unscoped);
     authorization_facts.binding = binding.clone();
-    authorization_facts.basalt_input = basalt_input(NETWORK_RESOURCE, NETWORK_ABILITY, "lattice-network");
+    authorization_facts.evidence =
+        authority::Evidence::VerifiedUcan(basalt_input(NETWORK_RESOURCE, NETWORK_ABILITY, "lattice-network"));
     authorization_facts.trusted_policy_ref = dispatch::trusted_policy_ref("lattice-network");
     let recorded = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let shell = dispatch::Shell::new(
@@ -934,7 +944,7 @@ fn end_to_end_authorization_facts(binding: authority::IntentBinding) -> authorit
         receipt.request_ref.clone_from(&request);
     }
     authority::AuthorizationFacts {
-        basalt_input,
+        evidence: authority::Evidence::VerifiedUcan(basalt_input),
         trusted_policy_ref: dispatch::trusted_policy_ref("lattice-network"),
         scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
         scope_snapshot: None,

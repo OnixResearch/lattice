@@ -20,6 +20,7 @@ pub enum Error {
     TransitionDenied,
     UnexpectedBindings,
     InvalidCheckpoint,
+    AuthoritySource,
 }
 
 impl std::fmt::Display for Error {
@@ -32,6 +33,7 @@ impl std::fmt::Display for Error {
             Self::TransitionDenied => write!(formatter, "Choregraph denied the product execution transition"),
             Self::UnexpectedBindings => write!(formatter, "Choregraph returned an unexpected concrete intent set"),
             Self::InvalidCheckpoint => write!(formatter, "persisted workflow checkpoint is not admissible"),
+            Self::AuthoritySource => write!(formatter, "operator effect authority is unavailable or invalid"),
         }
     }
 }
@@ -82,13 +84,11 @@ impl Session {
         let portable = crate::workflow_format::workflow_to_portable(workflow);
         let lowered = crate::workflow_format::choregraph::lower_portable(&portable)
             .map_err(|error| Error::Lowering(error.to_string()))?;
-        let artifact = choregraph_kamacite::build_concrete_machine_artifact(&lowered.machine)
-            .map_err(|_| Error::MachineIdentity)?;
-        let machine_reference = format!("{}:{}", artifact.identity.algorithm, artifact.identity.hex);
+        let machine_reference = canonical_machine_identity(&lowered.machine)?;
         let revision = crate::orchestration::workflow_revision(workflow).map_err(|_| Error::WorkflowRevision)?;
         let workflow_reference = format!("blake3:{}", revision.content_hash);
         let context = super::choregraph::TransitionContext {
-            machine: super::authority::MachineIdentity::new(machine_reference)?,
+            machine: machine_reference,
             workflow_revision: super::authority::WorkflowRevisionIdentity::new(workflow_reference)?,
             run: run.run.clone(),
             authority: run.authority.clone(),
@@ -261,4 +261,13 @@ impl Session {
 
 fn node_reference(node_id: crate::engine::workflow::NodeId) -> String {
     format!("{CHOREGRAPH_NODE_PREFIX}{}", node_id.0)
+}
+
+/// Canonical product machine identity shared by execution and read-only inspection.
+pub(crate) fn canonical_machine_identity(
+    machine: &choregraph_core::AdmittedMachine,
+) -> Result<super::authority::MachineIdentity, Error> {
+    let artifact = choregraph_kamacite::build_concrete_machine_artifact(machine).map_err(|_| Error::MachineIdentity)?;
+    super::authority::MachineIdentity::new(format!("{}:{}", artifact.identity.algorithm, artifact.identity.hex))
+        .map_err(Error::from)
 }

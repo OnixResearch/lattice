@@ -16,7 +16,7 @@
     "expected_missing_count": 315,
     "expected_missing_hash": "2b7906ee39473996244bcfbf795e9ee984704c8bbfe2db9017309647c4d8373c",
     "reviewed_decisions": 11,
-    "policy_hash": "27fca0c83548707b9610503f95bc2c3990700cbf44e7a999cd10ade0883fafc9"
+    "policy_hash": "d60eb53b0442499f7e8164b6483031b0e322940861e965f70021cd09793d2058"
   },
   "summary": {
     "total": 315,
@@ -427,7 +427,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.package-clippy-no-deps-with-deny-fixture"
@@ -451,7 +451,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.vendor-clippy-deny-excluded"
@@ -463,7 +463,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "0afd4c2a6b3a8309234ac2cac25ce9661cd8229ca571578a206bc130149655ff"
+          "blake3": "358edc911ad086aa1ba0af059bcf7633089fab6b16b4599fafb35bcca0fa25c7"
         },
         {
           "path": "flake.nix",
@@ -471,7 +471,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.check-only-signing-override-and-external-policy"
@@ -483,7 +483,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "0afd4c2a6b3a8309234ac2cac25ce9661cd8229ca571578a206bc130149655ff"
+          "blake3": "358edc911ad086aa1ba0af059bcf7633089fab6b16b4599fafb35bcca0fa25c7"
         },
         {
           "path": "flake.nix",
@@ -491,7 +491,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.missing-key-overridden-for-full-check"
@@ -503,7 +503,7 @@
       "evidence": [
         {
           "path": "README.md",
-          "blake3": "0afd4c2a6b3a8309234ac2cac25ce9661cd8229ca571578a206bc130149655ff"
+          "blake3": "358edc911ad086aa1ba0af059bcf7633089fab6b16b4599fafb35bcca0fa25c7"
         },
         {
           "path": "flake.nix",
@@ -511,7 +511,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.flake-signing-policy-absent"
@@ -531,7 +531,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.package-format-excludes-vendor-fixture"
@@ -551,7 +551,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.nonconforming-vendor-format-excluded"
@@ -571,7 +571,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.nix-nextest-compiles-tracked-test-fixtures"
@@ -591,7 +591,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.filtered-json-fixture-compiles"
@@ -619,7 +619,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.git-and-nix-nested-source-admission"
@@ -647,7 +647,7 @@
         },
         {
           "path": "tests/test_repository_validation.rs",
-          "blake3": "d4597ae38b09d88b9a20188f9449e4f185f6f4e69258b351160842171ef62302"
+          "blake3": "88642396fd42f3dd8f23cda53a0a097397f942c6ce6e2a3c0cb3d3ceca192abf"
         }
       ],
       "rationale_code": "assertions.nested-output-name-admitted"
@@ -2420,5 +2420,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "4e0dd0457a0b1a702ece517b5462709ec6ed2b2a7f9da7e552ccdacd92e63241"
+  "inventory_hash": "eb0150a8e356b677175f535d69eb7bfb185d8b3c0253039d17f1fd38d1a75b64"
 }

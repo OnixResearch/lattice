@@ -29,14 +29,14 @@ pub async fn run_saved_workflow_with_app_config(
     });
     debug_assert!(frontier_policy.total_slots > 0);
     debug_assert!(!frontier_policy.lane_slots.is_empty());
-    let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    let authority_provider = app_config.effect_authority_provider();
     run_saved_workflow_with_executor_factory(
         ProductRunRequest {
             store,
             workflow_name,
             run_id,
             owner: crate::store::RunOwner::Unscoped,
-            authority_provider: &authority_provider,
+            authority_provider: authority_provider.as_ref(),
         },
         || configured_executor(agent_runtime, frontier_policy),
     )

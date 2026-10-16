@@ -1021,6 +1021,23 @@
         "type": "github"
       }
     },
+    "role-protocol-runtime-source": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786668340,
+        "narHash": "sha256-Whno6Rc5/EiPrMEQ0og06dNBJLVkiXMEUc1M6ls5uOw=",
+        "ref": "refs/heads/main",
+        "rev": "cbb5db0e4844b466dcd1877218eb1f00a2a7caf2",
+        "revCount": 232,
+        "type": "git",
+        "url": "https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git"
+      },
+      "original": {
+        "rev": "cbb5db0e4844b466dcd1877218eb1f00a2a7caf2",
+        "type": "git",
+        "url": "https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git"
+      }
+    },
     "root": {
       "inputs": {
         "bounded-exec": "bounded-exec",
@@ -1034,6 +1051,7 @@
         "nickel-eval": "nickel-eval",
         "nixpkgs": "nixpkgs_2",
         "octet": "octet",
+        "role-protocol-runtime-source": "role-protocol-runtime-source",
         "rust-overlay": "rust-overlay_9",
         "transactional-reconciliation-core": "transactional-reconciliation-core"
       }

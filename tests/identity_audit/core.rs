@@ -45,12 +45,6 @@ pub struct BrandingFinding {
     pub line: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RequiredText<'a> {
-    pub path: &'a str,
-    pub needle: &'a str,
-}
-
 pub fn stale_branding_findings(files: &[TextSnapshot]) -> Vec<BrandingFinding> {
     let mut findings = Vec::new();
     for file in files {
@@ -67,17 +61,6 @@ pub fn stale_branding_findings(files: &[TextSnapshot]) -> Vec<BrandingFinding> {
         }
     }
     findings
-}
-
-pub fn missing_required_text(files: &[TextSnapshot], requirements: &[RequiredText<'_>]) -> Vec<String> {
-    let mut missing = Vec::new();
-    for requirement in requirements {
-        let matches = files.iter().any(|file| file.path == requirement.path && file.text.contains(requirement.needle));
-        if !matches {
-            missing.push(format!("{}: {}", requirement.path, requirement.needle));
-        }
-    }
-    missing
 }
 
 pub fn accepted_legacy_id_manifest_hash(files: &[TextSnapshot]) -> String {

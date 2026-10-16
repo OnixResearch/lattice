@@ -15,6 +15,10 @@
       url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=5e1fe08d62149b286ff583eb056e655fe92e3cf1";
       flake = false;
     };
+    role-protocol-runtime-source = {
+      url = "git+https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git?rev=cbb5db0e4844b466dcd1877218eb1f00a2a7caf2";
+      flake = false;
+    };
     bounded-exec = {
       url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
       flake = false;
@@ -51,6 +55,7 @@
       flake-utils,
       octet,
       cairn,
+      role-protocol-runtime-source,
       bounded-exec,
       choregraph,
       nickel-eval,
@@ -771,7 +776,8 @@
               test "$(wc -l < "$source_manifest")" -eq 24
               sort --check --key=2,2 "$source_manifest"
               test "$(grep --extended-regexp --count '^[0-9a-f]{64}  [A-Za-z0-9._/-]+$' "$source_manifest")" -eq 24
-              (cd ${self} && b3sum --check "$source_manifest")
+              test '${role-protocol-runtime-source.rev}' = "$(jq --raw-output '.runtime.revision' "$generated")"
+              (cd ${role-protocol-runtime-source} && b3sum --check "$source_manifest")
               if sed --regexp-extended 's/^[0-9a-f]{64}  //' "$source_manifest" \
                 | grep --extended-regexp '(^/|(^|/)\.\.(/|$))'; then
                 echo 'runtime source manifest contains an unsafe path' >&2

@@ -29,20 +29,17 @@ pub fn evaluate_for(
     if facts.revocation != super::RevocationDisposition::Current {
         return denied(super::AuthorizationDenial::RevocationDenied, None);
     }
-    if facts.basalt_input.replay != basalt::authority_core::AuthorityReplayDisposition::Admitted {
+    if let super::Evidence::VerifiedUcan(input) = &facts.evidence
+        && input.replay != basalt::authority_core::AuthorityReplayDisposition::Admitted
+    {
         return denied(super::AuthorizationDenial::ReplayDenied, None);
     }
     let policy = match basalt::parse_policy_json(super::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_JSON) {
         Ok(policy) => policy,
         Err(_) => return denied(super::AuthorizationDenial::AuthorityUnavailable, None),
     };
-    let basalt_decision =
-        basalt::authority_core::evaluate_authority(&policy, &facts.trusted_policy_ref, &facts.basalt_input);
-    if basalt_decision.is_denied() {
-        return denied(
-            super::AuthorizationDenial::BasaltDenied,
-            basalt_decision.diagnostic.map(|diagnostic| diagnostic.as_str().to_owned()),
-        );
+    if let Some(decision) = evidence_denial(&policy, facts) {
+        return decision;
     }
     super::AuthorizationDecision {
         allowed: true,
@@ -58,23 +55,69 @@ fn binding_denial(facts: &super::AuthorizationFacts) -> Option<super::Authorizat
     {
         return Some(super::AuthorizationDenial::MalformedBinding);
     }
-    if !request_matches_binding(&facts.binding, &facts.basalt_input) {
+    if !request_matches_binding(&facts.binding, &facts.evidence) {
         return Some(super::AuthorizationDenial::BindingMismatch);
     }
     if facts.trusted_policy_ref.artifact_ref != facts.binding.policy.as_str()
-        || facts.trusted_policy_ref.contract_id != facts.basalt_input.request.contract_id
+        || facts.trusted_policy_ref.schema_version != super::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_SCHEMA
+        || facts.trusted_policy_ref.contract_id != evidence_request(&facts.evidence).contract_id
     {
         return Some(super::AuthorizationDenial::PolicyMismatch);
     }
     None
 }
 
-fn request_matches_binding(binding: &super::IntentBinding, input: &basalt::authority_core::AuthorityInput) -> bool {
-    let is_request_match = input.request.resource == binding.resource.as_str()
-        && input.request.ability == binding.ability.as_str()
-        && input.request.request_ref == binding.request.as_str();
-    let is_policy_match = input.policy_refs.len() == 1 && input.policy_refs[0].artifact_ref == binding.policy.as_str();
-    is_request_match && is_policy_match
+fn evidence_request(evidence: &super::Evidence) -> &basalt::authority_core::AuthorityRequest {
+    match evidence {
+        super::Evidence::VerifiedUcan(input) => &input.request,
+        super::Evidence::LocalOperator(grant) => &grant.request,
+    }
+}
+
+fn request_matches_binding(binding: &super::IntentBinding, evidence: &super::Evidence) -> bool {
+    let request = evidence_request(evidence);
+    let is_request_match = request.resource == binding.resource.as_str()
+        && request.ability == binding.ability.as_str()
+        && request.request_ref == binding.request.as_str();
+    let is_evidence_match = match evidence {
+        super::Evidence::VerifiedUcan(input) => {
+            input.policy_refs.len() == 1 && input.policy_refs[0].artifact_ref == binding.policy.as_str()
+        }
+        super::Evidence::LocalOperator(grant) => {
+            grant.authority_ref == binding.authority.as_str() && grant.operation == binding.operation.as_str()
+        }
+    };
+    is_request_match && is_evidence_match
+}
+
+// r[impl lattice.standalone_effect_authority.provenance]
+fn evidence_denial(policy: &basalt::Policy, facts: &super::AuthorizationFacts) -> Option<super::AuthorizationDecision> {
+    match &facts.evidence {
+        super::Evidence::VerifiedUcan(input) => {
+            let decision = basalt::authority_core::evaluate_authority(policy, &facts.trusted_policy_ref, input);
+            decision.is_denied().then(|| {
+                denied(
+                    super::AuthorizationDenial::BasaltDenied,
+                    decision.diagnostic.map(|diagnostic| diagnostic.as_str().to_owned()),
+                )
+            })
+        }
+        super::Evidence::LocalOperator(grant) => {
+            let request = basalt::EnforcementRequest::new(
+                &grant.request.contract_id,
+                facts.binding.resource.as_str(),
+                facts.binding.ability.as_str(),
+            )
+            .with_capabilities(vec![basalt::CapabilityGrant::new(
+                &grant.request.resource,
+                &grant.request.ability,
+            )]);
+            match basalt::enforce(policy, &request) {
+                Ok(receipt) if receipt.is_allowed() => None,
+                _ => Some(denied(super::AuthorizationDenial::BasaltDenied, None)),
+            }
+        }
+    }
 }
 
 fn validate_scope(

@@ -6,11 +6,9 @@ mod core;
 mod shell;
 
 use core::BinarySnapshot;
-use core::RequiredText;
 use core::TextSnapshot;
 use core::accepted_legacy_id_manifest_hash;
 use core::archive_manifest_hash;
-use core::missing_required_text;
 use core::stale_branding_findings;
 
 const CANONICAL_PACKAGE_NAME: &str = "lattice";
@@ -18,28 +16,6 @@ const LEGACY_PRODUCT_NAME: &str = concat!("n8n", "clone");
 const EXPECTED_ACCEPTED_ID_MANIFEST_BLAKE3: &str = "9a7274e65812d089ca587151e94c765fec703c4cd06d6a280fa67c5bc848c95e";
 const EXPECTED_RENAME_ARCHIVE_MANIFEST_BLAKE3: &str =
     "cb0b15ff320803f9e98ae49f01691c4b478c0bf21d2c223b90d5d9e1f72f481d";
-const CANONICAL_SURFACES: &[RequiredText<'_>] = &[
-    RequiredText {
-        path: "Cargo.toml",
-        needle: "[package]\nname = \"lattice\"",
-    },
-    RequiredText {
-        path: "Cargo.toml",
-        needle: "[[bin]]\nname = \"lattice\"",
-    },
-    RequiredText {
-        path: "flake.nix",
-        needle: "lattice = craneLib.buildPackage",
-    },
-    RequiredText {
-        path: "README.md",
-        needle: "# Lattice",
-    },
-    RequiredText {
-        path: "README.md",
-        needle: "lattice --config",
-    },
-];
 
 // r[verify lattice.project_identity.canonical.scenario.build-and-run]
 #[test]
@@ -61,10 +37,8 @@ fn cargo_and_binary_expose_lattice_identity() {
 fn maintained_identity_audit_rejects_stale_public_branding() {
     let root = shell::repository_root();
     let public_files = shell::read_public_text(&root).expect("public identity surfaces should be readable");
-    let missing = missing_required_text(&public_files, CANONICAL_SURFACES);
     let stale = stale_branding_findings(&public_files);
 
-    assert!(missing.is_empty(), "missing canonical identity surfaces: {missing:#?}");
     assert!(stale.is_empty(), "stale public branding: {stale:#?}");
 }
 

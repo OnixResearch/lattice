@@ -387,6 +387,19 @@ impl Store {
         }
     }
 
+    /// Load a saved workflow without creating a database, tables, or write transactions.
+    pub fn load_workflow_read_only(path: &Path, name: &str) -> Result<Option<Workflow>, StoreError> {
+        let db = redb::ReadOnlyDatabase::open(path).map_err(|e| StoreError::Db(e.to_string()))?;
+        let txn = db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
+        let table = txn.open_table(WORKFLOWS).map_err(|e| StoreError::Table(e.to_string()))?;
+        match table.get(name).map_err(|e| StoreError::Db(e.to_string()))? {
+            Some(data) => {
+                serde_json::from_slice(data.value()).map(Some).map_err(|e| StoreError::Deserialize(e.to_string()))
+            }
+            None => Ok(None),
+        }
+    }
+
     /// List all workflow names.
     pub fn list_workflows(&self) -> Result<Vec<String>, StoreError> {
         let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
