@@ -55,6 +55,7 @@ pub fn metadata(candidate: &super::model::Candidate) -> Result<Vec<Metadata>, su
     Ok(result)
 }
 
+// r[impl lattice.operation_packs.skills.denied]
 pub fn validate_body(admitted: &super::model::AdmittedPack, name: &str, body: &[u8]) -> Result<(), super::Error> {
     let skill = admitted
         .candidate

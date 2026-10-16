@@ -19,6 +19,8 @@ pub struct ScheduleOccurrenceInput<'a> {
 ///
 /// The role wrapper fixes the product domain, tags, integer encoding, and output
 /// spelling. The shared core only performs the existing hashed-part framing.
+// r[impl lattice.content_identity_adoption.boundary]
+// r[impl lattice.content_identity_adoption.cutover]
 pub fn schedule_occurrence(input: ScheduleOccurrenceInput<'_>) -> Result<String, content_identity_core::IdentityError> {
     let domain = content_identity_core::Domain::new(SCHEDULE_OCCURRENCE_DOMAIN)?;
     let mut hasher = content_identity_core::IdentityHasher::new(domain);

@@ -4,4 +4,6 @@
 
 `default.ncl` overlays Lattice traceability roots and keeps the upstream lifecycle, workflow, receipt, and validation policy.
 
+`traceability-contracts.ncl` adds Lattice-owned component-wise admission for those roots. It rejects absolute, empty, dot, parent-traversing and non-normalized components without changing either upstream snapshot.
+
 The snapshot supplies policy structure only. It does not transfer Cairn correctness, Lattice correctness, release authority, or evidence authority.

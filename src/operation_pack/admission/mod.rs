@@ -15,6 +15,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+// r[impl lattice.operation_packs.admission.valid]
+// r[impl lattice.operation_packs.admission.denied]
 pub fn admit(
     candidate: &super::model::Candidate,
     lock: &super::model::Lock,

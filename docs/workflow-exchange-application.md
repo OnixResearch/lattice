@@ -65,7 +65,13 @@ An exact duplicate dispatch returns the stored acceptance. A changed request can
 
 ## Lifecycle
 
-A worker stores `Running` before it enters the headless runtime. Terminal results retain node and execution receipt identities.
+A worker stores `Running` before it enters the headless runtime. Executed terminal nodes and the terminal execution retain receipt identities. Skipped nodes have no execution receipt, as required by the published observation contract.
+
+Immutable exchange snapshots require every mapped shell command to exit zero
+before completing that node successfully. A nonzero or unavailable successful
+exit status retains a failed node, skips dependent effects, and produces a failed
+terminal observation with `successful = false`. Ordinary graph execution outside
+this exchange snapshot path retains its existing exit-as-data behavior.
 
 Cancellation records the request and signals the bounded executor cancellation flag. A cancellation request does not by itself prove cancellation.
 

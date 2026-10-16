@@ -32,6 +32,7 @@ impl Plane {
         })
     }
 
+    // r[impl lattice.operation_data.versions.uncertain]
     pub fn recover_publications(&self) -> Result<Vec<(String, PublicationOutcome)>, Error> {
         let records = self.list_metadata()?;
         let referenced = records

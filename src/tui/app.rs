@@ -1117,6 +1117,7 @@ impl App {
         self.confirm_quit
     }
 
+    // r[impl lattice.workflow_validation.domain_boundary.validation.shell_time]
     /// Mark the current workflow as dirty after a user-visible mutation.
     pub fn mark_workflow_dirty(&mut self) {
         let timestamp = crate::engine::workflow::WorkflowTimestamp::from_datetime(chrono::Utc::now());

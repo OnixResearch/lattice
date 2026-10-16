@@ -110,6 +110,67 @@ mod tests {
     }
 
     #[test]
+    fn subwayrat_workflow_record_loads_and_admits_without_effects() {
+        use crate::engine::workflow::NodeConfig;
+
+        let directory = tempfile::tempdir().expect("record directory");
+        let database_path = directory.path().join("legacy.redb");
+        let effect_path = directory.path().join("must-not-run");
+        let mut graph = rat_nodegraph::model::Graph::new();
+        let source = graph.add_node("source", &[rat_nodegraph::model::PortSpec::new("stdin", "string")], &[
+            rat_nodegraph::model::PortSpec::new("stdout", "string"),
+            rat_nodegraph::model::PortSpec::new("stderr", "string"),
+            rat_nodegraph::model::PortSpec::new("exit", "exitcode"),
+        ]);
+        let target = graph.add_node("target", &[rat_nodegraph::model::PortSpec::new("stdin", "string")], &[
+            rat_nodegraph::model::PortSpec::new("stdout", "string"),
+            rat_nodegraph::model::PortSpec::new("stderr", "string"),
+            rat_nodegraph::model::PortSpec::new("exit", "exitcode"),
+        ]);
+        let output = graph.node(source).expect("source").output_ports[0].id;
+        let input = graph.node(target).expect("target").input_ports[0].id;
+        graph.add_edge(output, input).expect("legacy edge");
+        let command = format!("touch {}", effect_path.display());
+        let configs = std::collections::HashMap::from([
+            (source.0, NodeConfig::shell(&command)),
+            (target.0, NodeConfig::shell("cat")),
+        ]);
+        let record = serde_json::to_vec(&serde_json::json!({
+            "meta": { "name": "legacy", "description": "", "created": "1970-01-01T00:00:00Z", "modified": "1970-01-01T00:00:00Z" },
+            "graph": graph,
+            "configs": configs
+        })).expect("legacy record encodes");
+
+        drop(crate::store::Store::new(&database_path).expect("initialize tables"));
+        let database = redb::Database::create(&database_path).expect("open raw store");
+        let transaction = database.begin_write().expect("write transaction");
+        {
+            let mut table =
+                transaction.open_table(redb::TableDefinition::<&str, &[u8]>::new("workflows")).expect("workflows");
+            table.insert("legacy", record.as_slice()).expect("legacy bytes persist");
+        }
+        transaction.commit().expect("commit legacy record");
+        drop(database);
+
+        let store = crate::store::Store::new(&database_path).expect("current store");
+        let loaded = store.load_workflow("legacy").expect("legacy decode").expect("legacy record exists");
+        let portable = crate::workflow_format::workflow_to_portable(&loaded);
+        let admitted = crate::workflow_format::choregraph::lower_portable(&portable).expect("legacy graph admits");
+
+        // r[verify lattice.workflow_validation.domain_boundary.compatibility.persisted]
+        assert_eq!(loaded.graph.node(workflow_node_id(source)).expect("source identity").label, "source");
+        assert_eq!(loaded.graph.edges(), &[crate::engine::workflow::Edge {
+            source: workflow_port_id(output),
+            target: workflow_port_id(input)
+        }]);
+        assert!(
+            matches!(loaded.node_config(workflow_node_id(source)), Some(NodeConfig::Shell { command: actual, .. }) if actual == &command)
+        );
+        assert_eq!(admitted.machine.edges().len(), 1);
+        assert!(!effect_path.exists());
+    }
+
+    #[test]
     fn malformed_graph_payload_fails_closed() {
         let error = decode_domain("{\"nodes\":[]}").expect_err("malformed graph must fail");
         assert!(matches!(error, AdapterError::Decode(_)));

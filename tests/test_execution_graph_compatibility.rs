@@ -36,6 +36,7 @@ fn diamond_graph() -> ExecutionGraph {
     )
 }
 
+// r[verify lattice.execution_graph_external_adoption.compatibility]
 // r[verify lattice.execution_graph_external_adoption.compatibility.scenario.agree]
 #[test]
 fn external_core_preserves_selected_graph_and_lifecycle_decisions() {

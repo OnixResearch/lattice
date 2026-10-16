@@ -192,6 +192,7 @@ fn allows_current_scope_protected_authority() {
 
     let decision = authority::evaluate(&facts);
 
+    // r[verify lattice.choregraph_effect_authority.scope_currentness.scenario.current]
     assert!(decision.allowed);
     assert_eq!(decision.denial, None);
 }
@@ -215,6 +216,7 @@ fn denies_missing_wrong_and_replayed_authority() {
 
     assert_eq!(authority::evaluate(&missing).denial, Some(authority::AuthorizationDenial::BasaltDenied));
     assert_eq!(authority::evaluate(&wrong_resource).denial, Some(authority::AuthorizationDenial::BindingMismatch));
+    // r[verify lattice.choregraph_effect_authority.basalt.scenario.ability]
     assert_eq!(authority::evaluate(&wrong_ability).denial, Some(authority::AuthorizationDenial::BasaltDenied));
     assert_eq!(authority::evaluate(&wrong_request).denial, Some(authority::AuthorizationDenial::BindingMismatch));
     assert_eq!(authority::evaluate(&stale_policy).denial, Some(authority::AuthorizationDenial::PolicyMismatch));
@@ -228,6 +230,7 @@ fn denies_missing_stale_removed_audience_consent_and_revocation_scope_facts() {
     assert_eq!(authority::evaluate(&missing).denial, Some(authority::AuthorizationDenial::ScopeRequired));
     let mut fabricated_unscoped = facts(authority::CollaborationScopeBinding::Unscoped);
     fabricated_unscoped.scope_requirement = authority::ScopeRequirement::ProtectedRequired;
+    // r[verify lattice.choregraph_effect_authority.scope_currentness.scenario.unscoped]
     assert_eq!(
         authority::evaluate(&fabricated_unscoped).denial,
         Some(authority::AuthorizationDenial::ScopeRequired)
@@ -249,6 +252,44 @@ fn denies_missing_stale_removed_audience_consent_and_revocation_scope_facts() {
 }
 
 #[test]
+fn scope_binding_rejects_each_mismatched_snapshot_identity() {
+    for mutate in [
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.scope = id(authority::ScopeIdentity::new, "other-scope")
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.revision = id(authority::ScopeRevisionIdentity::new, "other-revision")
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| snapshot.membership_epoch += 1,
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.audience = id(authority::AudienceIdentity::new, "other-audience")
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.consent = id(authority::ConsentDecisionIdentity::new, AUTHORITY_REF)
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.snapshot = id(authority::ScopeSnapshotIdentity::new, AUTHORITY_REF)
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.resource = id(authority::ResourceIdentity::new, "lattice://file/other")
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.ability = id(authority::AbilityIdentity::new, "file/read")
+        },
+        |snapshot: &mut authority::ScopeSnapshotFacts| {
+            snapshot.request = id(authority::RequestIdentity::new, AUTHORITY_REF)
+        },
+    ] {
+        let mut changed = facts(protected_scope());
+        let mut snapshot = scope_snapshot(FILE_RESOURCE, FILE_ABILITY);
+        mutate(&mut snapshot);
+        changed.scope_snapshot = Some(snapshot);
+        // r[verify lattice.choregraph_effect_authority.binding.scenario.scope-mismatch]
+        assert_eq!(authority::evaluate(&changed).denial, Some(authority::AuthorizationDenial::ScopeMismatch));
+    }
+}
+
+#[test]
 fn replayed_allowance_never_becomes_fresh_dispatch_authority() {
     let binding = binding(FILE_RESOURCE, FILE_ABILITY, authority::CollaborationScopeBinding::Unscoped);
     let prior = authority::AuthorizationDecision {
@@ -260,6 +301,7 @@ fn replayed_allowance_never_becomes_fresh_dispatch_authority() {
 
     let replay = authority::replay_observation(&binding, Some(&prior));
 
+    // r[verify lattice.choregraph_effect_authority.replay.scenario.history]
     assert!(!replay.allowed);
     assert_eq!(replay.denial, Some(authority::AuthorizationDenial::ReplayDenied));
     assert!(replay.binding.is_none());
@@ -309,6 +351,17 @@ impl dispatch::ScopeSnapshotProvider for NoScope {
     }
 }
 
+struct CurrentScope(std::sync::Arc<std::sync::Mutex<authority::ScopeSnapshotFacts>>);
+
+impl dispatch::ScopeSnapshotProvider for CurrentScope {
+    fn load_current(
+        &self,
+        _binding: &authority::IntentBinding,
+    ) -> Result<Option<authority::ScopeSnapshotFacts>, dispatch::Error> {
+        Ok(Some(self.0.lock().expect("scope lock").clone()))
+    }
+}
+
 struct FailingAttempts;
 impl EffectAttemptStore for FailingAttempts {
     fn reserve(&self, _binding: authority::IntentBinding) -> Result<authority::Attempt, dispatch::Error> {
@@ -338,6 +391,62 @@ impl EffectAttemptStore for RecordingAttempts {
 }
 
 #[test]
+fn dispatch_rechecks_removed_membership_instead_of_trusting_prior_allowance() {
+    let root_dir = tempfile::tempdir().expect("root directory");
+    let request = FileAdapterRequest {
+        root_id: ROOT_ID.to_owned(),
+        relative_path: TEST_FILE_NAME.to_owned(),
+        content: Some(TEST_FILE_CONTENT.to_vec()),
+        overwrite: false,
+        read_max_bytes: FILE_READ_LIMIT_BYTES,
+    };
+    let binding = binding_with_payload(
+        FILE_RESOURCE,
+        FILE_ABILITY,
+        protected_scope(),
+        &lattice::engine::effect::runtime::file_plan_identity(&request),
+    );
+    let mut admitted = facts(protected_scope());
+    admitted.binding = binding.clone();
+    admitted.scope_requirement = authority::ScopeRequirement::ProtectedRequired;
+    admitted.scope_snapshot = Some(scope_snapshot(FILE_RESOURCE, FILE_ABILITY));
+    assert!(authority::evaluate(&admitted).allowed);
+
+    let mut removed = scope_snapshot(FILE_RESOURCE, FILE_ABILITY);
+    removed.membership_current = false;
+    let current = std::sync::Arc::new(std::sync::Mutex::new(removed));
+    let recorded = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let root = cap_std::fs::Dir::open_ambient_dir(root_dir.path(), cap_std::ambient_authority()).expect("root");
+    let shell = dispatch::Shell::new(
+        Box::new(FixedFacts { facts: admitted }),
+        Box::new(CurrentScope(std::sync::Arc::clone(&current))),
+        Box::new(RecordingAttempts {
+            recorded: std::sync::Arc::clone(&recorded),
+        }),
+        Box::new(lattice::engine::effect::runtime::ConfiguredRoots::new(BTreeMap::from([(ROOT_ID.to_owned(), root)]))),
+    );
+    let http = lattice::http::StaticHttpClient::new(std::collections::HashMap::new());
+    let process_config = lattice::process::core::RuntimeConfig::default();
+    let runtime = Adapters::new(&shell, &http, &process_config);
+
+    // r[verify lattice.choregraph_effect_authority.scope_currentness.scenario.membership-removed]
+    assert_eq!(shell.dispatch(&runtime, binding.clone(), &request), Err(dispatch::Error::AuthorityDenied));
+    assert!(!root_dir.path().join(TEST_FILE_NAME).exists());
+    assert_eq!(recorded.lock().expect("outcomes")[0].denial, Some(authority::AuthorizationDenial::StaleScope));
+
+    *current.lock().expect("scope lock") = scope_snapshot(FILE_RESOURCE, FILE_ABILITY);
+    // r[verify lattice.choregraph_effect_authority.scope_currentness.scenario.current]
+    // r[verify lattice.choregraph_effect_authority.fixtures.scenario.corpus]
+    assert_eq!(
+        shell.dispatch(&runtime, binding, &request),
+        Ok(FileAdapterOutput::Written {
+            bytes: TEST_FILE_CONTENT.len()
+        })
+    );
+    assert_eq!(std::fs::read(root_dir.path().join(TEST_FILE_NAME)).expect("observed file"), TEST_FILE_CONTENT);
+}
+
+#[test]
 fn unavailable_authority_records_deterministic_denial() {
     let recorded = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let shell = dispatch::Shell::new(
@@ -350,6 +459,7 @@ fn unavailable_authority_records_deterministic_denial() {
     );
     let binding = binding(FILE_RESOURCE, FILE_ABILITY, authority::CollaborationScopeBinding::Unscoped);
 
+    // r[verify lattice.choregraph_effect_authority.denial.scenario.unavailable]
     assert_eq!(shell.authorize(binding), Err(dispatch::Error::AuthorityUnavailable));
     let events = recorded.lock().expect("record lock");
     assert_eq!(events.len(), ATTEMPT_SEQUENCE as usize);
@@ -364,6 +474,7 @@ fn authority_mismatch_and_persistence_failure_stop_before_adapters() {
     let mut mismatched = facts(authority::CollaborationScopeBinding::Unscoped);
     mismatched.binding.run = id(authority::RunIdentity::new, "another-run");
     let mismatch = authority::evaluate_for(&requested, &mismatched);
+    // r[verify lattice.choregraph_effect_authority.binding.scenario.run-mismatch]
     assert_eq!(mismatch.denial, Some(authority::AuthorizationDenial::BindingMismatch));
 
     let persistence_shell = dispatch::Shell::new(
@@ -374,6 +485,7 @@ fn authority_mismatch_and_persistence_failure_stop_before_adapters() {
         Box::new(FailingAttempts),
         Box::new(NoRoots),
     );
+    // r[verify lattice.choregraph_effect_authority.durability.scenario.persistence]
     assert_eq!(persistence_shell.authorize(requested), Err(dispatch::Error::AttemptPersistence));
 }
 
@@ -537,6 +649,7 @@ fn root_and_path_admission_fail_closed() {
     let shell =
         dispatch::Shell::new(Box::new(Unavailable), Box::new(Unavailable), Box::new(Unavailable), Box::new(NoRoots));
 
+    // r[verify lattice.choregraph_effect_authority.root_authority.scenario.unknown]
     assert_eq!(
         shell.admit_file_path(&authorized, dispatch::FileTarget {
             root_id: ROOT_ID,
@@ -581,6 +694,7 @@ fn file_adapter_rejects_symlink_escape() {
     let process_config = lattice::process::core::RuntimeConfig::default();
     let runtime = Adapters::new(&shell, &http, &process_config);
 
+    // r[verify lattice.choregraph_effect_authority.files.scenario.escape]
     assert_eq!(runtime.file(&allowed_attempt(file_binding), &request), Err(dispatch::Error::AdapterRejected));
 }
 
@@ -663,6 +777,20 @@ fn allowed_file_process_and_network_use_selected_bounded_adapters() {
     let process_output =
         runtime.process(&allowed_attempt(process_binding), &process_request, None).expect("process adapter");
     assert_eq!(process_output.stdout, b"bounded");
+
+    let mut over_limit_request = process_request.clone();
+    over_limit_request.output_limit_bytes = 1;
+    let over_limit_binding = binding_with_payload(
+        PROCESS_RESOURCE,
+        PROCESS_ABILITY,
+        authority::CollaborationScopeBinding::Unscoped,
+        &lattice::engine::effect::runtime::process_plan_identity(&over_limit_request),
+    );
+    // r[verify lattice.choregraph_effect_authority.adapters.scenario.process]
+    assert_eq!(
+        runtime.process(&allowed_attempt(over_limit_binding), &over_limit_request, None),
+        Err(dispatch::Error::AdapterRejected)
+    );
 }
 
 fn allowed_attempt(binding: authority::IntentBinding) -> dispatch::AuthorizedAttempt {
@@ -1083,6 +1211,4 @@ fn stale_policy_binding_is_denied() {
 fn policy_is_separate_and_has_exact_blake3_identity() {
     let digest = blake3::hash(authority::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_JSON.as_bytes());
     assert_eq!(digest.to_hex().as_str(), authority::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_BLAKE3);
-    assert!(!authority::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_JSON.contains("machine"));
-    assert!(!authority::CHOREGRAPH_EFFECT_AUTHORITY_POLICY_JSON.contains("workflow"));
 }

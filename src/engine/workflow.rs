@@ -31,6 +31,7 @@ use crate::file_node::FileOperationKind;
 use crate::image_node::DEFAULT_MAX_IMAGE_BYTES;
 use crate::triggers::TriggerDefinition;
 
+// r[impl lattice.workflow_validation.domain_boundary.time]
 /// A validated explicit UTC timestamp for workflow-domain decisions.
 #[allow(unknown_lints)]
 #[allow(
@@ -223,6 +224,7 @@ impl NodeRunnerSettings {
     }
 }
 
+// r[impl lattice.workflow_validation.domain_boundary.application_model]
 /// A complete workflow: graph topology + node configs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
@@ -550,6 +552,7 @@ impl Workflow {
         self.runner.insert(id.workflow_node_id().0, settings);
     }
 
+    // r[impl lattice.workflow_validation.domain_boundary.validation.shell_time]
     /// Set the modified timestamp from one shell-owned clock observation.
     pub fn touch(&mut self, timestamp: WorkflowTimestamp) {
         self.meta.modified = timestamp.into_datetime();
@@ -584,6 +587,7 @@ mod tests {
         workflow.set_node_runner_settings(source, NodeRunnerSettings::new("host", "shell"));
 
         workflow.remove_node(source).expect("aggregate removal succeeds");
+        // r[verify lattice.workflow_validation.domain_boundary.application_model.accepted]
 
         assert!(workflow.graph.node(source).is_none());
         assert!(workflow.graph.node(target).is_some());
@@ -703,6 +707,8 @@ mod tests {
         let prior_edges = workflow.graph.edges().to_vec();
 
         let result = workflow.replace_condition_branches(condition, vec![branch("duplicate"), branch("duplicate")]);
+        // r[verify lattice.workflow_validation.domain_boundary.validation]
+        // r[verify lattice.workflow_validation.domain_boundary.validation.paired]
 
         assert_eq!(
             result,

@@ -19,6 +19,13 @@ const LINE_NUMBER_BASE: usize = 1;
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
+const OCTET_MIGRATION_FORMAT_ARGS: &[&str] = &[
+    "--check",
+    "--edition",
+    "2024",
+    "scripts/octet-baseline-migrate.rs",
+    "scripts/octet_baseline_migration.rs",
+];
 const TOON_SYNC_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/sync_toon_format.rs"];
 const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "--check",
@@ -134,6 +141,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "Octet migration script format",
+        program: RUSTFMT_PROGRAM,
+        args: OCTET_MIGRATION_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "TOON sync script format",
         program: RUSTFMT_PROGRAM,
         args: TOON_SYNC_SCRIPT_FORMAT_ARGS,
@@ -211,6 +224,7 @@ const COMMAND_STEPS: &[CheckStep] = &[
         args: ORCHESTRATION_IDENTITY_CHECK_ARGS,
         use_repo_local_target: true,
     },
+    // r[impl lattice.choregraph_effect_authority.validation.scenario.crash]
     CheckStep {
         name: "operator E2E",
         program: CARGO_PROGRAM,
@@ -312,6 +326,8 @@ impl std::fmt::Display for SpecDiagnostic {
     }
 }
 
+// r[impl lattice.nickel_toolchain.validation]
+// r[impl lattice.nickel_toolchain.validation.scenario.passed]
 fn run_checks(command_steps: &[CheckStep]) -> Result<(), CheckError> {
     for step in command_steps {
         run_step(*step)?;

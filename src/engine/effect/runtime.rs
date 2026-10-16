@@ -168,6 +168,7 @@ impl<'a> Adapters<'a> {
     }
 
     // r[impl lattice.choregraph_effect_authority.adapters]
+    // r[impl lattice.choregraph_effect_authority.adapters.scenario.process]
     pub fn process(
         &self,
         authorized: &super::dispatch::AuthorizedAttempt,

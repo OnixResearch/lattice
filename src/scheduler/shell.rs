@@ -62,6 +62,21 @@ pub async fn execute_occurrence(
     occurrence: &super::ScheduleOccurrence,
     agent_runtime: crate::agent_node::AgentRuntimeConfig,
 ) -> Result<crate::headless::HeadlessRunSummary, Error> {
+    execute_occurrence_with_authority_provider(
+        store,
+        occurrence,
+        agent_runtime,
+        &crate::engine::effect::execution::UnavailableRunContextSource,
+    )
+    .await
+}
+
+pub async fn execute_occurrence_with_authority_provider(
+    store: &crate::store::Store,
+    occurrence: &super::ScheduleOccurrence,
+    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<crate::headless::HeadlessRunSummary, Error> {
     super::validate_schedule_occurrence(occurrence).map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
     debug_assert!(!occurrence.identity.is_empty());
     debug_assert_eq!(occurrence.attempt_run_ids.last().copied(), Some(occurrence.active_run_id));
@@ -72,17 +87,20 @@ pub async fn execute_occurrence(
     if revision != occurrence.workflow_revision {
         return Err(Error::InvalidOccurrence(super::OccurrenceError::WorkflowRevisionMismatch.to_string()));
     }
-    let dispatch = crate::reconciliation::admit_occurrence(occurrence)
-        .map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
+    let dispatch = store.admit_schedule_occurrence_dispatch(occurrence)?;
     debug_assert_eq!(dispatch.attempt_identity().as_bytes().len(), blake3::OUT_LEN);
-    let summary = crate::headless::run_owned_workflow(store, crate::headless::OwnedRunRequest {
-        workflow_name: occurrence.workflow_name.clone(),
-        run_id: occurrence.active_run_id,
-        owner: crate::store::RunOwner::ScheduleOccurrence {
-            identity: occurrence.identity.clone(),
+    let summary = crate::headless::run_owned_workflow_with_authority_provider(
+        store,
+        crate::headless::OwnedRunRequest {
+            workflow_name: occurrence.workflow_name.clone(),
+            run_id: occurrence.active_run_id,
+            owner: crate::store::RunOwner::ScheduleOccurrence {
+                identity: occurrence.identity.clone(),
+            },
+            agent_runtime,
         },
-        agent_runtime,
-    })
+        authority_provider,
+    )
     .await
     .map_err(|error| Error::Execution(error.to_string()))?;
     let recovered = recover_occurrence(store, &occurrence.identity)?;
@@ -177,7 +195,7 @@ fn load_workflow_revision(store: &crate::store::Store, workflow_name: &str) -> R
 
 fn load_occurrence(store: &crate::store::Store, identity: &str) -> Result<super::ScheduleOccurrence, Error> {
     store
-        .load_schedule_occurrence(identity)?
+        .load_schedule_occurrence_for_recovery(identity)?
         .ok_or_else(|| Error::MissingOccurrence(identity.to_string()))
 }
 

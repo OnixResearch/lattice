@@ -86,6 +86,7 @@ pub fn recheck(expected: &ResolvedInput, current: &ResolvedInput) -> Result<(), 
     if expected == current { Ok(()) } else { Err(Error::Stale) }
 }
 
+// r[impl lattice.operation_data.query.bound]
 pub fn bind_resolved_inputs(
     plan: &crate::operation::InvocationPlan,
     mut inputs: Vec<ResolvedInput>,

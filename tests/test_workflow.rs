@@ -30,6 +30,7 @@ fn equal_explicit_timestamps_create_equal_metadata() {
     let timestamp = WorkflowTimestamp::epoch();
     let first = WorkflowMeta::new("ts test", timestamp);
     let second = WorkflowMeta::new("ts test", timestamp);
+    // r[verify lattice.workflow_validation.domain_boundary.time.deterministic]
     assert_eq!(first.created, second.created);
     assert_eq!(first.modified, second.modified);
 }

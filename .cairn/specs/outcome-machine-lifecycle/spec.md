@@ -12,6 +12,7 @@ r[lattice.lifecycle.outcome_machine_profile] Lattice MUST pin the published `out
 
 #### Scenario: Planned workflow change attempts sync
 
+r[lattice.lifecycle.outcome_machine_profile.scenario.planned_sync_rejected]
 - GIVEN a Lattice change has a complete delivery plan
 - AND repository completion evidence remains planned
 - WHEN the repository-owned Cairn runner evaluates sync
@@ -20,6 +21,7 @@ r[lattice.lifecycle.outcome_machine_profile] Lattice MUST pin the published `out
 
 #### Scenario: Repository evidence completes admission
 
+r[lattice.lifecycle.outcome_machine_profile.scenario.repository_evidence_admitted]
 - GIVEN the selected Lattice checks pass
 - AND the change binds that observation with fresh-state evidence
 - WHEN Cairn reevaluates the change

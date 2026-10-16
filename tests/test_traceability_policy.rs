@@ -1,81 +1,126 @@
-use std::collections::BTreeSet;
-
 use serde_json::Value;
+use serde_json::json;
+
+#[path = "support/cairn.rs"]
+mod cairn;
+use cairn::Fixture;
+use cairn::TestResult;
 
 const GENERATED_POLICY: &str = include_str!("../cairn-policy/generated/cairn-policy.json");
-const INVALID_SOURCE_ROOT_FIXTURE: &str = include_str!("../cairn-policy/fixtures/invalid-traceability-source-root.ncl");
-const DEFAULT_PROFILE_ID: &str = "cairn-default";
-const UNSAFE_SOURCE_ROOT: &str = "../src";
-const INTERNAL_CRATE_ROOT: &str = "crates";
-const LEGACY_TOOL_ROOT: &str = "tools";
-const REQUIRED_MARKER_VERBS: [&str; 4] = ["depends", "impl", "related", "verify"];
-const REQUIRED_SOURCES: [(&str, &str); 8] = [
-    ("cairn-policy", "nickel_source"),
-    (INTERNAL_CRATE_ROOT, "rust_source"),
-    ("examples", "nickel_source"),
-    ("examples", "rust_source"),
-    ("scripts", "tool_source"),
-    ("src", "rust_source"),
-    ("tests", "rust_source"),
-    (".cairn/specs", "accepted_specs"),
-];
 
-fn policy() -> Value {
-    serde_json::from_str(GENERATED_POLICY).expect("generated Cairn policy must be valid JSON")
+fn marker(verb: &str, id: &str) -> String {
+    format!("r[{verb} {id}]\n")
 }
 
-fn default_profile(policy: &Value) -> &Value {
-    let traceability = &policy["traceability_policy"];
-    assert_eq!(traceability["default_profile"], DEFAULT_PROFILE_ID);
-    traceability["profiles"]
-        .as_array()
-        .expect("traceability profiles")
-        .iter()
-        .find(|profile| profile["id"] == DEFAULT_PROFILE_ID)
-        .expect("default traceability profile")
-}
-
-fn source_pairs(profile: &Value) -> BTreeSet<(&str, &str)> {
-    let mut sources = BTreeSet::new();
-    for field in ["requirement_sources", "evidence_sources"] {
-        for source in profile[field].as_array().expect("traceability sources") {
-            sources.insert((
-                source["root"].as_str().expect("source root"),
-                source["source_kind"].as_str().expect("source kind"),
-            ));
-        }
-    }
-    sources
+fn requirement(id: &str) -> String {
+    format!("r[{id}] The fixture MUST retain exact linkage.\n")
 }
 
 // r[verify lattice.repository_validation.traceability_sources.scenario.discovery]
 // r[verify lattice.architecture.core_crate.traceability]
 #[test]
-fn default_traceability_profile_scans_lattice_owned_sources() {
-    let policy = policy();
-    let actual = source_pairs(default_profile(&policy));
-    let expected = BTreeSet::from(REQUIRED_SOURCES);
+fn default_traceability_profile_discovers_each_owned_evidence_root() -> TestResult {
+    let fixture = Fixture::new()?;
+    let policy: Value = serde_json::from_str(GENERATED_POLICY)?;
+    let profile = policy["traceability_policy"]["profiles"]
+        .as_array()
+        .ok_or("profiles")?
+        .iter()
+        .find(|profile| profile["id"] == "cairn-default")
+        .ok_or("default profile")?;
+    let sources = profile["evidence_sources"].as_array().ok_or("evidence sources")?;
+    let mut spec = String::new();
+    for (index, source) in sources.iter().enumerate() {
+        let id = format!("fixture.discovery.source_{index}");
+        spec.push_str(&requirement(&id));
+        let root = source["root"].as_str().ok_or("source root")?;
+        let path = if std::path::Path::new(root).extension().is_some() {
+            root.to_string()
+        } else {
+            let extension = source["extensions"][0].as_str().ok_or("source extension")?;
+            format!("{root}/probe.{extension}")
+        };
+        fixture.write(&path, marker("impl", &id))?;
+    }
+    fixture.write(".cairn/specs/probe/spec.md", spec)?;
+    fixture.write("tools/stray.rs", marker("impl", "fixture.unowned.tool"))?;
 
-    assert_eq!(actual, expected);
+    let (success, receipt) = fixture.run(&["traceability", "coverage", "--json"])?;
+    assert!(success, "{receipt}");
+    assert_eq!(receipt["requirements"], sources.len());
+    assert_eq!(receipt["referenced"], sources.len());
+    assert_eq!(receipt["missing"], json!([]));
+    assert_eq!(receipt["dangling"], json!([]));
+    assert_eq!(receipt["valid"], true);
+    Ok(())
 }
 
 // r[verify lattice.repository_validation.traceability_sources.scenario.fail-closed]
+// r[verify lattice.repository_validation.traceability_sources.scenario.marker-reconciliation]
+#[test]
+fn missing_and_dangling_linkage_fails_closed_without_hiding_unrelated_debt() -> TestResult {
+    let fixture = Fixture::new()?;
+    let covered = "fixture.linkage.covered";
+    let repaired = "fixture.linkage.repaired";
+    let unrelated = "fixture.linkage.unrelated";
+    fixture.write(
+        ".cairn/specs/probe/spec.md",
+        [requirement(covered), requirement(repaired), requirement(unrelated)].concat(),
+    )?;
+    fixture.write("src/lib.rs", [marker("impl", covered), marker("related", "fixture.linkage.stale")].concat())?;
+    let (success, receipt) = fixture.run(&["traceability", "coverage", "--json"])?;
+    assert!(!success, "{receipt}");
+    assert_eq!(receipt["valid"], false);
+    assert_eq!(receipt["missing"], json!([repaired, unrelated]));
+    assert_eq!(receipt["dangling"], json!(["fixture.linkage.stale"]));
+
+    fixture.write("src/lib.rs", [marker("impl", covered), marker("impl", repaired)].concat())?;
+    let (success, receipt) = fixture.run(&["traceability", "coverage", "--json"])?;
+    assert!(!success, "{receipt}");
+    assert_eq!(receipt["valid"], false);
+    assert_eq!(receipt["missing"], json!([unrelated]));
+    assert_eq!(receipt["dangling"], json!([]));
+    Ok(())
+}
+
 // r[verify lattice.repository_validation.traceability_sources.scenario.unsafe-root]
 #[test]
-fn traceability_profile_rejects_fallback_and_unsafe_roots_without_relaxing_verbs() {
-    let policy = policy();
-    let profile = default_profile(&policy);
-    let sources = source_pairs(profile);
-    let actual_verbs = profile["marker_verbs"]
-        .as_array()
-        .expect("marker verbs")
-        .iter()
-        .map(|verb| verb.as_str().expect("marker verb"))
-        .collect::<BTreeSet<_>>();
-    let required_verbs = BTreeSet::from(REQUIRED_MARKER_VERBS);
-
-    assert!(sources.contains(&(INTERNAL_CRATE_ROOT, "rust_source")));
-    assert!(!sources.iter().any(|(root, _)| *root == LEGACY_TOOL_ROOT));
-    assert_eq!(actual_verbs, required_verbs);
-    assert!(INVALID_SOURCE_ROOT_FIXTURE.contains(UNSAFE_SOURCE_ROOT));
+fn nickel_export_rejects_unsafe_roots_before_evidence_discovery() -> TestResult {
+    let fixture = Fixture::new()?;
+    let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
+    let local = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/traceability-contracts.ncl");
+    fixture.write(
+        "policy.ncl",
+        format!(
+            "let Contracts = import {} in let Local = import {} in (import \"policy.json\") | (Contracts.Policy & {{traceability_policy | Local.Policy}})\n",
+            serde_json::to_string(&contracts)?,
+            serde_json::to_string(&local)?
+        ),
+    )?;
+    let valid: Value = serde_json::from_str(GENERATED_POLICY)?;
+    for unsafe_root in [
+        None,
+        Some("../src"),
+        Some("/src"),
+        Some("src/../outside"),
+        Some("src/./inside"),
+        Some("src//inside"),
+    ] {
+        let mut policy = valid.clone();
+        if let Some(root) = unsafe_root {
+            policy["traceability_policy"]["profiles"][0]["evidence_sources"][0]["root"] = json!(root);
+        }
+        fixture.write("policy.json", serde_json::to_vec(&policy)?)?;
+        let output = std::process::Command::new("nickel")
+            .current_dir(fixture.root.path())
+            .args(["export", "--format", "json", "policy.ncl"])
+            .output()?;
+        assert_eq!(
+            output.status.success(),
+            unsafe_root.is_none(),
+            "root={unsafe_root:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
 }

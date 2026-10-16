@@ -20,7 +20,7 @@ Choregraph supplies deterministic graph and machine decisions. Other adapters pr
 
 [Bounded DAG node memoization](docs/dag-node-memoization.md) defines canonical cache keys, explicit bounds, pure retention decisions, deferred release, and executor non-claims.
 
-[Storage commit uncertainty](docs/storage-commit-uncertainty.md) defines commit outcomes, process-local quarantine, exact read-back reconciliation, and repair non-claims.
+[Storage commit uncertainty](docs/storage-commit-uncertainty.md) defines durable occurrence fences, quarantine, exact read-back reconciliation, and repair non-claims.
 
 [Choregraph effect authority](docs/choregraph-effect-authority.md) defines exact intent binding, Basalt enforcement, durable attempts, scope currentness, and capability routing.
 
@@ -46,6 +46,10 @@ nix flake check -L --option secret-key-files '' # full CI; check outputs do not 
 The Octet hook uses the library target profile. It treats each configured lint as `deny`.
 
 `octet-baseline.json` records accepted debt. A new finding ID fails the hook until a review accepts it.
+
+`scripts/octet-baseline-migrate.rs` is an identity-migration tool, not a debt-acceptance command. Run it from the pinned development shell with the accepted baseline, complete reference `results.jsonl` and `status.json`, complete current `results.jsonl` and `status.json`, and an output path, in that order. Without `--execute` it only reports the comparison.
+
+The tool requires successful raw observations under the same toolchain, profile and configuration. Every reference and current raw row must carry the configuration hash declared by its status file. It preserves normalized warning multiplicities and Octet's canonical first-per-stable-ID baseline facts. Its bounded normalization ignores source-line counts and the reviewed `ambiguous_params`/`numeric_units` wording transitions; configured limits, assertion counts, parameter counts/types and quantity names remain significant. A mismatch refuses the migration before writing the output.
 
 ## Choregraph machine source
 
@@ -152,17 +156,20 @@ They do not prove rendering equivalence, unsupported-host behavior, arbitrary cl
 
 ## Traceability debt
 
-The maintained inventory classifies the exact missing-requirement set. Inventory rows are not traceability evidence.
+The maintained inventory binds the exact current missing-requirement set. A fully linked checkout produces an empty inventory; inventory rows never supply traceability evidence.
 
-Generate the expected failing receipt before you update the inventory:
+Capture the current receipt from the pinned development shell, then regenerate and check the inventory:
 
 ```bash
-nix run path:../cairn#cairn -- traceability coverage --root . \
+nix develop
+cairn traceability coverage --root . --json \
   --policy cairn-policy/generated/cairn-policy.json \
-  > target/traceability-coverage.json # expected to exit nonzero while debt remains
-./scripts/traceability-inventory.rs generate target/traceability-coverage.json
-./scripts/traceability-inventory.rs check target/traceability-coverage.json
+  > target/traceability-coverage.json
+cargo -q -Zscript scripts/traceability-inventory.rs generate target/traceability-coverage.json
+cargo -q -Zscript scripts/traceability-inventory.rs check target/traceability-coverage.json
 ```
+
+Coverage exits nonzero while missing or dangling linkage remains; retain that receipt rather than treating the inventory as a waiver.
 
 The review policy is `cairn-policy/traceability-inventory.ncl`. The generated report is `cairn-policy/generated/traceability-debt-inventory.json`.
 

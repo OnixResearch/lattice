@@ -104,6 +104,8 @@ fn bounded_process_preserves_stdin_cwd_environment_and_exit_status() {
 
     let output = runner_with_limits(limits()).run(&request).expect("bounded process must complete");
 
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior]
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert_eq!(output.status_code, Some(SUCCESS_EXIT_CODE));
     assert_eq!(output.stderr, Vec::<u8>::new());
     assert_eq!(
@@ -158,6 +160,7 @@ fn bounded_process_enforces_mandatory_timeout() {
     request.timeout_secs = TIMEOUT_TEST_SECS;
 
     let error = runner_with_limits(limits()).run(&request).expect_err("long process must time out");
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert_eq!(error, ProcessError::Timeout);
 }
 
@@ -170,6 +173,7 @@ fn bounded_process_rejects_each_truncated_stream_without_returning_prefixes() {
     let stdout_error = runner_with_limits(stdout_limits)
         .run(&shell_request(repeated_output_script("", OVERFLOW_OUTPUT_BYTES)))
         .expect_err("stdout truncation must fail closed");
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert!(matches!(stdout_error, ProcessError::OutputLimitExceeded {
         limit: TINY_LIMIT_BYTES,
         actual: OVERFLOW_OUTPUT_BYTES,
@@ -228,6 +232,7 @@ fn timeout_terminates_the_owned_process_group() {
     request.timeout_secs = TIMEOUT_TEST_SECS;
 
     let error = runner_with_limits(limits()).run(&request).expect_err("timed-out process group must fail");
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert_eq!(error, ProcessError::Timeout);
 
     thread::sleep(Duration::from_millis(TIMEOUT_DESCENDANT_OBSERVATION_MILLIS));
@@ -254,6 +259,7 @@ fn explicit_cancellation_terminates_the_owned_process_group() {
         .join()
         .expect("bounded runner thread must not panic")
         .expect_err("cancelled process must not produce output");
+    // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert_eq!(error, ProcessError::Cancelled);
 
     thread::sleep(Duration::from_millis(DESCENDANT_OBSERVATION_MILLIS));

@@ -49,6 +49,7 @@ pub fn observed_outcome_event(
     outcome_event_for_state(attempt, state, denial)
 }
 
+// r[impl lattice.choregraph_effect_authority.non_claims.scenario.scope]
 fn outcome_event_for_state(
     attempt: &super::Attempt,
     state: super::OutcomeState,

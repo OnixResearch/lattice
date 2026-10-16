@@ -334,6 +334,112 @@ fn dispatch_executes_once_recovers_acceptance_and_reads_bounded_log() {
     assert!(matches!(response.result, ExchangeResult::Rejected(_)));
 }
 
+// r[verify lattice.workflow_interchange.shell_success]
+// r[verify lattice.workflow_interchange.shell_success.scenario.zero]
+// r[verify lattice.workflow_interchange.shell_success.scenario.nonzero]
+#[test]
+fn exchange_shell_exit_controls_durable_results_and_dependent_effects() {
+    for (command, successful) in [("printf ready", true), ("exit 23", false)] {
+        let (directory, store, mut workflow, contract, mut request, mut profile) = fixture(command);
+        let source = crate::engine::workflow::NodeId(profile.routes[0].nodes[0].workflow_node_id);
+        let marker = directory.path().join("dependent-effect");
+        let dependent = workflow.add_shell_node("dependent", format!("printf dependent > '{}'", marker.display()));
+        let stdout =
+            workflow.graph.node(source).expect("source exists").output_ports.first().expect("stdout exists").id;
+        let stdin = workflow
+            .graph
+            .node(dependent)
+            .expect("dependent exists")
+            .input_ports
+            .first()
+            .expect("stdin exists")
+            .id;
+        workflow.graph.add_edge(stdout, stdin).expect("dependency is valid");
+        store.save_workflow(&workflow).expect("dependent workflow saves");
+        request.graph.nodes.push(WorkflowNode {
+            id: label("dependent"),
+            kind: label("build"),
+            effect_class: EffectClass::Build,
+            adapter_kind: label("local"),
+            operation_identity: identity('8'),
+        });
+        request.graph.edges.push(WorkflowEdge {
+            source: label("build"),
+            target: label("dependent"),
+        });
+        request.graph.identity = graph_identity(&request.graph);
+        request.identity = lattice_workflow_contract::request_identity(&request);
+        let route = &mut profile.routes[0];
+        route.graph_identity = request.graph.identity.clone();
+        route.workflow_revision = super::application::workflow_facts(&workflow).expect("workflow facts exist").revision;
+        route.nodes.push(super::RouteNode {
+            request_node_id: label("dependent"),
+            operation_identity: identity('8'),
+            workflow_node_id: dependent.0,
+        });
+        let handler =
+            super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::AgentRuntimeConfig::default())
+                .expect("handler starts");
+        let mut service = WorkflowExchangeService::new(handler);
+        let dispatch = new_request(ExchangeCommand::Dispatch {
+            profile: contract.clone(),
+            request: request.clone(),
+        })
+        .expect("dispatch envelope is valid");
+        let accepted = accepted_from_response(service.exchange(&dispatch).expect("dispatch succeeds"));
+        service.handler_mut().wait_for_workers();
+        let record = store
+            .load_workflow_exchange(&accepted.execution_identity)
+            .expect("record loads")
+            .expect("record exists");
+        let details = store
+            .load_run_details(crate::engine::RunId(record.run_id))
+            .expect("details load")
+            .expect("details exist");
+        let node = details.nodes.iter().find(|node| node.node_id == source).expect("source result exists");
+        let dependent_node =
+            details.nodes.iter().find(|node| node.node_id == dependent).expect("dependent result exists");
+        assert_eq!(
+            node.status,
+            if successful {
+                crate::store::RunNodeDetailStatus::Completed
+            } else {
+                crate::store::RunNodeDetailStatus::Failed
+            }
+        );
+        assert_eq!(
+            dependent_node.status,
+            if successful {
+                crate::store::RunNodeDetailStatus::Completed
+            } else {
+                crate::store::RunNodeDetailStatus::Skipped
+            }
+        );
+        let observe = new_request(ExchangeCommand::Observe {
+            profile: contract,
+            request,
+            accepted,
+        })
+        .expect("observe envelope is valid");
+        let observation = observed(service.exchange(&observe).expect("observe succeeds"));
+        assert_eq!(
+            observation.state,
+            if successful {
+                ExecutionState::Completed
+            } else {
+                ExecutionState::Failed
+            }
+        );
+        assert!(observation.terminal);
+        assert_eq!(observation.successful, successful);
+        if successful {
+            assert_eq!(std::fs::read(&marker).expect("dependent effect exists"), b"dependent");
+        } else {
+            assert!(!marker.exists(), "failed dependency must prevent downstream effects");
+        }
+    }
+}
+
 // r[verify lattice.workflow_interchange.application_admission.scenario.conflict]
 #[test]
 fn reused_idempotency_key_with_changed_request_is_rejected() {

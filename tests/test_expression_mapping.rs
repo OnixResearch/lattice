@@ -133,8 +133,6 @@ async fn shell_command_resolves_upstream_stdout_expression() {
     let source_id = workflow.add_shell_node(SOURCE_LABEL, "unused");
     let source_stdout = stdout_port(&workflow, source_id);
     let target_id = workflow.add_shell_node(TARGET_LABEL, "placeholder");
-    let target_stdin = workflow.graph.node(target_id).expect("target node").input_ports[HTTP_BODY_INPUT_INDEX].id;
-    workflow.graph.add_edge(source_stdout, target_stdin).expect("connect nodes");
     workflow.set_node_config(
         target_id,
         NodeConfig::shell(format!("printf '{}'", expression_for(source_id, source_stdout))),

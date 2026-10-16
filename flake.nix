@@ -62,6 +62,9 @@
       system:
       let
         exactNickel = nickel-1-17-0.packages.${system}.default;
+        cairnNative =
+          (builtins.getFlake (builtins.unsafeDiscardStringContext "path:${cairn}?narHash=${cairn.narHash}"))
+          .packages.${system}.cairn;
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -74,7 +77,7 @@
           name = "cairn";
           runtimeInputs = [ pkgs.nix ];
           text = ''
-            policy_path=${pkgs.lib.escapeShellArg "${self}/cairn-policy/generated/cairn-policy.json"}
+            policy_path=${pkgs.lib.escapeShellArg "${./cairn-policy/generated/cairn-policy.json}"}
             source_flake=${pkgs.lib.escapeShellArg "path:${cairn}"}
 
             has_policy_arg=false
@@ -245,11 +248,25 @@
           )
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/rats/source/themes/" (toString path);
         isRuntimeConfigAssetPath = path: toString path == "${sourceRoot}/src/config/default.ncl";
-        isCompileTimeDocPath = path: toString path == "${sourceRoot}/docs/bounded-ready-frontier.md";
+        isCompileTimeDocPath =
+          path:
+          builtins.elem (toString path) (
+            map (relative: "${sourceRoot}/${relative}") [
+              "docs/bounded-ready-frontier.md"
+              "docs/choregraph-effect-authority.md"
+              "docs/content-identity-source.md"
+              "docs/dag-node-memoization.md"
+              "docs/expression-dependencies.md"
+              "docs/nickel-eval-source.md"
+              "docs/role-protocol-execution.md"
+              "docs/workflow-domain-boundaries.md"
+            ]
+          );
         isPolicyAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/policy/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/contracts/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/profiles/" (toString path)
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/contracts/generated/policy.json"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE"
           || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";
@@ -382,6 +399,7 @@
             ;
         };
 
+        # r[impl lattice.repository_validation.baselined_octet_gate.scenario.boundary]
         octetPreCommitCheck = pkgs.writeShellApplication {
           name = "octet-precommit-check";
           runtimeInputs =
@@ -553,6 +571,9 @@
               mkdir -p "$out"
             '';
 
+        # r[impl lattice.repository_validation.radicle_bounded_exec_source]
+        # r[verify lattice.repository_validation.radicle_bounded_exec_source.scenario.accepted]
+        # r[impl lattice.repository_validation.radicle_bounded_exec_locks]
         boundedExecSourceIdentityCheck =
           pkgs.runCommand "lattice-bounded-exec-source-identity"
             {
@@ -573,6 +594,8 @@
               grep --fixed-strings 'name = "bounded-exec"' "$source_root/crates/bounded-exec/Cargo.toml" > /dev/null
               grep --fixed-strings 'name = "bounded-exec-core"' "$source_root/crates/bounded-exec-core/Cargo.toml" > /dev/null
 
+              # r[impl lattice.repository_validation.radicle_bounded_exec_availability]
+              # Verify the bound producer availability receipt, not a live seed-outage claim.
               admission=${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.json
               expected_hash="$(cat ${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.blake3)"
               actual_hash="$(b3sum "$admission" | cut -d ' ' -f 1)"
@@ -580,11 +603,12 @@
               nickel export --format json ${self}/tests/fixtures/radicle/bounded-exec-source-admission-v1.ncl \
                 | jq -S . > "$TMPDIR/admission-from-nickel.json"
               cmp "$admission" "$TMPDIR/admission-from-nickel.json"
+              # r[impl lattice.repository_validation.radicle_bounded_exec_availability.scenario.seed-outage]
               jq -e \
                 --arg rid 'rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo' \
                 --arg rev '29dac88ecded94457572db3fdfaaaab95fa91525' \
                 --arg source_hash '4fbbf8f0749262469f00748e04c775180488dba800303f139172656d25931927' \
-                '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false' \
+                '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .repository.source_archive_blake3 == $source_hash and .availability.github_fallback_configured == false and .availability.seed_count == 2 and .availability.primary_only == "verified" and .availability.replica_only == "verified"' \
                 "$admission" > /dev/null
 
               cutover=${self}/evidence/radicle/bounded-exec-cutover-v1.json
@@ -600,18 +624,23 @@
                 '.status == "accepted" and .repository.rid == $rid and .repository.reviewed_commit == $rev and .cargo.github_fallback_configured == false and .availability.github_fallback_configured == false' \
                 "$cutover" > /dev/null
 
+              # r[impl lattice.repository_validation.radicle_bounded_exec_source.scenario.github-rejected]
+              # r[impl lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback]
               forbidden_source='github.com/OnixResearch/'"bounded-exec"
               if grep --fixed-strings "$forbidden_source" \
                 ${self}/Cargo.toml ${self}/Cargo.lock ${self}/flake.nix ${self}/flake.lock; then
                 echo 'Bounded Exec source retained a GitHub fallback' >&2
                 exit 1
               fi
+              # r[impl lattice.repository_validation.radicle_bounded_exec_behavior.scenario.non-claim]
+              echo 'Source identity and bound availability receipt only: not Radicle protocol correctness, Bounded Exec correctness, host sandboxing, third-party GitHub independence, or release readiness.'
               touch "$out"
             '';
 
         # r[verify lattice.choregraph_adoption.source]
         # r[verify lattice.choregraph_adoption.source_alignment]
         # r[verify lattice.choregraph_adoption.single_implementation]
+        # r[impl lattice.execution_graph_external_adoption.source]
         choregraphSourceIdentityCheck =
           pkgs.runCommand "lattice-choregraph-source-identity"
             {
@@ -670,7 +699,10 @@
               test -f ${choregraph}/crates/choregraph-nickel/Cargo.toml
               test -f ${choregraph}/crates/choregraph-seaglass/Cargo.toml
               grep --fixed-strings 'GNU AFFERO GENERAL PUBLIC LICENSE' ${choregraph}/LICENSE > /dev/null
+              # r[impl lattice.execution_graph_external_adoption.cutover]
               test ! -e ${self}/vendor-cargo-deps/seaglass-execution-graph
+              # r[impl lattice.execution_graph_external_adoption.authority]
+              # r[impl lattice.execution_graph_external_adoption.authority.scenario.denied]
               grep -R -l 'seaglass_execution_graph' ${src}/src --include='*.rs' | sort > "$TMPDIR/seaglass-import-files"
               printf '%s\n%s\n' \
                 "${src}/src/engine/runner.rs" \
@@ -695,6 +727,8 @@
                 echo 'forbidden Choregraph fallback remains' >&2
                 exit 1
               fi
+              # r[impl lattice.execution_graph_external_adoption.cutover.scenario.non-claim]
+              echo 'Selected graph/source checks only: not workflow correctness, scheduler fairness, effect safety, persistence correctness, Radicle availability, or release readiness.'
               touch "$out"
             '';
 
@@ -792,6 +826,9 @@
               touch "$out"
             '';
 
+        # r[impl lattice.content_identity_adoption.source]
+        # r[impl lattice.content_identity_adoption.source.scenario.accepted]
+        # r[impl lattice.content_identity_adoption.source.scenario.rejected]
         contentIdentityCoreSourceCheck =
           pkgs.runCommand "lattice-content-identity-core-source"
             {
@@ -818,6 +855,7 @@
                 echo 'forbidden content-identity-core GitHub fallback' >&2
                 exit 1
               fi
+              # r[impl lattice.content_identity_adoption.boundary.scenario.denied]
               if grep -E 'content_identity_core|crate::content_identity' \
                 ${self}/src/credentials.rs ${self}/src/triggers.rs; then
                 echo 'security owner imported shared content identity' >&2
@@ -828,6 +866,8 @@
               touch "$out"
             '';
 
+        # r[impl lattice.persistence_uncertainty.shared_core]
+        # r[impl lattice.persistence_uncertainty.shared_core.scenario.selected]
         transactionalReconciliationCoreSourceCheck =
           pkgs.runCommand "lattice-transactional-reconciliation-core-source"
             {
@@ -1012,9 +1052,10 @@
             src
             cargoArtifacts
             cargoVendorDir
-            nativeBuildInputs
             buildInputs
             ;
+          nativeBuildInputs = nativeBuildInputs ++ [ pkgs.nickel ];
+          LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
         };
       in
       {
@@ -1031,6 +1072,12 @@
 
           role-protocol-runtime-profile = roleProtocolRuntimeProfileCheck;
 
+          # r[impl lattice.nickel_eval_adoption.source]
+          # r[impl lattice.nickel_eval_adoption.source.scenario.accepted]
+          # r[impl lattice.nickel_eval_adoption.source.scenario.rejected]
+          # r[impl lattice.nickel_toolchain.cohort.scenario.published]
+          # r[impl lattice.nickel_toolchain.cohort.scenario.absent]
+          # r[impl lattice.nickel_toolchain.fixture_cohort.scenario.mixed]
           # r[impl lattice.nickel_toolchain.cohort]
           # r[impl lattice.nickel_toolchain.fixture_cohort]
           # r[verify lattice.nickel_toolchain.compatibility]
@@ -1040,6 +1087,10 @@
                 nativeBuildInputs = [
                   pkgs.gnugrep
                   pkgs.nickel
+                  pkgs.coreutils
+                  pkgs.diffutils
+                  pkgs.jq
+                  pkgs.python3
                 ];
               }
               ''
@@ -1048,16 +1099,36 @@
                 test "$(nickel --version)" = 'nickel-lang-cli nickel 1.17.0 (rev 1320a98)'
                 grep -F 'f23be09e41337de8fa729274f50023f861ae0e8a' ${self}/Cargo.toml >/dev/null
                 grep -F 'nickel-lang-core = "=0.18.0"' ${self}/Cargo.toml >/dev/null
+                source_url=https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git
+                revision=f23be09e41337de8fa729274f50023f861ae0e8a
+                test -f ${nickel-eval}/LICENSE
+                grep -Fx 'name = "nickel-eval"' ${nickel-eval}/Cargo.toml >/dev/null
+                grep -Fx 'license = "MIT"' ${nickel-eval}/Cargo.toml >/dev/null
+                grep -F "nickel-eval = { git = \"$source_url\", rev = \"$revision\" }" ${self}/Cargo.toml >/dev/null
+                grep -F "git+$source_url?rev=$revision#$revision" ${self}/Cargo.lock >/dev/null
+                jq --exit-status --arg rev "$revision" --arg url "$source_url" '
+                  .nodes["nickel-eval"].locked.rev == $rev
+                  and .nodes["nickel-eval"].locked.url == $url
+                  and .nodes["nickel-eval"].original.rev == $rev
+                ' ${self}/flake.lock >/dev/null
+                python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb"))["package"]; assert {(x["name"],x["version"]) for x in p if x["name"] in ("nickel-lang","nickel-lang-core")} == {("nickel-lang","2.2.0"),("nickel-lang-core","0.18.0")}, "mixed Nickel cohort"' ${self}/Cargo.lock
+                # r[impl lattice.nickel_eval_adoption.boundary]
+                # r[impl lattice.nickel_eval_adoption.boundary.scenario.denied]
+                grep -R -l 'nickel_eval::' ${self}/src --include='*.rs' | sort > "$TMPDIR/evaluator-imports"
+                printf '%s\n' '${self}/src/nickel/mod.rs' > "$TMPDIR/expected-evaluator-imports"
+                cmp "$TMPDIR/expected-evaluator-imports" "$TMPDIR/evaluator-imports"
                 if grep -E 'bf16cf223ed3dfe75a28f02ac21ed7891a60bac1|nickel-lang-core = "=0.17.0"' \
                   ${self}/Cargo.toml ${self}/docs/nickel-eval-source.md; then
                   echo 'old, mixed, or fallback Nickel evaluator source remains' >&2
                   exit 1
                 fi
+                # r[verify lattice.nickel_toolchain.compatibility.scenario.matrix]
                 nickel export --format json "$fixture_root/positive/workflow.ncl" >/dev/null
                 for fixture in \
                   "$fixture_root/negative/malformed.ncl" \
                   "$fixture_root/negative/missing-import.ncl" \
                   "$fixture_root/negative/contract.ncl" \
+                  "$fixture_root/negative/unknown-field.ncl" \
                   ${self}/tests/fixtures/operation-packs/manifest-policy-invalid.ncl \
                   ${self}/tests/fixtures/workflow-transport/negative/profile-zero-frame.ncl; do
                   if nickel export --format json "$fixture" >/dev/null 2>&1; then
@@ -1068,15 +1139,18 @@
                 touch "$out"
               '';
 
+          # r[impl lattice.nickel_toolchain.validation]
+          # r[impl lattice.nickel_toolchain.validation.scenario.passed]
           # Serialize process-heavy tests so the sandbox does not exhaust child-process capacity.
           nextest = craneLib.cargoNextest {
             inherit
               src
               cargoArtifacts
               cargoVendorDir
-              nativeBuildInputs
               buildInputs
               ;
+            nativeBuildInputs = nativeBuildInputs ++ [ pkgs.nickel ];
+            LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
             cargoNextestExtraArgs = "--test-threads 1";
             partitions = 1;
             partitionType = "count";
@@ -1289,11 +1363,13 @@
 
         devShells.default = craneLib.devShell {
           inherit buildInputs;
+          LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
 
           packages =
             (with pkgs; [
               cargo-nextest
               cargo-watch
+              nickel
               pre-commit
               rust-analyzer
             ])

@@ -92,6 +92,7 @@ fn settlement_below_and_at_reservation_folds_consumed_and_clears_reservation() {
     };
     reserve_budget(&mut ledger, "dispatch-1", plan(Some(4), Some(50))).expect("admission");
     let below = settle_budget(&mut ledger, "dispatch-1", charge(3, 40)).expect("below-bound settlement");
+    // r[verify lattice.budget_ledger_incubation.compatibility.scenario.accepted]
     assert!(!below.breached);
     assert_eq!(ledger.consumed, charge(3, 40));
     assert!(ledger.reservations.is_empty());
@@ -155,9 +156,10 @@ fn reserve_rejects_missing_bound_for_enforced_dimension() {
         policy: enforced_policy(10, 100),
         ..BudgetLedger::default()
     };
+    let before = ledger.clone();
     let error = reserve_budget(&mut ledger, "dispatch-1", plan(None, Some(10))).expect_err("rounds bound is required");
     assert!(matches!(error, LedgerError::MissingBudgetBound { label } if label == "rounds"));
-    assert!(ledger.reservations.is_empty());
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: duplicate reservation ----
@@ -169,8 +171,11 @@ fn reserve_rejects_duplicate_reservation_identity() {
         ..BudgetLedger::default()
     };
     reserve_budget(&mut ledger, "dispatch-1", plan(Some(2), Some(10))).expect("first admission");
+    let before = ledger.clone();
     let error = reserve_budget(&mut ledger, "dispatch-1", plan(Some(3), Some(10))).expect_err("duplicate rejected");
     assert!(matches!(error, LedgerError::DuplicateReservation));
+    // r[verify lattice.budget_ledger_incubation.compatibility.scenario.rejected]
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: missing settlement ----
@@ -181,8 +186,10 @@ fn settle_rejects_unknown_reservation_identity() {
         policy: enforced_policy(10, 100),
         ..BudgetLedger::default()
     };
+    let before = ledger.clone();
     let error = settle_budget(&mut ledger, "never-reserved", charge(1, 1)).expect_err("settlement without reservation");
     assert!(matches!(error, LedgerError::MissingReservation));
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: limit excess ----
@@ -194,8 +201,10 @@ fn reserve_rejects_total_that_exceeds_limits() {
         ..BudgetLedger::default()
     };
     reserve_budget(&mut ledger, "first", plan(Some(9), Some(90))).expect("first fits");
+    let before = ledger.clone();
     let error = reserve_budget(&mut ledger, "second", plan(Some(2), Some(20))).expect_err("exceeds limit");
     assert!(matches!(error, LedgerError::BudgetExceeded { label } if label == "rounds"));
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: arithmetic overflow ----
@@ -217,8 +226,10 @@ fn reserve_rejects_summed_overflow() {
         consumed: charge(u64::MAX, 0),
         ..BudgetLedger::default()
     };
+    let before = ledger.clone();
     let error = reserve_budget(&mut ledger, "dispatch-1", plan(Some(1), None)).expect_err("overflow rejected");
     assert!(matches!(error, LedgerError::BudgetOverflow { label } if label == "rounds"));
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: observed overage marks breach ----
@@ -246,8 +257,27 @@ fn settle_rejects_stale_identity_already_settled() {
     };
     reserve_budget(&mut ledger, "dispatch-1", plan(Some(2), Some(20))).expect("admission");
     settle_budget(&mut ledger, "dispatch-1", charge(2, 20)).expect("first settlement");
+    let before = ledger.clone();
     let error = settle_budget(&mut ledger, "dispatch-1", charge(1, 1)).expect_err("stale identity rejected");
     assert!(matches!(error, LedgerError::MissingReservation));
+    assert_eq!(ledger, before);
+}
+
+#[test]
+fn settlement_overflow_preserves_reservation_consumption_and_breach_state() {
+    let mut ledger = BudgetLedger {
+        policy: enforced_policy(u64::MAX, u64::MAX),
+        ..BudgetLedger::default()
+    };
+    reserve_budget(&mut ledger, "dispatch-1", plan(Some(1), Some(1))).expect("reservation fits");
+    ledger.consumed = charge(u64::MAX - 1, u64::MAX);
+    let before = ledger.clone();
+
+    let error = settle_budget(&mut ledger, "dispatch-1", charge(1, 1)).expect_err("observed total overflows");
+
+    // r[verify lattice.budget_ledger_incubation.compatibility.scenario.rejected]
+    assert_eq!(error, LedgerError::BudgetOverflow { label: "tokens" });
+    assert_eq!(ledger, before);
 }
 
 // ---- Negative: invalid orchestration integration ----

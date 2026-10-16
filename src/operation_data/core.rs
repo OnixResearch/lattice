@@ -66,6 +66,9 @@ struct AdmittedPayload {
     bytes: Vec<u8>,
 }
 
+// r[impl lattice.operation_data.records.resource]
+// r[impl lattice.operation_data.records.file]
+// r[impl lattice.operation_data.confidentiality.safe]
 pub fn admit(draft: &RecordDraft, policy: &AdmissionPolicy<'_>) -> Result<(RecordMetadata, Vec<u8>), Error> {
     validate_draft(draft, policy)?;
     let admitted = admit_payload(&draft.payload, policy)?;
@@ -171,6 +174,7 @@ fn build_metadata(draft: &RecordDraft, admitted: &AdmittedPayload) -> Result<Rec
     })
 }
 
+// r[impl lattice.operation_data.versions.conflict]
 pub fn publication_decision(existing: Option<&RecordMetadata>, candidate: &RecordMetadata) -> PublicationDecision {
     match existing {
         None => PublicationDecision::Append,

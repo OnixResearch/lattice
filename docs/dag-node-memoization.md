@@ -67,6 +67,7 @@ No source was copied.
 
 ## Non-claims
 
+<!-- r[impl lattice.node_result_cache.boundary.scenario.overclaim] -->
 A cache hit does not prove node correctness, input freshness, workflow
 correctness, exact-once execution, scheduler safety, or release eligibility.
 The executor retains all workflow and effect authority.

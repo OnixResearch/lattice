@@ -217,6 +217,7 @@ pub async fn run_workflow_snapshot_with_authority_provider_and_cancellation(
         request.workflow,
         || {
             crate::engine::executor::Executor::new_with_agent_runtime_config(request.agent_runtime)
+                .with_required_shell_success()
                 .with_cancellation(request.cancellation)
         },
     )

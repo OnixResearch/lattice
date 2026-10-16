@@ -58,6 +58,8 @@ pub struct Request<'a> {
     pub cancellation: Option<&'a std::sync::atomic::AtomicBool>,
 }
 
+// r[impl lattice.operation_packs.runtime.executable]
+// r[impl lattice.operation_packs.registry.offline]
 pub fn run(request: Request<'_>) -> Result<Report, super::super::Error> {
     super::super::admission::validate_lock(&request.admitted.candidate, &request.admitted.lock)?;
     let operation = select_operation(&request)?;

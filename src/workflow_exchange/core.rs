@@ -213,16 +213,21 @@ fn apply_terminal_results(
     Ok(())
 }
 
+// r[impl lattice.workflow_interchange.shell_success]
 fn terminalize_node(
     node: &mut DurableNode,
     state: NodeState,
     execution_identity: &Identity,
 ) -> Result<(), TransitionError> {
     node.state = state;
-    node.receipt_identity = Some(framed_identity(
-        NODE_RECEIPT_IDENTITY_DOMAIN,
-        &(execution_identity.as_str(), node.request_node_id.as_str(), node.workflow_node_id, state),
-    )?);
+    node.receipt_identity = if state == NodeState::Skipped {
+        None
+    } else {
+        Some(framed_identity(
+            NODE_RECEIPT_IDENTITY_DOMAIN,
+            &(execution_identity.as_str(), node.request_node_id.as_str(), node.workflow_node_id, state),
+        )?)
+    };
     Ok(())
 }
 

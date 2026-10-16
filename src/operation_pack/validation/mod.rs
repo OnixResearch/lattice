@@ -32,6 +32,8 @@ const ANALYZER_NON_CLAIM: &str = "analyzer output does not strengthen the origin
 const MINIMUM_BOUND: usize = 1;
 const MINIMUM_TIMEOUT_SECONDS: u64 = 1;
 
+// r[impl lattice.operation_packs.manifest.valid]
+// r[impl lattice.operation_packs.manifest.invalid]
 pub fn validate_manifest(mut manifest: super::model::Manifest) -> Result<super::model::Manifest, super::Error> {
     validate_top_level(&manifest)?;
     normalize(&mut manifest)?;
@@ -138,6 +140,7 @@ fn validate_contents(manifest: &super::model::Manifest) -> Result<(), super::Err
     Ok(())
 }
 
+// r[impl lattice.operation_packs.runtime.denied]
 fn validate_runtimes(manifest: &super::model::Manifest) -> Result<(), super::Error> {
     let content = content_map(manifest);
     let mut ids = BTreeSet::new();

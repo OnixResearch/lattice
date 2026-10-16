@@ -26,6 +26,7 @@ impl std::fmt::Display for SafeFailure {
     }
 }
 
+// r[impl lattice.nickel_eval_adoption.boundary]
 #[must_use]
 pub const fn classify_failure(error: &nickel_eval::NickelError) -> SafeFailure {
     match error.category() {
@@ -88,6 +89,7 @@ mod tests {
 
         let error = evaluate_file(&path).expect_err("invalid Nickel fails");
 
+        // r[verify lattice.nickel_eval_adoption.compatibility.scenario.differ]
         assert_eq!(error, SafeFailure::Evaluation);
         assert!(!error.to_string().contains(path.to_string_lossy().as_ref()));
     }
@@ -98,6 +100,7 @@ mod tests {
 
         let error = evaluate_file(path).expect_err("missing file fails");
 
+        // r[verify lattice.nickel_eval_adoption.compatibility.scenario.differ]
         assert_eq!(error, SafeFailure::FileAccess);
         assert!(!error.to_string().contains("secret"));
     }

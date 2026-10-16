@@ -3,119 +3,30 @@
   "hash_algorithm": "BLAKE3",
   "coverage": {
     "profile_id": "cairn-default",
-    "requirements": 938,
-    "referenced": 926,
-    "missing": 12,
+    "requirements": 1533,
+    "referenced": 1533,
+    "missing": 0,
     "dangling": 0,
-    "valid": false,
-    "policy_hash": "f5188ad02b20fe2c5b86fb6a890b8d90402eed165b9f075c0df96044a3bad177",
-    "input_hash": "40aa58c070c90b91191cbaae4278e289197653b883c7177188b74cc612a0723c",
-    "receipt_hash": "ad2ca54dc8cc141fe5b45b6aea5cfd0fff1c3078e578cbf5dc9a6c7d60c78760"
+    "valid": true,
+    "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+    "input_hash": "07e234af76f0d6c64434f4b5ffb6eaf0a76900be053ff1cd2c5bcf7e7751b557",
+    "receipt_hash": "8e1430df9265036a0ee5656b923a38d3353e5bcfc2eb339508f2c03864f81140"
   },
   "review_policy": {
-    "expected_missing_count": 12,
-    "expected_missing_hash": "c23fc013acdb1e4ae5d093b1f01ddb8c82e7d744ce8f9989f3841ea56e18c457",
+    "expected_missing_count": 0,
+    "expected_missing_hash": "86a0d721f0469382362733937cb24599c20b620b51b53628bce4215c77a19f87",
     "reviewed_decisions": 0,
-    "policy_hash": "42dc1e95387f94250979f70e189608b132c7bbbecf6f11a6adcc7699f7326085"
+    "policy_hash": "6c2bd4ead143dd536b383c67da1efdf0b08e44be5244331e3068da7081fd3694"
   },
   "summary": {
-    "total": 12,
+    "total": 0,
     "reviewed": 0,
-    "unassessed": 12,
-    "by_classification": {
-      "unassessed": 12
-    },
-    "by_subsystem": {
-      "repository-validation": 12
-    }
+    "unassessed": 0,
+    "by_classification": {},
+    "by_subsystem": {}
   },
-  "rows": [
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_availability",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_availability.scenario.seed-outage",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_behavior",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_behavior.scenario.non-claim",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_locks",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_locks.scenario.aligned",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_locks.scenario.drift",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_source",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_source.scenario.accepted",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    },
-    {
-      "requirement_id": "lattice.repository_validation.radicle_bounded_exec_source.scenario.github-rejected",
-      "subsystem": "repository-validation",
-      "classification": "unassessed",
-      "evidence": [],
-      "rationale_code": "not-reviewed"
-    }
-  ],
-  "missing_set_hash": "c23fc013acdb1e4ae5d093b1f01ddb8c82e7d744ce8f9989f3841ea56e18c457",
+  "rows": [],
+  "missing_set_hash": "86a0d721f0469382362733937cb24599c20b620b51b53628bce4215c77a19f87",
   "non_claims": [
     "a valid inventory does not prove semantic correctness, complete traceability, release readiness, or production readiness",
     "inventory rows do not satisfy requirements or create Tracey evidence",
@@ -125,5 +36,5 @@
   ],
   "issues": [],
   "valid": true,
-  "inventory_hash": "558f51684014581743a1cf144c5c250603ae181d63ef568b3fcb063c1051b446"
+  "inventory_hash": "e1b711cbf6e7daf0c41d22832fba59f7c613ac477a7b67712fc39660d3a19841"
 }

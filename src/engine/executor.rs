@@ -53,6 +53,7 @@ const SHELL_EXIT_OUTPUT_INDEX: usize = 2;
 const SHELL_STDIN_INPUT_LABEL: &str = "stdin";
 const SHELL_COMMAND_FLAG: &str = "-c";
 const UNKNOWN_EXIT_CODE: i32 = -1;
+const SHELL_SUCCESS_EXIT_CODE: i32 = 0;
 const PROCESS_TASK_FAILURE_DIAGNOSTIC: &str = "bounded local process task failed";
 const SHELL_ARGUMENT_COUNT: usize = 2;
 const CHOREGRAPH_NODE_PREFIX: &str = "lattice-node/";
@@ -1239,6 +1240,7 @@ pub struct Executor {
     image_io: Box<dyn ImageIo>,
     agent_adapter: Box<dyn AgentAdapter>,
     local_process: LocalProcessConfig,
+    require_successful_shells: bool,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub(super) frontier_policy: lattice_core::scheduling::CapacityPolicy,
@@ -1276,6 +1278,7 @@ impl Executor {
             image_io: components.image_io,
             agent_adapter: components.agent_adapter,
             local_process: components.local_process,
+            require_successful_shells: false,
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
             cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             frontier_policy: crate::engine::frontier::serial_capacity_policy(),
@@ -1383,6 +1386,12 @@ impl Executor {
 
     pub fn with_cancellation(mut self, cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Self {
         self.cancellation = cancellation;
+        self
+    }
+
+    // r[impl lattice.workflow_interchange.shell_success]
+    pub(crate) fn with_required_shell_success(mut self) -> Self {
+        self.require_successful_shells = true;
         self
     }
 
@@ -1661,10 +1670,7 @@ impl Executor {
                                 &self.local_process,
                                 self.cancellation.as_ref(),
                             );
-                            dispatch
-                                .dispatch(&runtime, binding.clone(), &request)
-                                .map(shell_output_values)
-                                .map_err(dispatch_error)
+                            dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error)
                         }
                     }
                     EffectExecution::Product(session) => {
@@ -1686,10 +1692,7 @@ impl Executor {
                                         &local_process,
                                         cancellation.as_ref(),
                                     );
-                                    dispatch
-                                        .dispatch(&runtime, binding, &request)
-                                        .map(shell_output_values)
-                                        .map_err(dispatch_error)
+                                    dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error)
                                 })
                                 .await
                                 {
@@ -1708,13 +1711,27 @@ impl Executor {
                 };
 
                 match result {
-                    Ok(shell_outputs) => completed_step_result(
+                    Ok(output)
+                        if self.require_successful_shells && output.status_code != Some(SHELL_SUCCESS_EXIT_CODE) =>
+                    {
+                        StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: format!(
+                                    "shell command exited with status {}",
+                                    output.status_code.unwrap_or(UNKNOWN_EXIT_CODE)
+                                ),
+                            },
+                            input_hash,
+                        }
+                    }
+                    Ok(output) => completed_step_result(
                         node_id,
                         input_hash,
                         node,
                         shell_outputs_by_real_port(
                             output_ports,
-                            redact_shell_outputs(shell_outputs, &sensitive_fragments),
+                            redact_shell_outputs(shell_output_values(output), &sensitive_fragments),
                         ),
                         false,
                     ),
@@ -2826,14 +2843,14 @@ async fn execute_shell(
     input: ShellExecutionInput<'_>,
     config: &LocalProcessConfig,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
-) -> Result<ShellOutputValues, crate::agent_node::ProcessError> {
+) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
     let request = shell_process_request(&input, config);
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
     let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request, &cancellation))
         .await
         .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
 
-    Ok(shell_output_values(output))
+    Ok(output)
 }
 
 /// Gather input values for a node from upstream edge outputs.

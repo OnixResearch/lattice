@@ -68,6 +68,7 @@ fn main() {
     let manifest = fs::read_to_string(&manifest_path).expect("budget-ledger-core Cargo.toml must exist");
 
     let mut failures: Vec<String> = Vec::new();
+    // r[impl lattice.budget_ledger_incubation.boundary.scenario.overreach]
 
     for token in FORBIDDEN_SOURCE {
         if lib.contains(token) {

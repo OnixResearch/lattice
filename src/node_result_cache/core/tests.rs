@@ -31,7 +31,9 @@ fn projection_is_stable_and_input_sensitive() -> Result<(), Box<dyn std::error::
     let first = project_key(projection(b"input-a"))?;
     let second = project_key(projection(b"input-a"))?;
     let changed = project_key(projection(b"input-b"))?;
+    // r[verify lattice.node_result_cache.projection.scenario.equal]
     assert_eq!(first, second);
+    // r[verify lattice.node_result_cache.projection.scenario.distinct]
     assert_ne!(first, changed);
     assert_eq!(first.to_hex().len(), blake3::OUT_LEN * HEX_CHARS_PER_BYTE);
     Ok(())
@@ -79,6 +81,7 @@ fn config_requires_explicit_valid_bounds() -> Result<(), Box<dyn std::error::Err
 // r[verify lattice.node_result_cache.verification]
 #[test]
 fn promotion_boundaries_and_middle_threshold_are_deterministic() {
+    // r[verify lattice.node_result_cache.decision.scenario.strict_lru]
     assert_eq!(
         promotion_disposition(PromotionInput {
             threshold: STRICT_LRU_PROMOTION_THRESHOLD,
@@ -86,6 +89,7 @@ fn promotion_boundaries_and_middle_threshold_are_deterministic() {
         }),
         Ok(PromotionDisposition::Promote)
     );
+    // r[verify lattice.node_result_cache.decision.scenario.fifo]
     assert_eq!(
         promotion_disposition(PromotionInput {
             threshold: FIFO_PROMOTION_THRESHOLD,
@@ -141,6 +145,7 @@ fn slot_and_trim_plans_cover_positive_and_negative_boundaries() -> Result<(), Bo
         eviction_order: &order,
     })?;
     assert_eq!(trim.evict, vec![key(FIRST_KEY_BYTE), key(SECOND_KEY_BYTE)]);
+    // r[verify lattice.node_result_cache.verification.scenario.matrix]
     assert_eq!(
         watermark_trim_plan(WatermarkInput {
             active_entries: u64::try_from(CAPACITY)?,

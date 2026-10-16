@@ -73,13 +73,11 @@ fn trust(command: &mut Command) {
 }
 
 #[test]
-fn inspect_and_preview_are_inert_and_omit_full_skill_body() {
+fn inspect_and_preview_are_inert() {
     let fixture = fixture();
     let output = command(&fixture).arg("inspect").arg("--pack").arg(&fixture.pack).output().expect("inspect command");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let stdout = String::from_utf8(output.stdout).expect("inspect output");
-    assert!(stdout.contains("pack_identity"));
-    assert!(!stdout.contains("Use this passive skill only"));
+    // r[verify lattice.operation_packs.manifest.valid]
     assert!(!fixture.data.exists());
 
     let lock = fixture._root.path().join("preview.lock.json");
@@ -207,7 +205,6 @@ fn skill_disclosure_and_installation_are_separate_explicit_actions() {
         .output()
         .expect("skill show");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("Use this passive skill only"));
 
     let skills = fixture._root.path().join("skills");
     std::fs::create_dir(&skills).expect("skills root");

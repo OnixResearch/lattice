@@ -127,6 +127,7 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
 
     let imported = exported_then_loaded(&workflow);
 
+    // r[verify lattice.nickel_toolchain.boundary.scenario.admitted]
     assert_eq!(imported.meta.name, workflow.meta.name);
     assert_eq!(imported.graph.node_count(), IMPORTED_NODE_COUNT);
     assert_eq!(imported.graph.edge_count(), IMPORTED_EDGE_COUNT);
@@ -145,6 +146,7 @@ fn decoded_workflow_lowers_in_memory_through_choregraph() {
     let portable = workflow_to_portable(&workflow);
 
     let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
+    // r[verify lattice.workflow_validation.domain_boundary.choregraph]
 
     assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV2);
     assert_eq!(lowered.machine.node_ids().len(), IMPORTED_NODE_COUNT);
@@ -212,7 +214,35 @@ fn decoded_workflow_cycle_fails_choregraph_admission() {
 
     let error = lattice::workflow_format::choregraph::lower_portable(&portable).expect_err("cycle rejected");
 
+    // r[verify lattice.workflow_validation.domain_boundary.choregraph.rejected]
     assert_eq!(error, WorkflowFormatError::ChoregraphLowering(FrontendIssueCode::MachineAdmissionRejected),);
+
+    let directory = tempfile::tempdir().expect("cyclic Nickel directory");
+    let path = directory.path().join("cycle.ncl");
+    std::fs::write(&path, lattice::workflow_format::portable_to_nickel(&portable)).expect("cyclic Nickel fixture");
+    let evaluated = nickel_eval::evaluate_to_json(&path).expect("cyclic graph still evaluates as Nickel");
+    serde_json::from_value::<lattice::workflow_format::PortableWorkflow>(evaluated)
+        .expect("evaluated cycle still matches the workflow schema");
+    // r[verify lattice.nickel_toolchain.boundary.scenario.rejected]
+    load_workflow_nickel_file(&path).expect_err("product admission rejects evaluated cycle");
+}
+
+#[test]
+fn portable_workflow_rejects_embedded_authorization_policy() {
+    let (workflow, _, _) = common::two_node_pipeline();
+    let portable = workflow_to_portable(&workflow);
+    let mut graph_authored = serde_json::to_value(&portable).expect("portable workflow encodes");
+    graph_authored["authorization_policy"] = serde_json::json!({
+        "resource": "lattice://process/7",
+        "ability": "process/execute",
+        "allow": true
+    });
+
+    let error = serde_json::from_value::<lattice::workflow_format::PortableWorkflow>(graph_authored)
+        .expect_err("workflow data cannot carry an authorization policy");
+
+    // r[verify lattice.choregraph_effect_authority.policy.scenario.self-grant]
+    assert_eq!(error.classify(), serde_json::error::Category::Data);
 }
 
 // r[verify n8nclone.workflow_format.generic_pipeline_ir]
@@ -447,6 +477,7 @@ fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
         .expect("saved workflow exists");
     let imported = exported_then_loaded(&loaded);
 
+    // r[verify lattice.workflow_validation.domain_boundary.compatibility]
     assert_eq!(imported.graph.node_count(), 1);
     assert_eq!(imported.graph.edge_count(), 0);
     assert!(imported.graph.nodes().any(|node| node.label == "Kept"));
@@ -643,6 +674,7 @@ fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store()
     let stderr = String::from_utf8_lossy(&output.stderr);
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store reopens");
 
+    // r[verify lattice.workflow_validation.domain_boundary.validation.malformed]
     assert!(!output.status.success());
     assert!(stderr.contains("unsupported image format"), "stderr: {stderr}");
     assert!(store.load_workflow(EXISTING_WORKFLOW_NAME).expect("existing workflow loads").is_some());

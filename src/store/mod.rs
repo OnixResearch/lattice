@@ -9,6 +9,7 @@
 
 mod admission;
 mod exchange;
+mod occurrences;
 mod quarantine;
 
 use std::collections::HashMap;
@@ -286,6 +287,7 @@ pub trait OrchestrationStore {
 pub struct Store {
     db: std::sync::Arc<Database>,
     quarantine: std::sync::Arc<std::sync::Mutex<Option<quarantine::State>>>,
+    occurrence_admission: std::sync::Arc<std::sync::Mutex<()>>,
 }
 
 // Occurrence admission stays isolated so its atomic transaction does not couple
@@ -293,7 +295,11 @@ pub struct Store {
 impl Store {
     /// Open or create the database at the given path.
     pub fn open(path: impl AsRef<Path>) -> Result<(), StoreError> {
-        let db = Database::create(path.as_ref()).map_err(|e| StoreError::Db(e.to_string()))?;
+        Self::new(path).map(|_| ())
+    }
+
+    fn open_database(path: &Path) -> Result<Database, StoreError> {
+        let db = Database::create(path).map_err(|e| StoreError::Db(e.to_string()))?;
 
         // Ensure tables exist.
         let txn = db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
@@ -334,19 +340,19 @@ impl Store {
                 .open_table(WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
+            quarantine::fence_pending(&txn)?;
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
-        Ok(())
+        Ok(db)
     }
 
     /// Open and return a Store instance.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, StoreError> {
-        let p = path.as_ref();
-        Self::open(p)?;
-        let db = Database::create(p).map_err(|e| StoreError::Db(e.to_string()))?;
+        let db = Self::open_database(path.as_ref())?;
         Ok(Self {
             db: std::sync::Arc::new(db),
             quarantine: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            occurrence_admission: std::sync::Arc::new(std::sync::Mutex::new(())),
         })
     }
 

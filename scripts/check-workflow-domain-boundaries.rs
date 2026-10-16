@@ -61,6 +61,8 @@ fn main() -> ExitCode {
     }
 }
 
+// r[impl lattice.workflow_validation.domain_boundary.enforcement]
+// r[impl lattice.workflow_validation.domain_boundary.subwayrat]
 fn check_repository(root: &Path) -> Result<(), String> {
     let mut diagnostics = Vec::new();
     for relative_path in CORE_SCOPES {
@@ -151,6 +153,7 @@ fn run_self_test() -> Result<(), String> {
     }
 
     let clock_diagnostics = find_clock_reads("negative-clock.rs", "let now = chrono::Utc::now();");
+    // r[verify lattice.workflow_validation.domain_boundary.enforcement.clock]
     if clock_diagnostics.len() != 1 || clock_diagnostics[0].effect_class != "ambient clock" {
         return Err("negative clock fixture did not report one bounded diagnostic".to_string());
     }
@@ -161,6 +164,7 @@ fn run_self_test() -> Result<(), String> {
         RAT_NODEGRAPH_TOKEN,
         "Subwayrat type leakage",
     );
+    // r[verify lattice.workflow_validation.domain_boundary.subwayrat.leak]
     if dependency_diagnostics.len() != 1 {
         return Err("negative dependency fixture did not report one bounded diagnostic".to_string());
     }

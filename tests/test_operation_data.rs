@@ -93,6 +93,7 @@ fn canonical_resources_are_order_independent_and_lineage_remains_distinct() {
     };
     let (first_record, first_bytes) = admit(&first, &policy(&fragments)).expect("first record");
     let (second_record, second_bytes) = admit(&second, &policy(&fragments)).expect("second record");
+    // r[verify lattice.operation_data.records.resource]
     assert_eq!(first_bytes, second_bytes);
     assert_eq!(first_record, second_record);
 
@@ -102,6 +103,7 @@ fn canonical_resources_are_order_independent_and_lineage_remains_distinct() {
         admit(&resource_draft("invocation-a", 1), &policy(&fragments)).expect("original record");
     assert_eq!(original_bytes, distinct_bytes);
     assert_eq!(original_record.record_identity, distinct_record.record_identity);
+    // r[verify lattice.operation_data.versions.append]
     assert_ne!(original_record.version_identity, distinct_record.version_identity);
 }
 
@@ -114,10 +116,12 @@ fn record_admission_rejects_secret_missing_non_claim_and_oversize_data() {
         selectable_paths: Vec::new(),
         value: serde_json::json!({"api_token": "known-secret-value"}),
     };
+    // r[verify lattice.operation_data.confidentiality.rejected]
     assert_eq!(admit(&secret, &policy(&fragments)).expect_err("secret denied"), Error::Secret);
 
     let mut missing = resource_draft("missing", 1);
     missing.required_non_claims.pop();
+    // r[verify lattice.operation_data.records.invalid]
     assert!(matches!(admit(&missing, &policy(&[])), Err(Error::Invalid(_))));
 
     let mut oversized = resource_draft("oversized", 1);
@@ -136,6 +140,7 @@ fn closed_query_is_bounded_stable_and_schema_confined() {
     let second_value = serde_json::from_slice(&second.1).expect("resource JSON");
     let candidates = vec![(first.0, Some(first_value)), (second.0.clone(), Some(second_value))];
     let results = reduce_query(&candidates, &query(), QueryAuthority { allow_sensitive: false }).expect("query");
+    // r[verify lattice.operation_data.query.valid]
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].metadata.sequence, 2);
 
@@ -159,6 +164,7 @@ fn closed_query_is_bounded_stable_and_schema_confined() {
 
     let mut invalid = query();
     invalid.maximum_result_count = MAX_QUERY_RESULTS + 1;
+    // r[verify lattice.operation_data.query.denied]
     assert_eq!(
         reduce_query(&candidates, &invalid, QueryAuthority { allow_sensitive: false }).expect_err("limit"),
         Error::Limit("query result limit")
@@ -179,6 +185,7 @@ fn exact_selection_rejects_empty_ambiguous_and_stale_results() {
         metadata: metadata.clone(),
         selected_value: None,
     };
+    // r[verify lattice.operation_data.query.bound]
     assert_eq!(resolve_exact(&[result.clone(), result.clone()]).expect_err("ambiguous"), Error::Ambiguous);
     let expected = resolve_exact(&[result]).expect("exact");
     let changed = ResolvedInput {
@@ -198,6 +205,7 @@ fn retention_never_acts_as_implicit_orphan_pruning() {
         terminal_run_ids: Vec::new(),
     })
     .expect("retention plan");
+    // r[verify lattice.operation_data.retention.orphan_preview]
     assert!(retention.selected_versions.is_empty());
 
     let orphan = orphan_prune_plan(&[retained], &BTreeSet::new(), &BTreeSet::new()).expect("orphan preview");
@@ -209,6 +217,7 @@ fn retention_never_acts_as_implicit_orphan_pruning() {
 fn recorded_only_projection_omits_payload_and_grants_no_authority() {
     let (metadata, _) = admit(&resource_draft("projection", 1), &policy(&[])).expect("record");
     let projection = project_recorded_only(&metadata).expect("projection");
+    // r[verify lattice.operation_data.valence_projection.valid]
     assert_eq!(projection.verification_role, "RecordedOnly");
     assert!(projection.non_claims.iter().any(|value| value == PROJECTION_NON_CLAIM));
     let encoded = serde_json::to_string(&projection).expect("projection JSON");
@@ -225,6 +234,7 @@ fn shell_appends_versions_idempotently_and_detects_missing_payloads() {
     let (metadata, first) = plane.publish(&draft, &policy(&[])).expect("first publication");
     assert_eq!(first.outcome, PublicationOutcome::Appended);
     let (_, second) = plane.publish(&draft, &policy(&[])).expect("idempotent publication");
+    // r[verify lattice.operation_data.versions.conflict]
     assert_eq!(second.outcome, PublicationOutcome::Idempotent);
     assert_eq!(plane.list_metadata().expect("metadata").len(), 1);
     assert!(!plane.read_payload(&metadata).expect("payload").is_empty());
@@ -244,6 +254,7 @@ fn shell_appends_versions_idempotently_and_detects_missing_payloads() {
 
     std::fs::remove_file(directory.path().join(&metadata.payload.safe_locator)).expect("remove fixture payload");
     assert!(plane.recheck_resolved_input(&resolved, QueryAuthority { allow_sensitive: false }).is_err());
+    // r[verify lattice.operation_data.versions.uncertain]
     assert_eq!(plane.recover_publications().expect("recovery"), vec![(
         metadata.version_identity,
         PublicationOutcome::Incomplete
@@ -261,6 +272,7 @@ fn concurrent_writers_append_distinct_versions_without_losing_lineage() {
     let second = std::thread::spawn(move || second_plane.publish(&resource_draft("writer-two", 2), &policy(&[])));
     let first_record = first.join().expect("first writer").expect("first publication").0;
     let second_record = second.join().expect("second writer").expect("second publication").0;
+    // r[verify lattice.operation_data.versions.append]
     assert_ne!(first_record.version_identity, second_record.version_identity);
     assert_eq!(plane.list_metadata().expect("metadata").len(), 2);
 }
@@ -324,6 +336,7 @@ fn deletion_is_idempotent_and_keeps_shared_content_until_last_version() {
     plane.execute_deletion(&second_plan).expect("delete second");
     assert!(!shared_path.exists());
     let repeated = plane.execute_deletion(&second_plan).expect("repeat delete");
+    // r[verify lattice.operation_data.retention.gc]
     assert_eq!(repeated.missing_versions, vec![second.version_identity]);
 }
 
@@ -369,6 +382,7 @@ fn metadata_query_deletion_and_projection_identities_fail_closed_after_tampering
 
     let mut projection = project_recorded_only(&metadata).expect("projection");
     projection.verification_role = "Property".to_string();
+    // r[verify lattice.operation_data.valence_projection.denied]
     assert!(matches!(
         validate_recorded_only_projection(&projection),
         Err(Error::Invalid("recorded-only projection policy"))
@@ -468,6 +482,7 @@ fn retention_applies_explicit_lifetimes_and_version_limits() {
         terminal_run_ids: vec![2],
     })
     .expect("retention plan");
+    // r[verify lattice.operation_data.retention.gc]
     assert!(plan.selected_versions.contains(&records[0].version_identity));
     assert!(plan.selected_versions.contains(&records[1].version_identity));
     assert!(plan.selected_versions.contains(&records[2].version_identity));
@@ -516,6 +531,7 @@ fn file_payload_is_opaque_to_field_queries_and_sensitive_reads_need_authority() 
     let mut field_query = query();
     field_query.field_path = Some(vec!["field".to_string()]);
     let candidates = vec![(file_metadata, None)];
+    // r[verify lattice.operation_data.records.file]
     assert!(matches!(
         reduce_query(&candidates, &field_query, QueryAuthority { allow_sensitive: false }),
         Err(Error::Invalid("file payload is opaque"))
@@ -528,9 +544,30 @@ fn file_payload_is_opaque_to_field_queries_and_sensitive_reads_need_authority() 
         prohibited_fragments: &[],
     };
     let (metadata, _) = admit(&sensitive, &sensitive_policy).expect("sensitive record");
+    // r[verify lattice.operation_data.confidentiality.safe]
     assert_eq!(
         reduce_query(&[(metadata, None)], &query(), QueryAuthority { allow_sensitive: false })
             .expect_err("sensitive query denied"),
         Error::Secret
     );
+}
+
+#[test]
+fn conflicting_payload_publication_preserves_existing_evidence() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let plane = Plane::open(&directory.path().join("lattice.redb"), directory.path()).expect("data plane");
+    let draft = resource_draft("conflicting-payload", 1);
+    let (metadata, _) = plane.publish(&draft, &policy(&[])).expect("original publication");
+    let payload_path = directory.path().join(&metadata.payload.safe_locator);
+    let conflicting_bytes = b"conflicting-payload-bytes";
+    std::fs::write(&payload_path, conflicting_bytes).expect("conflicting evidence fixture");
+
+    // r[verify lattice.operation_data.versions.conflict]
+    assert!(matches!(
+        plane.publish(&draft, &policy(&[])),
+        Err(lattice::operation_data::shell::Error::Conflict(_))
+    ));
+    assert_eq!(std::fs::read(&payload_path).expect("existing payload evidence"), conflicting_bytes);
+    assert_eq!(plane.load_metadata(&metadata.version_identity).expect("exact metadata"), Some(metadata.clone()));
+    assert_eq!(plane.list_metadata().expect("metadata index"), vec![metadata]);
 }

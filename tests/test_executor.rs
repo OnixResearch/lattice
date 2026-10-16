@@ -257,7 +257,7 @@ async fn execute_failing_command() {
         NodeStatus::Completed { outputs, .. } => {
             let exit_port = common::exit_port_id(&wf, node_id);
             let exit_val = outputs.get(&exit_port).expect("exit missing");
-            assert_eq!(exit_val.as_display_string(), "exit code: 1");
+            assert!(matches!(exit_val.data, lattice::engine::ValueData::ExitCode(1)));
         }
         other => panic!("expected Completed (with non-zero exit), got {:?}", other),
     }

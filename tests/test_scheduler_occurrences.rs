@@ -355,20 +355,24 @@ fn redb_claim_race_selects_one_occurrence_and_advances_once() {
 // r[verify lattice.persistence_uncertainty.effect_gate]
 // r[verify lattice.persistence_uncertainty.validation]
 #[test]
+#[doc = "r[verify lattice.persistence_uncertainty.operator_actions.scenario.retry_requires_acknowledgement]"]
 fn uncertain_claim_commit_quarantines_until_exact_readback() {
     let (published_store, _published_dir) = common::temp_store();
     published_store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("published fault schedule saves");
     let request = plan_schedule_occurrence(&plan(SCHEDULE_ID, DUE_EPOCH_MS), WORKFLOW_REVISION)
         .expect("uncertain occurrence plans");
+    // r[verify lattice.persistence_uncertainty.commit_outcomes.scenario.uncertain]
     assert!(matches!(
         published_store.claim_schedule_occurrence_with_fault(&request, lattice::store::CommitFault::ObservationLost,),
         Err(lattice::store::StoreError::PublicationUnknown)
     ));
     assert!(published_store.is_quarantined().expect("quarantine status reads"));
+    // r[verify lattice.persistence_uncertainty.quarantine.scenario.workflow_command_rejected]
     assert!(matches!(
         published_store.claim_schedule_occurrence(&request),
         Err(lattice::store::StoreError::Quarantined)
     ));
+    // r[verify lattice.persistence_uncertainty.reconciliation.scenario.match_publishes]
     assert_eq!(
         published_store.reconcile_schedule_occurrence_publication().expect("exact successor reconciles"),
         transactional_reconciliation_core::PersistenceState::Published
@@ -394,8 +398,8 @@ fn uncertain_claim_commit_quarantines_until_exact_readback() {
     );
     assert!(missing_store.is_quarantined().expect("missing quarantine reads"));
     assert!(matches!(
-        missing_store.retry_schedule_occurrence(&request.identity, WORKFLOW_REVISION, true),
-        Err(lattice::store::StoreError::Quarantined)
+        missing_store.retry_schedule_occurrence(&request.identity, WORKFLOW_REVISION, false),
+        Err(lattice::store::StoreError::Conflict(_))
     ));
 }
 
@@ -651,4 +655,115 @@ fn shell_abandon_closes_without_creating_run_evidence() {
 
     assert_eq!(abandoned.status, ScheduleOccurrenceStatus::AbandonedUnknown);
     assert!(store.load_run(initial.active_run_id).expect("abandoned run lookup succeeds").is_none());
+}
+
+#[tokio::test]
+async fn reopened_pending_reservation_blocks_allowed_effect_until_acknowledged_retry() {
+    let directory = tempfile::tempdir().expect("temporary store");
+    let path = directory.path().join("repair-effects.redb");
+    let marker = directory.path().join("effect-marker");
+    let store = lattice::store::Store::new(&path).expect("store");
+    let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
+    workflow.add_shell_node("observable effect", format!("printf executed > '{}'", marker.display()));
+    store.save_workflow(&workflow).expect("workflow persists");
+    store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("schedule persists");
+    let ScheduleOccurrenceClaimResolution::Inserted(first) =
+        claim_due_occurrence(&store, &plan(SCHEDULE_ID, DUE_EPOCH_MS)).expect("first claim")
+    else {
+        panic!("fresh claim must insert")
+    };
+    let authority = common::authority::TestRunContextProvider::new();
+    let completed = lattice::scheduler::shell::execute_occurrence_with_authority_provider(
+        &store,
+        &first,
+        lattice::agent_node::AgentRuntimeConfig::default(),
+        &authority,
+    )
+    .await
+    .expect("current admitted authority permits the actual shell effect");
+    assert_eq!(completed.status, lattice::headless::HeadlessRunStatus::Succeeded);
+    assert_eq!(std::fs::read(&marker).expect("first effect"), b"executed");
+    std::fs::remove_file(&marker).expect("clear observed effect");
+
+    let mut second_schedule = schedule(DUE_EPOCH_MS);
+    second_schedule.id = "reopened-pending".to_string();
+    store.save_schedule(&second_schedule).expect("second schedule");
+    let ScheduleOccurrenceClaimResolution::Inserted(pending) =
+        claim_due_occurrence(&store, &plan("reopened-pending", DUE_EPOCH_MS)).expect("pending claim")
+    else {
+        panic!("fresh pending claim must insert")
+    };
+    drop(store);
+    lattice::run::shell::repair_path(&path).expect("structural repair/open");
+    let store = lattice::store::Store::new(&path).expect("reopened store");
+    assert!(store.is_quarantined().expect("durable fence"));
+    // r[verify lattice.persistence_uncertainty.repair_boundary.scenario.records_stay_blocked]
+    assert!(matches!(
+        lattice::scheduler::shell::execute_occurrence_with_authority_provider(
+            &store,
+            &pending,
+            lattice::agent_node::AgentRuntimeConfig::default(),
+            &authority,
+        )
+        .await,
+        Err(lattice::scheduler::shell::Error::Store(lattice::store::StoreError::Quarantined))
+    ));
+    assert!(!marker.exists());
+    assert!(store.load_run(pending.active_run_id).expect("run remains absent").is_none());
+    assert_eq!(
+        store.reconcile_schedule_occurrence_publication().expect("readback cannot clear repair fence"),
+        transactional_reconciliation_core::PersistenceState::PublicationUnknown
+    );
+    assert!(store.retry_schedule_occurrence(&pending.identity, &pending.workflow_revision, false).is_err());
+    let retry = store
+        .retry_schedule_occurrence(&pending.identity, &pending.workflow_revision, true)
+        .expect("acknowledged fresh reservation closes uncertainty");
+    assert_ne!(retry.active_run_id, pending.active_run_id);
+    let completed = lattice::scheduler::shell::execute_occurrence_with_authority_provider(
+        &store,
+        &retry,
+        lattice::agent_node::AgentRuntimeConfig::default(),
+        &authority,
+    )
+    .await
+    .expect("explicit fresh reservation can dispatch");
+    assert_eq!(completed.status, lattice::headless::HeadlessRunStatus::Succeeded);
+    assert_eq!(std::fs::read(marker).expect("explicit retry effect"), b"executed");
+}
+
+#[test]
+fn reopened_fence_requires_exact_terminal_run_and_ack_does_not_bypass_ownership() {
+    for exact_owner in [false, true] {
+        let directory = tempfile::tempdir().expect("temporary store");
+        let path = directory.path().join("terminal-repair.redb");
+        let store = lattice::store::Store::new(&path).expect("store");
+        store.save_schedule(&schedule(DUE_EPOCH_MS)).expect("schedule");
+        let request = plan_schedule_occurrence(&plan(SCHEDULE_ID, DUE_EPOCH_MS), WORKFLOW_REVISION).expect("request");
+        let ScheduleOccurrenceClaimResolution::Inserted(pending) =
+            store.claim_schedule_occurrence(&request).expect("claim")
+        else {
+            panic!("fresh claim must insert")
+        };
+        let owner = if exact_owner {
+            RunOwner::ScheduleOccurrence {
+                identity: pending.identity.clone(),
+            }
+        } else {
+            RunOwner::Unscoped
+        };
+        store.save_run(&run_record(pending.active_run_id, owner, NO_FAILURES)).expect("terminal evidence");
+        drop(store);
+        let store = lattice::store::Store::new(&path).expect("reopened store");
+        assert!(store.is_quarantined().expect("fence"));
+        assert!(store.retry_schedule_occurrence(&pending.identity, WORKFLOW_REVISION, true).is_err());
+        assert!(store.abandon_schedule_occurrence(&pending.identity, true).is_err());
+        let recovery = recover_occurrence(&store, &pending.identity);
+        if exact_owner {
+            assert!(matches!(recovery, Ok(ScheduleOccurrenceRecoveryOutcome::Reconciled { .. })));
+            assert!(!store.is_quarantined().expect("exact terminal evidence closes fence"));
+        } else {
+            assert!(recovery.is_err());
+            assert!(store.is_quarantined().expect("foreign ownership stays blocked"));
+        }
+    }
 }

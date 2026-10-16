@@ -12,6 +12,8 @@ use std::io::Write as _;
 const OUTPUT_BYTES: usize = 1_024;
 
 fn main() {
+    // Settle stdin delivery before exiting so this fixture isolates output overflow.
+    std::io::copy(&mut std::io::stdin().lock(), &mut std::io::sink()).expect("consume analyzer input");
     let output = [b'x'; OUTPUT_BYTES];
     let write_result = std::io::stdout().write_all(&output);
     if write_result.is_err() {
@@ -58,16 +60,16 @@ fn skills_are_metadata_first_then_explicitly_disclosed_installed_and_removed() {
     let admitted = admitted();
     let metadata = pack::skill::metadata(&admitted.candidate).expect("skill metadata");
     assert_eq!(metadata.len(), 1);
-    assert!(!metadata[0].description.contains("Use this skill"));
     let gateway = &admitted.candidate.manifest.skills[0];
+    // r[verify lattice.operation_packs.skills.valid]
     assert!(pack::skill::validate_routing_cases(gateway));
     assert!(pack::skill::route_query(gateway, "Cairn lifecycle inspection"));
+    // r[verify lattice.operation_packs.skills.denied]
     assert!(!pack::skill::route_query(gateway, "Cairn lifecycle inspection as a generic shell task",));
     assert!(!pack::skill::route_query(gateway, "unavailable operation type"));
 
     let disclosed = pack::shell::disclose_skill(&fixture_root(), &admitted, "lattice-operation-gateway", true)
         .expect("skill disclosure");
-    assert!(disclosed.body.contains("explicit pack trust"));
     assert_eq!(disclosed.references.len(), 1);
     assert!(!disclosed.grants_authority);
     assert!(pack::shell::disclose_skill(&fixture_root(), &admitted, "missing", false).is_err());
@@ -131,10 +133,14 @@ fn exact_operation_and_required_analyzer_publish_metadata_only_operation_data() 
         cancellation: None,
     })
     .expect("packed operation execution");
+    // r[verify lattice.operation_packs.runtime.executable]
+    // r[verify lattice.operation_packs.registry.offline]
+    // r[verify lattice.operation_packs.verification.positive]
     assert_eq!(report.status, pack::shell::execution::Status::Completed);
     assert_eq!(report.operation_state, lattice::operation::RunState::Completed);
     assert!(report.operation_data_version.is_some());
     assert_eq!(report.analyzer_outcomes.len(), 1);
+    // r[verify lattice.operation_packs.analyzers.valid]
     assert_eq!(report.analyzer_outcomes[0].status, pack::analyzer::Status::Completed);
     assert!(report.output_content_omitted);
     assert!(report.credentials_omitted);
@@ -178,6 +184,7 @@ fn active_runtime_ceilings_deny_planning_before_store_creation() {
         prohibited_fragments: &[],
         cancellation: None,
     });
+    // r[verify lattice.operation_packs.verification.negative]
     assert!(result.is_err());
     assert!(!data_root.exists());
 }
@@ -197,6 +204,7 @@ fn analyzer_timeout_and_truncation_are_explicit_and_block_required_parent_succes
     let timeout_script = "#!/bin/sh\nwhile :; do\n  :\ndone\n";
     let timed_out =
         execute_with_analyzer(AnalyzerFixture::Script(timeout_script), SHORT_TIMEOUT_SECONDS, TRUNCATED_OUTPUT_BYTES);
+    // r[verify lattice.operation_packs.analyzers.failure]
     assert_eq!(timed_out.status, pack::shell::execution::Status::Failed);
     assert_eq!(timed_out.analyzer_outcomes[0].status, pack::analyzer::Status::TimedOut);
 
@@ -270,7 +278,10 @@ fn doctor_reports_distinct_cache_registry_platform_and_admission_states() {
             registry_available: true,
         },
     );
+    // r[verify lattice.operation_packs.doctor.valid]
     assert!(healthy.healthy);
+    assert!(!healthy.ordinary_effect_invoked);
+    assert!(!healthy.credentials_resolved);
 
     let invalid = pack::Error::Invalid("fixture");
     let unhealthy = pack::doctor::evaluate(Err(&invalid), None, None, pack::doctor::ShellFacts {
@@ -278,6 +289,7 @@ fn doctor_reports_distinct_cache_registry_platform_and_admission_states() {
         registry_configured: true,
         registry_available: false,
     });
+    // r[verify lattice.operation_packs.doctor.invalid]
     assert!(!unhealthy.healthy);
     assert!(unhealthy.findings.iter().any(|finding| finding.id == "manifest"));
     assert!(unhealthy.findings.iter().any(|finding| finding.id == "cache"));

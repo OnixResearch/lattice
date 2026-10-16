@@ -5723,6 +5723,97 @@
             ],
             "root": "cairn-policy/fixtures",
             "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "ncl"
+            ],
+            "root": "cairn-policy/default.ncl",
+            "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "ncl"
+            ],
+            "root": "cairn-policy/traceability-contracts.ncl",
+            "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "toml"
+            ],
+            "root": "Cargo.toml",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "nix"
+            ],
+            "root": "flake.nix",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "ncl"
+            ],
+            "root": "contracts/role-protocol-runtime-profile.ncl",
+            "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "ncl"
+            ],
+            "root": "profiles/role-protocol-runtime-v1.ncl",
+            "source_kind": "nickel_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/choregraph-effect-authority.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/content-identity-source.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/dag-node-memoization.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/expression-dependencies.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/nickel-eval-source.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/role-protocol-execution.md",
+            "source_kind": "tool_source"
+          },
+          {
+            "extensions": [
+              "md"
+            ],
+            "root": "docs/workflow-domain-boundaries.md",
+            "source_kind": "tool_source"
           }
         ],
         "id": "cairn-default",

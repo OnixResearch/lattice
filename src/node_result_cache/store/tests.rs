@@ -38,8 +38,10 @@ fn strict_lru_and_fifo_choose_different_evictions() -> Result<(), Error> {
     drop(lru.insert(key(SECOND_KEY_BYTE), "two")?.value);
     drop(lru.get(key(FIRST_KEY_BYTE))?);
     drop(lru.insert(key(THIRD_KEY_BYTE), "three")?.value);
+    // r[verify lattice.node_result_cache.bound.scenario.full]
     assert!(lru.contains(key(FIRST_KEY_BYTE))?);
     assert!(!lru.contains(key(SECOND_KEY_BYTE))?);
+    assert_eq!(lru.len_entries()?, u64::try_from(CAPACITY).map_err(|_| Error::CountOverflow)?);
 
     let fifo = Memoizer::new(config(Some(CAPACITY), super::super::core::FIFO_PROMOTION_THRESHOLD))?;
     drop(fifo.insert(key(FIRST_KEY_BYTE), "one")?.value);
@@ -82,6 +84,7 @@ fn watermark_overflow_trims_to_the_declared_low_mark() -> Result<(), Error> {
     drop(memoizer.insert(key(SECOND_KEY_BYTE), "two")?.value);
     let inserted = memoizer.insert(key(THIRD_KEY_BYTE), "three")?;
     drop(inserted.value);
+    // r[verify lattice.node_result_cache.bound.scenario.configured]
     assert_eq!(inserted.report.active_entries, u64::try_from(LOW_WATERMARK).map_err(|_| Error::CountOverflow)?);
     assert_eq!(memoizer.len_entries()?, u64::try_from(LOW_WATERMARK).map_err(|_| Error::CountOverflow)?);
     assert!(memoizer.contains(key(THIRD_KEY_BYTE))?);
@@ -153,6 +156,7 @@ fn evicted_value_drops_after_guard_release() -> Result<(), Error> {
         dropped_after_unlock: std::sync::Arc::new(AtomicBool::new(false)),
     };
     drop(memoizer.insert(key(SECOND_KEY_BYTE), second)?.value);
+    // r[verify lattice.node_result_cache.deferral.scenario.evicted]
     assert!(observed.load(Ordering::SeqCst));
     Ok(())
 }

@@ -10,6 +10,29 @@
 //! concerns. Callers supply every policy value, planned charge, reservation
 //! identity, and observed charge. No decision is inferred from ambient state.
 //!
+//! # Local incubation and external promotion
+//!
+//! r[impl lattice.budget_ledger_incubation.promotion]
+//! This is a Lattice-local functional core, not an independently published
+//! budget-ledger product. Creating or publishing an independent repository
+//! requires a separate promotion review with a real second consumer that
+//! replaces material duplicate durable reserve-and-settle decisions and two
+//! simplifying adapters that preserve positive and negative accounting behavior.
+//!
+//! r[impl lattice.budget_ledger_incubation.promotion.scenario.deferred]
+//! Overlap in scalar memory, row, byte, concurrency, quota, or timeout limits
+//! alone is not equivalent durable reservation and settlement. Such overlap
+//! leaves external extraction deferred.
+//!
+//! r[impl lattice.budget_ledger_incubation.promotion.scenario.eligible]
+//! With the second consumer and both adapters' positive and negative parity
+//! established, a separate promotion change may propose a licensed independent
+//! repository with a canonical Radicle RID and exact immutable revisions, with
+//! no GitHub or sibling fallback. Local tests do not approve that promotion.
+//!
+//! # Accounting claim boundary
+//!
+//! r[impl lattice.budget_ledger_incubation.promotion.scenario.non-claim]
 //! The ledger classifies supplied integer accounting facts only. It does not
 //! prove provider usage, billing, elapsed time, resource availability, fairness,
 //! work completion, budget-policy correctness, or release readiness.
@@ -155,6 +178,7 @@ pub fn reserve_budget(
     reserve_budget_for(ledger, reservation_id.to_owned(), plan)
 }
 
+// r[impl lattice.budget_ledger_incubation.boundary.scenario.pure]
 /// Reserve a planned charge under a caller-owned nominal identity type.
 pub fn reserve_budget_for<Identity: Clone + Ord>(
     ledger: &mut BudgetLedger<Identity>,
@@ -176,6 +200,7 @@ pub fn reserve_budget_for<Identity: Clone + Ord>(
 // r[impl lattice.budget_ledger_incubation.boundary]
 /// Settle a reservation with an observed charge, folding the observed charge
 /// into the consumed total and marking breach when limits are crossed.
+/// Missing reservations and arithmetic overflow leave all ledger state unchanged.
 pub fn settle_budget(
     ledger: &mut BudgetLedger,
     reservation_id: &str,
@@ -185,15 +210,18 @@ pub fn settle_budget(
 }
 
 /// Settle a charge under a caller-owned nominal identity type.
+/// Check observed totals before removing the reservation so rejection is atomic.
 pub fn settle_budget_for<Identity: Ord>(
     ledger: &mut BudgetLedger<Identity>,
     reservation_id: &Identity,
     observed: BudgetCharge,
 ) -> Result<BudgetSettlement, LedgerError> {
-    let reservation = ledger.reservations.remove(reservation_id).ok_or(LedgerError::MissingReservation)?;
+    let reservation = ledger.reservations.get(reservation_id).ok_or(LedgerError::MissingReservation)?;
     let is_breached = charge_exceeds(observed, reservation.charge);
-    ledger.consumed = checked_add_charge(ledger.consumed, observed)?;
-    if is_breached || ensure_within_limits(&ledger.policy, ledger.consumed).is_err() {
+    let consumed = checked_add_charge(ledger.consumed, observed)?;
+    ledger.reservations.remove(reservation_id);
+    ledger.consumed = consumed;
+    if is_breached || ensure_within_limits(&ledger.policy, consumed).is_err() {
         ledger.breached = true;
     }
     Ok(BudgetSettlement {

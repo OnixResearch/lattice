@@ -37,6 +37,28 @@ Protected effects require an explicit current snapshot from a Lattice-owned port
 
 A missing or stale snapshot denies dispatch. `RunOwner`, trigger history, UI audience, and prior authorization are not scope authority.
 
+## Adoption baseline and source admission
+
+r[impl lattice.choregraph_effect_authority.baseline]
+
+The [pre-integration baseline](../.cairn/archive/2026-08-13-authorize-choregraph-effect-intents/evidence/baseline-and-blocker-2026-07-27.md) records the effect adapters, operator-configured roots, outer admission ordering, absent per-node attempts, replay behavior, Basalt/UCAN sources, supplied-fact boundary, and crash fixtures before integration. The [resolution record](../.cairn/archive/2026-08-13-authorize-choregraph-effect-intents/evidence/blocker-resolution-2026-08-13.md) retains the later pre-change checks and selected immutable V2 intent model.
+
+r[impl lattice.choregraph_effect_authority.baseline.scenario.unknown]
+
+The original baseline left implementation blocked while production intent and machine-identity ordering were unresolved; it did not substitute an external allow boolean or a task checkbox for that prerequisite. These are bounded historical adoption records, not fresh execution results or a new automatic readiness gate.
+
+r[impl lattice.choregraph_effect_authority.source]
+
+The admitted build uses the checked-in Basalt snapshot at `bb8fb5f4a763f532df96b6e65407163ac668834e` and its UCAN snapshot at `277ab768eb532ac0c715a3bbff2a7dc37a702f11`. `vendor-cargo-deps/basalt/SOURCE` binds their revisions and the Basalt archive identity. Cargo selects that exact local snapshot; it has no authenticated upstream fetch fallback.
+
+r[impl lattice.choregraph_effect_authority.source.scenario.ssh]
+
+The original baseline explicitly rejected the direct Basalt dependency because its SSH-only UCAN closure could not be reproduced without source authority. It recorded a release blocker rather than skipping Cargo-dependent checks. The resolution selected the reviewed vendored closure instead; it did not infer source access from a sandbox-safe check that deferred Cargo.
+
 ## Non-claims
+
+r[impl lattice.choregraph_effect_authority.non_claims.scenario.scope]
+
+`AuthorizationOutcomeEvent` records the bound local attempt, its local outcome state, and any authorization denial. An observed success is an observation of the selected local adapter result, not evidence of external truth or a global guarantee.
 
 Checks do not prove human identity, membership-store correctness, consent-policy sufficiency, key truth, global revocation freshness, replay-store durability, UCAN cryptographic correctness, operating-system correctness, external effect success, exactly-once behavior, or whole-workflow correctness.

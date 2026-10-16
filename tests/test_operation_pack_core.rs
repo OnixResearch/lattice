@@ -54,6 +54,7 @@ fn manifest_and_pack_identities_are_deterministic_and_ignore_display_metadata() 
     display_changed.manifest.release.deprecated = true;
     display_changed.manifest.release.superseded_by = Some(pack::content_identity(b"display replacement"));
     display_changed.manifest.release.publication_epoch_seconds = Some(CURRENT_EPOCH_SECONDS);
+    // r[verify lattice.operation_packs.identity.stable]
     assert_eq!(
         pack::manifest_identity(&display_changed.manifest).expect("display identity"),
         first.manifest_identity
@@ -62,6 +63,7 @@ fn manifest_and_pack_identities_are_deterministic_and_ignore_display_metadata() 
 
     let mut behavior_changed = first.clone();
     behavior_changed.manifest.runtimes[0].timeout_seconds -= 1;
+    // r[verify lattice.operation_packs.identity.changed]
     assert_ne!(pack::pack_identity(&behavior_changed.manifest).expect("changed pack identity"), first.pack_identity);
 }
 
@@ -71,6 +73,7 @@ fn nickel_contract_accepts_the_exact_manifest_and_rejects_unknown_fields() {
     let valid_result = pack::shell::validate_manifest_contract(&valid);
     assert!(valid_result.is_ok(), "{valid_result:?}");
     let invalid = std::fs::canonicalize(INVALID_POLICY_FIXTURE).expect("invalid policy fixture");
+    // r[verify lattice.operation_packs.manifest.invalid]
     assert!(pack::shell::validate_manifest_contract(&invalid).is_err());
 }
 
@@ -128,6 +131,7 @@ fn strict_manifest_and_exact_content_validation_fail_closed() {
     assert!(pack::validate_manifest(unicode).is_err());
     let mut unsupported_runtime = candidate().manifest;
     unsupported_runtime.runtimes[0].kind = "node".to_string();
+    // r[verify lattice.operation_packs.runtime.denied]
     assert!(pack::validate_manifest(unsupported_runtime).is_err());
     let mut contradictory_release = candidate().manifest;
     contradictory_release.release.superseded_by = Some(pack::content_identity(b"replacement"));
@@ -146,11 +150,13 @@ fn lock_admission_binds_trust_platform_license_capability_and_closure() {
     let admitted_facts = facts(&candidate);
     let lock = pack::create_lock(&candidate, &admitted_facts).expect("exact lock");
     let admitted = pack::admit(&candidate, &lock, &admitted_facts).expect("admitted pack");
+    // r[verify lattice.operation_packs.admission.valid]
     assert_eq!(admitted.candidate.pack_identity, candidate.pack_identity);
     assert!(pack::validate_lock(&candidate, &lock).is_ok());
 
     let mut denied = admitted_facts.clone();
     denied.trusted_pack_identity = pack::content_identity(b"other pack");
+    // r[verify lattice.operation_packs.admission.denied]
     assert!(pack::create_lock(&candidate, &denied).is_err());
     let mut denied = admitted_facts.clone();
     denied.platform = "unsupported-platform".to_string();
@@ -291,11 +297,13 @@ fn registry_search_freshness_and_forward_promotion_are_deterministic() {
     assert!(pack::registry::validate_catalog(unsafe_mirror).is_err());
     let promoted = pack::registry::promote(&catalog, &results[0].pack_identity, pack::ReleaseChannel::Rc)
         .expect("forward promotion");
+    // r[verify lattice.operation_packs.registry.promote]
     assert_eq!(promoted.entries[0].channel, pack::ReleaseChannel::Rc);
     assert!(pack::registry::promote(&promoted, &results[0].pack_identity, pack::ReleaseChannel::Beta).is_err());
 
     let ambiguous = std::fs::canonicalize(AMBIGUOUS_REGISTRY).expect("ambiguous registry path");
     assert!(pack::shell::load_registry(&ambiguous).is_err());
+    // r[verify lattice.operation_packs.registry.advisory]
     assert!(pack::registry::freshness(None, CURRENT_EPOCH_SECONDS, MAXIMUM_REGISTRY_AGE_SECONDS).unavailable);
 }
 

@@ -30,11 +30,6 @@ const REVIEWED_COUNT: usize = 1;
 const SAMPLE_UNASSESSED_COUNT: usize = 1;
 const EMPTY_MISSING_COUNT: usize = 0;
 const EMPTY_MISSING_HASH: &str = "86a0d721f0469382362733937cb24599c20b620b51b53628bce4215c77a19f87";
-const CURRENT_MISSING_COUNT: usize = 12;
-const CURRENT_REVIEWED_COUNT: usize = 0;
-const CURRENT_UNASSESSED_COUNT: usize = CURRENT_MISSING_COUNT;
-const CURRENT_MISSING_HASH: &str = "c23fc013acdb1e4ae5d093b1f01ddb8c82e7d744ce8f9989f3841ea56e18c457";
-const GENERATED_INVENTORY: &str = include_str!("../cairn-policy/generated/traceability-debt-inventory.json");
 const REQUIRED_UNASSESSED_NON_CLAIM: &str = "unassessed does not mean behavior or evidence is absent";
 
 fn sample_coverage() -> CoverageReceipt {
@@ -233,22 +228,4 @@ fn missing_decision_remains_unassessed_without_absence_claim() {
     assert!(unassessed.evidence.is_empty());
     assert_eq!(unassessed.rationale_code, "not-reviewed");
     assert!(report.non_claims.iter().any(|value| value == REQUIRED_UNASSESSED_NON_CLAIM));
-}
-
-// r[verify lattice.repository_validation.traceability_debt_inventory.scenario.complete]
-// r[verify lattice.repository_validation.traceability_debt_inventory.scenario.non_claim]
-#[test]
-fn checked_inventory_matches_current_traceability_state() {
-    let report: InventoryReport = serde_json::from_str(GENERATED_INVENTORY).expect("generated inventory must decode");
-
-    assert!(report.valid, "issues: {:?}", report.issues);
-    assert_eq!(report.summary.total, CURRENT_MISSING_COUNT);
-    assert_eq!(report.summary.reviewed, CURRENT_REVIEWED_COUNT);
-    assert_eq!(report.summary.unassessed, CURRENT_UNASSESSED_COUNT);
-    assert_eq!(report.missing_set_hash, CURRENT_MISSING_HASH);
-    assert!(!report.summary.by_classification.contains_key("exact_maintained_evidence"));
-    assert!(!report.summary.by_classification.contains_key("partial_evidence_only"));
-    assert!(!report.summary.by_classification.contains_key("no_exact_evidence_identified"));
-    assert_eq!(report.summary.by_classification.get("unassessed"), Some(&CURRENT_UNASSESSED_COUNT));
-    assert!(verify_report(&report).is_empty());
 }

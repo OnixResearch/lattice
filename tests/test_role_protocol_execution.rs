@@ -134,6 +134,7 @@ fn stale_projection_receipt_is_rejected_by_exact_intake() {
         projected: &projected,
         bundle: &changed.1,
     });
+    // r[verify lattice.role_protocol.validation.stale]
     assert_eq!(result, Err(Error::Issue(Issue::IdentityMismatch)));
     assert_ne!(bundle.receipt().identity, changed.1.receipt().identity);
 }
@@ -197,6 +198,7 @@ fn exact_owned_transfer_commits_both_cursors_and_excludes_former_owner() {
         Ok(session) => session,
         Err(error) => panic!("settle failed: {error:?}"),
     };
+    // r[verify lattice.role_protocol.envelopes.valid]
     assert_eq!(committed.status, SessionStatus::Complete);
     assert!(committed.cursors.iter().all(|cursor| cursor.protocol == RoleProgram::End));
     assert_eq!(committed.owners[0].owner, common::protocol::lattice_role(common::protocol::ROLE_B));

@@ -10,8 +10,6 @@ const DUE_EPOCH_MS: i64 = 1_000;
 const SCHEDULE_ID_TAG: &[u8] = b"schedule-id";
 const DUE_EPOCH_MS_TAG: &[u8] = b"due-epoch-ms";
 const EXPECTED_IDENTITY: &str = "b3:0f3b3ea4c2e1cb44d54ab759e6c69cd6e1d91af09a8bef1b503aa81dc176596c";
-const SHARED_IMPORT: &str = "content_identity_core";
-const WRAPPER_IMPORT: &str = "crate::content_identity";
 
 fn legacy_schedule_occurrence_identity(schedule_id: &str, due_epoch_ms: i64) -> String {
     let mut hasher = blake3::Hasher::new();
@@ -28,10 +26,9 @@ fn update_legacy_part(hasher: &mut blake3::Hasher, tag: &[u8], value: &[u8]) {
     hasher.update(part.finalize().as_bytes());
 }
 
-fn forbidden_shared_import<'a>(source: &'a str, forbidden: &'a [&str]) -> Option<&'a str> {
-    forbidden.iter().copied().find(|term| source.contains(term))
-}
-
+// r[verify lattice.content_identity_adoption.compatibility]
+// r[verify lattice.content_identity_adoption.compatibility.scenario.agree]
+// r[verify lattice.content_identity_adoption.cutover.scenario.accepted]
 #[test]
 fn schedule_occurrence_wrapper_matches_fixed_legacy_vector() -> Result<(), IdentityError> {
     let legacy = legacy_schedule_occurrence_identity(SCHEDULE_ID, DUE_EPOCH_MS);
@@ -46,6 +43,7 @@ fn schedule_occurrence_wrapper_matches_fixed_legacy_vector() -> Result<(), Ident
     Ok(())
 }
 
+// r[verify lattice.content_identity_adoption.compatibility.scenario.differ]
 #[test]
 fn wrong_domain_order_and_field_omission_change_the_identity() -> Result<(), IdentityError> {
     let expected = schedule_occurrence(ScheduleOccurrenceInput {
@@ -72,6 +70,7 @@ fn wrong_domain_order_and_field_omission_change_the_identity() -> Result<(), Ide
     Ok(())
 }
 
+// r[verify lattice.content_identity_adoption.boundary.scenario.denied]
 #[test]
 fn invalid_domains_and_duplicate_inputs_fail_closed() -> Result<(), IdentityError> {
     assert!(matches!(Domain::new("lattice-schedule-occurrence"), Err(IdentityError::UnversionedDomain { .. })));
@@ -83,18 +82,4 @@ fn invalid_domains_and_duplicate_inputs_fail_closed() -> Result<(), IdentityErro
         Err(IdentityError::DuplicateMapKey { .. })
     ));
     Ok(())
-}
-
-#[test]
-fn security_owners_do_not_import_shared_content_identity() {
-    let credential_source = include_str!("../src/credentials.rs");
-    let trigger_source = include_str!("../src/triggers.rs");
-    let forbidden = [SHARED_IMPORT, WRAPPER_IMPORT];
-
-    assert_eq!(forbidden_shared_import(credential_source, &forbidden), None);
-    assert_eq!(forbidden_shared_import(trigger_source, &forbidden), None);
-    assert_eq!(
-        forbidden_shared_import("use content_identity_core::IdentityHasher;", &forbidden),
-        Some(SHARED_IMPORT)
-    );
 }

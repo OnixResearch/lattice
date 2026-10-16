@@ -181,6 +181,10 @@ impl<V> Memoizer<V> {
         Ok(Inserted { value, report })
     }
 
+    /// Returns the stored value or the supplied executor's result.
+    ///
+    /// A hit is advisory: it establishes neither node correctness nor input
+    /// freshness. Workflow and effect authority remain with the executor.
     // r[impl lattice.node_result_cache.boundary]
     pub fn get_or_execute<E, F>(
         &self,

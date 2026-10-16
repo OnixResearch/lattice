@@ -155,6 +155,7 @@ pub fn repair_path(store_path: &std::path::Path) -> Result<RepairOutcome, Error>
         callback_observed.store(true, std::sync::atomic::Ordering::Relaxed);
     });
     let database = builder.open(store_path).map_err(|error| Error::Open(classify_open_failure(&error)))?;
+    crate::store::Store::fence_reopened_occurrences(&database)?;
     drop(database);
     debug_assert!(store_path.exists());
     if repair_observed.load(std::sync::atomic::Ordering::Relaxed) {

@@ -59,6 +59,8 @@ struct OccurrencePilot {
     persistence_binding: transactional_reconciliation_core::PersistenceBinding,
 }
 
+// r[impl lattice.persistence_uncertainty.shared_core]
+// r[impl lattice.persistence_uncertainty.shared_core.scenario.selected]
 fn plan_occurrence(occurrence: &crate::scheduler::ScheduleOccurrence) -> Result<OccurrencePilot, PilotError> {
     crate::scheduler::validate_schedule_occurrence(occurrence)?;
     debug_assert!(!occurrence.identity.is_empty());
@@ -115,15 +117,27 @@ fn plan_occurrence(occurrence: &crate::scheduler::ScheduleOccurrence) -> Result<
     })
 }
 
-pub(crate) fn admit_occurrence(
-    occurrence: &crate::scheduler::ScheduleOccurrence,
+pub(crate) fn admit_occurrence_readback(
+    expected: &crate::scheduler::ScheduleOccurrence,
+    observed: Option<&crate::scheduler::ScheduleOccurrence>,
 ) -> Result<transactional_reconciliation_core::DispatchIntent, PilotError> {
-    let pilot = plan_occurrence(occurrence)?;
-    let persisted = transactional_reconciliation_core::classify_commit(
+    if expected.status != crate::scheduler::ScheduleOccurrenceStatus::PendingUnobserved {
+        return Err(crate::scheduler::OccurrenceError::NotPending.into());
+    }
+    if observed.is_some_and(|row| row != expected) {
+        return Err(transactional_reconciliation_core::CoreError::PersistenceBindingMismatch.into());
+    }
+    let pilot = plan_occurrence(expected)?;
+    let unknown = transactional_reconciliation_core::classify_commit(
         pilot.persistence_binding,
-        transactional_reconciliation_core::CommitObservation::Applied(pilot.persistence_binding),
+        transactional_reconciliation_core::CommitObservation::OutcomeUnknown,
     );
-    let published = transactional_reconciliation_core::admit_published(persisted, pilot.reservation)?;
+    let observation = match observed {
+        Some(_) => transactional_reconciliation_core::ReadBackObservation::Reservation(pilot.persistence_binding),
+        None => transactional_reconciliation_core::ReadBackObservation::Missing,
+    };
+    let reconciled = transactional_reconciliation_core::reconcile_read_back(unknown, observation)?;
+    let published = transactional_reconciliation_core::admit_published(reconciled, pilot.reservation)?;
     debug_assert_eq!(published.binding(), pilot.persistence_binding);
     admit_observation(&pilot, transactional_reconciliation_core::ReservationObservation::Durable(pilot.reservation))
 }
@@ -176,67 +190,4 @@ fn append(hasher: &mut blake3::Hasher, bytes: &[u8]) -> Result<(), PilotError> {
 }
 
 #[cfg(test)]
-mod tests {
-    const SCHEDULE_ID: &str = "daily";
-    const WORKFLOW_NAME: &str = "digest";
-    const WORKFLOW_REVISION: &str = "workflow-v1";
-    const DUE_EPOCH_MS: i64 = 1_000;
-    const NEXT_RUN_EPOCH_MS: i64 = 2_000;
-    const RUN_ID: u64 = 17;
-
-    fn occurrence() -> Result<crate::scheduler::ScheduleOccurrence, super::PilotError> {
-        let plan = crate::scheduler::DueRunPlan {
-            schedule_id: SCHEDULE_ID.to_string(),
-            workflow_name: WORKFLOW_NAME.to_string(),
-            due_epoch_ms: DUE_EPOCH_MS,
-            next_run_epoch_ms: NEXT_RUN_EPOCH_MS,
-        };
-        Ok(crate::scheduler::plan_schedule_occurrence(&plan, WORKFLOW_REVISION)?
-            .occurrence(crate::engine::RunId(RUN_ID)))
-    }
-
-    #[test]
-    fn exact_occurrence_reservation_admits_shared_dispatch() -> Result<(), super::PilotError> {
-        let occurrence = occurrence()?;
-        let pilot = super::plan_occurrence(&occurrence)?;
-        let dispatch = super::admit_occurrence(&occurrence)?;
-
-        assert_eq!(dispatch.plan_identity(), pilot.plan.identity());
-        assert_eq!(dispatch.attempt_identity(), pilot.reservation.attempt_identity());
-        Ok(())
-    }
-
-    #[test]
-    fn uncertain_publication_quarantines_until_exact_reopen() -> Result<(), super::PilotError> {
-        let pilot = super::plan_occurrence(&occurrence()?)?;
-        let uncertain = transactional_reconciliation_core::classify_commit(
-            pilot.persistence_binding,
-            transactional_reconciliation_core::CommitObservation::OutcomeUnknown,
-        );
-        let reconciled = transactional_reconciliation_core::reconcile_read_back(
-            uncertain,
-            transactional_reconciliation_core::ReadBackObservation::Reservation(pilot.persistence_binding),
-        )?;
-
-        assert!(matches!(
-            uncertain.quarantine(),
-            transactional_reconciliation_core::QuarantineStatus::Quarantined(_)
-        ));
-        assert_eq!(reconciled.state(), transactional_reconciliation_core::PersistenceState::Published);
-        assert_eq!(reconciled.quarantine(), transactional_reconciliation_core::QuarantineStatus::Clear);
-        Ok(())
-    }
-
-    #[test]
-    fn missing_reservation_blocks_shared_dispatch() -> Result<(), super::PilotError> {
-        let pilot = super::plan_occurrence(&occurrence()?)?;
-        let result =
-            super::admit_observation(&pilot, transactional_reconciliation_core::ReservationObservation::Missing);
-
-        assert!(matches!(
-            result,
-            Err(super::PilotError::Core(transactional_reconciliation_core::CoreError::ReservationMismatch))
-        ));
-        Ok(())
-    }
-}
+mod tests;
